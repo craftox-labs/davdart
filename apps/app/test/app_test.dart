@@ -14,7 +14,9 @@ import 'package:davdart_app/ui/list_view.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
+import 'package:davdart_app/ui/parts.dart';
 
 class FakeSource implements NoteSource {
   FakeSource(this.notes);
@@ -50,6 +52,11 @@ final sample = [
   ),
   Note(uid: 'c', summary: 'Loose note', description: 'just text'),
 ];
+
+Finder byAction(String tooltip) => find.byWidgetPredicate(
+  (w) => w is IconAction && w.tooltip == tooltip,
+  description: 'IconAction "$tooltip"',
+);
 
 Future<void> pump(WidgetTester t, {Size size = const Size(1400, 900)}) async {
   t.view.physicalSize = size;
@@ -765,7 +772,7 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const Key('scope-bar')), findsOneWidget);
       expect(find.byKey(const Key('scope-text')), findsOneWidget);
-      expect(find.byIcon(Icons.folder_open), findsWidgets);
+      expect(find.byIcon(FLucideIcons.folderOpen), findsWidgets);
       // A note made now lands inside the open folder.
       await t.tap(find.text('New note'));
       await t.pumpAndSettle();
@@ -922,7 +929,7 @@ void main() {
       await pump(t);
       await t.tap(find.text('List').first);
       await t.pumpAndSettle();
-      await t.enterText(find.byType(TextField), 'loose');
+      await t.enterText(find.byType(FTextField), 'loose');
       await t.pumpAndSettle();
       expect(find.text('Loose note'), findsWidgets);
       expect(
@@ -938,15 +945,15 @@ void main() {
   group('narrow layout', () {
     testWidgets('uses a drawer and a single pane', (t) async {
       await pump(t, size: const Size(420, 800));
-      expect(find.byTooltip('Menu'), findsOneWidget);
-      await t.tap(find.byTooltip('Menu'));
+      expect(byAction('Menu'), findsOneWidget);
+      await t.tap(byAction('Menu'));
       await t.pumpAndSettle();
       expect(find.text('NOTES'), findsOneWidget);
       await t.tap(find.text('Core slice').last);
       await t.pumpAndSettle();
       expect(find.text('Body text'), findsOneWidget);
       expect(find.text('BACKLOG'), findsNothing);
-      await t.tap(find.byTooltip('Close'));
+      await t.tap(byAction('Close'));
       await t.pumpAndSettle();
       expect(find.text('BACKLOG'), findsOneWidget);
     });
@@ -955,7 +962,7 @@ void main() {
   testWidgets('a 320px phone does not overflow', (t) async {
     await pump(t, size: const Size(320, 640));
     expect(t.takeException(), isNull);
-    await t.tap(find.byTooltip('Show list'));
+    await t.tap(byAction('Show list'));
     await t.pumpAndSettle();
     expect(t.takeException(), isNull);
   });
