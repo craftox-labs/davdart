@@ -115,8 +115,10 @@ class Shell extends StatelessWidget {
 
           final mirror = state.layoutSide == LayoutSide.end;
           final Widget body;
-          if (wide && state.fullPage) {
-            // The note fills the main panel; the peek pane is hidden.
+          final maxed = wide && state.maximised;
+          if (maxed) {
+            // The detail pane fills the whole content area; the strip, list
+            // or board and top bar are hidden (and come back on Minimise).
             body = DetailView(
               key: const Key('full-page'),
               state: state,
@@ -141,7 +143,6 @@ class Shell extends StatelessWidget {
                       DetailView(
                         state: state,
                         onClose: () => state.guarded(() => state.select(null)),
-                        onExpand: state.openFullPage,
                         inHeader: true,
                       ),
                       Positioned(
@@ -173,8 +174,8 @@ class Shell extends StatelessWidget {
               },
             );
           } else if (hasDetail) {
-            // Wide but not split: the note replaces the list; Expand and Close
-            // are on the header's detail tab.
+            // Wide but not split: the note replaces the list; Maximise and
+            // Close are on the header's detail tab.
             body = DetailView(
               state: state,
               onClose: () => state.guarded(() => state.select(null)),
@@ -186,7 +187,7 @@ class Shell extends StatelessWidget {
 
           Widget content = FScaffold(
             childPad: false,
-            header: TopBar(state: state, showMenu: !wide),
+            header: maxed ? null : TopBar(state: state, showMenu: !wide),
             child: body,
           );
           if (wide && !state.sidebarCollapsed) {
@@ -215,14 +216,33 @@ class Shell extends StatelessWidget {
             final contentW = panelWidth - dockW;
             // Beside the list the tab spans the pane; where the note replaces
             // the list (not split) it is a compact tab at the end of the row.
-            final detailW = hasDetail && !state.fullPage
-                ? (split
+            final detailW = hasDetail
+                ? (maxed
+                      ? contentW
+                      : split
                       ? detailWidthFor(t, state, contentW)
                       : t.sizes.detailTab.clamp(0.0, contentW))
                 : null;
             // Clear of the panel's rounded corner where the strip starts at
             // the panel edge, else just the concave corner.
             final edgePad = t.radii.panel + t.radii.tab;
+            if (maxed) {
+              // Only the detail tab and its control; the pane's outer edge
+              // (where Maximise sat) is unchanged.
+              final h = DetailHeader(
+                state: state,
+                width: contentW,
+                mirror: mirror,
+                startPad: (mirror ? false : dockW == 0) ? edgePad : 0,
+              );
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (mirror) h else SizedBox(width: dockW),
+                  if (mirror) SizedBox(width: dockW) else h,
+                ],
+              );
+            }
             final strip = Expanded(
               child: TabStrip(
                 state: state,

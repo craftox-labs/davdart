@@ -966,7 +966,7 @@ class AppState extends ChangeNotifier {
     await _save(n);
     if (error == null) {
       select(n.uid);
-      if (inTab) openFullPage();
+      if (inTab) openNoteTab(n.uid);
     }
   }
 
@@ -976,11 +976,14 @@ class AppState extends ChangeNotifier {
   // and one closable tab per note opened full page or saved view applied.
   // Rules: opening a note full page, or applying a saved view, opens its tab
   // or focuses it if open; the home tab shows whatever the main area holds,
-  // so leaving a tab for home keeps the current filters; Back leaves the
-  // full page for the home tab. Open tabs are saved per Space (by uid).
+  // so leaving a tab for home keeps the current filters. A note tab shows its
+  // note in the detail pane (not maximised): "+" (new note) opens one; the
+  // detail pane's own tab, with its maximise control, is separate from the
+  // strip and never creates or removes strip tabs. Open tabs are saved per
+  // Space (by uid).
 
   final TabList _tabs = TabList();
-  DocTab? _activeViewTab;
+  DocTab? _activeViewTab; // the focused view or note tab
   bool _tabsLoaded = false;
 
   /// The open document tabs in strip order (the home tab is not in it).
@@ -988,8 +991,8 @@ class AppState extends ChangeNotifier {
 
   /// The focused document tab; null means the home tab.
   DocTab? get activeTab {
-    if (fullPage) return DocTab.note(selectedUid!);
     final v = _activeViewTab;
+    if (v != null && v.kind == TabKind.note && v.id != selectedUid) return null;
     return v != null && _tabs.contains(v) ? v : null;
   }
 
@@ -1032,8 +1035,15 @@ class AppState extends ChangeNotifier {
     _saveTabs();
   }
 
-  void _openNoteTab(String uid) {
-    if (_tabs.add(DocTab.note(uid))) _saveTabs();
+  /// Opens (or focuses) the strip tab of note [uid] and shows the note in
+  /// the detail pane. The "+" button's new note is opened this way.
+  void openNoteTab(String uid) {
+    if (tree.find(uid) == null) return;
+    final t = DocTab.note(uid);
+    if (_tabs.add(t)) _saveTabs();
+    select(uid);
+    _activeViewTab = t;
+    notifyListeners();
   }
 
   /// Title of a tab: the note's title or the view's name.
@@ -1069,9 +1079,9 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     } else if (t.kind == TabKind.note) {
       if (tree.find(t.id) == null) return;
-      _activeViewTab = null;
-      _fullPage = true;
+      _fullPage = false;
       select(t.id);
+      _activeViewTab = t;
     } else {
       final v = _viewByUid(t.id);
       if (v != null) applyView(v);
@@ -1117,19 +1127,18 @@ class AppState extends ChangeNotifier {
 
   bool _fullPage = false;
 
-  /// The selected note fills the main area (not persisted). Ends by itself
-  /// when nothing is selected.
-  bool get fullPage => _fullPage && selected != null;
+  /// The detail pane fills the whole content area, hiding the strip, list or
+  /// board and top bar (not persisted). Ends by itself when nothing is
+  /// selected.
+  bool get maximised => _fullPage && selected != null;
 
-  void openFullPage() {
-    final n = selected;
-    if (n == null) return;
+  void maximise() {
+    if (selected == null) return;
     _fullPage = true;
-    _openNoteTab(n.uid);
     notifyListeners();
   }
 
-  void closeFullPage() {
+  void minimise() {
     if (!_fullPage) return;
     _fullPage = false;
     notifyListeners();
@@ -1230,8 +1239,9 @@ class AppState extends ChangeNotifier {
     }
     selectedUid = uid;
     if (uid == null) _fullPage = false;
-    // Showing another note while a note fills the page opens its tab.
-    if (uid != null && _fullPage) _openNoteTab(uid);
+    final f = _activeViewTab;
+    if (f != null && f.kind == TabKind.note && f.id != uid)
+      _activeViewTab = null;
     if (draft != null && draft!.uid != uid) _dropDraft();
     notifyListeners();
   }

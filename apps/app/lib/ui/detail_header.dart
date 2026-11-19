@@ -1,26 +1,32 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'parts.dart';
-import 'shell_frame.dart';
+import 'tab_strip.dart';
 import 'theme.dart';
 
-/// The detail pane's header, in the shell's header row above the pane: its
-/// tab (the open note's title, a [JoinedTab] flush on the panel's top edge)
-/// and, at the far end, the pane's Expand (open as a full page) and Close
-/// (deselect the note) actions. A row of tabs here could later hold several
-/// pane tabs. With [mirror] (the pane is on the left) the order is reversed.
+/// The detail pane's header, in the shell's header row above the pane: a row
+/// of tabs (one now: the selected note, closable like a strip tab, with its
+/// dirty dot) and, at the pane's outer edge, the Maximise / Minimise control.
+/// The control keeps its place in both states because the header spans the
+/// pane's outer edge either way. With [mirror] (the pane is on the left) the
+/// order is reversed. [startPad] clears the panel's rounded corner when the
+/// tabs start at the panel edge (maximised, side panel collapsed).
 class DetailHeader extends StatelessWidget {
   const DetailHeader({
     super.key,
     required this.state,
     required this.width,
     required this.mirror,
+    this.startPad = 0,
   });
   final AppState state;
   final double width;
   final bool mirror;
+  final double startPad;
 
   @override
   Widget build(BuildContext context) {
@@ -29,69 +35,51 @@ class DetailHeader extends StatelessWidget {
     final title = note == null || note.summary.isEmpty
         ? 'Details'
         : note.summary;
+    final draft = state.draft;
     final tab = Expanded(
-      child: Padding(
-        // Room for the tab's concave corner on its open side.
-        padding: EdgeInsets.only(
-          left: mirror ? 0 : t.radii.tab,
-          right: mirror ? t.radii.tab : 0,
-        ),
-        child: Align(
-          alignment: mirror ? Alignment.topRight : Alignment.topLeft,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: t.sizes.tabMax),
-            child: JoinedTab(
-              key: const Key('detail-tab'),
-              active: true,
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: t.space.md),
-                child: Row(
-                  spacing: t.space.sm,
-                  children: [
-                    Icon(
-                      note != null && AppState.isFolder(note)
-                          ? FLucideIcons.folder
-                          : FLucideIcons.fileText,
-                      size: t.icons.sm,
-                      color: t.fg,
-                    ),
-                    Expanded(
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: t.type.captionStyle.copyWith(color: t.fg),
-                      ),
-                    ),
-                  ],
-                ),
+      child: ListenableBuilder(
+        // The dirty dot follows the open edit, which notifies on its own.
+        listenable: Listenable.merge([state, ?draft]),
+        builder: (context, _) => Padding(
+          // Room for the tab's concave corner on its open side.
+          padding: EdgeInsets.only(
+            left: mirror ? 0 : math.max(t.radii.tab, startPad),
+            right: mirror ? math.max(t.radii.tab, startPad) : 0,
+          ),
+          child: LayoutBuilder(
+            builder: (context, c) => Align(
+              alignment: mirror ? Alignment.topRight : Alignment.topLeft,
+              child: TabItem(
+                key: const Key('detail-tab'),
+                width: math.min(c.maxWidth, t.sizes.tabMax),
+                icon: note != null && AppState.isFolder(note)
+                    ? FLucideIcons.folder
+                    : FLucideIcons.fileText,
+                title: title,
+                active: true,
+                dirty: state.dirty,
+                onPress: () {},
+                onClose: () => state.guarded(() => state.select(null)),
               ),
             ),
           ),
         ),
       ),
     );
-    final actions = [
-      IconAction(
-        key: const Key('expand-note'),
-        tooltip: 'Open full page',
-        icon: FLucideIcons.maximize2,
-        onPress: state.openFullPage,
-      ),
-      IconAction(
-        key: const Key('detail-close'),
-        tooltip: 'Close',
-        icon: FLucideIcons.x,
-        onPress: () => state.guarded(() => state.select(null)),
-      ),
-    ];
+    final max = state.maximised;
+    final toggle = IconAction(
+      key: const Key('pane-size'),
+      tooltip: max ? 'Minimise' : 'Maximise',
+      icon: max ? FLucideIcons.minimize : FLucideIcons.maximize,
+      onPress: max ? () => state.guarded(state.minimise) : state.maximise,
+    );
     return SizedBox(
       key: const Key('detail-header'),
       width: width,
       height: t.sizes.tabStrip + t.borders.hairline,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: mirror ? [...actions.reversed, tab] : [tab, ...actions],
+        children: mirror ? [toggle, tab] : [tab, toggle],
       ),
     );
   }

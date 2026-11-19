@@ -55,7 +55,7 @@ class TabStrip extends StatelessWidget {
                 );
                 return Row(
                   children: [
-                    _TabItem(
+                    TabItem(
                       key: const Key('tab-home'),
                       width: per,
                       icon: state.view == ViewMode.board
@@ -77,7 +77,7 @@ class TabStrip extends StatelessWidget {
                         child: Row(
                           children: [
                             for (final tab in tabs)
-                              _TabItem(
+                              TabItem(
                                 key: Key('tab-${tab.code}'),
                                 width: math.min(per, t.sizes.tabMax),
                                 icon: tab.kind == TabKind.view
@@ -155,9 +155,10 @@ class _Box extends StatelessWidget {
   }
 }
 
-/// One tab. Without [onClose] it is the pinned home tab.
-class _TabItem extends StatefulWidget {
-  const _TabItem({
+/// One tab: icon, title, dirty dot and close button. Without [onClose] it is
+/// the pinned home tab. Shared by the strip and the detail pane's header.
+class TabItem extends StatefulWidget {
+  const TabItem({
     super.key,
     required this.width,
     required this.icon,
@@ -175,10 +176,10 @@ class _TabItem extends StatefulWidget {
   final VoidCallback? onClose;
 
   @override
-  State<_TabItem> createState() => _TabItemState();
+  State<TabItem> createState() => TabItemState();
 }
 
-class _TabItemState extends State<_TabItem> {
+class TabItemState extends State<TabItem> {
   @override
   void initState() {
     super.initState();
@@ -186,7 +187,7 @@ class _TabItemState extends State<_TabItem> {
   }
 
   @override
-  void didUpdateWidget(_TabItem old) {
+  void didUpdateWidget(TabItem old) {
     super.didUpdateWidget(old);
     if (widget.active && !old.active) _reveal();
   }

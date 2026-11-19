@@ -17,21 +17,18 @@ class DetailView extends StatelessWidget {
     super.key,
     required this.state,
     required this.onClose,
-    this.onExpand,
     this.full = false,
     this.inHeader = false,
   });
   final AppState state;
   final VoidCallback onClose;
 
-  /// Opens the note as a full page; null where that is not offered.
-  final VoidCallback? onExpand;
-
-  /// This is the full page (Back and a breadcrumb), not the peek pane.
+  /// This is the maximised pane (no Back or breadcrumb: the header row has
+  /// Minimise), not the peek pane.
   final bool full;
 
-  /// The shell's header row carries this pane's tab with Expand and Close, so
-  /// the pane leaves them out.
+  /// The shell's header row carries this pane's tab with Close and Maximise,
+  /// so the pane leaves them out.
   final bool inHeader;
 
   @override
@@ -51,41 +48,23 @@ class DetailView extends StatelessWidget {
           padding: EdgeInsets.fromLTRB(t.space.xs, t.space.xs, t.space.md, 0),
           child: Row(
             children: [
-              if (full)
-                IconAction(
-                  key: const Key('back'),
-                  tooltip: 'Back',
-                  icon: FLucideIcons.arrowLeft,
-                  onPress: () => state.guarded(state.closeFullPage),
-                )
-              else if (!inHeader)
+              if (!full && !inHeader)
                 IconAction(
                   tooltip: 'Close',
                   icon: FLucideIcons.arrowLeft,
                   onPress: onClose,
                 ),
               Expanded(
-                child: Text(
-                  key: const Key('breadcrumb'),
-                  full
-                      ? [
-                          ?state.currentSpaceName,
-                          ...path.map((n) => n.summary),
-                          note.summary,
-                        ].join(' > ')
-                      : path.map((n) => n.summary).join('  /  '),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: t.type.captionStyle.copyWith(color: t.muted),
-                ),
+                child: full
+                    ? const SizedBox.shrink()
+                    : Text(
+                        key: const Key('breadcrumb'),
+                        path.map((n) => n.summary).join('  /  '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.type.captionStyle.copyWith(color: t.muted),
+                      ),
               ),
-              if (!full && !inHeader && onExpand != null)
-                IconAction(
-                  key: const Key('expand-note'),
-                  tooltip: 'Open full page',
-                  icon: FLucideIcons.maximize2,
-                  onPress: onExpand,
-                ),
               if (state.editable) ...[
                 if (state.spaces.length > 1)
                   IconAction(
@@ -299,7 +278,7 @@ class DetailView extends StatelessWidget {
         ),
       ],
     );
-    // Ctrl/Cmd+S saves an open edit; Escape leaves the full page.
+    // Ctrl/Cmd+S saves an open edit; Escape minimises.
     page = CallbackShortcuts(
       bindings: {
         if (draft != null) ...{
@@ -312,7 +291,7 @@ class DetailView extends StatelessWidget {
         },
         if (full)
           const SingleActivator(LogicalKeyboardKey.escape): () =>
-              state.guarded(state.closeFullPage),
+              state.guarded(state.minimise),
       },
       child: Focus(autofocus: full, child: page),
     );
