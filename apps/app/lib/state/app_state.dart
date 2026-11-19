@@ -61,6 +61,9 @@ class SpaceHit {
   final Note note;
 }
 
+/// Which edge of the window the shell's icon rail sits on.
+enum LayoutSide { start, end }
+
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
     _loadViews();
@@ -72,6 +75,45 @@ class AppState extends ChangeNotifier {
     sidebarCollapsed = prefs?.read(_collapsedKey) == 'true';
     final w = double.tryParse(prefs?.read(_widthKey) ?? '');
     sidebarWidth = (w == null || !w.isFinite) ? null : w;
+    final dw = double.tryParse(prefs?.read(_detailWidthKey) ?? '');
+    detailWidth = (dw == null || !dw.isFinite) ? null : dw;
+    layoutSide = prefs?.read(_layoutSideKey) == LayoutSide.end.name
+        ? LayoutSide.end
+        : LayoutSide.start;
+  }
+
+  static const _detailWidthKey = 'davdart.detail.width.v1';
+  static const _layoutSideKey = 'davdart.layout.side.v1';
+
+  /// Dragged width of the detail pane in the split layout; null means the
+  /// default token. Callers clamp it.
+  double? detailWidth;
+
+  /// Which edge the icon rail sits on; [LayoutSide.end] mirrors the shell.
+  LayoutSide layoutSide = LayoutSide.start;
+
+  void setDetailWidth(double? w, {bool save = true}) {
+    if (detailWidth != w) {
+      detailWidth = w;
+      notifyListeners();
+    }
+    if (!save) return;
+    if (w == null) {
+      prefs?.remove(_detailWidthKey);
+    } else {
+      prefs?.write(_detailWidthKey, '$w');
+    }
+  }
+
+  void setLayoutSide(LayoutSide side) {
+    if (layoutSide == side) return;
+    layoutSide = side;
+    if (side == LayoutSide.start) {
+      prefs?.remove(_layoutSideKey);
+    } else {
+      prefs?.write(_layoutSideKey, side.name);
+    }
+    notifyListeners();
   }
 
   static const _sectionKey = 'davdart.section.v1';

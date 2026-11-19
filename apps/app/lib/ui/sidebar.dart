@@ -1,10 +1,10 @@
-import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../data/space_catalog.dart';
 import '../state/app_state.dart';
 import 'new_space_dialog.dart';
+import 'resize_handle.dart';
 import 'sections.dart';
 import 'shell_frame.dart';
 import 'theme.dart';
@@ -18,9 +18,13 @@ class Sidebar extends StatelessWidget {
     required this.state,
     this.inDrawer = false,
     this.width,
+    this.mirror = false,
   });
   final AppState state;
   final bool inDrawer;
+
+  /// Draws the panel's border on its start edge (the rail is on the right).
+  final bool mirror;
 
   /// Width of the docked panel; null uses the default token.
   final double? width;
@@ -40,11 +44,23 @@ class Sidebar extends StatelessWidget {
       Section.account => AccountSection(state: state, onPick: close),
       Section.settings => SettingsSection(state: state, onPick: close),
     };
+    final t = tokensOf(context);
     return FSidebar.raw(
       style: .delta(
-        constraints: BoxConstraints.tightFor(
-          width: width ?? tokensOf(context).sizes.sidebar,
-        ),
+        constraints: BoxConstraints.tightFor(width: width ?? t.sizes.sidebar),
+        decoration: mirror
+            ? DecorationDelta.value(
+                BoxDecoration(
+                  color: t.panel,
+                  border: Border(
+                    left: BorderSide(
+                      color: t.divider,
+                      width: t.borders.hairline,
+                    ),
+                  ),
+                ),
+              )
+            : null,
       ),
       header: inDrawer ? SectionBar(state: state, onPick: close) : null,
       child: body,
@@ -146,90 +162,41 @@ double sidebarWidthOf(BuildContext context, AppState state) {
   return (state.sidebarWidth ?? z.sidebar).clamp(z.sidebarMin, z.sidebarMax);
 }
 
-/// The docked side panel with a drag handle on its right edge. Dragging
-/// resizes it between the token limits and saves the width on release; a
-/// double-click restores the default.
+/// The docked side panel with a drag handle on its inner edge (the edge
+/// facing the content: right at [LayoutSide.start], left at
+/// [LayoutSide.end]). Dragging resizes it between the token limits and saves
+/// the width on release; a double-click restores the default.
 class DockedSidebar extends StatelessWidget {
   const DockedSidebar({super.key, required this.state});
   final AppState state;
 
   @override
   Widget build(BuildContext context) {
+    final z = tokensOf(context).sizes;
     final width = sidebarWidthOf(context, state);
+    final mirror = state.layoutSide == LayoutSide.end;
     return SizedBox(
       width: width,
       child: Stack(
         children: [
-          Sidebar(state: state, width: width),
+          Sidebar(state: state, width: width, mirror: mirror),
           Positioned(
             top: 0,
             bottom: 0,
-            right: 0,
-            child: SidebarResizeHandle(state: state),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// A slim handle on the panel edge: resize cursor, a line on hover or drag.
-class SidebarResizeHandle extends StatefulWidget {
-  const SidebarResizeHandle({super.key, required this.state});
-  final AppState state;
-
-  @override
-  State<SidebarResizeHandle> createState() => _SidebarResizeHandleState();
-}
-
-class _SidebarResizeHandleState extends State<SidebarResizeHandle> {
-  bool _hover = false;
-  bool _drag = false;
-  double _startX = 0;
-  double _startWidth = 0;
-
-  double _clamp(BuildContext context, double w) {
-    final z = tokensOf(context).sizes;
-    return w.clamp(z.sidebarMin, z.sidebarMax);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    final state = widget.state;
-    return MouseRegion(
-      cursor: SystemMouseCursors.resizeColumn,
-      onEnter: (_) => setState(() => _hover = true),
-      onExit: (_) => setState(() => _hover = false),
-      child: GestureDetector(
-        key: const Key('sidebar-handle'),
-        behavior: HitTestBehavior.opaque,
-        dragStartBehavior: DragStartBehavior.down,
-        onDoubleTap: () => state.setSidebarWidth(null),
-        onHorizontalDragStart: (d) {
-          _startX = d.globalPosition.dx;
-          _startWidth = sidebarWidthOf(context, state);
-          setState(() => _drag = true);
-        },
-        onHorizontalDragUpdate: (d) => state.setSidebarWidth(
-          _clamp(context, _startWidth + d.globalPosition.dx - _startX),
-          save: false,
-        ),
-        onHorizontalDragEnd: (_) {
-          setState(() => _drag = false);
-          state.setSidebarWidth(state.sidebarWidth);
-        },
-        onHorizontalDragCancel: () => setState(() => _drag = false),
-        child: SizedBox(
-          width: t.sizes.resizeHit,
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: SizedBox(
-              width: t.sizes.resizeLine,
-              child: Container(color: _hover || _drag ? t.accent : null),
+            left: mirror ? 0 : null,
+            right: mirror ? null : 0,
+            child: PaneResizeHandle(
+              key: const Key('sidebar-handle'),
+              width: width,
+              min: z.sidebarMin,
+              max: z.sidebarMax,
+              grow: mirror ? -1 : 1,
+              onResize: (w) => state.setSidebarWidth(w, save: false),
+              onEnd: () => state.setSidebarWidth(state.sidebarWidth),
+              onReset: () => state.setSidebarWidth(null),
             ),
           ),
-        ),
+        ],
       ),
     );
   }

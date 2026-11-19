@@ -181,6 +181,9 @@ class SizeTokens {
     this.resizeHit = 8,
     this.resizeLine = 2,
     this.detail = 440,
+    this.detailMin = 320,
+    this.detailMax = 720,
+    this.listMin = 280,
     this.topBar = 52,
     this.boardColumn = 264,
     this.statusDot = 8,
@@ -208,6 +211,10 @@ class SizeTokens {
   /// Grab width of the drag handle on the side panel edge, and the width of
   /// the line it shows on hover.
   final double resizeHit, resizeLine;
+
+  /// Limits of the detail pane's drag handle ([detail] is the default and
+  /// the double-click reset), and the least width the list keeps beside it.
+  final double detailMin, detailMax, listMin;
 
   final double boardColumn, statusDot, spinner, statusField, metaLabel;
   final double chevronBox, listChevronBox, listMarker;

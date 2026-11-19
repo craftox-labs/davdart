@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -12,6 +14,7 @@ import 'board_view.dart';
 import 'detail_view.dart';
 import 'list_view.dart';
 import 'parts.dart';
+import 'resize_handle.dart';
 import 'scope_bar.dart';
 import 'shell_frame.dart';
 import 'sidebar.dart';
@@ -106,22 +109,60 @@ class Shell extends StatelessWidget {
             ],
           );
 
+          final mirror = state.layoutSide == LayoutSide.end;
           final Widget body;
           if (split) {
-            body = Row(
-              children: [
-                Expanded(child: main()),
-                if (hasDetail) ...[
-                  Container(width: t.borders.hairline, color: t.divider),
-                  SizedBox(
-                    width: t.sizes.detail,
-                    child: DetailView(
-                      state: state,
-                      onClose: () => state.select(null),
-                    ),
+            body = LayoutBuilder(
+              builder: (context, bc) {
+                final z = t.sizes;
+                final hi = math.max(
+                  z.detailMin,
+                  math.min(z.detailMax, bc.maxWidth - z.listMin),
+                );
+                final width = (state.detailWidth ?? z.detail).clamp(
+                  z.detailMin,
+                  hi,
+                );
+                final divider = Container(
+                  width: t.borders.hairline,
+                  color: t.divider,
+                );
+                final detail = SizedBox(
+                  key: const Key('detail-pane'),
+                  width: width,
+                  child: Stack(
+                    children: [
+                      DetailView(
+                        state: state,
+                        onClose: () => state.select(null),
+                      ),
+                      Positioned(
+                        top: 0,
+                        bottom: 0,
+                        left: mirror ? null : 0,
+                        right: mirror ? 0 : null,
+                        child: PaneResizeHandle(
+                          key: const Key('detail-handle'),
+                          width: width,
+                          min: z.detailMin,
+                          max: hi,
+                          grow: mirror ? 1 : -1,
+                          onResize: (w) => state.setDetailWidth(w, save: false),
+                          onEnd: () => state.setDetailWidth(state.detailWidth),
+                          onReset: () => state.setDetailWidth(null),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ],
+                );
+                return Row(
+                  children: [
+                    if (mirror && hasDetail) ...[detail, divider],
+                    Expanded(child: main()),
+                    if (!mirror && hasDetail) ...[divider, detail],
+                  ],
+                );
+              },
             );
           } else if (hasDetail) {
             body = DetailView(state: state, onClose: () => state.select(null));
@@ -129,19 +170,29 @@ class Shell extends StatelessWidget {
             body = main();
           }
 
+          Widget content = FScaffold(
+            childPad: false,
+            header: TopBar(state: state, showMenu: !wide),
+            child: body,
+          );
+          if (wide && !state.sidebarCollapsed) {
+            // Docked beside the content, on the side facing it: left of it
+            // normally, right of it when the rail is on the right.
+            final dock = IconTheme(
+              data: context.theme.style.iconStyle,
+              child: DockedSidebar(state: state),
+            );
+            content = Row(
+              children: [
+                if (!mirror) dock,
+                Expanded(child: content),
+                if (mirror) dock,
+              ],
+            );
+          }
+
           return SafeArea(
-            child: ShellFrame(
-              state: state,
-              showRail: wide,
-              child: FScaffold(
-                childPad: false,
-                sidebar: wide && !state.sidebarCollapsed
-                    ? DockedSidebar(state: state)
-                    : null,
-                header: TopBar(state: state, showMenu: !wide),
-                child: body,
-              ),
-            ),
+            child: ShellFrame(state: state, showRail: wide, child: content),
           );
         },
       ),
