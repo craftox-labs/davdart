@@ -120,49 +120,12 @@ class Sidebar extends StatelessWidget {
     Widget spaceMenu() => FPopoverMenu(
       menuAnchor: Alignment.topLeft,
       childAnchor: Alignment.bottomLeft,
-      menuBuilder: (ctx, controller, _) {
-        void pick(VoidCallback act) {
-          controller.hide();
-          _close(context);
-          act();
-        }
-
-        return [
-          FItemGroup(
-            children: [
-              for (final sp in state.spaces)
-                FItem(
-                  key: Key('space-${sp.id}'),
-                  selected: sp.id == state.currentSpaceId,
-                  title: Text(sp.name, overflow: TextOverflow.ellipsis),
-                  suffix: sp.onServer
-                      ? Icon(FLucideIcons.cloud, size: 14, color: t.muted)
-                      : null,
-                  onPress: () => pick(() => state.switchSpace(sp.id)),
-                ),
-            ],
-          ),
-          FItemGroup(
-            children: [
-              FItem(
-                title: const Text('New space…'),
-                onPress: () => pick(() => showNewSpaceDialog(context, state)),
-              ),
-              FItem(
-                title: const Text('Rename this space…'),
-                onPress: () =>
-                    pick(() => showRenameSpaceDialog(context, state)),
-              ),
-              if (state.currentSpaceId != SpaceCatalog.planningId)
-                FItem(
-                  title: const Text('Delete this space…'),
-                  onPress: () =>
-                      pick(() => showDeleteSpaceDialog(context, state)),
-                ),
-            ],
-          ),
-        ];
-      },
+      menuBuilder: (ctx, controller, _) => spaceMenuGroups(
+        context,
+        state,
+        controller,
+        onPick: () => _close(context),
+      ),
       builder: (ctx, controller, _) => FTappable(
         key: const Key('space-menu'),
         semanticsLabel: 'Switch space',
@@ -414,4 +377,54 @@ class Sidebar extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The Space menu's items (switch, new, rename, delete), shared by the sidebar
+/// header and the icon rail. [onPick] runs after the menu closes.
+List<FItemGroup> spaceMenuGroups(
+  BuildContext context,
+  AppState state,
+  FPopoverController controller, {
+  VoidCallback? onPick,
+}) {
+  final t = tokensOf(context);
+  void pick(VoidCallback act) {
+    controller.hide();
+    onPick?.call();
+    act();
+  }
+
+  return [
+    FItemGroup(
+      children: [
+        for (final sp in state.spaces)
+          FItem(
+            key: Key('space-${sp.id}'),
+            selected: sp.id == state.currentSpaceId,
+            title: Text(sp.name, overflow: TextOverflow.ellipsis),
+            suffix: sp.onServer
+                ? Icon(FLucideIcons.cloud, size: 14, color: t.muted)
+                : null,
+            onPress: () => pick(() => state.switchSpace(sp.id)),
+          ),
+      ],
+    ),
+    FItemGroup(
+      children: [
+        FItem(
+          title: const Text('New space…'),
+          onPress: () => pick(() => showNewSpaceDialog(context, state)),
+        ),
+        FItem(
+          title: const Text('Rename this space…'),
+          onPress: () => pick(() => showRenameSpaceDialog(context, state)),
+        ),
+        if (state.currentSpaceId != SpaceCatalog.planningId)
+          FItem(
+            title: const Text('Delete this space…'),
+            onPress: () => pick(() => showDeleteSpaceDialog(context, state)),
+          ),
+      ],
+    ),
+  ];
 }

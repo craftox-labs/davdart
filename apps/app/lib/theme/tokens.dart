@@ -47,4 +47,14 @@ class Tokens {
 
   /// Width at which the detail opens beside the list instead of replacing it.
   static const double splitBreakpoint = 1280;
+
+  // Shell frame (placeholders; tm will revise).
+  /// Width of the icon rail on the left edge.
+  static const double railWidth = 48;
+
+  /// Margin between the window edge and the inset content panel.
+  static const double frameInset = 6;
+
+  /// Corner radius of the inset content panel.
+  static const double panelRadius = 12;
 }
