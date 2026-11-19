@@ -1,12 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 
-import 'package:davdart/davdart.dart';
-
 import '../data/browser_storage_stub.dart'
     if (dart.library.js_interop) '../data/browser_storage_web.dart';
 import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
-import '../data/persistent_store.dart';
+import '../data/space_catalog.dart';
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
@@ -41,26 +39,27 @@ ThemeData buildTheme(Tokens t, Brightness b) {
   );
 }
 
-/// The real app: a local Space kept in browser storage, filled once from the
-/// board server's feed. Edits stay on this device until a server is attached.
-NoteSource defaultSource() {
-  final storage = defaultStorage();
-  return SpaceNoteSource(
-    Space(
-      SpaceConfig(id: 'planning', name: 'Planning'),
-      PersistentNoteStore(storage),
-    ),
-    seed: ApiNoteSource(),
-    flags: storage,
-  );
-}
+/// The real app: Spaces kept in browser storage. `Planning` is filled once
+/// from the board server's feed; edits stay on this device until a server is
+/// connected.
+SpaceCatalog defaultCatalog() =>
+    SpaceCatalog(defaultStorage(), planningSeed: ApiNoteSource());
+
+AppState _fromCatalog(SpaceCatalog c) =>
+    AppState(c.sourceFor(c.current), prefs: c.storage, catalog: c);
 
 class DavdartApp extends StatelessWidget {
-  DavdartApp({super.key, NoteSource? source, KeyValueStorage? prefs})
-    : state = source == null
-          ? AppState(defaultSource(), prefs: defaultStorage())
-          : AppState(source, prefs: prefs) {
-    state.load();
+  DavdartApp({
+    super.key,
+    NoteSource? source,
+    KeyValueStorage? prefs,
+    AppState? state,
+  }) : state =
+           state ??
+           (source == null
+               ? _fromCatalog(defaultCatalog())
+               : AppState(source, prefs: prefs)) {
+    this.state.load();
   }
 
   final AppState state;

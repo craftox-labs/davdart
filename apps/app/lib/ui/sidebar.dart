@@ -6,6 +6,7 @@ import '../theme/tokens.dart';
 import 'markdown_lite.dart';
 import 'connect_dialog.dart';
 import 'new_note_dialog.dart';
+import 'new_space_dialog.dart';
 import 'save_view_dialog.dart';
 
 class Sidebar extends StatelessWidget {
@@ -104,12 +105,61 @@ class Sidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.fromLTRB(6, 6, 6, 12),
-            child: Text(
-              'davdart',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 6, 6, 12),
+            child: state.spaces.isEmpty
+                ? const Text(
+                    'davdart',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
+                  )
+                : PopupMenuButton<String>(
+                    key: const Key('space-menu'),
+                    tooltip: 'Switch space',
+                    padding: EdgeInsets.zero,
+                    onSelected: (v) {
+                      if (v == '\u0000new') {
+                        _close(context);
+                        showNewSpaceDialog(context, state);
+                      } else {
+                        state.switchSpace(v);
+                        _close(context);
+                      }
+                    },
+                    itemBuilder: (_) => [
+                      for (final sp in state.spaces)
+                        PopupMenuItem(
+                          value: sp.id,
+                          child: Text(
+                            sp.name,
+                            style: TextStyle(
+                              fontWeight: sp.id == state.currentSpaceId
+                                  ? FontWeight.w700
+                                  : FontWeight.w400,
+                            ),
+                          ),
+                        ),
+                      const PopupMenuDivider(),
+                      const PopupMenuItem(
+                        value: '\u0000new',
+                        child: Text('New space…'),
+                      ),
+                    ],
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            state.currentSpaceName ?? 'davdart',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Icon(Icons.expand_more, size: 18, color: t.muted),
+                      ],
+                    ),
+                  ),
           ),
           TextField(
             controller: state.searchController,

@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart' show TextEditingController;
 
 import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
+import '../data/space_catalog.dart';
 
 enum ViewMode { board, list }
 
@@ -49,11 +50,42 @@ class SavedView {
 }
 
 class AppState extends ChangeNotifier {
-  AppState(this.source, {this.prefs}) {
+  AppState(this.source, {this.prefs, this.catalog}) {
     _loadViews();
   }
 
-  final NoteSource source;
+  NoteSource source;
+
+  /// The Spaces on this device; null when the app has just one fixed source.
+  final SpaceCatalog? catalog;
+
+  List<SpaceInfo> get spaces => catalog?.spaces ?? const [];
+  String? get currentSpaceName => catalog?.currentInfo.name;
+  String? get currentSpaceId => catalog?.current;
+
+  /// Opens another Space: fresh selection and filters, its own notes.
+  Future<void> switchSpace(String id) async {
+    final c = catalog;
+    if (c == null || id == c.current) return;
+    c.select(id);
+    source = c.sourceFor(id);
+    notes = [];
+    tree = NoteTree.build(const []);
+    selectedUid = null;
+    query = '';
+    searchController.text = '';
+    tag = null;
+    syncMessage = null;
+    syncing = false;
+    await load();
+  }
+
+  /// Creates a local Space and opens it.
+  Future<void> createSpace(String name) async {
+    final c = catalog;
+    if (c == null || name.trim().isEmpty) return;
+    await switchSpace(c.add(name).id);
+  }
 
   /// Where saved views are kept; null means they last only this session.
   final KeyValueStorage? prefs;

@@ -5,6 +5,7 @@ import '../../../test/support/fake_caldav.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/data/persistent_store.dart';
+import 'package:davdart_app/data/space_catalog.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:davdart_app/ui/list_view.dart';
@@ -137,6 +138,36 @@ void main() {
         expect(AppState(FakeSource(sample), prefs: prefs).savedViews, isEmpty);
         prefs.write('davdart.views.v1', '{oops');
         expect(AppState(FakeSource(sample), prefs: prefs).savedViews, isEmpty);
+      },
+    );
+
+    test(
+      'spaces: separate notes, restart keeps the list and current space',
+      () async {
+        final storage = MemoryStorage();
+        AppState open() {
+          final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
+          return AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+        }
+
+        final s = open();
+        await s.load();
+        expect(s.currentSpaceName, 'Planning');
+        expect(s.notes, hasLength(3));
+        await s.createSpace('  Inbox ');
+        expect(s.currentSpaceName, 'Inbox');
+        expect(s.notes, isEmpty);
+        await s.addNote('Only here');
+        expect(s.notes, hasLength(1));
+        await s.switchSpace('planning');
+        expect(s.notes, hasLength(3));
+        await s.switchSpace(s.spaces.last.id);
+        final r = open();
+        expect(r.currentSpaceName, 'Inbox');
+        await r.load();
+        expect(r.notes.map((n) => n.summary), ['Only here']);
+        await r.createSpace('   ');
+        expect(r.spaces, hasLength(2));
       },
     );
 
@@ -412,6 +443,31 @@ void main() {
         (await space.notes()).map((n) => n.summary),
         isNot(contains('Renamed')),
       );
+    });
+
+    testWidgets('space menu creates and switches spaces', (t) async {
+      t.view.physicalSize = const Size(1400, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
+      final state = AppState(
+        c.sourceFor(c.current),
+        prefs: storage,
+        catalog: c,
+      );
+      await t.pumpWidget(DavdartApp(state: state));
+      await t.pumpAndSettle();
+      expect(find.text('Planning'), findsWidgets);
+      await t.tap(find.byKey(const Key('space-menu')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('New space…'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('space-name')), 'Inbox');
+      await t.tap(find.byKey(const Key('space-create')));
+      await t.pumpAndSettle();
+      expect(find.text('Inbox'), findsWidgets);
+      expect(find.text('No notes'), findsWidgets);
     });
 
     testWidgets('search narrows the list', (t) async {
