@@ -263,7 +263,7 @@ class _TagWrap extends StatelessWidget {
   }
 }
 
-/// Views: saved views (apply, remove, save the current one) and the tags as
+/// Views: saved views (apply, update, rename, remove, save the current one) and the tags as
 /// filters.
 class ViewsSection extends _Section {
   const ViewsSection({super.key, required super.state, required super.onPick});
@@ -284,6 +284,19 @@ class ViewsSection extends _Section {
               }),
             ),
             IconAction(
+              key: Key('view-update-${v.name}'),
+              tooltip: 'Update from current view',
+              icon: FLucideIcons.refreshCw,
+              onPress: () => state.updateView(v),
+            ),
+            IconAction(
+              key: Key('view-rename-${v.name}'),
+              tooltip: 'Rename saved view',
+              icon: FLucideIcons.pencil,
+              onPress: () => showRenameViewDialog(context, state, v),
+            ),
+            IconAction(
+              key: Key('view-delete-${v.name}'),
               tooltip: 'Remove saved view',
               icon: FLucideIcons.x,
               onPress: () => state.deleteView(v.name),
