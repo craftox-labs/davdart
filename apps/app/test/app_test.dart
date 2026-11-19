@@ -588,6 +588,22 @@ void main() {
       expect(state.spaces, hasLength(1));
     });
 
+    test('search across spaces finds notes and opens the hit', () async {
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
+      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      await s.load();
+      await s.createSpace('Inbox');
+      await s.addNote('Loose idea about decisions');
+      final hits = await s.searchAllSpaces('DECISIONS');
+      expect(hits.map((h) => h.space.name).toSet(), {'Planning', 'Inbox'});
+      expect(await s.searchAllSpaces('  '), isEmpty);
+      final planning = hits.firstWhere((h) => h.space.id == 'planning');
+      await s.openHit(planning);
+      expect(s.currentSpaceName, 'Planning');
+      expect(s.selectedUid, planning.note.uid);
+    });
+
     testWidgets('search narrows the list', (t) async {
       await pump(t);
       await t.tap(find.text('List').first);

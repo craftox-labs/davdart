@@ -8,6 +8,7 @@ import 'connect_dialog.dart';
 import 'new_note_dialog.dart';
 import '../data/space_catalog.dart';
 import 'new_space_dialog.dart';
+import 'search_all_dialog.dart';
 import 'save_view_dialog.dart';
 
 class Sidebar extends StatelessWidget {
@@ -195,6 +196,18 @@ class Sidebar extends StatelessWidget {
               ),
             ),
           ),
+          if (state.spaces.length > 1)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton(
+                key: const Key('search-all'),
+                onPressed: () {
+                  _close(context);
+                  showSearchAllDialog(context, state);
+                },
+                child: const Text('Search all spaces…'),
+              ),
+            ),
           const SizedBox(height: 14),
           Padding(
             padding: const EdgeInsets.only(left: 6, bottom: 4),

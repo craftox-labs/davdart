@@ -49,6 +49,13 @@ class SavedView {
   }
 }
 
+/// A note found by a search across every Space.
+class SpaceHit {
+  const SpaceHit(this.space, this.note);
+  final SpaceInfo space;
+  final Note note;
+}
+
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
     _loadViews();
@@ -111,6 +118,39 @@ class AppState extends ChangeNotifier {
     prefs?.remove(viewsKey);
     c.remove(id);
     notifyListeners();
+  }
+
+  /// Notes in any Space whose title or text contain [q] (case-insensitive).
+  Future<List<SpaceHit>> searchAllSpaces(String q) async {
+    final needle = q.trim().toLowerCase();
+    final c = catalog;
+    if (needle.isEmpty || c == null) return const [];
+    final hits = <SpaceHit>[];
+    for (final sp in List.of(c.spaces)) {
+      List<Note> list;
+      if (sp.id == c.current) {
+        list = notes;
+      } else {
+        try {
+          list = await c.sourceFor(sp.id).load();
+        } catch (_) {
+          continue; // one unreadable Space should not hide the others
+        }
+      }
+      for (final n in list) {
+        if (n.summary.toLowerCase().contains(needle) ||
+            n.description.toLowerCase().contains(needle)) {
+          hits.add(SpaceHit(sp, n));
+        }
+      }
+    }
+    return hits;
+  }
+
+  /// Opens a search hit: switches to its Space and selects the note.
+  Future<void> openHit(SpaceHit h) async {
+    await switchSpace(h.space.id);
+    select(h.note.uid);
   }
 
   /// Where saved views are kept; null means they last only this session.
