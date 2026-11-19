@@ -141,7 +141,7 @@ void main() {
       c.close();
       expect(n.etag, isNotNull);
     } finally {
-      final r = await http.Request('DELETE', made)
+      final r = http.Request('DELETE', made)
         ..headers['Authorization'] =
             'Basic ${base64.encode(utf8.encode('$user:$pw'))}';
       final resp = await http.Response.fromStream(await r.send());
