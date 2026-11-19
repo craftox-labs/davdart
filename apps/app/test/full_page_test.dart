@@ -1,6 +1,7 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
+import 'package:davdart_app/data/space_catalog.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/services.dart';
@@ -128,6 +129,44 @@ void main() {
       await t.tap(_k('back'));
       await _settle(t);
       expect(t.getTopLeft(_k('detail-pane')), pane);
+    });
+  });
+
+  group('leaving a Space with unsaved edits', () {
+    testWidgets('asks first; keep stays, discard switches', (t) async {
+      t.view.physicalSize = const Size(1500, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(storage, planningSeed: _Seed());
+      final other = c.add('Other');
+      final startId = c.current;
+      final s = AppState(c.sourceFor(startId), prefs: storage, catalog: c);
+      await t.pumpWidget(DavdartApp(state: s));
+      await t.pumpAndSettle();
+      s.select('a');
+      await t.pumpAndSettle();
+      await t.tap(_k('edit-note'));
+      await _settle(t);
+      await _type(t, 'edit-title', 'Changed');
+      expect(s.dirty, isTrue);
+
+      final stay = s.switchSpace(other.id);
+      await _settle(t);
+      expect(find.text('Unsaved changes'), findsWidgets);
+      await t.tap(find.text('Keep editing'));
+      await _settle(t);
+      expect(await stay, isFalse);
+      expect(s.currentSpaceId, startId);
+      expect(s.dirty, isTrue);
+
+      final go = s.switchSpace(other.id);
+      await _settle(t);
+      await t.tap(_k('leave-discard'));
+      await _settle(t);
+      expect(await go, isTrue);
+      expect(s.currentSpaceId, other.id);
+      expect(s.dirty, isFalse);
     });
   });
 

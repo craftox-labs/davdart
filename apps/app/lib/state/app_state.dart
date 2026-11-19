@@ -221,9 +221,12 @@ class AppState extends ChangeNotifier {
   String? get currentSpaceId => catalog?.current;
 
   /// Opens another Space: fresh selection and filters, its own notes.
-  Future<void> switchSpace(String id) async {
+  /// Returns false when it stayed put (same Space, or the user chose to keep
+  /// editing unsaved changes).
+  Future<bool> switchSpace(String id) async {
     final c = catalog;
-    if (c == null || id == c.current) return;
+    if (c == null || id == c.current) return false;
+    if (!await _settleDraft()) return false;
     c.select(id);
     source = c.sourceFor(id);
     notes = [];
@@ -240,6 +243,7 @@ class AppState extends ChangeNotifier {
     savedViews.clear();
     _resetTabs();
     await load();
+    return true;
   }
 
   /// Creates a Space and opens it. With [onServer] (and an account) the
@@ -377,7 +381,12 @@ class AppState extends ChangeNotifier {
   /// Opens a search hit: switches to its Space and selects the note.
   Future<void> openHit(SpaceHit h) async {
     if (catalog?.spaces.any((s) => s.id == h.space.id) != true) return;
-    await switchSpace(h.space.id);
+    final sameSpace = h.space.id == currentSpaceId;
+    if (sameSpace) {
+      await guarded(() => select(h.note.uid));
+      return;
+    }
+    if (!await switchSpace(h.space.id)) return;
     select(h.note.uid);
   }
 
@@ -1186,20 +1195,23 @@ class AppState extends ChangeNotifier {
   /// Runs [action] (a navigation away from the note) once unsaved edits are
   /// settled: saved or discarded as the user chooses, or not run at all.
   Future<void> guarded(void Function() action) async {
+    if (await _settleDraft()) action();
+  }
+
+  /// True once unsaved edits are settled (nothing to settle, saved, or
+  /// discarded as the user chose); false when the user keeps editing.
+  Future<bool> _settleDraft() async {
     final g = leaveGuard;
-    if (!dirty || g == null) {
-      action();
-      return;
-    }
+    if (!dirty || g == null) return true;
     switch (await g()) {
       case DraftChoice.keep:
-        return;
+        return false;
       case DraftChoice.save:
-        if (!await saveDraft()) return;
+        return saveDraft();
       case DraftChoice.discard:
         _dropDraft();
+        return true;
     }
-    action();
   }
 
   Note? get selected =>
