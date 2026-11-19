@@ -132,6 +132,31 @@ void main() {
     });
   });
 
+  testWidgets('section titles stay in the same place across sections', (
+    t,
+  ) async {
+    final s = await _pump(t, select: false);
+    final ys = <Section, double>{};
+    final xs = <Section, double>{};
+    for (final (sec, label) in [
+      (Section.notes, 'Files'),
+      (Section.views, 'Views'),
+      (Section.search, 'Search'),
+    ]) {
+      s.setSection(sec);
+      await _settle(t);
+      final o = t.getTopLeft(find.text(label).first);
+      ys[sec] = o.dy;
+      xs[sec] = o.dx;
+    }
+    expect(
+      ys.values.toSet().length,
+      1,
+      reason: 'titles at different heights: $ys',
+    );
+    expect(xs.values.toSet().length, 1, reason: 'titles at different x: $xs');
+  });
+
   group('leaving a Space with unsaved edits', () {
     testWidgets('asks first; keep stays, discard switches', (t) async {
       t.view.physicalSize = const Size(1500, 900);

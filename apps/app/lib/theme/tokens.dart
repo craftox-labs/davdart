@@ -185,6 +185,7 @@ class SizeTokens {
     this.detailMax = 720,
     this.listMin = 280,
     this.topBar = 44,
+    this.sectionHeader = 32,
     this.boardColumn = 264,
     this.statusDot = 8,
     this.spinner = 14,
@@ -210,6 +211,10 @@ class SizeTokens {
     this.tabClose = 16,
   });
   final double rail, railItem, frameInset, sidebar, detail, topBar;
+
+  /// Height of every side-panel section's title row, so titles never move
+  /// when switching sections (trailing actions must fit inside it).
+  final double sectionHeader;
 
   /// Smallest and largest width the side panel can be dragged to; [sidebar]
   /// is its default (and the width a double-click on the handle restores).

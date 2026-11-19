@@ -34,11 +34,15 @@ class _Panel extends StatelessWidget {
             t.space.lg,
             t.space.md,
           ),
-          child: Row(
-            children: [
-              Expanded(child: heading),
-              ?trailing,
-            ],
+          child: SizedBox(
+            height: t.sizes.sectionHeader,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(child: heading),
+                ?trailing,
+              ],
+            ),
           ),
         ),
         Expanded(
@@ -202,6 +206,7 @@ class NotesSection extends _Section {
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconAction(
+                  compact: true,
                   key: const Key('new-note'),
                   tooltip: 'New note',
                   icon: FLucideIcons.plus,
@@ -211,6 +216,7 @@ class NotesSection extends _Section {
                   },
                 ),
                 IconAction(
+                  compact: true,
                   key: const Key('new-folder'),
                   tooltip: 'New folder',
                   icon: FLucideIcons.folderPlus,
