@@ -13,7 +13,7 @@ Future<void> main(List<String> args) async {
   final pass = cfg['password'];
   if (args.isEmpty || url == null || user == null || pass == null) {
     stderr.writeln(
-        'usage: davdart list [--status S] [--tag T] | board | show TEXT | add TITLE [BODY] | rm UID\n'
+        'usage: davdart list [--status S] [--tag T] | board | show TEXT | add TITLE [BODY] | new TITLE [--id I --status S --owner O --decided-by D --github-ref R --tags a,b] (body on stdin) | set-status MATCH STATUS | append MATCH (text on stdin) | export DIR | rm UID\n'
         'config: url, user, password in ~/.config/davdart/credentials '
         '(key=value lines) or DAVDART_URL, DAVDART_USER, DAVDART_PASSWORD');
     exit(2);
@@ -85,6 +85,89 @@ Future<void> main(List<String> args) async {
           lastModified: now,
         ));
         stdout.writeln('created ${n.uid}');
+      case 'export':
+        if (args.length < 2) {
+          stderr.writeln('export needs a directory');
+          exit(2);
+        }
+        Directory(args[1]).createSync(recursive: true);
+        var count = 0;
+        for (final n in await c.listNotes()) {
+          File('${args[1]}/${Uri.encodeComponent(n.uid)}.ics')
+              .writeAsStringSync(serializeNote(n));
+          count++;
+        }
+        stdout.writeln('exported $count notes to ${args[1]}');
+      case 'set-status':
+        if (args.length < 3) {
+          stderr.writeln('set-status needs MATCH and STATUS');
+          exit(2);
+        }
+        final n = await _one(c, args[1]);
+        final p = PlanItem.fromNote(n)
+          ..setStatus(args[2])
+          ..setField('updated', _today());
+        p.apply();
+        await c.putNote(n);
+        stdout.writeln('${n.summary}: status ${args[2]}');
+      case 'append':
+        if (args.length < 2) {
+          stderr.writeln('append needs MATCH; text on stdin');
+          exit(2);
+        }
+        final text =
+            (await stdin.transform(const SystemEncoding().decoder).join())
+                .trim();
+        final n = await _one(c, args[1]);
+        final p = PlanItem.fromNote(n);
+        p.text = p.text.trimRight().isEmpty
+            ? text
+            : '${p.text.trimRight()}\n\n$text';
+        if (p.fields.isNotEmpty) p.setField('updated', _today());
+        p.apply();
+        await c.putNote(n);
+        stdout.writeln('${n.summary}: appended ${text.length} chars');
+      case 'new':
+        if (args.length < 2) {
+          stderr.writeln('new needs a TITLE; body on stdin');
+          exit(2);
+        }
+        String? opt(String k) {
+          final i = args.indexOf('--$k');
+          return i > 0 && i + 1 < args.length ? args[i + 1] : null;
+        }
+
+        final body =
+            (await stdin.transform(const SystemEncoding().decoder).join())
+                .trim();
+        final now = DateTime.now();
+        final status = opt('status');
+        final note = Note(
+          uid:
+              '${now.microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32).toRadixString(16)}@davdart',
+          summary: args[1],
+          categories: [
+            ...(opt('tags') ?? '').split(',').where((t) => t.isNotEmpty),
+            if (status != null) 'status-$status',
+          ],
+          created: now,
+          lastModified: now,
+        );
+        final p = PlanItem.fromNote(note);
+        if (opt('id') != null) {
+          p
+            ..setField('item_id', opt('id')!)
+            ..setField('status', status ?? 'backlog')
+            ..setField('owner', opt('owner') ?? '')
+            ..setField('decided_by', opt('decided-by') ?? '')
+            ..setField('github_ref', opt('github-ref') ?? '(none)')
+            ..setField('created', _today())
+            ..setField('updated', _today());
+        }
+        p.text = body;
+        p.apply();
+        final saved = await c.putNote(note);
+        stdout.writeln('created ${saved.uid}');
       case 'rm':
         if (args.length < 2) {
           stderr.writeln('rm needs a uid');
@@ -105,4 +188,28 @@ Future<void> main(List<String> args) async {
   } finally {
     c.close();
   }
+}
+
+String _today() {
+  final d = DateTime.now();
+  String t(int n) => n.toString().padLeft(2, '0');
+  return '${d.year}-${t(d.month)}-${t(d.day)}';
+}
+
+/// The one note whose uid equals [q] or whose title contains it (case-blind).
+Future<Note> _one(CalDavClient c, String q) async {
+  final low = q.toLowerCase();
+  final hits = (await c.listNotes())
+      .where((n) =>
+          n.uid == q ||
+          PlanItem.fromNote(n).itemId == q ||
+          n.summary.toLowerCase().contains(low))
+      .toList();
+  if (hits.length != 1) {
+    stderr.writeln(hits.isEmpty
+        ? 'no note matches "$q"'
+        : '${hits.length} notes match "$q": ${hits.map((n) => n.summary).join(' | ')}');
+    exit(1);
+  }
+  return hits.single;
 }
