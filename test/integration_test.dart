@@ -134,6 +134,12 @@ void main() {
       final mine = found.where((c) => c.name == name).toList();
       expect(mine, hasLength(1));
       expect(mine.single.holdsNotes, isTrue);
+      // Renaming sets the display name on the server.
+      await CalDavClient.renameCollection(made, '$name-renamed',
+          username: user, password: pw);
+      final again =
+          await CalDavClient.discover(home, username: user, password: pw);
+      expect(again.any((c) => c.name == '$name-renamed'), isTrue);
       // It takes notes.
       final c = CalDavClient(collection: made, username: user, password: pw);
       final n = await c.putNote(Note(uid: 'x1', summary: 'hi'));

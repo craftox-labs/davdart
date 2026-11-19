@@ -66,15 +66,13 @@ Future<void> showRenameSpaceDialog(BuildContext context, AppState state) {
     context: context,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setState) {
-        void submit() {
-          if (state.renameSpace(name.text)) {
+        Future<void> submit() async {
+          final err = await state.renameSpace(name.text);
+          if (!ctx.mounted) return;
+          if (err == null) {
             Navigator.of(ctx).pop();
           } else {
-            setState(
-              () => error = name.text.trim().isEmpty
-                  ? 'Enter a name'
-                  : 'Another space already has that name',
-            );
+            setState(() => error = err);
           }
         }
 

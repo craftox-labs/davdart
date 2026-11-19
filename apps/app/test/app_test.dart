@@ -190,9 +190,9 @@ void main() {
       s.setQuery('x');
       s.saveView('v');
       final id = s.currentSpaceId!;
-      expect(s.renameSpace('  '), isFalse);
-      expect(s.renameSpace('Planning'), isFalse);
-      expect(s.renameSpace('Scratch'), isTrue);
+      expect(await s.renameSpace('  '), isNotNull);
+      expect(await s.renameSpace('Planning'), isNotNull);
+      expect(await s.renameSpace('Scratch'), isNull);
       expect(s.currentSpaceName, 'Scratch');
       expect(storage.keys, contains('davdart.views.v1.$id'));
       expect(storage.read('davdart.views.v1'), isNull);
@@ -210,7 +210,7 @@ void main() {
       expect(storage.keys.where((k) => k.contains(id)), isEmpty);
       await s.deleteSpace(); // Planning: ignored
       expect(s.spaces, hasLength(1));
-      expect(s.renameSpace('Work'), isTrue);
+      expect(await s.renameSpace('Work'), isNull);
       expect(s.currentSpaceName, 'Work');
     });
 
@@ -522,6 +522,13 @@ void main() {
           );
         }
         if (r.method == 'MKCALENDAR') return http.Response('', 201);
+        if (r.method == 'PROPPATCH') {
+          return http.Response(
+            '<multistatus xmlns="DAV:"><response><propstat>'
+            '<status>HTTP/1.1 200 OK</status></propstat></response></multistatus>',
+            207,
+          );
+        }
         if (r.url.path == '/dav/tm/' && r.method == 'REPORT') {
           return http.Response('', 404);
         }
@@ -568,9 +575,10 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 100));
       expect(storage.keys.any((k) => k.startsWith('sp.${work.id}.')), isTrue);
       // Renaming keeps it on the server.
-      expect(s.renameSpace('Work 2'), isTrue);
+      expect(await s.renameSpace('Work 2'), isNull);
+      expect(seen.any((e) => e.startsWith('PROPPATCH /dav/c/')), isTrue);
       expect(s.currentOnServer, isTrue);
-      expect(s.renameSpace('Work'), isTrue);
+      expect(await s.renameSpace('Work'), isNull);
       // Restart: still signed in, the space reconnects without asking again.
       final c2 = SpaceCatalog(
         storage,
@@ -588,6 +596,44 @@ void main() {
       await s.signIn('other', 'pw');
       expect(s.syncMessage, startsWith('Could not sign in'));
       expect(s.accountUser, 'tm');
+    });
+
+    test('sign-in links a space connected by hand and takes server names', () async {
+      final server = FakeCalDav();
+      final client = MockClient((r) async {
+        if (r.method == 'PROPFIND' && r.url.path == '/dav/tm/') {
+          return http.Response(
+            '<multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
+            '<response><href>/dav/c/</href><propstat><prop>'
+            '<displayname>Server Name</displayname>'
+            '<resourcetype><collection/><C:calendar/></resourcetype>'
+            '</prop></propstat></response></multistatus>',
+            207,
+          );
+        }
+        return server.respond(r);
+      });
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(
+        storage,
+        planningSeed: FakeSource(sample),
+        davBase: Uri.parse('https://fake.test/dav/'),
+        httpClient: client,
+      );
+      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      await s.load();
+      // The Planning space was connected to the collection by hand.
+      await s.connect('c/', 'tm', 'pw');
+      expect(storage.read('davdart.server.v1'), contains('"password":"pw"'));
+      await s.signIn('tm', 'pw');
+      // No duplicate: the hand-connected space is the account space now.
+      expect(s.spaces, hasLength(1));
+      expect(s.spaces.single.id, 'planning');
+      expect(s.spaces.single.onServer, isTrue);
+      expect(s.spaces.single.name, 'Server Name');
+      expect(storage.read('davdart.server.v1'), isNot(contains('pw')));
+      expect(s.connected, isTrue);
+      expect(s.notes, hasLength(3));
     });
 
     testWidgets('detail lists earlier versions kept by a merge', (t) async {

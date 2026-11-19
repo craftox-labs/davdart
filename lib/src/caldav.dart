@@ -171,6 +171,43 @@ class CalDavClient {
     return url;
   }
 
+  /// Sets the display name of the collection at [url] (PROPPATCH).
+  static Future<void> renameCollection(
+    Uri url,
+    String name, {
+    required String username,
+    required String password,
+    http.Client? client,
+  }) async {
+    final u = _withSlash(url);
+    final c = CalDavClient(
+        collection: u, username: username, password: password, client: client);
+    final b = XmlBuilder();
+    b.element('d:propertyupdate', nest: () {
+      b.namespace('DAV:', 'd');
+      b.element('d:set', nest: () {
+        b.element('d:prop', nest: () {
+          b.element('d:displayname', nest: name);
+        });
+      });
+    });
+    final r = await c._send('PROPPATCH', u,
+        headers: {'Content-Type': 'application/xml; charset=utf-8'},
+        body: b.buildDocument().toXmlString());
+    if (r.statusCode != 207 && r.statusCode != 200 && r.statusCode != 204) {
+      throw CalDavException(r.statusCode, 'PROPPATCH failed');
+    }
+    if (r.statusCode == 207) {
+      final bad = XmlDocument.parse(utf8.decode(r.bodyBytes))
+          .descendantElements
+          .where((e) => e.name.local == 'status')
+          .where((e) => !e.innerText.contains(' 200'));
+      if (bad.isNotEmpty) {
+        throw CalDavException(403, 'rename refused: ${bad.first.innerText}');
+      }
+    }
+  }
+
   Uri _resolve(String href) => collection.resolve(href);
 
   Future<http.Response> _send(

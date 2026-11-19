@@ -194,16 +194,59 @@ class SpaceCatalog {
     ];
   }
 
+  static String _norm(String p) =>
+      p.replaceAll(RegExp('^/+'), '').replaceAll(RegExp('/+\$'), '');
+
+  KeyValueStorage _scoped(String id) =>
+      id == planningId ? storage : PrefixedStorage(storage, 'sp.$id.');
+
+  /// The collection path a local Space was connected to by hand, if any.
+  String? _connectedPath(String id) {
+    try {
+      final raw = _scoped(id).read(SpaceNoteSource.loginKey);
+      if (raw == null || raw.isEmpty) return null;
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      return j['path'] is String ? _norm(j['path'] as String) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// The server's display name wins; a name another Space already uses stays.
+  void _applyName(int i, String serverName) {
+    final n = serverName.trim();
+    final s = spaces[i];
+    if (n.isEmpty || n == s.name) return;
+    if (spaces.any((o) => o.id != s.id && o.name == n)) return;
+    spaces[i] = SpaceInfo(s.id, n, collection: s.collection);
+  }
+
   int _addFound(List<FoundCollection> found) {
     var added = 0;
     for (final f in found) {
       final id = 'srv-${Uri.encodeComponent(f.path)}';
       _deleted.remove(id); // a Space removed earlier may come back
-      if (spaces.any((s) => s.collection == f.path)) continue;
-      final old = spaces.indexWhere((s) => s.id == id);
-      if (old >= 0) {
-        // A local copy left by an earlier sign-out: link it back.
-        spaces[old] = SpaceInfo(id, spaces[old].name, collection: f.path);
+      final have = spaces.indexWhere((s) => s.collection == f.path);
+      if (have >= 0) {
+        _applyName(have, f.name);
+        continue;
+      }
+      // A local copy left by an earlier sign-out, or a Space connected to
+      // this collection by hand: link it instead of adding a duplicate.
+      var at = spaces.indexWhere((s) => s.id == id);
+      if (at < 0) {
+        at = spaces.indexWhere(
+          (s) => s.collection == null && _connectedPath(s.id) == _norm(f.path),
+        );
+        if (at >= 0) _adoptLogin(spaces[at].id);
+      }
+      if (at >= 0) {
+        spaces[at] = SpaceInfo(
+          spaces[at].id,
+          spaces[at].name,
+          collection: f.path,
+        );
+        _applyName(at, f.name);
         added++;
         continue;
       }
@@ -212,6 +255,55 @@ class SpaceCatalog {
     }
     _save();
     return added;
+  }
+
+  /// Rewrites a hand-made login so the Space uses the account's password.
+  void _adoptLogin(String id) {
+    final a = account;
+    if (a == null) return;
+    final own = _scoped(id);
+    try {
+      final j = jsonDecode(
+        own.read(SpaceNoteSource.loginKey)!,
+      ) as Map<String, dynamic>;
+      own.write(
+        SpaceNoteSource.loginKey,
+        jsonEncode({'path': j['path'], 'user': a.user, 'account': true}),
+      );
+    } catch (_) {}
+  }
+
+  /// Renames Space [id]. For an account Space the server's display name is
+  /// changed first, so other apps see it; null means done, else the reason.
+  Future<String?> renameSpace(String id, String name) async {
+    final n = name.trim();
+    final i = spaces.indexWhere((s) => s.id == id);
+    if (i < 0) return 'No such space';
+    if (n.isEmpty) return 'Enter a name';
+    if (spaces.any((s) => s.id != id && s.name == n)) {
+      return 'Another space already has that name';
+    }
+    final a = account;
+    final path = spaces[i].collection;
+    if (path != null && a != null) {
+      try {
+        await CalDavClient.renameCollection(
+          _davBase.resolve(path),
+          n,
+          username: a.user,
+          password: a.password,
+          client: httpClient,
+        );
+      } catch (e) {
+        return 'Could not rename on the server: $e';
+      }
+    }
+    // The list may have changed while the server answered.
+    final j = spaces.indexWhere((s) => s.id == id);
+    if (j < 0) return null;
+    spaces[j] = SpaceInfo(id, n, collection: spaces[j].collection);
+    _save();
+    return null;
   }
 
   /// Creates a new collection on the server and a Space for it.
@@ -253,17 +345,6 @@ class SpaceCatalog {
       own.write(SpaceNoteSource.loginKey, '');
     }
     _save();
-  }
-
-  /// Renames Space [id]; blank or already-used names are refused (false).
-  bool rename(String id, String name) {
-    final n = name.trim();
-    final i = spaces.indexWhere((s) => s.id == id);
-    if (i < 0 || n.isEmpty) return false;
-    if (spaces.any((s) => s.id != id && s.name == n)) return false;
-    spaces[i] = SpaceInfo(id, n, collection: spaces[i].collection);
-    _save();
-    return true;
   }
 
   /// Deletes a local Space and everything stored for it. The Planning Space
