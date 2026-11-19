@@ -5,28 +5,8 @@ import 'package:davdart/davdart.dart';
 
 /// Minimal CLI. Config: a key=value file (url, user, password) or DAVDART_*
 /// environment variables, which win. Commands: list, add TITLE [BODY], rm UID.
-Map<String, String> _loadConfig() {
-  final env = Platform.environment;
-  final cfg = <String, String>{};
-  final file = File(
-      env['DAVDART_CONFIG'] ?? '${env['HOME']}/.config/davdart/credentials');
-  if (file.existsSync()) {
-    for (final line in file.readAsLinesSync()) {
-      final i = line.indexOf('=');
-      if (i > 0 && !line.trimLeft().startsWith('#')) {
-        cfg[line.substring(0, i).trim()] = line.substring(i + 1).trim();
-      }
-    }
-  }
-  for (final k in ['url', 'user', 'password']) {
-    final v = env['DAVDART_${k.toUpperCase()}'];
-    if (v != null && v.isNotEmpty) cfg[k] = v;
-  }
-  return cfg;
-}
-
 Future<void> main(List<String> args) async {
-  final cfg = _loadConfig();
+  final cfg = loadConfig();
   final url = cfg['url'];
   final user = cfg['user'];
   final pass = cfg['password'];
