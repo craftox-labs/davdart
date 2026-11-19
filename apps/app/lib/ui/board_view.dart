@@ -90,9 +90,9 @@ class _Card extends StatelessWidget {
         onPress: () => state.select(note.uid),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: t.surface,
+            color: t.card,
             borderRadius: BorderRadius.circular(Tokens.radius),
-            border: Border.all(color: selected ? t.accent : t.line),
+            border: Border.all(color: selected ? t.accent : t.cardBorder),
           ),
           child: Padding(
             padding: const EdgeInsets.all(12),

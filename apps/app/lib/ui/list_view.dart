@@ -42,7 +42,7 @@ class NoteListView extends StatelessWidget {
     }
     return ListView.separated(
       itemCount: rows.length,
-      separatorBuilder: (_, _) => Container(height: 1, color: t.line),
+      separatorBuilder: (_, _) => Container(height: 1, color: t.divider),
       itemBuilder: (context, i) {
         final (n, depth) = rows[i];
         final p = PlanItem.fromNote(n);
@@ -50,7 +50,7 @@ class NoteListView extends StatelessWidget {
         return FTappable(
           onPress: () => state.select(n.uid),
           child: Container(
-            color: state.selectedUid == n.uid ? t.surface : null,
+            color: state.selectedUid == n.uid ? t.selected : null,
             padding: EdgeInsets.fromLTRB(12 + depth * 20.0, 10, 12, 10),
             child: Row(
               children: [

@@ -8,13 +8,13 @@ Color statusColor(String? status, BuildContext context) {
   final t = tokensOf(context);
   switch (status) {
     case 'done':
-      return const Color(0xFF3FA37A);
+      return t.statusDone;
     case 'doing':
       return t.accent;
     case 'blocked':
-      return const Color(0xFFD9694F);
+      return t.statusBlocked;
     case 'todo':
-      return const Color(0xFFD8A23A);
+      return t.statusTodo;
     default:
       return t.muted;
   }

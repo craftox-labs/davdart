@@ -28,8 +28,8 @@ class ScopeBar extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
       decoration: BoxDecoration(
-        color: t.surface,
-        border: Border(bottom: BorderSide(color: t.line)),
+        color: t.card,
+        border: Border(bottom: BorderSide(color: t.divider)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

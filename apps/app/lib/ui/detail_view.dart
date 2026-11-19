@@ -116,8 +116,8 @@ class DetailView extends StatelessWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: t.surface,
-                      border: Border.all(color: t.line),
+                      color: t.card,
+                      border: Border.all(color: t.cardBorder),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Column(
@@ -185,8 +185,8 @@ class DetailView extends StatelessWidget {
                                     margin: const EdgeInsets.only(bottom: 8),
                                     padding: const EdgeInsets.all(12),
                                     decoration: BoxDecoration(
-                                      color: t.surface,
-                                      border: Border.all(color: t.line),
+                                      color: t.card,
+                                      border: Border.all(color: t.cardBorder),
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Column(

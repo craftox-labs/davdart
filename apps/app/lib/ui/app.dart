@@ -101,7 +101,7 @@ class Shell extends StatelessWidget {
               children: [
                 Expanded(child: main()),
                 if (hasDetail) ...[
-                  Container(width: 1, color: t.line),
+                  Container(width: 1, color: t.divider),
                   SizedBox(
                     width: Tokens.detailWidth,
                     child: DetailView(
@@ -199,7 +199,7 @@ class TopBar extends StatelessWidget {
     );
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: t.line)),
+        border: Border(bottom: BorderSide(color: t.divider)),
       ),
       child: SizedBox(
         height: 52,

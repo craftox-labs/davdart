@@ -10,6 +10,9 @@ import '../data/space_catalog.dart';
 
 enum ViewMode { board, list }
 
+/// The section the side panel shows, chosen with the icon rail.
+enum Section { notes, views, search, spaces, account, settings }
+
 const boardOrder = ['backlog', 'todo', 'doing', 'blocked', 'done'];
 
 String _clock() {
@@ -59,6 +62,23 @@ class SpaceHit {
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
     _loadViews();
+    final saved = prefs?.read(_sectionKey);
+    section = Section.values.firstWhere(
+      (v) => v.name == saved,
+      orElse: () => Section.notes,
+    );
+  }
+
+  static const _sectionKey = 'davdart.section.v1';
+
+  /// Which section the side panel shows.
+  Section section = Section.notes;
+
+  void setSection(Section s) {
+    if (section == s) return;
+    section = s;
+    prefs?.write(_sectionKey, s.name);
+    notifyListeners();
   }
 
   NoteSource source;

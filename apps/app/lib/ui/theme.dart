@@ -10,21 +10,19 @@ Tokens tokensOf(BuildContext context) =>
     ? Tokens.dark
     : Tokens.light;
 
-FColors _colors(Tokens t, FColors base) {
-  final dark = base.brightness == Brightness.dark;
-  return base.copyWith(
-    background: t.bg,
-    foreground: t.fg,
-    primary: t.accent,
-    primaryForeground: dark ? t.bg : const Color(0xFFFFFFFF),
-    secondary: t.line,
-    secondaryForeground: t.fg,
-    muted: Color.alphaBlend(t.line.withValues(alpha: .5), t.bg),
-    mutedForeground: t.muted,
-    card: t.surface,
-    border: t.line,
-  );
-}
+FColors _colors(Tokens t, FColors base) => base.copyWith(
+  background: t.panel,
+  foreground: t.fg,
+  primary: t.accent,
+  primaryForeground: t.onAccent,
+  secondary: t.selected,
+  secondaryForeground: t.fg,
+  muted: t.hover,
+  mutedForeground: t.muted,
+  // forui fills text fields and popovers with `card`.
+  card: t.field,
+  border: t.divider,
+);
 
 final _cache = <(Brightness, bool), FThemeData>{};
 
