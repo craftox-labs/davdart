@@ -3,7 +3,6 @@ import 'package:forui/forui.dart';
 
 import '../data/space_catalog.dart';
 import '../state/app_state.dart';
-import '../theme/tokens.dart';
 import 'new_space_dialog.dart';
 import 'sections.dart';
 import 'shell_frame.dart';
@@ -29,68 +28,104 @@ class Sidebar extends StatelessWidget {
       Section.notes => NotesSection(state: state, onPick: close),
       Section.views => ViewsSection(state: state, onPick: close),
       Section.search => SearchSection(state: state, onPick: close),
-      Section.spaces => SpacesSection(state: state, onPick: close),
       Section.account => AccountSection(state: state, onPick: close),
       Section.settings => SettingsSection(state: state, onPick: close),
     };
     return FSidebar.raw(
-      style: const .delta(
-        constraints: BoxConstraints.tightFor(width: Tokens.sidebarWidth),
+      style: .delta(
+        constraints: BoxConstraints.tightFor(
+          width: tokensOf(context).sizes.sidebar,
+        ),
       ),
-      header: inDrawer ? SectionBar(state: state) : null,
+      header: inDrawer ? SectionBar(state: state, onPick: close) : null,
       child: body,
     );
   }
 }
 
-/// The Space menu's items (switch, new, rename, delete). [onPick] runs after
-/// the menu closes; [quickOnly] keeps just the list of Spaces to switch to.
+/// Sync state line of a Space in the Spaces popup.
+String spaceSyncLabel(AppState state, SpaceInfo sp) =>
+    sp.id == state.currentSpaceId && state.syncing
+    ? 'Syncing…'
+    : sp.onServer
+    ? 'Synced with the server'
+    : 'On this device only';
+
+/// The Spaces popup's groups: every Space (the current one first, marked)
+/// with its sync state, then the manage actions (new, rename, delete).
+/// Picking a Space switches to it and shows Files; [onPick] runs only before a
+/// manage action opens a dialog.
 List<FItemGroup> spaceMenuGroups(
   BuildContext context,
   AppState state,
   FPopoverController controller, {
   VoidCallback? onPick,
-  bool quickOnly = false,
 }) {
   final t = tokensOf(context);
+  if (state.spaces.isEmpty) {
+    return [
+      FItemGroup(
+        children: [FItem(title: const Text('One fixed notes source'))],
+      ),
+    ];
+  }
   void pick(VoidCallback act) {
     controller.hide();
-    onPick?.call();
     act();
   }
 
+  void manage(VoidCallback act) => pick(() {
+    onPick?.call();
+    act();
+  });
+
+  final spaces = [
+    ...state.spaces.where((s) => s.id == state.currentSpaceId),
+    ...state.spaces.where((s) => s.id != state.currentSpaceId),
+  ];
   return [
     FItemGroup(
       children: [
-        for (final sp in state.spaces)
+        for (final sp in spaces)
           FItem(
             key: Key('space-${sp.id}'),
             selected: sp.id == state.currentSpaceId,
+            prefix: Icon(
+              sp.onServer ? FLucideIcons.cloud : FLucideIcons.hardDrive,
+              size: t.icons.md,
+              color: t.muted,
+            ),
             title: Text(sp.name, overflow: TextOverflow.ellipsis),
-            suffix: sp.onServer
-                ? Icon(FLucideIcons.cloud, size: 14, color: t.muted)
+            subtitle: Text(spaceSyncLabel(state, sp)),
+            suffix: sp.id == state.currentSpaceId
+                ? Icon(FLucideIcons.check, size: t.icons.md, color: t.accent)
                 : null,
-            onPress: () => pick(() => state.switchSpace(sp.id)),
+            onPress: () => pick(() {
+              state.switchSpace(sp.id);
+              state.setSection(Section.notes);
+            }),
           ),
       ],
     ),
-    if (!quickOnly)
-      FItemGroup(
-        children: [
+    FItemGroup(
+      children: [
+        FItem(
+          prefix: Icon(FLucideIcons.plus, size: t.icons.md, color: t.muted),
+          title: const Text('New space…'),
+          onPress: () => manage(() => showNewSpaceDialog(context, state)),
+        ),
+        FItem(
+          prefix: Icon(FLucideIcons.pencil, size: t.icons.md, color: t.muted),
+          title: const Text('Rename this space…'),
+          onPress: () => manage(() => showRenameSpaceDialog(context, state)),
+        ),
+        if (state.currentSpaceId != SpaceCatalog.planningId)
           FItem(
-            title: const Text('New space…'),
-            onPress: () => pick(() => showNewSpaceDialog(context, state)),
+            prefix: Icon(FLucideIcons.trash2, size: t.icons.md, color: t.muted),
+            title: const Text('Delete this space…'),
+            onPress: () => manage(() => showDeleteSpaceDialog(context, state)),
           ),
-          FItem(
-            title: const Text('Rename this space…'),
-            onPress: () => pick(() => showRenameSpaceDialog(context, state)),
-          ),
-          if (state.currentSpaceId != SpaceCatalog.planningId)
-            FItem(
-              title: const Text('Delete this space…'),
-              onPress: () => pick(() => showDeleteSpaceDialog(context, state)),
-            ),
-        ],
-      ),
+      ],
+    ),
   ];
 }

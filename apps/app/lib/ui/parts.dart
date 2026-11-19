@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import 'theme.dart';
+
 /// A small icon-only button with a hover tooltip.
 class IconAction extends StatelessWidget {
   const IconAction({
@@ -32,37 +34,40 @@ Future<void> showAppDialog(
   required String title,
   required Widget content,
   required List<Widget> actions,
-  double width = 420,
+  double? width,
 }) => showFDialog<void>(
   context: context,
   builder: (ctx, style, animation) => FDialog(
     animation: animation,
-    constraints: BoxConstraints(maxWidth: width),
-    builder: (ctx, style) => Padding(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(title, style: style.titleTextStyle),
-          const SizedBox(height: 12),
-          Flexible(
-            child: SingleChildScrollView(
-              child: DefaultTextStyle.merge(
-                style: style.bodyTextStyle,
-                child: content,
+    constraints: BoxConstraints(maxWidth: width ?? tokensOf(ctx).sizes.dialog),
+    builder: (ctx, style) {
+      final t = tokensOf(ctx);
+      return Padding(
+        padding: EdgeInsets.all(t.space.xxl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(title, style: style.titleTextStyle),
+            SizedBox(height: t.space.lg),
+            Flexible(
+              child: SingleChildScrollView(
+                child: DefaultTextStyle.merge(
+                  style: style.bodyTextStyle,
+                  child: content,
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.end,
-            spacing: 8,
-            children: actions,
-          ),
-        ],
-      ),
-    ),
+            SizedBox(height: t.space.xl),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              spacing: t.space.md,
+              children: actions,
+            ),
+          ],
+        ),
+      );
+    },
   ),
 );
 

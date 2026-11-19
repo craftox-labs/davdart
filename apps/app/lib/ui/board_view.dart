@@ -3,7 +3,6 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
-import '../theme/tokens.dart';
 import 'chips.dart';
 import 'theme.dart';
 
@@ -27,34 +26,37 @@ class BoardView extends StatelessWidget {
     }
     return ListView(
       scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.all(Tokens.gap),
+      padding: EdgeInsets.all(t.space.lg),
       children: [
         for (final (name, notes) in cols)
           Container(
-            width: 264,
-            margin: const EdgeInsets.only(right: Tokens.gap),
+            width: t.sizes.boardColumn,
+            margin: EdgeInsets.only(right: t.space.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 8),
+                  padding: EdgeInsets.fromLTRB(
+                    t.space.xs,
+                    t.space.xs,
+                    t.space.xs,
+                    t.space.md,
+                  ),
                   child: Row(
                     children: [
                       StatusDot(name == 'notes' ? null : name),
-                      const SizedBox(width: 8),
+                      SizedBox(width: t.space.md),
                       Text(
                         name.toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          letterSpacing: .8,
+                        style: t.type.labelStyle.copyWith(
+                          fontSize: t.type.caption,
                           color: t.muted,
-                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      SizedBox(width: t.space.sm),
                       Text(
                         '${notes.length}',
-                        style: TextStyle(fontSize: 12, color: t.muted),
+                        style: t.type.captionStyle.copyWith(color: t.muted),
                       ),
                     ],
                   ),
@@ -85,38 +87,35 @@ class _Card extends StatelessWidget {
     final p = PlanItem.fromNote(note);
     final selected = state.selectedUid == note.uid;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: t.space.md),
       child: FTappable(
         onPress: () => state.select(note.uid),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: t.card,
-            borderRadius: BorderRadius.circular(Tokens.radius),
+            borderRadius: BorderRadius.circular(t.radii.card),
             border: Border.all(color: selected ? t.accent : t.cardBorder),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: EdgeInsets.all(t.space.lg),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  p.itemId ?? note.summary,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
+                Text(p.itemId ?? note.summary, style: t.type.semiboldStyle),
                 if (p.itemId != null) ...[
-                  const SizedBox(height: 2),
+                  SizedBox(height: t.space.xxs),
                   Text(
                     note.summary,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, color: t.muted),
+                    style: t.type.bodyStyle.copyWith(color: t.muted),
                   ),
                 ],
                 if (p.owner != null) ...[
-                  const SizedBox(height: 6),
+                  SizedBox(height: t.space.sm),
                   Text(
                     p.owner!,
-                    style: TextStyle(fontSize: 12, color: t.muted),
+                    style: t.type.captionStyle.copyWith(color: t.muted),
                   ),
                 ],
               ],

@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'parts.dart';
+import 'theme.dart';
 
 /// Moves a note (and the notes under it) to another Space.
 Future<void> showMoveSpaceDialog(
@@ -19,7 +20,7 @@ Future<void> showMoveSpaceDialog(
   return showAppDialog(
     context,
     title: 'Move "${note.summary}" to…',
-    width: 360,
+    width: tokensOf(context).sizes.dialogSm,
     content: Builder(
       builder: (ctx) => Column(
         mainAxisSize: MainAxisSize.min,
@@ -30,21 +31,21 @@ Future<void> showMoveSpaceDialog(
                 ? 'The note goes to the top level of the space you pick.'
                 : 'The note and the $count under it go to the top level of '
                       'the space you pick.',
-            style: const TextStyle(fontSize: 12),
+            style: tokensOf(ctx).type.captionStyle,
           ),
-          const SizedBox(height: 4),
-          const Text(
+          SizedBox(height: tokensOf(ctx).space.xs),
+          Text(
             'Moved notes get new ids and leave their earlier versions '
             'behind. A server space syncs them when you open it.',
-            style: TextStyle(fontSize: 12),
+            style: tokensOf(ctx).type.captionStyle,
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: tokensOf(ctx).space.md),
           for (final s in others)
             FItem(
               key: Key('move-to-${s.id}'),
               prefix: Icon(
                 s.onServer ? FLucideIcons.cloud : FLucideIcons.folder,
-                size: 18,
+                size: tokensOf(ctx).icons.lg,
               ),
               title: Text(s.name),
               onPress: () {

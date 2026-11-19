@@ -17,6 +17,7 @@ import 'package:http/testing.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/semantics.dart';
 import 'package:forui/forui.dart';
+import 'package:davdart_app/ui/logo.dart';
 import 'package:davdart_app/ui/parts.dart';
 import 'package:davdart_app/ui/sidebar.dart';
 import 'package:davdart_app/theme/tokens.dart';
@@ -902,6 +903,8 @@ void main() {
       await t.tap(find.byKey(const Key('space-rename')));
       await t.pumpAndSettle();
       expect(state.currentSpaceName, 'Later');
+      await t.tap(find.byKey(const Key('rail-spaces')));
+      await t.pumpAndSettle();
       await t.tap(find.text('Delete this space…'));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('space-delete')));
@@ -986,19 +989,6 @@ void main() {
               as BoxDecoration);
       expect(deco('rail-notes').color, Tokens.light.activeItem);
       expect(deco('rail-views').color, isNull);
-      await t.tap(find.byKey(const Key('rail-spaces')));
-      await t.pumpAndSettle();
-      expect(state.section, Section.spaces);
-      expect(find.text('New space…'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byType(Sidebar),
-          matching: find.text('Core slice'),
-        ),
-        findsNothing, // the notes tree is gone
-      );
-      expect(deco('rail-spaces').color, Tokens.light.activeItem);
-      expect(deco('rail-notes').color, isNull);
       await t.tap(find.byKey(const Key('rail-views')));
       await t.pumpAndSettle();
       expect(find.text('No saved views yet'), findsOneWidget);
@@ -1017,24 +1007,80 @@ void main() {
       expect(again.section, Section.views);
     });
 
-    testWidgets('the Notes heading switches Space quickly', (t) async {
+    testWidgets('the Spaces popup lists the current Space first', (t) async {
       final state = await multi(t, const Size(1400, 900));
-      await t.tap(find.byKey(const Key('space-menu')));
+      state.setSection(Section.views);
       await t.pumpAndSettle();
-      expect(find.text('New space…'), findsNothing); // quick switch only
-      await t.tap(find.text('Inbox').last);
-      await t.pumpAndSettle();
-      expect(state.currentSpaceName, 'Inbox');
-    });
-
-    testWidgets('the Spaces section lists Spaces and switches', (t) async {
-      final state = await multi(t, const Size(1400, 900));
       await t.tap(find.byKey(const Key('rail-spaces')));
       await t.pumpAndSettle();
+      expect(state.section, Section.views); // not a section
       expect(find.text('On this device only'), findsNWidgets(2));
+      expect(find.text('New space…'), findsOneWidget);
+      expect(find.text('Rename this space…'), findsOneWidget);
+      final planning = t.getTopLeft(find.byKey(const Key('space-planning')));
+      final inbox = t.getTopLeft(
+        find.byKey(Key('space-${state.spaces.last.id}')),
+      );
+      expect(planning.dy, lessThan(inbox.dy)); // current first
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('space-planning')),
+          matching: find.byIcon(FLucideIcons.check),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('picking a Space switches and shows Files', (t) async {
+      final state = await multi(t, const Size(1400, 900));
+      state.setSection(Section.settings);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('rail-spaces')));
+      await t.pumpAndSettle();
       await t.tap(find.text('Inbox'));
       await t.pumpAndSettle();
       expect(state.currentSpaceName, 'Inbox');
+      expect(state.section, Section.notes);
+      expect(find.text('New space…'), findsNothing); // popup closed
+      await t.tap(find.byKey(const Key('rail-spaces')));
+      await t.pumpAndSettle();
+      final inbox = t.getTopLeft(find.text('Inbox').last);
+      final planning = t.getTopLeft(find.text('Planning').last);
+      expect(inbox.dy, lessThan(planning.dy)); // Inbox is now first
+    });
+
+    testWidgets('rail order: logo, Spaces, Files, Views, Search', (t) async {
+      await pump(t);
+      expect(find.byKey(const Key('logo-slot')), findsOneWidget);
+      expect(find.text(logoLetter), findsOneWidget);
+      final keys = [
+        'logo-slot',
+        'rail-spaces',
+        'rail-notes',
+        'rail-views',
+        'rail-search',
+        'rail-settings',
+      ];
+      final ys = [for (final k in keys) t.getTopLeft(find.byKey(Key(k))).dy];
+      expect(ys, [...ys]..sort());
+      expect(
+        find.byKey(const Key('rail-account')),
+        findsNothing,
+      ); // can't sign in
+      // The logo does nothing when tapped.
+      await t.tap(find.byKey(const Key('logo-slot')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('rail-spaces')), findsOneWidget);
+      expect(find.text('New space…'), findsNothing);
+    });
+
+    test('a saved Spaces selection falls back to Files', () {
+      final storage = MemoryStorage();
+      storage.write('davdart.section.v1', 'spaces');
+      expect(
+        AppState(FakeSource(sample), prefs: storage).section,
+        Section.notes,
+      );
     });
 
     testWidgets('the Search section lists hits across Spaces', (t) async {

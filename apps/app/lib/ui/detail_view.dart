@@ -28,7 +28,7 @@ class DetailView extends StatelessWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
+          padding: EdgeInsets.fromLTRB(t.space.xs, t.space.xs, t.space.md, 0),
           child: Row(
             children: [
               IconAction(
@@ -41,7 +41,7 @@ class DetailView extends StatelessWidget {
                   path.map((n) => n.summary).join('  /  '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 12, color: t.muted),
+                  style: t.type.captionStyle.copyWith(color: t.muted),
                 ),
               ),
               if (state.editable) ...[
@@ -70,25 +70,24 @@ class DetailView extends StatelessWidget {
         ),
         Expanded(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 4, 20, 40),
+            padding: EdgeInsets.fromLTRB(
+              t.space.xxl,
+              t.space.xs,
+              t.space.xxl,
+              t.space.huge,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  note.summary,
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                Text(note.summary, style: t.type.displayStyle),
                 if (state.editable && !AppState.isFolder(note)) ...[
-                  const SizedBox(height: 8),
+                  SizedBox(height: t.space.md),
                   Row(
                     children: [
                       Text('Status', style: TextStyle(color: t.muted)),
-                      const SizedBox(width: 12),
+                      SizedBox(width: t.space.lg),
                       SizedBox(
-                        width: 160,
+                        width: t.sizes.statusField,
                         child: FSelect<String>.rich(
                           key: const Key('status-menu'),
                           format: (v) => v,
@@ -110,40 +109,37 @@ class DetailView extends StatelessWidget {
                     ],
                   ),
                 ],
-                const SizedBox(height: 12),
+                SizedBox(height: t.space.lg),
                 if (p.fields.isNotEmpty)
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                    padding: EdgeInsets.all(t.space.lg),
                     decoration: BoxDecoration(
                       color: t.card,
                       border: Border.all(color: t.cardBorder),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(t.radii.card),
                     ),
                     child: Column(
                       children: [
                         for (final e in p.fields.entries)
                           Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 2),
+                            padding: EdgeInsets.symmetric(
+                              vertical: t.space.xxs,
+                            ),
                             child: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 SizedBox(
-                                  width: 104,
+                                  width: t.sizes.metaLabel,
                                   child: Text(
                                     e.key,
-                                    style: TextStyle(
-                                      fontFamily: 'monospace',
-                                      fontSize: 12,
+                                    style: t.type.monoStyle.copyWith(
                                       color: t.muted,
                                     ),
                                   ),
                                 ),
                                 Expanded(
-                                  child: Text(
-                                    e.value,
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
+                                  child: Text(e.value, style: t.type.bodyStyle),
                                 ),
                               ],
                             ),
@@ -152,14 +148,14 @@ class DetailView extends StatelessWidget {
                     ),
                   ),
                 if (note.categories.isNotEmpty) ...[
-                  const SizedBox(height: 12),
+                  SizedBox(height: t.space.lg),
                   Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
+                    spacing: t.space.sm,
+                    runSpacing: t.space.sm,
                     children: [for (final c in note.categories) TagChip(c)],
                   ),
                 ],
-                const SizedBox(height: 16),
+                SizedBox(height: t.space.xl),
                 MarkdownLite(p.text),
                 FutureBuilder<List<Revision>>(
                   key: ValueKey('rev-${note.uid}-${note.lastModified}'),
@@ -168,26 +164,28 @@ class DetailView extends StatelessWidget {
                     final revs = snap.data ?? const <Revision>[];
                     if (revs.isEmpty) return const SizedBox.shrink();
                     return Padding(
-                      padding: const EdgeInsets.only(top: 20),
+                      padding: EdgeInsets.only(top: t.space.xxl),
                       child: FAccordion(
                         key: const Key('revisions'),
                         children: [
                           FAccordionItem(
                             title: Text(
                               'Earlier versions (${revs.length})',
-                              style: TextStyle(fontSize: 13, color: t.muted),
+                              style: t.type.bodyStyle.copyWith(color: t.muted),
                             ),
                             child: Column(
                               children: [
                                 for (final r in revs.reversed)
                                   Container(
                                     width: double.infinity,
-                                    margin: const EdgeInsets.only(bottom: 8),
-                                    padding: const EdgeInsets.all(12),
+                                    margin: EdgeInsets.only(bottom: t.space.md),
+                                    padding: EdgeInsets.all(t.space.lg),
                                     decoration: BoxDecoration(
                                       color: t.card,
                                       border: Border.all(color: t.cardBorder),
-                                      borderRadius: BorderRadius.circular(8),
+                                      borderRadius: BorderRadius.circular(
+                                        t.radii.card,
+                                      ),
                                     ),
                                     child: Column(
                                       crossAxisAlignment:
@@ -195,24 +193,19 @@ class DetailView extends StatelessWidget {
                                       children: [
                                         Text(
                                           '${r.at.toLocal().toString().substring(0, 16)}  ·  ${r.reason}',
-                                          style: TextStyle(
-                                            fontSize: 11,
+                                          style: t.type.microStyle.copyWith(
                                             color: t.muted,
                                           ),
                                         ),
-                                        const SizedBox(height: 4),
+                                        SizedBox(height: t.space.xs),
                                         Text(
                                           r.summary,
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w600,
-                                          ),
+                                          style: t.type.semiboldStyle,
                                         ),
                                         SelectableBody(
                                           child: Text(
                                             r.body,
-                                            style: const TextStyle(
-                                              fontSize: 13,
-                                            ),
+                                            style: t.type.bodyStyle,
                                           ),
                                         ),
                                       ],

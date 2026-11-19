@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 import '../data/note_source.dart';
 import '../state/app_state.dart';
 import 'parts.dart';
+import 'theme.dart';
 
 /// Connects the local Space to a CalDAV collection through the board
 /// server's /dav/ proxy. The first sync sends every local note and merges by
@@ -61,7 +62,7 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 12,
+          spacing: tokensOf(ctx).space.lg,
           children: [
             field(
               key: const Key('connect-user'),
@@ -87,7 +88,7 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
               child: Text(finding == '' ? 'Looking…' : 'Find collections'),
             ),
             if (finding != null && finding != '')
-              Text(finding!, style: const TextStyle(fontSize: 12)),
+              Text(finding!, style: tokensOf(ctx).type.captionStyle),
             if (found != null)
               found!.isEmpty
                   ? const Text('No note collections for this user.')
@@ -130,10 +131,10 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
               onChange: (v) => setLocal(() => replace = v),
               label: const Text('Start from the server (drop local notes)'),
             ),
-            const Text(
+            Text(
               'Otherwise notes here are sent to this collection and merged with what '
               'it holds. The login is kept in this browser.',
-              style: TextStyle(fontSize: 12),
+              style: tokensOf(ctx).type.captionStyle,
             ),
           ],
         );

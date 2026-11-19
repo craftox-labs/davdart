@@ -3,6 +3,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'parts.dart';
+import 'theme.dart';
 
 /// Names a new local Space and opens it.
 Future<void> showNewSpaceDialog(BuildContext context, AppState state) {
@@ -21,7 +22,7 @@ Future<void> showNewSpaceDialog(BuildContext context, AppState state) {
       builder: (ctx, setLocal) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 12,
+        spacing: tokensOf(ctx).space.lg,
         children: [
           field(
             key: const Key('space-name'),

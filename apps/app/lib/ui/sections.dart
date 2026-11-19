@@ -2,16 +2,13 @@ import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
-import '../data/space_catalog.dart';
 import '../state/app_state.dart';
 import 'account_dialog.dart';
 import 'connect_dialog.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
-import 'new_space_dialog.dart';
 import 'parts.dart';
 import 'save_view_dialog.dart';
-import 'sidebar.dart';
 import 'theme.dart';
 
 /// The panels the side panel shows, one per rail section. Each takes
@@ -25,59 +22,76 @@ class _Panel extends StatelessWidget {
   final Widget? trailing;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(18, 14, 12, 8),
-        child: Row(
-          children: [
-            Expanded(child: heading),
-            ?trailing,
-          ],
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            t.space.xl + t.space.xxs,
+            t.space.lg + t.space.xxs,
+            t.space.lg,
+            t.space.md,
+          ),
+          child: Row(
+            children: [
+              Expanded(child: heading),
+              ?trailing,
+            ],
+          ),
         ),
-      ),
-      Expanded(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          children: children,
+        Expanded(
+          child: ListView(
+            padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+            children: children,
+          ),
         ),
-      ),
-    ],
-  );
+      ],
+    );
+  }
 }
 
-Widget _title(String text) => Text(
-  text,
-  style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-);
+class _Title extends StatelessWidget {
+  const _Title(this.text);
+  final String text;
+
+  @override
+  Widget build(BuildContext context) =>
+      Text(text, style: tokensOf(context).type.headingStyle);
+}
+
+Widget _title(String text) => _Title(text);
 
 class _Muted extends StatelessWidget {
   const _Muted(this.text, {super.key});
   final String text;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
-    child: Text(
-      text,
-      style: TextStyle(fontSize: 12, color: tokensOf(context).muted),
-    ),
-  );
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(
+        horizontal: t.space.md,
+        vertical: t.space.xs,
+      ),
+      child: Text(text, style: t.type.captionStyle.copyWith(color: t.muted)),
+    );
+  }
 }
 
-Widget _label(BuildContext context, String text) => Padding(
-  padding: const EdgeInsets.fromLTRB(8, 14, 8, 4),
-  child: Text(
-    text,
-    style: TextStyle(
-      fontSize: 11,
-      letterSpacing: .8,
-      color: tokensOf(context).muted,
-      fontWeight: FontWeight.w600,
+Widget _label(BuildContext context, String text) {
+  final t = tokensOf(context);
+  return Padding(
+    padding: EdgeInsets.fromLTRB(
+      t.space.md,
+      t.space.lg + t.space.xxs,
+      t.space.md,
+      t.space.xs,
     ),
-  ),
-);
+    child: Text(text, style: t.type.labelStyle.copyWith(color: t.muted)),
+  );
+}
 
 Widget _item(IconData icon, String text, VoidCallback tap, {bool on = false}) =>
     FSidebarItem(
@@ -93,8 +107,8 @@ abstract class _Section extends StatelessWidget {
   final VoidCallback onPick;
 }
 
-/// Notes: the Space name (a quick-switch dropdown), then the notes tree with
-/// folders and the tags at the end.
+/// Files (the notes): the Space name, then the tree with folders and the tags
+/// at the end. Spaces are switched from the rail's Spaces popup.
 class NotesSection extends _Section {
   const NotesSection({super.key, required super.state, required super.onPick});
 
@@ -119,15 +133,20 @@ class NotesSection extends _Section {
               onPick();
             },
             child: Container(
-              padding: EdgeInsets.fromLTRB(4 + depth * 14.0, 5, 8, 5),
+              padding: EdgeInsets.fromLTRB(
+                t.space.xs + depth * t.sizes.treeIndent,
+                t.space.sm - t.borders.hairline,
+                t.space.md,
+                t.space.sm - t.borders.hairline,
+              ),
               decoration: BoxDecoration(
                 color: on ? t.selected : null,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(t.radii.small),
               ),
               child: Row(
                 children: [
                   SizedBox(
-                    width: 20,
+                    width: t.sizes.chevronBox,
                     child: kids
                         ? FTappable(
                             semanticsLabel: open ? 'Collapse' : 'Expand',
@@ -137,7 +156,7 @@ class NotesSection extends _Section {
                               open
                                   ? FLucideIcons.chevronDown
                                   : FLucideIcons.chevronRight,
-                              size: 16,
+                              size: t.icons.md,
                               color: t.muted,
                             ),
                           )
@@ -148,17 +167,17 @@ class NotesSection extends _Section {
                       open && kids
                           ? FLucideIcons.folderOpen
                           : FLucideIcons.folder,
-                      size: 15,
+                      size: t.icons.tree,
                       color: t.muted,
                     ),
-                    const SizedBox(width: 6),
+                    SizedBox(width: t.space.sm),
                   ],
                   Expanded(
                     child: Text(
                       n.note.summary,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13),
+                      style: t.type.bodyStyle,
                     ),
                   ),
                 ],
@@ -172,31 +191,7 @@ class NotesSection extends _Section {
 
     walk(state.tree.roots, 0);
 
-    final name = state.currentSpaceName ?? 'davdart';
-    final Widget heading = state.spaces.isEmpty
-        ? _title(name)
-        : FPopoverMenu(
-            menuAnchor: Alignment.topLeft,
-            childAnchor: Alignment.bottomLeft,
-            menuBuilder: (ctx, controller, _) => spaceMenuGroups(
-              context,
-              state,
-              controller,
-              onPick: onPick,
-              quickOnly: true,
-            ),
-            builder: (ctx, controller, _) => FTappable(
-              key: const Key('space-menu'),
-              semanticsLabel: 'Switch space',
-              onPress: controller.toggle,
-              child: Row(
-                children: [
-                  Flexible(child: _title(name)),
-                  Icon(FLucideIcons.chevronDown, size: 18, color: t.muted),
-                ],
-              ),
-            ),
-          );
+    final heading = _title(state.currentSpaceName ?? 'davdart');
 
     return _Panel(
       heading: heading,
@@ -230,7 +225,7 @@ class NotesSection extends _Section {
         if (state.tags.isNotEmpty) ...[
           _label(context, 'TAGS'),
           _TagWrap(state: state),
-          const SizedBox(height: 12),
+          SizedBox(height: t.space.lg),
         ],
       ],
     );
@@ -242,27 +237,30 @@ class _TagWrap extends StatelessWidget {
   final AppState state;
 
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 8),
-    child: Wrap(
-      spacing: 6,
-      runSpacing: 6,
-      children: [
-        for (final tag in state.tags)
-          FTappable(
-            key: Key('tag-$tag'),
-            semanticsLabel: 'Tag $tag',
-            onPress: () => state.setTag(tag),
-            child: FBadge(
-              variant: state.tag == tag
-                  ? FBadgeVariant.secondary
-                  : FBadgeVariant.outline,
-              child: Text(tag),
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: t.space.md),
+      child: Wrap(
+        spacing: t.space.sm,
+        runSpacing: t.space.sm,
+        children: [
+          for (final tag in state.tags)
+            FTappable(
+              key: Key('tag-$tag'),
+              semanticsLabel: 'Tag $tag',
+              onPress: () => state.setTag(tag),
+              child: FBadge(
+                variant: state.tag == tag
+                    ? FBadgeVariant.secondary
+                    : FBadgeVariant.outline,
+                child: Text(tag),
+              ),
             ),
-          ),
-      ],
-    ),
-  );
+        ],
+      ),
+    );
+  }
 }
 
 /// Views: saved views (apply, remove, save the current one) and the tags as
@@ -357,11 +355,12 @@ class _SearchSectionState extends State<SearchSection> {
   @override
   Widget build(BuildContext context) {
     final hits = _hits;
+    final t = tokensOf(context);
     return _Panel(
       heading: _title('Search'),
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          padding: EdgeInsets.fromLTRB(t.space.xs, 0, t.space.xs, t.space.md),
           child: field(
             key: const Key('search-all-field'),
             controller: state.searchController,
@@ -384,61 +383,6 @@ class _SearchSectionState extends State<SearchSection> {
               state.openHit(h);
             },
           ),
-      ],
-    );
-  }
-}
-
-/// Spaces: every Space with its sync state; switch, and the new, rename and
-/// delete actions of the Space menu.
-class SpacesSection extends _Section {
-  const SpacesSection({super.key, required super.state, required super.onPick});
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return _Panel(
-      heading: _title('Spaces'),
-      children: [
-        if (state.spaces.isEmpty) const _Muted('One fixed notes source'),
-        for (final sp in state.spaces)
-          FItem(
-            key: Key('space-${sp.id}'),
-            selected: sp.id == state.currentSpaceId,
-            prefix: Icon(
-              sp.onServer ? FLucideIcons.cloud : FLucideIcons.hardDrive,
-              size: 16,
-              color: t.muted,
-            ),
-            title: Text(sp.name, overflow: TextOverflow.ellipsis),
-            subtitle: Text(
-              sp.id == state.currentSpaceId && state.syncing
-                  ? 'Syncing…'
-                  : sp.onServer
-                  ? 'Synced with the server'
-                  : 'On this device only',
-            ),
-            onPress: () {
-              onPick();
-              state.switchSpace(sp.id);
-            },
-          ),
-        if (state.spaces.isNotEmpty) ...[
-          _label(context, 'MANAGE'),
-          _item(FLucideIcons.plus, 'New space…', () {
-            onPick();
-            showNewSpaceDialog(context, state);
-          }),
-          _item(FLucideIcons.pencil, 'Rename this space…', () {
-            onPick();
-            showRenameSpaceDialog(context, state);
-          }),
-          if (state.currentSpaceId != SpaceCatalog.planningId)
-            _item(FLucideIcons.trash2, 'Delete this space…', () {
-              onPick();
-              showDeleteSpaceDialog(context, state);
-            }),
-        ],
       ],
     );
   }

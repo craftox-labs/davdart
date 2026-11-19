@@ -26,7 +26,12 @@ class ScopeBar extends StatelessWidget {
     return Container(
       key: const Key('scope-bar'),
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+      padding: EdgeInsets.fromLTRB(
+        t.space.xl,
+        t.space.md,
+        t.space.md,
+        t.space.md,
+      ),
       decoration: BoxDecoration(
         color: t.card,
         border: Border(bottom: BorderSide(color: t.divider)),
@@ -34,8 +39,8 @@ class ScopeBar extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(FLucideIcons.folderOpen, size: 18, color: t.accent),
-          const SizedBox(width: 8),
+          Icon(FLucideIcons.folderOpen, size: t.icons.lg, color: t.accent),
+          SizedBox(width: t.space.md),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,20 +52,17 @@ class ScopeBar extends StatelessWidget {
                   ].where((e) => e.isNotEmpty).join('  /  '),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: t.type.bodyStrong,
                 ),
                 if (folder.description.trim().isNotEmpty)
                   Padding(
-                    padding: const EdgeInsets.only(top: 4),
+                    padding: EdgeInsets.only(top: t.space.xs),
                     child: Text(
                       folder.description.trim(),
                       key: const Key('scope-text'),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: t.muted),
+                      style: t.type.captionStyle.copyWith(color: t.muted),
                     ),
                   ),
               ],

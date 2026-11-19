@@ -3,6 +3,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'parts.dart';
+import 'theme.dart';
 
 /// Names a new folder. Its text is optional: notes about the folder, or
 /// instructions for whoever (or whatever agent) works inside it.
@@ -24,12 +25,12 @@ Future<void> showNewFolderDialog(BuildContext context, AppState state) {
   return showAppDialog(
     context,
     title: 'New folder',
-    width: 480,
+    width: tokensOf(context).sizes.dialogLg,
     content: StatefulBuilder(
       builder: (ctx, setLocal) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 12,
+        spacing: tokensOf(ctx).space.lg,
         children: [
           field(
             key: const Key('new-folder-title'),

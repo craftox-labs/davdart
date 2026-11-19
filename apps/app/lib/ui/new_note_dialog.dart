@@ -3,6 +3,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'parts.dart';
+import 'theme.dart';
 
 /// Asks for a title and adds the note, under the selected note if chosen.
 Future<void> showNewNoteDialog(BuildContext context, AppState state) {
@@ -23,13 +24,13 @@ Future<void> showNewNoteDialog(BuildContext context, AppState state) {
   return showAppDialog(
     context,
     title: 'New note',
-    width: 420,
+    width: tokensOf(context).sizes.dialog,
     content: StatefulBuilder(
       builder: (ctx, setLocal) {
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 12,
+          spacing: tokensOf(ctx).space.lg,
           children: [
             field(
               key: const Key('new-note-title'),

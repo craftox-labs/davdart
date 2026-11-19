@@ -32,6 +32,7 @@ class DavdartApp extends StatelessWidget {
     NoteSource? source,
     KeyValueStorage? prefs,
     AppState? state,
+    this.tokens,
   }) : state =
            state ??
            (source == null
@@ -42,11 +43,14 @@ class DavdartApp extends StatelessWidget {
 
   final AppState state;
 
+  /// Replaces the default light and dark tokens (previews, tests).
+  final Tokens? tokens;
+
   @override
   Widget build(BuildContext context) {
     return WidgetsApp(
       title: 'davdart',
-      color: Tokens.light.accent,
+      color: (tokens ?? Tokens.light).accent,
       debugShowCheckedModeBanner: false,
       localizationsDelegates: FLocalizations.localizationsDelegates,
       supportedLocales: FLocalizations.supportedLocales,
@@ -54,13 +58,20 @@ class DavdartApp extends StatelessWidget {
         settings: settings,
         pageBuilder: (context, _, _) => builder(context),
       ),
-      builder: (context, child) => FTheme(
-        data: buildTheme(
-          MediaQuery.platformBrightnessOf(context),
-          touch: isTouchPlatform,
-        ),
-        child: FToaster(child: FTooltipGroup(child: child!)),
-      ),
+      builder: (context, child) {
+        final themed = FTheme(
+          data: buildTheme(
+            MediaQuery.platformBrightnessOf(context),
+            touch: isTouchPlatform,
+            tokens: tokens,
+          ),
+          child: FToaster(child: FTooltipGroup(child: child!)),
+        );
+        final custom = tokens;
+        return custom == null
+            ? themed
+            : TokensScope(tokens: custom, child: themed);
+      },
       home: Shell(state: state),
     );
   }
@@ -101,9 +112,9 @@ class Shell extends StatelessWidget {
               children: [
                 Expanded(child: main()),
                 if (hasDetail) ...[
-                  Container(width: 1, color: t.divider),
+                  Container(width: t.borders.hairline, color: t.divider),
                   SizedBox(
-                    width: Tokens.detailWidth,
+                    width: t.sizes.detail,
                     child: DetailView(
                       state: state,
                       onClose: () => state.select(null),
@@ -142,7 +153,7 @@ Future<void> openSidebarSheet(BuildContext context, AppState state) =>
       context: context,
       side: FLayout.ltr,
       mainAxisMaxRatio: null,
-      constraints: const BoxConstraints(maxWidth: Tokens.sidebarWidth),
+      constraints: BoxConstraints(maxWidth: tokensOf(context).sizes.sidebar),
       useSafeArea: true,
       builder: (_) => ListenableBuilder(
         listenable: state,
@@ -185,7 +196,7 @@ class TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final narrow = MediaQuery.sizeOf(context).width < 440;
+    final narrow = MediaQuery.sizeOf(context).width < t.sizes.narrowBar;
     final board = state.view == ViewMode.board;
     Widget toggle(String label, ViewMode mode) => FButton(
       variant: state.view == mode
@@ -199,12 +210,14 @@ class TopBar extends StatelessWidget {
     );
     return DecoratedBox(
       decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: t.divider)),
+        border: Border(
+          bottom: BorderSide(color: t.divider, width: t.borders.hairline),
+        ),
       ),
       child: SizedBox(
-        height: 52,
+        height: t.sizes.topBar,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: EdgeInsets.symmetric(horizontal: t.space.md),
           child: Row(
             children: [
               if (showMenu)
@@ -214,25 +227,19 @@ class TopBar extends StatelessWidget {
                   icon: FLucideIcons.menu,
                   onPress: () => openSidebarSheet(context, state),
                 ),
-              const SizedBox(width: 4),
-              Text(
-                board ? 'Board' : 'List',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(width: 12),
+              SizedBox(width: t.space.xs),
+              Text(board ? 'Board' : 'List', style: t.type.titleStyle),
+              SizedBox(width: t.space.lg),
               if (state.loading)
-                const SizedBox(
-                  width: 14,
-                  height: 14,
-                  child: FCircularProgress(),
+                SizedBox(
+                  width: t.sizes.spinner,
+                  height: t.sizes.spinner,
+                  child: const FCircularProgress(),
                 ),
               const Spacer(),
               if (!narrow) ...[
                 toggle('Board', ViewMode.board),
-                const SizedBox(width: 4),
+                SizedBox(width: t.space.xs),
                 toggle('List', ViewMode.list),
               ] else
                 IconAction(

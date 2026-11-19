@@ -42,7 +42,8 @@ class NoteListView extends StatelessWidget {
     }
     return ListView.separated(
       itemCount: rows.length,
-      separatorBuilder: (_, _) => Container(height: 1, color: t.divider),
+      separatorBuilder: (_, _) =>
+          Container(height: t.borders.hairline, color: t.divider),
       itemBuilder: (context, i) {
         final (n, depth) = rows[i];
         final p = PlanItem.fromNote(n);
@@ -51,11 +52,16 @@ class NoteListView extends StatelessWidget {
           onPress: () => state.select(n.uid),
           child: Container(
             color: state.selectedUid == n.uid ? t.selected : null,
-            padding: EdgeInsets.fromLTRB(12 + depth * 20.0, 10, 12, 10),
+            padding: EdgeInsets.fromLTRB(
+              t.space.lg + depth * t.sizes.listIndent,
+              t.space.lg - t.space.xxs,
+              t.space.lg,
+              t.space.lg - t.space.xxs,
+            ),
             child: Row(
               children: [
                 SizedBox(
-                  width: 24,
+                  width: t.sizes.listChevronBox,
                   child: kids && !filtering
                       ? GestureDetector(
                           behavior: HitTestBehavior.opaque,
@@ -64,14 +70,14 @@ class NoteListView extends StatelessWidget {
                             state.collapsed.contains(n.uid)
                                 ? FLucideIcons.chevronRight
                                 : FLucideIcons.chevronDown,
-                            size: 18,
+                            size: t.icons.lg,
                             color: t.muted,
                           ),
                         )
                       : null,
                 ),
                 StatusDot(p.status),
-                const SizedBox(width: 10),
+                SizedBox(width: t.space.lg - t.space.xxs),
                 Expanded(
                   child: Text(
                     n.summary,
@@ -82,7 +88,7 @@ class NoteListView extends StatelessWidget {
                 if (p.owner != null)
                   Text(
                     p.owner!,
-                    style: TextStyle(fontSize: 12, color: t.muted),
+                    style: t.type.captionStyle.copyWith(color: t.muted),
                   ),
               ],
             ),

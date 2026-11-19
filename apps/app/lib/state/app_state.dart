@@ -11,7 +11,9 @@ import '../data/space_catalog.dart';
 enum ViewMode { board, list }
 
 /// The section the side panel shows, chosen with the icon rail.
-enum Section { notes, views, search, spaces, account, settings }
+/// `notes` is shown as "Files"; the id stays so saved selections still load.
+/// Spaces is a popup on the rail, not a section.
+enum Section { notes, views, search, account, settings }
 
 const boardOrder = ['backlog', 'todo', 'doing', 'blocked', 'done'];
 

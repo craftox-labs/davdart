@@ -21,7 +21,7 @@ class MarkdownLite extends StatelessWidget {
       if (para.isEmpty) return;
       out.add(
         Padding(
-          padding: const EdgeInsets.only(bottom: 10),
+          padding: EdgeInsets.only(bottom: t.space.lg - t.space.xxs),
           child: Text.rich(_inline(para.join(' '), base, t)),
         ),
       );
@@ -36,14 +36,14 @@ class MarkdownLite extends StatelessWidget {
         flush();
       } else if (h != null) {
         flush();
-        final size = [20.0, 17.0, 15.0, 14.0][h.group(1)!.length - 1];
+        final size = t.type.markdownHeadings[h.group(1)!.length - 1];
         out.add(
           Padding(
-            padding: const EdgeInsets.only(top: 8, bottom: 6),
+            padding: EdgeInsets.only(top: t.space.md, bottom: t.space.sm),
             child: Text.rich(
               _inline(
                 h.group(2)!,
-                base.copyWith(fontSize: size, fontWeight: FontWeight.w600),
+                base.copyWith(fontSize: size, fontWeight: t.type.semibold),
                 t,
               ),
             ),
@@ -54,11 +54,14 @@ class MarkdownLite extends StatelessWidget {
         final marker = li.group(1)!.endsWith('.') ? li.group(1)! : '•';
         out.add(
           Padding(
-            padding: const EdgeInsets.only(left: 6, bottom: 4),
+            padding: EdgeInsets.only(left: t.space.sm, bottom: t.space.xs),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SizedBox(width: 22, child: Text(marker, style: base)),
+                SizedBox(
+                  width: t.sizes.listMarker,
+                  child: Text(marker, style: base),
+                ),
                 Expanded(child: Text.rich(_inline(li.group(2)!, base, t))),
               ],
             ),
@@ -79,19 +82,13 @@ class MarkdownLite extends StatelessWidget {
     for (final m in re.allMatches(s)) {
       if (m.start > pos) spans.add(TextSpan(text: s.substring(pos, m.start)));
       if (m.group(1) != null) {
-        spans.add(
-          TextSpan(
-            text: m.group(1),
-            style: const TextStyle(fontWeight: FontWeight.w700),
-          ),
-        );
+        spans.add(TextSpan(text: m.group(1), style: t.type.boldStyle));
       } else {
         spans.add(
           TextSpan(
             text: m.group(2),
-            style: TextStyle(
-              fontFamily: 'monospace',
-              fontSize: (base.fontSize ?? 14) - 1,
+            style: t.type.monoStyle.copyWith(
+              fontSize: (base.fontSize ?? t.type.body) - 1,
               color: t.accent,
             ),
           ),

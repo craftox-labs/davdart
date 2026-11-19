@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 
 import '../state/app_state.dart';
 import 'parts.dart';
+import 'theme.dart';
 
 /// Signs in to the server once. Every collection the user has appears as a
 /// Space; new Spaces can then be created on the server from the app.
@@ -17,12 +18,12 @@ Future<void> showAccountDialog(BuildContext context, AppState state) {
   return showAppDialog(
     context,
     title: 'Sign in',
-    width: 380,
+    width: tokensOf(context).sizes.dialogMd,
     content: Builder(
       builder: (ctx) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 12,
+        spacing: tokensOf(ctx).space.lg,
         children: [
           field(
             key: const Key('account-user'),
@@ -37,10 +38,10 @@ Future<void> showAccountDialog(BuildContext context, AppState state) {
             label: 'Password',
             onSubmit: (_) => submit(ctx),
           ),
-          const Text(
+          Text(
             'Your collections become Spaces and sync here. The login is '
             'kept in this browser.',
-            style: TextStyle(fontSize: 12),
+            style: tokensOf(ctx).type.captionStyle,
           ),
         ],
       ),

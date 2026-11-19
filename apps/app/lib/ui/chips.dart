@@ -25,14 +25,17 @@ class StatusDot extends StatelessWidget {
   final String? status;
 
   @override
-  Widget build(BuildContext context) => Container(
-    width: 8,
-    height: 8,
-    decoration: BoxDecoration(
-      color: statusColor(status, context),
-      shape: BoxShape.circle,
-    ),
-  );
+  Widget build(BuildContext context) {
+    final size = tokensOf(context).sizes.statusDot;
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: statusColor(status, context),
+        shape: BoxShape.circle,
+      ),
+    );
+  }
 }
 
 class TagChip extends StatelessWidget {

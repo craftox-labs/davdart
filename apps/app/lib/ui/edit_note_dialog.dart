@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'parts.dart';
+import 'theme.dart';
 
 /// Edits a note's title and body text. Header lines are kept as they are.
 Future<void> showEditNoteDialog(
@@ -59,12 +60,12 @@ Future<void> showEditNoteDialog(
   return showAppDialog(
     context,
     title: isFolder ? 'Edit folder' : 'Edit note',
-    width: 560,
+    width: tokensOf(context).sizes.dialogXl,
     content: StatefulBuilder(
       builder: (ctx, setLocal) => Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 12,
+        spacing: tokensOf(ctx).space.lg,
         children: [
           field(
             key: const Key('edit-title'),
@@ -93,7 +94,9 @@ Future<void> showEditNoteDialog(
                     e.$3 ? '${e.$2.trim()}  (folder)' : e.$2.trim(),
                     overflow: TextOverflow.ellipsis,
                   ),
-                  prefix: SizedBox(width: _indent(e.$2) * 12),
+                  prefix: SizedBox(
+                    width: _indent(e.$2) * tokensOf(ctx).space.lg,
+                  ),
                   value: e.$1 ?? '',
                 ),
             ],
