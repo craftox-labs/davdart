@@ -1,6 +1,11 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'package:davdart/davdart.dart';
+
+import '../data/browser_storage_stub.dart'
+    if (dart.library.js_interop) '../data/browser_storage_web.dart';
 import '../data/note_source.dart';
+import '../data/persistent_store.dart';
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
@@ -35,9 +40,19 @@ ThemeData buildTheme(Tokens t, Brightness b) {
   );
 }
 
+/// The real app: a local Space kept in browser storage, filled once from the
+/// board server's feed. Edits stay on this device until a server is attached.
+NoteSource defaultSource() => SpaceNoteSource(
+  Space(
+    SpaceConfig(id: 'planning', name: 'Planning'),
+    PersistentNoteStore(defaultStorage()),
+  ),
+  seed: ApiNoteSource(),
+);
+
 class DavdartApp extends StatelessWidget {
   DavdartApp({super.key, NoteSource? source})
-    : state = AppState(source ?? ApiNoteSource()) {
+    : state = AppState(source ?? defaultSource()) {
     state.load();
   }
 

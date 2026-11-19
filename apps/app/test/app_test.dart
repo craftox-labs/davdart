@@ -1,5 +1,7 @@
 import 'package:davdart/davdart.dart';
+import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
+import 'package:davdart_app/data/persistent_store.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:davdart_app/ui/list_view.dart';
@@ -81,6 +83,29 @@ void main() {
       await s.load();
       expect(s.notes, hasLength(4));
     });
+
+    test(
+      'edits survive a restart through storage, damaged data is ignored',
+      () async {
+        final storage = MemoryStorage();
+        Space open() => Space(
+          SpaceConfig(id: 's', name: 'S'),
+          PersistentNoteStore(storage),
+        );
+        final a = AppState(SpaceNoteSource(open(), seed: FakeSource(sample)));
+        await a.load();
+        await a.setStatus('b', 'done');
+        await a.addNote('Kept');
+        final b = AppState(SpaceNoteSource(open(), seed: FakeSource(sample)));
+        await b.load();
+        expect(b.notes, hasLength(4));
+        expect(PlanItem.fromNote(b.tree.find('b')!.note).status, 'done');
+        storage.write('davdart.space.v1', '{not json');
+        final c = AppState(SpaceNoteSource(open(), seed: FakeSource(sample)));
+        await c.load();
+        expect(c.notes, hasLength(3));
+      },
+    );
 
     test('keeps the error when loading fails', () async {
       final s = AppState(_Failing());
