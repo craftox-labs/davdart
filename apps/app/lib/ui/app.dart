@@ -4,6 +4,7 @@ import 'package:davdart/davdart.dart';
 
 import '../data/browser_storage_stub.dart'
     if (dart.library.js_interop) '../data/browser_storage_web.dart';
+import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
 import '../data/persistent_store.dart';
 import '../state/app_state.dart';
@@ -55,8 +56,10 @@ NoteSource defaultSource() {
 }
 
 class DavdartApp extends StatelessWidget {
-  DavdartApp({super.key, NoteSource? source})
-    : state = AppState(source ?? defaultSource()) {
+  DavdartApp({super.key, NoteSource? source, KeyValueStorage? prefs})
+    : state = source == null
+          ? AppState(defaultSource(), prefs: defaultStorage())
+          : AppState(source, prefs: prefs) {
     state.load();
   }
 

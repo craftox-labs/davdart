@@ -6,6 +6,7 @@ import '../theme/tokens.dart';
 import 'markdown_lite.dart';
 import 'connect_dialog.dart';
 import 'new_note_dialog.dart';
+import 'save_view_dialog.dart';
 
 class Sidebar extends StatelessWidget {
   const Sidebar({super.key, required this.state, this.inDrawer = false});
@@ -147,6 +148,28 @@ class Sidebar extends StatelessWidget {
             state.select(null);
             _close(context);
           }),
+          for (final v in state.savedViews)
+            Row(
+              children: [
+                Expanded(
+                  child: item(Icons.bookmark_border, v.name, false, () {
+                    state.applyView(v);
+                    _close(context);
+                  }),
+                ),
+                IconButton(
+                  tooltip: 'Remove saved view',
+                  iconSize: 16,
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.close, color: t.muted),
+                  onPressed: () => state.deleteView(v.name),
+                ),
+              ],
+            ),
+          if (state.hasFilter)
+            item(Icons.bookmark_add_outlined, 'Save this view', false, () {
+              showSaveViewDialog(context, state);
+            }),
           if (state.canConnect) ...[
             const SizedBox(height: 14),
             Padding(

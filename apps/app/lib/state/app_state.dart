@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:davdart/davdart.dart';
 import 'package:flutter/foundation.dart';
 
+import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
 
 enum ViewMode { board, list }
@@ -13,10 +16,93 @@ String _clock() {
   return '${two(n.hour)}:${two(n.minute)}';
 }
 
+/// A named combination of view, search text and tag filter.
+class SavedView {
+  SavedView(this.name, this.view, this.query, this.tag);
+  final String name;
+  final ViewMode view;
+  final String query;
+  final String? tag;
+
+  Map<String, Object?> toJson() => {
+    'name': name,
+    'view': view.name,
+    'query': query,
+    'tag': tag,
+  };
+
+  static SavedView? fromJson(Object? j) {
+    if (j is! Map) return null;
+    final name = j['name'];
+    if (name is! String || name.isEmpty) return null;
+    return SavedView(
+      name,
+      ViewMode.values.firstWhere(
+        (v) => v.name == j['view'],
+        orElse: () => ViewMode.board,
+      ),
+      j['query'] is String ? j['query'] as String : '',
+      j['tag'] is String ? j['tag'] as String : null,
+    );
+  }
+}
+
 class AppState extends ChangeNotifier {
-  AppState(this.source);
+  AppState(this.source, {this.prefs}) {
+    _loadViews();
+  }
 
   final NoteSource source;
+
+  /// Where saved views are kept; null means they last only this session.
+  final KeyValueStorage? prefs;
+  static const _viewsKey = 'davdart.views.v1';
+  final List<SavedView> savedViews = [];
+
+  void _loadViews() {
+    try {
+      final raw = prefs?.read(_viewsKey);
+      if (raw == null || raw.isEmpty) return;
+      for (final j in jsonDecode(raw) as List<dynamic>) {
+        final v = SavedView.fromJson(j);
+        if (v != null) savedViews.add(v);
+      }
+    } catch (_) {
+      savedViews.clear();
+    }
+  }
+
+  void _storeViews() => prefs?.write(
+    _viewsKey,
+    jsonEncode([for (final v in savedViews) v.toJson()]),
+  );
+
+  bool get hasFilter => query.trim().isNotEmpty || tag != null;
+
+  /// Saves the current view and filters under [name] (replacing a same name).
+  void saveView(String name) {
+    final n = name.trim();
+    if (n.isEmpty) return;
+    savedViews
+      ..removeWhere((v) => v.name == n)
+      ..add(SavedView(n, view, query.trim(), tag));
+    _storeViews();
+    notifyListeners();
+  }
+
+  void applyView(SavedView v) {
+    view = v.view;
+    query = v.query;
+    tag = v.tag;
+    selectedUid = null;
+    notifyListeners();
+  }
+
+  void deleteView(String name) {
+    savedViews.removeWhere((v) => v.name == name);
+    _storeViews();
+    notifyListeners();
+  }
 
   List<Note> notes = [];
   NoteTree tree = NoteTree.build(const []);

@@ -112,6 +112,29 @@ void main() {
       },
     );
 
+    test('saved views persist, apply and delete; bad data is ignored', () {
+      final prefs = MemoryStorage();
+      final a = AppState(FakeSource(sample), prefs: prefs);
+      a.setView(ViewMode.list);
+      a.setTag('planning');
+      a.setQuery(' body ');
+      expect(a.hasFilter, isTrue);
+      a.saveView('Planning bodies');
+      a.saveView('   ');
+      expect(a.savedViews, hasLength(1));
+      final b = AppState(FakeSource(sample), prefs: prefs);
+      expect(b.savedViews.single.name, 'Planning bodies');
+      b.setView(ViewMode.board);
+      b.setTag(null);
+      b.setQuery('');
+      b.applyView(b.savedViews.single);
+      expect((b.view, b.tag, b.query), (ViewMode.list, 'planning', 'body'));
+      b.deleteView('Planning bodies');
+      expect(AppState(FakeSource(sample), prefs: prefs).savedViews, isEmpty);
+      prefs.write('davdart.views.v1', '{oops');
+      expect(AppState(FakeSource(sample), prefs: prefs).savedViews, isEmpty);
+    });
+
     test('keeps the error when loading fails', () async {
       final s = AppState(_Failing());
       await s.load();
