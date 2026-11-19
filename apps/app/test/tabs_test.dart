@@ -3,6 +3,7 @@ import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/tab_state.dart';
+import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -265,7 +266,8 @@ void main() {
       expect(_k('full-page'), findsOneWidget);
       final panel = t.getRect(_k('shell-panel'));
       final strip = t.getRect(_k('tab-strip'));
-      expect(strip.top, panel.top);
+      // The strip is in the header row, over the panel's top edge.
+      expect(strip.bottom - Tokens.light.borders.hairline, panel.top);
       expect(strip.right, lessThanOrEqualTo(panel.right));
       expect(t.takeException(), isNull);
     });

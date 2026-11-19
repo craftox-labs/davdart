@@ -13,6 +13,7 @@ import '../state/app_state.dart';
 import '../state/note_draft.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
+import 'detail_header.dart';
 import 'detail_view.dart';
 import 'list_view.dart';
 import 'parts.dart';
@@ -114,7 +115,7 @@ class Shell extends StatelessWidget {
 
           final mirror = state.layoutSide == LayoutSide.end;
           final Widget body;
-          if (split && state.fullPage) {
+          if (wide && state.fullPage) {
             // The note fills the main panel; the peek pane is hidden.
             body = DetailView(
               key: const Key('full-page'),
@@ -126,14 +127,8 @@ class Shell extends StatelessWidget {
             body = LayoutBuilder(
               builder: (context, bc) {
                 final z = t.sizes;
-                final hi = math.max(
-                  z.detailMin,
-                  math.min(z.detailMax, bc.maxWidth - z.listMin),
-                );
-                final width = (state.detailWidth ?? z.detail).clamp(
-                  z.detailMin,
-                  hi,
-                );
+                final hi = detailMaxFor(t, bc.maxWidth);
+                final width = detailWidthFor(t, state, bc.maxWidth);
                 final divider = Container(
                   width: t.borders.hairline,
                   color: t.divider,
@@ -147,6 +142,7 @@ class Shell extends StatelessWidget {
                         state: state,
                         onClose: () => state.guarded(() => state.select(null)),
                         onExpand: state.openFullPage,
+                        inHeader: true,
                       ),
                       Positioned(
                         top: 0,
@@ -177,9 +173,12 @@ class Shell extends StatelessWidget {
               },
             );
           } else if (hasDetail) {
+            // Wide but not split: the note replaces the list; Expand and Close
+            // are on the header's detail tab.
             body = DetailView(
               state: state,
               onClose: () => state.guarded(() => state.select(null)),
+              inHeader: wide,
             );
           } else {
             body = main();
@@ -190,24 +189,6 @@ class Shell extends StatelessWidget {
             header: TopBar(state: state, showMenu: !wide),
             child: body,
           );
-          if (split) {
-            // Document tabs sit above the top bar, across the content area
-            // (they need the full-page layout, so only on the widest screens).
-            content = CallbackShortcuts(
-              bindings: {
-                const SingleActivator(LogicalKeyboardKey.keyW, control: true):
-                    state.closeActiveTab,
-                const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
-                    state.closeActiveTab,
-              },
-              child: Column(
-                children: [
-                  TabStrip(state: state),
-                  Expanded(child: content),
-                ],
-              ),
-            );
-          }
           if (wide && !state.sidebarCollapsed) {
             // Docked beside the content, on the side facing it: left of it
             // normally, right of it when the rail is on the right.
@@ -224,10 +205,65 @@ class Shell extends StatelessWidget {
             );
           }
 
+          // The header row, over the panel: the tab strip above the main
+          // content, the detail tab above the detail pane, the side panel's
+          // width left empty.
+          Widget header(BuildContext context, double panelWidth) {
+            final dockW = state.sidebarCollapsed
+                ? 0.0
+                : sidebarWidthOf(context, state);
+            final contentW = panelWidth - dockW;
+            final detailW = hasDetail && !state.fullPage
+                ? detailWidthFor(t, state, contentW)
+                : null;
+            // Clear of the panel's rounded corner where the strip starts at
+            // the panel edge, else just the concave corner.
+            final edgePad = t.radii.panel + t.radii.tab;
+            final strip = Expanded(
+              child: TabStrip(
+                state: state,
+                startPad: mirror
+                    ? (detailW != null ? t.radii.tab : edgePad)
+                    : (dockW > 0 ? t.radii.tab : edgePad),
+                endPad: !mirror && detailW != null ? t.radii.tab : t.space.sm,
+              ),
+            );
+            final detail = detailW == null
+                ? null
+                : DetailHeader(state: state, width: detailW, mirror: mirror);
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (mirror) ?detail else SizedBox(width: dockW),
+                strip,
+                if (mirror) SizedBox(width: dockW) else ?detail,
+              ],
+            );
+          }
+
           return _LeaveGuard(
             state: state,
             child: SafeArea(
-              child: ShellFrame(state: state, showRail: wide, child: content),
+              child: wide
+                  ? CallbackShortcuts(
+                      bindings: {
+                        const SingleActivator(
+                          LogicalKeyboardKey.keyW,
+                          control: true,
+                        ): state.closeActiveTab,
+                        const SingleActivator(
+                          LogicalKeyboardKey.keyW,
+                          meta: true,
+                        ): state.closeActiveTab,
+                      },
+                      child: ShellFrame(
+                        state: state,
+                        showRail: true,
+                        header: header,
+                        child: content,
+                      ),
+                    )
+                  : ShellFrame(state: state, showRail: false, child: content),
             ),
           );
         },
@@ -235,6 +271,21 @@ class Shell extends StatelessWidget {
     );
   }
 }
+
+/// The widest the detail pane may be beside a main area [content] wide (the
+/// list keeps its least width).
+double detailMaxFor(Tokens t, double content) => math.max(
+  t.sizes.detailMin,
+  math.min(t.sizes.detailMax, content - t.sizes.listMin),
+);
+
+/// The detail pane's width in a main area [content] wide: the dragged width
+/// (or the default) within the limits.
+double detailWidthFor(Tokens t, AppState state, double content) =>
+    (state.detailWidth ?? t.sizes.detail).clamp(
+      t.sizes.detailMin,
+      detailMaxFor(t, content),
+    );
 
 /// Registers the dialog asked when leaving a note with unsaved edits.
 class _LeaveGuard extends StatefulWidget {

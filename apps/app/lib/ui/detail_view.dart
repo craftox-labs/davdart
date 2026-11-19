@@ -19,6 +19,7 @@ class DetailView extends StatelessWidget {
     required this.onClose,
     this.onExpand,
     this.full = false,
+    this.inHeader = false,
   });
   final AppState state;
   final VoidCallback onClose;
@@ -28,6 +29,10 @@ class DetailView extends StatelessWidget {
 
   /// This is the full page (Back and a breadcrumb), not the peek pane.
   final bool full;
+
+  /// The shell's header row carries this pane's tab with Expand and Close, so
+  /// the pane leaves them out.
+  final bool inHeader;
 
   @override
   Widget build(BuildContext context) {
@@ -53,7 +58,7 @@ class DetailView extends StatelessWidget {
                   icon: FLucideIcons.arrowLeft,
                   onPress: () => state.guarded(state.closeFullPage),
                 )
-              else
+              else if (!inHeader)
                 IconAction(
                   tooltip: 'Close',
                   icon: FLucideIcons.arrowLeft,
@@ -74,7 +79,7 @@ class DetailView extends StatelessWidget {
                   style: t.type.captionStyle.copyWith(color: t.muted),
                 ),
               ),
-              if (!full && onExpand != null)
+              if (!full && !inHeader && onExpand != null)
                 IconAction(
                   key: const Key('expand-note'),
                   tooltip: 'Open full page',
