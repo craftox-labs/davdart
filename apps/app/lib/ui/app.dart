@@ -135,7 +135,9 @@ class Shell extends StatelessWidget {
               showRail: wide,
               child: FScaffold(
                 childPad: false,
-                sidebar: wide ? Sidebar(state: state) : null,
+                sidebar: wide && !state.sidebarCollapsed
+                    ? DockedSidebar(state: state)
+                    : null,
                 header: TopBar(state: state, showMenu: !wide),
                 child: body,
               ),

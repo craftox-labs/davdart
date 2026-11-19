@@ -69,14 +69,59 @@ class AppState extends ChangeNotifier {
       (v) => v.name == saved,
       orElse: () => Section.notes,
     );
+    sidebarCollapsed = prefs?.read(_collapsedKey) == 'true';
+    sidebarWidth = double.tryParse(prefs?.read(_widthKey) ?? '');
   }
 
   static const _sectionKey = 'davdart.section.v1';
+  static const _collapsedKey = 'davdart.sidebar.collapsed.v1';
+  static const _widthKey = 'davdart.sidebar.width.v1';
+
+  /// Whether the docked side panel is folded away (wide layout only; the
+  /// narrow sheet ignores it).
+  bool sidebarCollapsed = false;
+
+  /// Dragged width of the docked side panel; null means the default token.
+  /// Callers clamp it to the token limits.
+  double? sidebarWidth;
+
+  void setSidebarCollapsed(bool v) {
+    if (sidebarCollapsed == v) return;
+    sidebarCollapsed = v;
+    prefs?.write(_collapsedKey, '$v');
+    notifyListeners();
+  }
+
+  /// Sets the side panel width (null restores the default). While dragging,
+  /// pass `save: false` and save once at the end.
+  void setSidebarWidth(double? w, {bool save = true}) {
+    if (sidebarWidth != w) {
+      sidebarWidth = w;
+      notifyListeners();
+    }
+    if (!save) return;
+    if (w == null) {
+      prefs?.remove(_widthKey);
+    } else {
+      prefs?.write(_widthKey, '$w');
+    }
+  }
+
+  /// A press on a rail icon: the open section folds the side panel away,
+  /// any other section (or any icon while folded) opens that section.
+  void pressRail(Section s) {
+    if (s == section && !sidebarCollapsed) {
+      setSidebarCollapsed(true);
+    } else {
+      setSection(s);
+    }
+  }
 
   /// Which section the side panel shows.
   Section section = Section.notes;
 
   void setSection(Section s) {
+    setSidebarCollapsed(false);
     if (section == s) return;
     section = s;
     prefs?.write(_sectionKey, s.name);

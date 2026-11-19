@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -12,9 +13,17 @@ import 'theme.dart';
 /// In the narrow sheet ([inDrawer]) a [SectionBar] on top picks the section,
 /// because there is no rail.
 class Sidebar extends StatelessWidget {
-  const Sidebar({super.key, required this.state, this.inDrawer = false});
+  const Sidebar({
+    super.key,
+    required this.state,
+    this.inDrawer = false,
+    this.width,
+  });
   final AppState state;
   final bool inDrawer;
+
+  /// Width of the docked panel; null uses the default token.
+  final double? width;
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +43,7 @@ class Sidebar extends StatelessWidget {
     return FSidebar.raw(
       style: .delta(
         constraints: BoxConstraints.tightFor(
-          width: tokensOf(context).sizes.sidebar,
+          width: width ?? tokensOf(context).sizes.sidebar,
         ),
       ),
       header: inDrawer ? SectionBar(state: state, onPick: close) : null,
@@ -128,4 +137,100 @@ List<FItemGroup> spaceMenuGroups(
       ],
     ),
   ];
+}
+
+/// The docked side panel width: the dragged one clamped to the token limits,
+/// else the default.
+double sidebarWidthOf(BuildContext context, AppState state) {
+  final z = tokensOf(context).sizes;
+  return (state.sidebarWidth ?? z.sidebar).clamp(z.sidebarMin, z.sidebarMax);
+}
+
+/// The docked side panel with a drag handle on its right edge. Dragging
+/// resizes it between the token limits and saves the width on release; a
+/// double-click restores the default.
+class DockedSidebar extends StatelessWidget {
+  const DockedSidebar({super.key, required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final width = sidebarWidthOf(context, state);
+    return SizedBox(
+      width: width,
+      child: Stack(
+        children: [
+          Sidebar(state: state, width: width),
+          Positioned(
+            top: 0,
+            bottom: 0,
+            right: 0,
+            child: SidebarResizeHandle(state: state),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A slim handle on the panel edge: resize cursor, a line on hover or drag.
+class SidebarResizeHandle extends StatefulWidget {
+  const SidebarResizeHandle({super.key, required this.state});
+  final AppState state;
+
+  @override
+  State<SidebarResizeHandle> createState() => _SidebarResizeHandleState();
+}
+
+class _SidebarResizeHandleState extends State<SidebarResizeHandle> {
+  bool _hover = false;
+  bool _drag = false;
+  double _startX = 0;
+  double _startWidth = 0;
+
+  double _clamp(BuildContext context, double w) {
+    final z = tokensOf(context).sizes;
+    return w.clamp(z.sidebarMin, z.sidebarMax);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final state = widget.state;
+    return MouseRegion(
+      cursor: SystemMouseCursors.resizeColumn,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        key: const Key('sidebar-handle'),
+        behavior: HitTestBehavior.opaque,
+        dragStartBehavior: DragStartBehavior.down,
+        onDoubleTap: () => state.setSidebarWidth(null),
+        onHorizontalDragStart: (d) {
+          _startX = d.globalPosition.dx;
+          _startWidth = sidebarWidthOf(context, state);
+          setState(() => _drag = true);
+        },
+        onHorizontalDragUpdate: (d) => state.setSidebarWidth(
+          _clamp(context, _startWidth + d.globalPosition.dx - _startX),
+          save: false,
+        ),
+        onHorizontalDragEnd: (_) {
+          setState(() => _drag = false);
+          state.setSidebarWidth(state.sidebarWidth);
+        },
+        onHorizontalDragCancel: () => setState(() => _drag = false),
+        child: SizedBox(
+          width: t.sizes.resizeHit,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              width: t.sizes.resizeLine,
+              child: Container(color: _hover || _drag ? t.accent : null),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
