@@ -32,6 +32,19 @@ class FakeSource implements NoteSource {
   Future<List<Note>> load() async => notes;
 }
 
+class MemSource implements EditableNoteSource {
+  MemSource(Iterable<Note> start) : notes = {for (final n in start) n.uid: n};
+  final Map<String, Note> notes;
+  @override
+  Future<List<Note>> load() async => [
+    for (final n in notes.values) n.copyWith(),
+  ];
+  @override
+  Future<Note> save(Note n) async => notes[n.uid] = n.copyWith();
+  @override
+  Future<void> delete(String uid) async => notes.remove(uid);
+}
+
 class SlowSource implements NoteSource {
   SlowSource(this.result);
   final Future<List<Note>> result;
@@ -136,31 +149,130 @@ void main() {
       },
     );
 
+    test('saved views are notes: hidden, round trip, apply, update', () async {
+      final src = MemSource(sample);
+      final a = AppState(src);
+      await a.load();
+      await a.addFolder('Docs');
+      final folder = a.notes.firstWhere(AppState.isFolder).uid;
+      a.openFolder(null);
+      a.setView(ViewMode.list);
+      a.setTag('planning');
+      a.setQuery(' body ');
+      expect(a.hasFilter, isTrue);
+      await a.saveView('Planning bodies');
+      await a.saveView('   ');
+      expect(a.savedViews, hasLength(1));
+      final stored = src.notes.values.singleWhere(isViewNote);
+      expect(stored.summary, 'Planning bodies');
+      expect(stored.description, contains('mode: list'));
+      // hidden from tree, lists, tags and search
+      expect(a.notes.any(isViewNote), isFalse);
+      expect(a.tree.find(stored.uid), isNull);
+      expect(a.filtered.any(isViewNote), isFalse);
+      expect(a.columns.expand((c) => c.$2).any(isViewNote), isFalse);
+      expect(a.tags, isNot(contains('kind-view')));
+      a.setQuery('');
+      a.setTag(null);
+      expect(a.filtered.map((n) => n.uid), isNot(contains(stored.uid)));
+      // another client sees the same view
+      final b = AppState(src);
+      await b.load();
+      expect(b.savedViews.single.name, 'Planning bodies');
+      b.setView(ViewMode.board);
+      b.openFolder(folder);
+      b.applyView(b.savedViews.single);
+      expect(b.searchController.text, 'body');
+      expect((b.view, b.tag, b.query), (ViewMode.list, 'planning', 'body'));
+      expect(b.scopeUid, isNull); // saved without a folder
+      // saving the same name updates the note instead of adding one
+      b.openFolder(folder);
+      b.setQuery('x');
+      await b.saveView('Planning bodies');
+      expect(src.notes.values.where(isViewNote), hasLength(1));
+      b.setQuery('');
+      b.openFolder(null);
+      b.applyView(b.savedViews.single);
+      expect((b.query, b.scopeUid), ('x', folder));
+      // update from the current state
+      b.setView(ViewMode.board);
+      b.setQuery('y');
+      b.openFolder(null);
+      await b.updateView(b.savedViews.single);
+      expect(
+        src.notes.values.singleWhere(isViewNote).description,
+        isNot(contains('folder:')),
+      );
+      expect(b.savedViews.single.query, 'y');
+      expect(b.savedViews.single.view, ViewMode.board);
+      // a folder that is gone is dropped on apply
+      b.openFolder(folder);
+      await b.saveView('Docs view');
+      await b.deleteNote(folder);
+      b.applyView(b.savedViews.firstWhere((v) => v.name == 'Docs view'));
+      expect(b.scopeUid, isNull);
+    });
+
+    test('rename and delete a saved view', () async {
+      final src = MemSource(sample);
+      final s = AppState(src);
+      await s.load();
+      s.setQuery('a');
+      await s.saveView('One');
+      await s.saveView('Two');
+      final one = s.savedViews.firstWhere((v) => v.name == 'One');
+      expect(await s.renameView(one, 'Two'), isNotNull);
+      expect(await s.renameView(one, '  '), isNotNull);
+      expect(await s.renameView(one, ' Uno '), isNull);
+      expect(s.savedViews.map((v) => v.name), ['Two', 'Uno']);
+      expect(src.notes[one.uid]!.summary, 'Uno');
+      await s.deleteView('Two');
+      expect(s.savedViews.map((v) => v.name), ['Uno']);
+      expect(src.notes.values.where(isViewNote), hasLength(1));
+      await s.deleteView('Uno');
+      expect(src.notes.values.where(isViewNote), isEmpty);
+    });
+
+    test('old local views move into notes once, then never again', () async {
+      final prefs = MemoryStorage();
+      const old =
+          '[{"name":"Planning bodies","view":"list","query":"body","tag":"planning"},'
+          '{"name":"Plain","view":"board","query":"","tag":null},{"bad":1}]';
+      prefs.write('davdart.views.v1', old);
+      final src = MemSource(sample);
+      final a = AppState(src, prefs: prefs);
+      await a.load();
+      expect(a.savedViews.map((v) => v.name), ['Plain', 'Planning bodies']);
+      final v = a.savedViews.last;
+      expect((v.view, v.query), (ViewMode.list, 'body'));
+      expect(v.tags, ['planning']);
+      expect(prefs.read('davdart.views.v1'), old); // left untouched
+      expect(prefs.read('davdart.views.v1.migrated'), '1');
+      await a.deleteView('Plain');
+      final b = AppState(src, prefs: prefs);
+      await b.load();
+      await b.load();
+      expect(b.savedViews.map((v) => v.name), ['Planning bodies']);
+      expect(src.notes.values.where(isViewNote), hasLength(1));
+      // a read-only source keeps the old views for later
+      final p2 = MemoryStorage()..write('davdart.views.v1', old);
+      final r = AppState(FakeSource(sample), prefs: p2);
+      await r.load();
+      expect(p2.read('davdart.views.v1.migrated'), isNull);
+    });
+
     test(
-      'saved views persist, apply and delete; bad data is ignored',
+      'migration skips names that already exist and retries cleanly',
       () async {
-        final prefs = MemoryStorage();
-        final a = AppState(FakeSource(sample), prefs: prefs);
-        a.setView(ViewMode.list);
-        a.setTag('planning');
-        a.setQuery(' body ');
-        expect(a.hasFilter, isTrue);
-        a.saveView('Planning bodies');
-        a.saveView('   ');
-        expect(a.savedViews, hasLength(1));
-        final b = AppState(FakeSource(sample), prefs: prefs);
-        expect(b.savedViews.single.name, 'Planning bodies');
-        await b.load();
-        b.setView(ViewMode.board);
-        b.setTag(null);
-        b.setQuery('');
-        b.applyView(b.savedViews.single);
-        expect(b.searchController.text, 'body');
-        expect((b.view, b.tag, b.query), (ViewMode.list, 'planning', 'body'));
-        b.deleteView('Planning bodies');
-        expect(AppState(FakeSource(sample), prefs: prefs).savedViews, isEmpty);
-        prefs.write('davdart.views.v1', '{oops');
-        expect(AppState(FakeSource(sample), prefs: prefs).savedViews, isEmpty);
+        final prefs = MemoryStorage()
+          ..write('davdart.views.v1', '[{"name":"A","view":"list"}]');
+        final src = MemSource([
+          SavedView('A', ViewMode.board, '', const [], uid: 'v-a').toNote(),
+        ]);
+        final s = AppState(src, prefs: prefs);
+        await s.load();
+        expect(src.notes.values.where(isViewNote), hasLength(1));
+        expect(s.savedViews.single.view, ViewMode.board);
       },
     );
 
@@ -202,14 +314,13 @@ void main() {
       await s.createSpace('Inbox');
       await s.addNote('doomed');
       s.setQuery('x');
-      s.saveView('v');
+      await s.saveView('v');
       final id = s.currentSpaceId!;
       expect(await s.renameSpace('  '), isNotNull);
       expect(await s.renameSpace('Planning'), isNotNull);
       expect(await s.renameSpace('Scratch'), isNull);
       expect(s.currentSpaceName, 'Scratch');
-      expect(storage.keys, contains('davdart.views.v1.$id'));
-      expect(storage.read('davdart.views.v1'), isNull);
+      expect(s.savedViews.map((v) => v.name), ['v']);
       final doomed = c.sourceFor(id);
       expect(SpaceCatalog(storage).spaces.last.name, 'Scratch');
       expect(storage.keys.any((k) => k.startsWith('sp.$id.')), isTrue);
@@ -253,7 +364,7 @@ void main() {
         final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
         await s.load();
         s.setQuery('x');
-        s.saveView('mine');
+        await s.saveView('mine');
         await s.createSpace('Planning');
         await s.createSpace('Planning');
         expect(s.spaces.map((e) => e.name), [
