@@ -99,39 +99,32 @@ void main() {
       expect(_close('tab-home'), findsNothing);
     });
 
-    testWidgets('maximise creates no strip tab; opening a note tab does', (
+    testWidgets('peeking creates no strip tab; opening a note tab does', (
       t,
     ) async {
       final s = await _pump(t);
       s.select('a');
       await t.pumpAndSettle();
       expect(_k('tab-n:a'), findsNothing);
-      await t.tap(_k('pane-size'));
-      await t.pumpAndSettle();
-      expect(s.maximised, isTrue);
-      expect(s.tabs, isEmpty);
-      await t.tap(_k('pane-size'));
-      await t.pumpAndSettle();
       expect(s.tabs, isEmpty);
       s.openNoteTab('a');
       s.openNoteTab('a');
       await t.pumpAndSettle();
       expect(_k('tab-n:a'), findsOneWidget);
       expect(s.activeTab, const DocTab.note('a'));
-      expect(s.maximised, isFalse);
-      // Home shows the list again; the tab stays open, note still selected.
+      // One place per note: the peek of it closed.
+      expect(s.peekUid, isNull);
+      // Home shows the list again; the tab stays open.
       await t.tap(_k('tab-home'));
       await t.pumpAndSettle();
       expect(s.tabs, hasLength(1));
       expect(s.activeTab, isNull);
       await t.tap(_k('tab-n:a'));
       await t.pumpAndSettle();
+      // Clicking a main tab shows it in the main area, never the peek.
       expect(s.activeTab, const DocTab.note('a'));
-      expect(s.selectedUid, 'a');
-      // Maximise and minimise keep the strip tabs unchanged.
-      s.maximise();
-      s.minimise();
-      expect(s.tabs, hasLength(1));
+      expect(s.peekUid, isNull);
+      expect(_k('main-note'), findsOneWidget);
     });
 
     testWidgets('closing the active tab activates its neighbour, then home', (
@@ -146,12 +139,11 @@ void main() {
       await t.tap(_close('tab-n:b'));
       await t.pumpAndSettle();
       expect(s.activeTab, const DocTab.note('a'));
-      expect(s.selectedUid, 'a');
+      expect(s.peekUid, isNull);
       await t.tap(_close('tab-n:a'));
       await t.pumpAndSettle();
       expect(s.activeTab, isNull);
       expect(s.tabs, isEmpty);
-      expect(s.maximised, isFalse);
       expect(_k('tab-n:a'), findsNothing);
     });
 
@@ -167,17 +159,13 @@ void main() {
         find.descendant(of: _k('tab-n:a'), matching: _k('tab-dirty')),
         findsOneWidget,
       );
-      expect(
-        find.descendant(of: _k('detail-tab'), matching: _k('tab-dirty')),
-        findsOneWidget,
-      );
       await t.tap(_close('tab-n:a'));
       await t.pumpAndSettle();
       expect(_k('leave-discard'), findsOneWidget);
       await t.tap(find.text('Keep editing'));
       await t.pumpAndSettle();
       expect(s.tabs, hasLength(1));
-      expect(s.dirty, isTrue);
+      expect(s.dirtyFor('a'), isTrue);
       await t.tap(_close('tab-n:a'));
       await t.pumpAndSettle();
       await t.tap(_k('leave-discard'));
@@ -193,10 +181,10 @@ void main() {
       await t.enterText(_k('new-note-title'), 'Fresh');
       await t.tap(_k('new-note-add'));
       await t.pumpAndSettle();
-      expect(s.maximised, isFalse);
-      expect(s.selected?.summary, 'Fresh');
-      expect(s.activeTab, DocTab.note(s.selectedUid!));
       expect(s.tabs, hasLength(1));
+      final tab = s.activeTab!;
+      expect(s.tabTitle(tab), 'Fresh');
+      expect(s.mainNoteUid, tab.id);
     });
 
     testWidgets('applying a saved view opens and focuses a view tab', (
@@ -267,19 +255,12 @@ void main() {
       expect(third.tabs, [const DocTab.note('b')]);
     });
 
-    testWidgets('mirrored layout keeps the strip and the maximised pane', (
-      t,
-    ) async {
+    testWidgets('mirrored layout keeps the strip with a main note', (t) async {
       final s = await _pump(t, side: LayoutSide.end);
       s.openNoteTab('a');
       await t.pumpAndSettle();
       expect(_k('tab-strip'), findsOneWidget);
-      s.maximise();
-      await t.pumpAndSettle();
-      expect(_k('tab-strip'), findsNothing);
-      expect(_k('full-page'), findsOneWidget);
-      s.minimise();
-      await t.pumpAndSettle();
+      expect(_k('main-note'), findsOneWidget);
       final panel = t.getRect(_k('shell-panel'));
       final strip = t.getRect(_k('tab-strip'));
       // The strip is in the header row, over the panel's top edge.

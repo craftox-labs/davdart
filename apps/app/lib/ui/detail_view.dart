@@ -16,32 +16,36 @@ class DetailView extends StatelessWidget {
   const DetailView({
     super.key,
     required this.state,
+    required this.uid,
     required this.onClose,
     this.full = false,
     this.inHeader = false,
   });
   final AppState state;
+
+  /// The note shown (the peek note, or the main tab's note).
+  final String uid;
   final VoidCallback onClose;
 
-  /// This is the maximised pane (no Back or breadcrumb: the header row has
-  /// Minimise), not the peek pane.
+  /// This is the main area's full page (no Back or breadcrumb), not the peek
+  /// pane.
   final bool full;
 
-  /// The shell's header row carries this pane's tab with Close and Maximise,
-  /// so the pane leaves them out.
+  /// The shell's header row carries this pane's tab with its controls, so the
+  /// pane leaves Back out.
   final bool inHeader;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final note = state.selected;
+    final note = state.tree.find(uid)?.note;
     if (note == null) return const SizedBox.shrink();
     final p = PlanItem.fromNote(note);
     final path = <Note>[];
     for (var n = state.tree.find(note.uid)?.parent; n != null; n = n.parent) {
       path.insert(0, n.note);
     }
-    final draft = state.activeDraft;
+    final draft = state.draftFor(uid);
     Widget page = Column(
       children: [
         Padding(
@@ -78,7 +82,7 @@ class DetailView extends StatelessWidget {
                     key: const Key('edit-note'),
                     tooltip: 'Edit',
                     icon: FLucideIcons.pencil,
-                    onPress: state.startEdit,
+                    onPress: () => state.startEdit(uid),
                   ),
                 IconAction(
                   key: const Key('delete-note'),
@@ -278,15 +282,15 @@ class DetailView extends StatelessWidget {
         ),
       ],
     );
-    // Ctrl/Cmd+S saves an open edit; the shell handles Escape (minimise).
+    // Ctrl/Cmd+S saves an open edit;
     page = CallbackShortcuts(
       bindings: {
         if (draft != null) ...{
           const SingleActivator(LogicalKeyboardKey.keyS, control: true): () {
-            if (draft.dirty) state.saveDraft();
+            if (draft.dirty) state.saveDraft(uid);
           },
           const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () {
-            if (draft.dirty) state.saveDraft();
+            if (draft.dirty) state.saveDraft(uid);
           },
         },
       },

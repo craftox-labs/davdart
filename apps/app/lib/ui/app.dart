@@ -100,32 +100,44 @@ class Shell extends StatelessWidget {
           final t = tokensOf(context);
           final wide = c.maxWidth >= Tokens.wideBreakpoint;
           final split = c.maxWidth >= Tokens.splitBreakpoint;
-          final hasDetail = state.selected != null;
+          // The peek (single side slot) and the main pane are independent.
+          // Collapsed, the peek keeps its note but takes no room.
+          final peekUid = state.peekUid;
+          final hasDetail = state.peek != null && !state.peekCollapsed;
+          final collapsedPeek = state.peek != null && state.peekCollapsed;
+          // Main note tabs need the strip, so only where it shows (wide).
+          final mainNote = wide ? state.mainNoteUid : null;
 
-          Widget main() => Column(
-            children: [
-              ScopeBar(state: state),
-              Expanded(
-                child: state.view == ViewMode.board
-                    ? BoardView(state: state)
-                    : NoteListView(state: state),
-              ),
-            ],
+          Widget main() => mainNote != null
+              ? DetailView(
+                  key: const Key('main-note'),
+                  state: state,
+                  uid: mainNote,
+                  onClose: () => state.closeActiveTab(),
+                  full: true,
+                )
+              : Column(
+                  children: [
+                    ScopeBar(state: state),
+                    Expanded(
+                      child: state.view == ViewMode.board
+                          ? BoardView(state: state)
+                          : NoteListView(state: state),
+                    ),
+                  ],
+                );
+
+          Widget peekView({bool header = false}) => DetailView(
+            key: const Key('peek-view'),
+            state: state,
+            uid: peekUid!,
+            onClose: () => state.guarded(() => state.select(null)),
+            inHeader: header,
           );
 
           final mirror = state.layoutSide == LayoutSide.end;
           final Widget body;
-          final maxed = wide && state.maximised;
-          if (maxed) {
-            // The detail pane fills the whole content area; the strip, list
-            // or board and top bar are hidden (and come back on Minimise).
-            body = DetailView(
-              key: const Key('full-page'),
-              state: state,
-              onClose: () => state.guarded(() => state.select(null)),
-              full: true,
-            );
-          } else if (split) {
+          if (split) {
             body = LayoutBuilder(
               builder: (context, bc) {
                 final z = t.sizes;
@@ -135,59 +147,60 @@ class Shell extends StatelessWidget {
                   width: t.borders.hairline,
                   color: t.divider,
                 );
-                final detail = SizedBox(
-                  key: const Key('detail-pane'),
-                  width: width,
-                  child: Stack(
-                    children: [
-                      DetailView(
-                        state: state,
-                        onClose: () => state.guarded(() => state.select(null)),
-                        inHeader: true,
-                      ),
-                      Positioned(
-                        top: 0,
-                        bottom: 0,
-                        left: mirror ? null : 0,
-                        right: mirror ? 0 : null,
-                        child: PaneResizeHandle(
-                          key: const Key('detail-handle'),
-                          width: width,
-                          min: z.detailMin,
-                          max: hi,
-                          grow: mirror ? 1 : -1,
-                          onResize: (w) => state.setDetailWidth(w, save: false),
-                          onEnd: () => state.setDetailWidth(state.detailWidth),
-                          onReset: () => state.setDetailWidth(null),
+                final detail = !hasDetail
+                    ? const SizedBox.shrink()
+                    : SizedBox(
+                        key: const Key('detail-pane'),
+                        width: width,
+                        child: Stack(
+                          children: [
+                            peekView(header: true),
+                            Positioned(
+                              top: 0,
+                              bottom: 0,
+                              left: mirror ? null : 0,
+                              right: mirror ? 0 : null,
+                              child: PaneResizeHandle(
+                                key: const Key('detail-handle'),
+                                width: width,
+                                min: z.detailMin,
+                                max: hi,
+                                grow: mirror ? 1 : -1,
+                                onResize: (w) =>
+                                    state.setDetailWidth(w, save: false),
+                                onEnd: () =>
+                                    state.setDetailWidth(state.detailWidth),
+                                onReset: () => state.setDetailWidth(null),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    ],
-                  ),
-                );
+                      );
                 return Row(
                   children: [
                     if (mirror && hasDetail) ...[detail, divider],
-                    Expanded(child: main()),
+                    Expanded(
+                      child: PromoteTarget(state: state, child: main()),
+                    ),
                     if (!mirror && hasDetail) ...[divider, detail],
                   ],
                 );
               },
             );
           } else if (hasDetail) {
-            // Wide but not split: the note replaces the list; Maximise and
-            // Close are on the header's detail tab.
-            body = DetailView(
-              state: state,
-              onClose: () => state.guarded(() => state.select(null)),
-              inHeader: wide,
-            );
+            // Wide but not split: the peeked note replaces the main area;
+            // Promote and Collapse are on the header's peek tab.
+            body = peekView(header: wide);
           } else {
             body = main();
           }
 
           Widget content = FScaffold(
             childPad: false,
-            header: maxed ? null : TopBar(state: state, showMenu: !wide),
+            // A main note tab is a full page: no search or view switch.
+            header: mainNote != null
+                ? null
+                : TopBar(state: state, showMenu: !wide),
             child: body,
           );
           if (wide && !state.sidebarCollapsed) {
@@ -207,7 +220,7 @@ class Shell extends StatelessWidget {
           }
 
           // The header row, over the panel: the tab strip above the main
-          // content, the detail tab above the detail pane, the side panel's
+          // content, the peek's tab above the peek pane, the side panel's
           // width left empty.
           Widget header(BuildContext context, double panelWidth) {
             final dockW = state.sidebarCollapsed
@@ -217,43 +230,29 @@ class Shell extends StatelessWidget {
             // Beside the list the tab spans the pane; where the note replaces
             // the list (not split) it is a compact tab at the end of the row.
             final detailW = hasDetail
-                ? (maxed
-                      ? contentW
-                      : split
+                ? (split
                       ? detailWidthFor(t, state, contentW)
                       : t.sizes.detailTab.clamp(0.0, contentW))
                 : null;
             // Clear of the panel's rounded corner where the strip starts at
             // the panel edge, else just the concave corner.
             final edgePad = t.radii.panel + t.radii.tab;
-            if (maxed) {
-              // Only the detail tab and its control; the pane's outer edge
-              // (where Maximise sat) is unchanged.
-              final h = DetailHeader(
-                state: state,
-                width: contentW,
-                mirror: mirror,
-                startPad: (mirror ? false : dockW == 0) ? edgePad : 0,
-              );
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (mirror) h else SizedBox(width: dockW),
-                  if (mirror) SizedBox(width: dockW) else h,
-                ],
-              );
-            }
             final strip = Expanded(
-              child: TabStrip(
+              child: PromoteTarget(
                 state: state,
-                startPad: mirror
-                    ? (detailW != null ? t.radii.tab : edgePad)
-                    : (dockW > 0 ? t.radii.tab : edgePad),
-                endPad: !mirror && detailW != null ? t.radii.tab : t.space.sm,
+                child: TabStrip(
+                  state: state,
+                  startPad: mirror
+                      ? (detailW != null ? t.radii.tab : edgePad)
+                      : (dockW > 0 ? t.radii.tab : edgePad),
+                  endPad: !mirror && detailW != null ? t.radii.tab : t.space.sm,
+                ),
               ),
             );
             final detail = detailW == null
-                ? null
+                ? (collapsedPeek && wide
+                      ? PeekExpandButton(state: state, mirror: mirror)
+                      : null)
                 : DetailHeader(state: state, width: detailW, mirror: mirror);
             return Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,11 +278,6 @@ class Shell extends StatelessWidget {
                           LogicalKeyboardKey.keyW,
                           meta: true,
                         ): state.closeActiveTab,
-                        if (maxed)
-                          const SingleActivator(
-                            LogicalKeyboardKey.escape,
-                          ): () =>
-                              state.minimise(),
                       },
                       // Focus so the shortcuts work before anything is clicked.
                       child: Focus(

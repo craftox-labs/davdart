@@ -153,8 +153,11 @@ class RadiusTokens {
 
 /// Border widths.
 class BorderTokens {
-  const BorderTokens({this.hairline = 1});
+  const BorderTokens({this.hairline = 1, this.focus = 2});
   final double hairline;
+
+  /// Outline of a drop target while a drag is over it.
+  final double focus;
 }
 
 /// Icon sizes.

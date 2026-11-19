@@ -124,8 +124,7 @@ class NotesSection extends _Section {
       for (final n in nodes) {
         final kids = n.children.isNotEmpty;
         final open = !state.collapsed.contains(n.note.uid);
-        final on =
-            state.selectedUid == n.note.uid || state.scopeUid == n.note.uid;
+        final on = state.peekUid == n.note.uid || state.scopeUid == n.note.uid;
         tree.add(
           FTappable(
             onPress: () {

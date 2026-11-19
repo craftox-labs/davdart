@@ -8,30 +8,27 @@ import 'parts.dart';
 import 'tab_strip.dart';
 import 'theme.dart';
 
-/// The detail pane's header, in the shell's header row above the pane: a row
-/// of tabs (one now: the selected note, closable like a strip tab, with its
-/// dirty dot) and, at the pane's outer edge, the Maximise / Minimise control.
-/// The control keeps its place in both states because the header spans the
-/// pane's outer edge either way. With [mirror] (the pane is on the left) the
-/// order is reversed. [startPad] clears the panel's rounded corner when the
-/// tabs start at the panel edge (maximised, side panel collapsed).
+/// The peek pane's header, in the shell's header row above the pane: its one
+/// tab (the peeked note, closable like a strip tab, with its dirty dot; drag
+/// it onto the main area to promote it) and, at the pane's outer edge, the
+/// Promote ("Open in main area") and Collapse controls. With [mirror] (the
+/// pane is on the left) the order is reversed.
 class DetailHeader extends StatelessWidget {
   const DetailHeader({
     super.key,
     required this.state,
     required this.width,
     required this.mirror,
-    this.startPad = 0,
   });
   final AppState state;
   final double width;
   final bool mirror;
-  final double startPad;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final note = state.selected;
+    final uid = state.peekUid;
+    final note = state.peek;
     final title = note == null || note.summary.isEmpty
         ? 'Details'
         : note.summary;
@@ -43,35 +40,68 @@ class DetailHeader extends StatelessWidget {
         builder: (context, _) => Padding(
           // Room for the tab's concave corner on its open side.
           padding: EdgeInsets.only(
-            left: mirror ? 0 : math.max(t.radii.tab, startPad),
-            right: mirror ? math.max(t.radii.tab, startPad) : 0,
+            left: mirror ? 0 : t.radii.tab,
+            right: mirror ? t.radii.tab : 0,
           ),
           child: LayoutBuilder(
-            builder: (context, c) => Align(
-              alignment: mirror ? Alignment.topRight : Alignment.topLeft,
-              child: TabItem(
-                key: const Key('detail-tab'),
-                width: math.min(c.maxWidth, t.sizes.tabMax),
-                icon: note != null && AppState.isFolder(note)
-                    ? FLucideIcons.folder
-                    : FLucideIcons.fileText,
-                title: title,
-                active: true,
-                dirty: state.dirty,
-                onPress: () {},
-                onClose: () => state.guarded(() => state.select(null)),
-              ),
-            ),
+            builder: (context, c) {
+              final w = math.min(c.maxWidth, t.sizes.tabMax);
+              final icon = note != null && AppState.isFolder(note)
+                  ? FLucideIcons.folder
+                  : FLucideIcons.fileText;
+              return Align(
+                alignment: mirror ? Alignment.topRight : Alignment.topLeft,
+                child: Draggable<String>(
+                  key: const Key('detail-drag'),
+                  data: uid,
+                  maxSimultaneousDrags: uid == null ? 0 : 1,
+                  feedback: DefaultTextStyle(
+                    style: t.type.captionStyle.copyWith(color: t.fg),
+                    child: Container(
+                      width: w,
+                      height: t.sizes.tabStrip,
+                      alignment: Alignment.centerLeft,
+                      padding: EdgeInsets.symmetric(horizontal: t.space.md),
+                      decoration: BoxDecoration(
+                        color: t.panel,
+                        border: Border.all(color: t.divider),
+                        borderRadius: BorderRadius.circular(t.radii.small),
+                      ),
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                  child: TabItem(
+                    key: const Key('detail-tab'),
+                    width: w,
+                    icon: icon,
+                    title: title,
+                    active: true,
+                    dirty: state.dirty,
+                    onPress: () {},
+                    onClose: () => state.guarded(() => state.select(null)),
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),
     );
-    final max = state.maximised;
-    final toggle = IconAction(
-      key: const Key('pane-size'),
-      tooltip: max ? 'Minimise' : 'Maximise',
-      icon: max ? FLucideIcons.minimize : FLucideIcons.maximize,
-      onPress: max ? () => state.minimise() : state.maximise,
+    final promote = IconAction(
+      key: const Key('peek-promote'),
+      tooltip: 'Open in main area',
+      icon: FLucideIcons.squareArrowOutUpRight,
+      onPress: uid == null ? null : () => state.promote(uid),
+    );
+    final collapse = IconAction(
+      key: const Key('peek-collapse'),
+      tooltip: 'Collapse',
+      icon: mirror ? FLucideIcons.panelLeftClose : FLucideIcons.panelRightClose,
+      onPress: () => state.setPeekCollapsed(true),
     );
     return SizedBox(
       key: const Key('detail-header'),
@@ -79,8 +109,28 @@ class DetailHeader extends StatelessWidget {
       height: t.sizes.tabStrip + t.borders.hairline,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: mirror ? [toggle, tab] : [tab, toggle],
+        children: mirror ? [collapse, promote, tab] : [tab, promote, collapse],
       ),
     );
   }
+}
+
+/// The header cell shown at the outer edge while the peek is collapsed: one
+/// button that brings the parked note back at peek width.
+class PeekExpandButton extends StatelessWidget {
+  const PeekExpandButton({
+    super.key,
+    required this.state,
+    required this.mirror,
+  });
+  final AppState state;
+  final bool mirror;
+
+  @override
+  Widget build(BuildContext context) => IconAction(
+    key: const Key('peek-expand'),
+    tooltip: 'Show ${state.peek?.summary ?? 'note'}',
+    icon: mirror ? FLucideIcons.panelLeftOpen : FLucideIcons.panelRightOpen,
+    onPress: () => state.setPeekCollapsed(false),
+  );
 }

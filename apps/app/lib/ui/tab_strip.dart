@@ -30,10 +30,9 @@ class TabStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final draft = state.draft;
     return ListenableBuilder(
       // The dirty dot follows the open edit, which notifies on its own.
-      listenable: Listenable.merge([state, ?draft]),
+      listenable: Listenable.merge([state, ...state.drafts]),
       builder: (context, _) {
         final tabs = state.tabs;
         final active = state.activeTab;
@@ -274,6 +273,32 @@ class TabItemState extends State<TabItem> {
             );
           },
         ),
+      ),
+    );
+  }
+}
+
+/// Accepts a peek note dragged from the side panel and promotes it to a main
+/// tab; outlines itself while a drag is over it.
+class PromoteTarget extends StatelessWidget {
+  const PromoteTarget({super.key, required this.state, required this.child});
+  final AppState state;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return DragTarget<String>(
+      onWillAcceptWithDetails: (d) => state.tree.find(d.data) != null,
+      onAcceptWithDetails: (d) => state.promote(d.data),
+      builder: (context, candidates, _) => DecoratedBox(
+        position: DecorationPosition.foreground,
+        decoration: BoxDecoration(
+          border: candidates.isEmpty
+              ? null
+              : Border.all(color: t.accent, width: t.borders.focus),
+        ),
+        child: child,
       ),
     );
   }

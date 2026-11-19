@@ -3,6 +3,7 @@ import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/data/space_catalog.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/state/tab_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -62,90 +63,141 @@ Future<List<String>> _titles() async => [
 ];
 
 void main() {
-  group('maximised pane', () {
-    testWidgets('Maximise fills the area, Minimise returns, same selection', (
+  group('peek and main area', () {
+    testWidgets('Promote moves the peek note to a main tab, peek empties', (
       t,
     ) async {
       final s = await _pump(t);
       expect(_k('detail-pane'), findsOneWidget);
-      await t.tap(_k('pane-size'));
+      expect(_k('pane-size'), findsNothing);
+      await t.tap(_k('peek-promote'));
       await _settle(t);
-      expect(s.maximised, isTrue);
-      expect(_k('full-page'), findsOneWidget);
+      expect(s.peekUid, isNull);
+      expect(s.tabs, [const DocTab.note('a')]);
+      expect(s.activeTab, const DocTab.note('a'));
       expect(_k('detail-pane'), findsNothing);
+      expect(_k('main-note'), findsOneWidget);
       expect(find.text('TODO'), findsNothing);
-      expect(_k('back'), findsNothing);
-      await t.tap(_k('pane-size'));
-      await _settle(t);
-      expect(s.maximised, isFalse);
-      expect(s.selectedUid, 'a');
-      expect(_k('detail-pane'), findsOneWidget);
-      expect(find.text('TODO'), findsOneWidget);
-    });
-
-    testWidgets('Escape minimises', (t) async {
-      final s = await _pump(t);
-      s.maximise();
-      await _settle(t);
-      await t.sendKeyEvent(LogicalKeyboardKey.escape);
-      await _settle(t);
-      expect(s.maximised, isFalse);
-      expect(s.selectedUid, 'a');
-    });
-
-    testWidgets('another selected note shows in the tab while maximised', (
-      t,
-    ) async {
-      final s = await _pump(t);
-      s.maximise();
-      await _settle(t);
-      s.select('b');
-      await _settle(t);
-      expect(s.maximised, isTrue);
-      expect(
-        find.descendant(of: _k('detail-tab'), matching: find.text('Beta')),
-        findsOneWidget,
-      );
-    });
-
-    testWidgets('closing the tab while maximised returns to the list', (
-      t,
-    ) async {
-      final s = await _pump(t);
-      s.maximise();
-      await _settle(t);
-      await t.tap(
-        find.descendant(of: _k('detail-tab'), matching: _k('tab-close')),
-      );
-      await _settle(t);
-      expect(s.maximised, isFalse);
-      expect(s.selected, isNull);
       expect(_k('tab-strip'), findsOneWidget);
     });
 
-    testWidgets('narrow layout has no Maximise and no maximised pane', (
-      t,
-    ) async {
-      final s = await _pump(t, size: const Size(500, 900));
-      expect(_k('pane-size'), findsNothing);
-      s.maximise();
+    testWidgets('a main tab shows in the main area, not the peek', (t) async {
+      final s = await _pump(t);
+      s.openNoteTab('b');
       await _settle(t);
-      expect(_k('full-page'), findsNothing);
-      expect(find.text('Alpha body'), findsOneWidget);
+      expect(s.activeTab, const DocTab.note('b'));
+      expect(s.peekUid, 'a');
+      expect(_k('main-note'), findsOneWidget);
+      expect(
+        find.descendant(of: _k('main-note'), matching: find.text('Beta')),
+        findsWidgets,
+      );
+      expect(
+        find.descendant(of: _k('peek-view'), matching: find.text('Alpha')),
+        findsWidgets,
+      );
+      // Tapping the tab again, or home and back, never moves it to the peek.
+      await t.tap(_k('tab-home'));
+      await _settle(t);
+      await t.tap(_k('tab-n:b'));
+      await _settle(t);
+      expect(s.peekUid, 'a');
+      expect(s.activeTab, const DocTab.note('b'));
     });
 
-    testWidgets('mirrored layout keeps the pane and the maximised pane', (
+    testWidgets('a note open in a tab is focused there, not peeked', (t) async {
+      final s = await _pump(t);
+      s.openNoteTab('b');
+      await t.tap(_k('tab-home'));
+      await _settle(t);
+      s.select('b');
+      await _settle(t);
+      expect(s.peekUid, 'a');
+      expect(s.activeTab, const DocTab.note('b'));
+    });
+
+    testWidgets('opening a tab for the peeked note closes the peek', (t) async {
+      final s = await _pump(t);
+      s.openNoteTab('a');
+      await _settle(t);
+      expect(s.peekUid, isNull);
+      expect(_k('detail-pane'), findsNothing);
+    });
+
+    testWidgets('Collapse keeps the note; Expand brings it back', (t) async {
+      final s = await _pump(t);
+      final open = t.getRect(_k('detail-pane'));
+      await t.tap(_k('peek-collapse'));
+      await _settle(t);
+      expect(s.peekCollapsed, isTrue);
+      expect(s.peekUid, 'a');
+      expect(_k('detail-pane'), findsNothing);
+      expect(_k('peek-expand'), findsOneWidget);
+      await t.tap(_k('peek-expand'));
+      await _settle(t);
+      expect(s.peekCollapsed, isFalse);
+      expect(t.getRect(_k('detail-pane')), open);
+      expect(_k('peek-expand'), findsNothing);
+    });
+
+    testWidgets('a new peek while collapsed expands it', (t) async {
+      final s = await _pump(t);
+      s.setPeekCollapsed(true);
+      await _settle(t);
+      s.select('b');
+      await _settle(t);
+      expect(s.peekCollapsed, isFalse);
+      expect(_k('detail-pane'), findsOneWidget);
+    });
+
+    testWidgets('dragging the peek tab onto the strip promotes it', (t) async {
+      final s = await _pump(t);
+      final g = await t.startGesture(t.getCenter(_k('detail-drag')));
+      await t.pump();
+      await g.moveTo(t.getCenter(_k('tab-home')));
+      await t.pump();
+      await g.up();
+      await _settle(t);
+      expect(s.peekUid, isNull);
+      expect(s.activeTab, const DocTab.note('a'));
+    });
+
+    testWidgets('dragging the peek tab onto the main area promotes it', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      final g = await t.startGesture(t.getCenter(_k('detail-drag')));
+      await t.pump();
+      await g.moveTo(t.getCenter(find.text('TODO').first));
+      await t.pump();
+      await g.up();
+      await _settle(t);
+      expect(s.activeTab, const DocTab.note('a'));
+    });
+
+    testWidgets('narrow layout has no Promote and no main tab page', (t) async {
+      final s = await _pump(t, size: const Size(500, 900));
+      expect(_k('peek-promote'), findsNothing);
+      s.openNoteTab('b');
+      await _settle(t);
+      expect(_k('main-note'), findsNothing);
+    });
+
+    testWidgets('mirrored layout keeps the pane; Promote and Collapse work', (
       t,
     ) async {
       final s = await _pump(t, side: LayoutSide.end);
       final pane = t.getTopLeft(_k('detail-pane'));
       expect(pane.dx, lessThan(300));
-      s.maximise();
+      await t.tap(_k('peek-collapse'));
       await _settle(t);
-      expect(_k('full-page'), findsOneWidget);
-      await t.tap(_k('pane-size'));
+      expect(_k('peek-expand'), findsOneWidget);
+      await t.tap(_k('peek-expand'));
       await _settle(t);
       expect(t.getTopLeft(_k('detail-pane')), pane);
+      await t.tap(_k('peek-promote'));
+      await _settle(t);
+      expect(s.activeTab, const DocTab.note('a'));
     });
   });
 
@@ -280,13 +332,13 @@ void main() {
       expect(_k('leave-save'), findsOneWidget);
       await t.tap(find.text('Keep editing'));
       await _settle(t);
-      expect(s.selectedUid, 'a');
+      expect(s.peekUid, 'a');
       expect(s.dirty, isTrue);
       await t.tap(find.text('Beta').first);
       await _settle(t);
       await t.tap(_k('leave-discard'));
       await _settle(t);
-      expect(s.selectedUid, 'b');
+      expect(s.peekUid, 'b');
       expect(await _titles(), isNot(contains('Changed')));
       // Save path, from changing the selection.
       await t.tap(_k('edit-note'));
@@ -296,18 +348,18 @@ void main() {
       await _settle(t);
       await t.tap(_k('leave-save'));
       await _settle(t);
-      expect(s.selectedUid, 'a');
+      expect(s.peekUid, 'a');
       expect(await _titles(), contains('Beta 2'));
     });
 
-    testWidgets('the draft survives maximising', (t) async {
+    testWidgets('the draft survives promoting', (t) async {
       final s = await _pump(t);
       await t.tap(_k('edit-note'));
       await _settle(t);
       await _type(t, 'edit-title', 'Kept');
-      await t.tap(_k('pane-size'));
+      await t.tap(_k('peek-promote'));
       await _settle(t);
-      expect(s.dirty, isTrue);
+      expect(s.dirtyFor('a'), isTrue);
       expect(
         t
             .widget<EditableText>(

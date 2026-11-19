@@ -2,6 +2,7 @@ import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/state/tab_state.dart';
 import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:davdart_app/ui/parts.dart';
@@ -104,42 +105,45 @@ void main() {
   });
 
   group('detail header', () {
-    testWidgets('sits above the pane: closable tab, then Maximise', (t) async {
-      final s = await _pump(t);
-      s.select('a');
-      await t.pumpAndSettle();
-      final header = t.getRect(_k('detail-header'));
-      final pane = t.getRect(_k('detail-pane'));
-      final panel = t.getRect(_k('shell-panel'));
-      expect(header.left, pane.left);
-      expect(header.width, pane.width);
-      expect(t.getRect(_in('detail-tab', 'joined-tab')).bottom, panel.top);
-      // Close lives in the tab itself, like a strip tab's.
-      expect(_in('detail-tab', 'tab-close'), findsOneWidget);
-      expect(_k('detail-close'), findsNothing);
-      expect(
-        t.getRect(_in('detail-tab', 'tab-close')).right,
-        lessThanOrEqualTo(t.getRect(_k('pane-size')).left),
-      );
-      expect(t.getRect(_k('pane-size')).right, header.right);
-      expect(
-        find.descendant(of: _k('detail-tab'), matching: find.text('Alpha')),
-        findsOneWidget,
-      );
-      expect(_in('detail-pane', 'pane-size'), findsNothing);
-      await t.tap(_in('detail-tab', 'tab-close'));
-      await t.pumpAndSettle();
-      expect(s.selected, isNull);
-      expect(_k('detail-header'), findsNothing);
-    });
+    testWidgets(
+      'sits above the pane: closable tab, then Promote and Collapse',
+      (t) async {
+        final s = await _pump(t);
+        s.select('a');
+        await t.pumpAndSettle();
+        final header = t.getRect(_k('detail-header'));
+        final pane = t.getRect(_k('detail-pane'));
+        final panel = t.getRect(_k('shell-panel'));
+        expect(header.left, pane.left);
+        expect(header.width, pane.width);
+        expect(t.getRect(_in('detail-tab', 'joined-tab')).bottom, panel.top);
+        // Close lives in the tab itself, like a strip tab's.
+        expect(_in('detail-tab', 'tab-close'), findsOneWidget);
+        expect(_k('detail-close'), findsNothing);
+        expect(
+          t.getRect(_in('detail-tab', 'tab-close')).right,
+          lessThanOrEqualTo(t.getRect(_k('peek-promote')).left),
+        );
+        expect(t.getRect(_k('peek-collapse')).right, header.right);
+        expect(
+          find.descendant(of: _k('detail-tab'), matching: find.text('Alpha')),
+          findsOneWidget,
+        );
+        await t.tap(_in('detail-tab', 'tab-close'));
+        await t.pumpAndSettle();
+        expect(s.peek, isNull);
+        expect(_k('detail-header'), findsNothing);
+      },
+    );
 
     testWidgets('the tab close matches a strip tab close in size', (t) async {
       final s = await _pump(t);
-      s.openNoteTab('a');
+      s.select('a');
+      s.openNoteTab('b');
       await t.pumpAndSettle();
       expect(
         t.getSize(_in('detail-tab', 'tab-close')),
-        t.getSize(_in('tab-n:a', 'tab-close')),
+        t.getSize(_in('tab-n:b', 'tab-close')),
       );
     });
 
@@ -159,93 +163,64 @@ void main() {
       expect(_k('leave-discard'), findsOneWidget);
       await t.tap(find.text('Keep editing'));
       await t.pumpAndSettle();
-      expect(s.selectedUid, 'a');
+      expect(s.peekUid, 'a');
       await t.tap(_in('detail-tab', 'tab-close'));
       await t.pumpAndSettle();
       await t.tap(_k('leave-discard'));
       await t.pumpAndSettle();
-      expect(s.selected, isNull);
+      expect(s.peek, isNull);
     });
 
-    testWidgets('Maximise hides strip, list and top bar; only the tab shows', (
-      t,
-    ) async {
+    testWidgets('Promote and Collapse sit at the pane edge', (t) async {
       final s = await _pump(t);
       s.select('a');
       await t.pumpAndSettle();
-      final before = t.getRect(_k('detail-header'));
-      await t.tap(_k('pane-size'));
-      await t.pumpAndSettle();
-      expect(s.maximised, isTrue);
-      expect(_k('tab-strip'), findsNothing);
-      expect(_k('tab-home'), findsNothing);
-      expect(_k('detail-pane'), findsNothing);
-      expect(find.text('Board'), findsNothing);
-      expect(_k('full-page'), findsOneWidget);
-      expect(_k('back'), findsNothing);
-      expect(_k('breadcrumb'), findsNothing);
-      final dock = t.getRect(find.byType(DockedSidebar));
       final header = t.getRect(_k('detail-header'));
-      expect(header.left, dock.right);
-      expect(header.right, before.right);
-      expect(header.width, greaterThan(before.width));
-      expect(_in('detail-header', 'detail-tab'), findsOneWidget);
-      // The side panel stays.
-      expect(find.byType(DockedSidebar), findsOneWidget);
-      expect(s.tabs, isEmpty);
+      final promote = t.getRect(_k('peek-promote'));
+      final collapse = t.getRect(_k('peek-collapse'));
+      expect(collapse.right, header.right);
+      expect(promote.right, lessThanOrEqualTo(collapse.left));
+      expect(
+        t.widget<IconAction>(_k('peek-promote')).tooltip,
+        'Open in main area',
+      );
+      expect(t.widget<IconAction>(_k('peek-collapse')).tooltip, 'Collapse');
     });
 
-    for (final side in [LayoutSide.start, LayoutSide.end]) {
-      testWidgets('Minimise sits where Maximise was ($side)', (t) async {
-        final s = await _pump(t, side: side);
-        s.select('a');
-        await t.pumpAndSettle();
-        final max = t.getRect(_k('pane-size'));
-        await t.tap(_k('pane-size'));
-        await t.pumpAndSettle();
-        expect(s.maximised, isTrue);
-        expect(t.getRect(_k('pane-size')), max);
-        expect(t.takeException(), isNull);
-        await t.tap(_k('pane-size'));
-        await t.pumpAndSettle();
-        expect(s.maximised, isFalse);
-        expect(s.selectedUid, 'a');
-        expect(t.getRect(_k('pane-size')), max);
-        expect(_k('tab-strip'), findsOneWidget);
-        expect(_k('detail-pane'), findsOneWidget);
-      });
-    }
-
-    testWidgets('tooltips read Maximise then Minimise', (t) async {
+    testWidgets('Promote keeps an open draft without prompting', (t) async {
       final s = await _pump(t);
       s.select('a');
-      await t.pumpAndSettle();
-      String tip() => t.widget<IconAction>(_k('pane-size')).tooltip;
-
-      expect(tip(), 'Maximise');
-      s.maximise();
-      await t.pumpAndSettle();
-      expect(tip(), 'Minimise');
-    });
-
-    testWidgets('Minimise keeps the open draft without prompting', (t) async {
-      final s = await _pump(t);
-      s.select('a');
-      s.maximise();
       await t.pumpAndSettle();
       await t.tap(_k('edit-note'));
       await t.pumpAndSettle();
       await t.enterText(_k('edit-title'), 'Changed');
       await t.pump();
-      await t.tap(_k('pane-size'));
+      await t.tap(_k('peek-promote'));
       await t.pumpAndSettle();
       expect(_k('leave-save'), findsNothing);
-      expect(s.maximised, isFalse);
-      expect(s.dirty, isTrue);
-      expect(s.selectedUid, 'a');
+      expect(s.dirtyFor('a'), isTrue);
+      expect(s.activeTab, const DocTab.note('a'));
     });
 
-    testWidgets('mirrored: the header is on the left, Maximise at its end', (
+    testWidgets('peek and main tab keep separate drafts', (t) async {
+      final s = await _pump(t);
+      s.select('a');
+      s.openNoteTab('b');
+      await t.pumpAndSettle();
+      s.startEdit('a');
+      s.startEdit('b');
+      s.draftFor('a')!.titleController.text = 'A2';
+      s.draftFor('b')!.titleController.text = 'B2';
+      await t.pump();
+      expect(s.dirtyFor('a'), isTrue);
+      expect(s.dirtyFor('b'), isTrue);
+      await t.tap(_k('tab-home'));
+      await t.pumpAndSettle();
+      expect(s.dirtyFor('b'), isTrue);
+      expect(s.draftFor('a')!.titleController.text, 'A2');
+    });
+
+    testWidgets('mirrored: the header is on the left, Collapse at its end', (
       t,
     ) async {
       final s = await _pump(t, side: LayoutSide.end);
@@ -258,9 +233,9 @@ void main() {
       expect(header.left, pane.left);
       expect(header.right, lessThanOrEqualTo(strip.left));
       expect(t.getRect(_k('icon-rail')).left, panel.right);
-      expect(t.getRect(_k('pane-size')).left, header.left);
+      expect(t.getRect(_k('peek-collapse')).left, header.left);
       expect(
-        t.getRect(_k('pane-size')).left,
+        t.getRect(_k('peek-promote')).left,
         lessThan(t.getRect(_k('detail-tab')).left),
       );
       expect(t.getRect(_in('detail-tab', 'joined-tab')).bottom, panel.top);
@@ -269,14 +244,12 @@ void main() {
   });
 
   group('between 880 and 1280', () {
-    testWidgets('compact tab with Maximise at the end; Minimise in place', (
-      t,
-    ) async {
+    testWidgets('compact peek tab; Promote opens a main tab', (t) async {
       final s = await _pump(t, size: const Size(1000, 800));
       expect(_k('tab-strip'), findsOneWidget);
       s.select('a');
       await t.pumpAndSettle();
-      // The note replaces the list, as before.
+      // The peeked note replaces the list, as before.
       expect(_k('detail-pane'), findsNothing);
       expect(_k('detail-header'), findsOneWidget);
       expect(
@@ -284,20 +257,12 @@ void main() {
         Tokens.light.sizes.detailTab,
       );
       expect(t.getSize(_k('tab-strip')).width, greaterThan(300));
-      final max = t.getRect(_k('pane-size'));
-      await t.tap(_k('pane-size'));
+      await t.tap(_k('peek-promote'));
       await t.pumpAndSettle();
-      expect(s.maximised, isTrue);
-      expect(_k('full-page'), findsOneWidget);
-      expect(_k('tab-strip'), findsNothing);
-      expect(t.getRect(_k('pane-size')), max);
-      await t.tap(_k('pane-size'));
-      await t.pumpAndSettle();
-      expect(s.maximised, isFalse);
+      expect(s.activeTab, const DocTab.note('a'));
+      expect(_k('detail-header'), findsNothing);
+      expect(_k('main-note'), findsOneWidget);
       expect(_k('tab-strip'), findsOneWidget);
-      await t.tap(_in('detail-tab', 'tab-close'));
-      await t.pumpAndSettle();
-      expect(s.selected, isNull);
       expect(t.takeException(), isNull);
     });
   });
@@ -309,6 +274,6 @@ void main() {
     expect(_k('tab-strip'), findsNothing);
     expect(_k('detail-header'), findsNothing);
     expect(_k('shell-panel'), findsNothing);
-    expect(_k('pane-size'), findsNothing);
+    expect(_k('peek-promote'), findsNothing);
   });
 }

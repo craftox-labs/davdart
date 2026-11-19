@@ -11,7 +11,7 @@ Future<void> showNewNoteDialog(
   AppState state, {
   bool inTab = false,
 }) {
-  final parent = state.selected ?? state.scope;
+  final parent = state.peek ?? state.scope;
   final title = TextEditingController();
   var underParent = parent != null;
   void submit(BuildContext ctx) {

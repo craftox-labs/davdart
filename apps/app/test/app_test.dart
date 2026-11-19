@@ -116,9 +116,9 @@ void main() {
       expect(PlanItem.fromNote(s.tree.find('c')!.note).status, 'todo');
       await s.addNote('  New idea ', parentUid: 'a', status: 'backlog');
       expect(s.notes, hasLength(4));
-      expect(s.selected!.summary, 'New idea');
-      expect(s.selected!.parentUid, 'a');
-      expect(PlanItem.fromNote(s.selected!).status, 'backlog');
+      expect(s.peek!.summary, 'New idea');
+      expect(s.peek!.parentUid, 'a');
+      expect(PlanItem.fromNote(s.peek!).status, 'backlog');
       await s.addNote('   ');
       expect(s.notes, hasLength(4));
       // reload keeps the edits and does not re-seed
@@ -455,7 +455,7 @@ void main() {
       await s.deleteNote('a');
       expect(s.notes.map((n) => n.uid).toSet(), {'b', 'c'});
       expect(s.tree.find('b')!.note.parentUid, isNull);
-      expect(s.selectedUid, isNull);
+      expect(s.peekUid, isNull);
       expect(s.error, isNull);
     });
 
@@ -779,7 +779,7 @@ void main() {
         final folder = s.scope!;
         expect(AppState.isFolder(folder), isTrue);
         expect(s.scopeUid, folder.uid);
-        expect(s.selectedUid, isNull);
+        expect(s.peekUid, isNull);
         await s.addNote('Ship it', parentUid: folder.uid, status: 'todo');
         await s.addNote('Elsewhere', status: 'todo'); // selecting it leaves
         expect(s.scopeUid, isNull); // the folder, as it is outside it
@@ -1041,7 +1041,7 @@ void main() {
       final planning = hits.firstWhere((h) => h.space.id == 'planning');
       await s.openHit(planning);
       expect(s.currentSpaceName, 'Planning');
-      expect(s.selectedUid, planning.note.uid);
+      expect(s.peekUid, planning.note.uid);
     });
 
     testWidgets('search narrows the list', (t) async {
@@ -1388,7 +1388,7 @@ void main() {
       expect(find.byKey(const Key('hit-a')), findsOneWidget);
       await t.tap(find.byKey(const Key('hit-a')));
       await t.pumpAndSettle();
-      expect(state.selectedUid, 'a');
+      expect(state.peekUid, 'a');
     });
 
     testWidgets('Account and Settings sections show server items', (t) async {

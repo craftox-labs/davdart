@@ -51,7 +51,7 @@ class NoteListView extends StatelessWidget {
         return FTappable(
           onPress: () => state.guarded(() => state.select(n.uid)),
           child: Container(
-            color: state.selectedUid == n.uid ? t.selected : null,
+            color: state.peekUid == n.uid ? t.selected : null,
             padding: EdgeInsets.fromLTRB(
               t.space.lg + depth * t.sizes.listIndent,
               t.space.lg - t.space.xxs,

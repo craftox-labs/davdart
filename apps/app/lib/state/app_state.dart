@@ -226,12 +226,13 @@ class AppState extends ChangeNotifier {
   Future<bool> switchSpace(String id) async {
     final c = catalog;
     if (c == null || id == c.current) return false;
-    if (!await _settleDraft()) return false;
+    if (!await _settleDrafts(_drafts.keys.toList())) return false;
+    _drafts.clear();
     c.select(id);
     source = c.sourceFor(id);
     notes = [];
     tree = NoteTree.build(const []);
-    selectedUid = null;
+    peekUid = null;
     query = '';
     searchController.text = '';
     tag = null;
@@ -533,8 +534,7 @@ class AppState extends ChangeNotifier {
       (t) => notes.any((n) => n.categories.contains(t)),
       orElse: () => null,
     );
-    selectedUid = null;
-    _fullPage = false;
+    _setPeek(null);
     scopeUid = v.folderUid != null && tree.find(v.folderUid!) != null
         ? v.folderUid
         : null;
@@ -594,8 +594,9 @@ class AppState extends ChangeNotifier {
   /// Shows only what is inside folder [uid] (null: the whole Space).
   void openFolder(String? uid) {
     scopeUid = uid;
-    selectedUid = null;
-    _fullPage = false;
+    _setPeek(null);
+    final a = _activeViewTab;
+    if (a != null && a.kind == TabKind.note) _activeViewTab = null;
     notifyListeners();
   }
 
@@ -662,9 +663,10 @@ class AppState extends ChangeNotifier {
       final loaded = await src.load();
       if (src != source) return group.length;
       _setNotes(loaded);
-      if (selectedUid != null && tree.find(selectedUid!) == null) {
-        selectedUid = null;
+      if (peekUid != null && tree.find(peekUid!) == null) {
+        _setPeek(null);
       }
+      _drafts.removeWhere((u, _) => tree.find(u) == null);
       error = null;
       notifyListeners();
       if (connected) sync();
@@ -707,7 +709,30 @@ class AppState extends ChangeNotifier {
   bool loading = false;
   String? error;
 
-  String? selectedUid;
+  /// The note shown in the side peek panel: a single slot, never a tab.
+  /// Board and List clicks replace it; [promote] moves it to the main area.
+  String? peekUid;
+
+  /// The peek is folded away but keeps its note; expanding shows it again.
+  bool peekCollapsed = false;
+
+  void setPeekCollapsed(bool v) {
+    if (peekCollapsed == v) return;
+    peekCollapsed = v;
+    notifyListeners();
+  }
+
+  /// Sets the peek note. A dropped peek note loses its edit draft unless the
+  /// note is also a main tab (one place per note, so the draft is shared).
+  void _setPeek(String? uid) {
+    final old = peekUid;
+    peekUid = uid;
+    if (uid != null) peekCollapsed = false;
+    if (old != null && old != uid && !_tabs.contains(DocTab.note(old))) {
+      _drafts.remove(old);
+    }
+  }
+
   ViewMode view = ViewMode.board;
   String query = '';
   String? tag;
@@ -938,7 +963,10 @@ class AppState extends ChangeNotifier {
       }
       await src.delete(uid);
     });
-    if (error == null && selectedUid == uid) selectedUid = null;
+    if (error == null) {
+      _drafts.remove(uid);
+      if (peekUid == uid) _setPeek(null);
+    }
     notifyListeners();
   }
 
@@ -965,35 +993,44 @@ class AppState extends ChangeNotifier {
     }
     await _save(n);
     if (error == null) {
-      select(n.uid);
-      if (inTab) openNoteTab(n.uid);
+      if (inTab) {
+        openNoteTab(n.uid);
+      } else {
+        select(n.uid);
+      }
     }
   }
 
   // --- Document tabs ---
   //
-  // The strip shows a fixed home tab (the Board or List, with the peek pane)
-  // and one closable tab per note opened full page or saved view applied.
-  // Rules: opening a note full page, or applying a saved view, opens its tab
-  // or focuses it if open; the home tab shows whatever the main area holds,
-  // so leaving a tab for home keeps the current filters. A note tab shows its
-  // note in the detail pane (not maximised): "+" (new note) opens one; the
-  // detail pane's own tab, with its maximise control, is separate from the
-  // strip and never creates or removes strip tabs. Open tabs are saved per
-  // Space (by uid).
+  // Two independent places show notes. The MAIN area is a layout of panes,
+  // each showing one tab (one pane for now, so a split can be added without
+  // reshaping this): the fixed home tab (the Board or List) or a closable tab
+  // per note opened full page or saved view applied. The PEEK is a single
+  // side slot ([peekUid]): Board, List and tree clicks replace it, and
+  // [promote] moves it to the main area as a note tab. A note lives in one
+  // place at a time: peeking a note that has a tab focuses the tab instead.
+  // Open tabs are saved per Space (by uid).
 
   final TabList _tabs = TabList();
-  DocTab? _activeViewTab; // the focused view or note tab
+  DocTab? _activeViewTab; // the main pane's tab; null is home
   bool _tabsLoaded = false;
 
   /// The open document tabs in strip order (the home tab is not in it).
   List<DocTab> get tabs => List.unmodifiable(_tabs.tabs);
 
-  /// The focused document tab; null means the home tab.
+  /// The main pane's tab; null means the home tab.
   DocTab? get activeTab {
     final v = _activeViewTab;
-    if (v != null && v.kind == TabKind.note && v.id != selectedUid) return null;
     return v != null && _tabs.contains(v) ? v : null;
+  }
+
+  /// The note the main pane shows full page, when its tab is a note tab.
+  String? get mainNoteUid {
+    final t = activeTab;
+    return t != null && t.kind == TabKind.note && tree.find(t.id) != null
+        ? t.id
+        : null;
   }
 
   String get _tabsKey => 'davdart.tabs.v1.${catalog?.current ?? 'default'}';
@@ -1011,7 +1048,7 @@ class AppState extends ChangeNotifier {
     _tabsLoaded = false;
     _tabs.tabs.clear();
     _activeViewTab = null;
-    _fullPage = false;
+    peekCollapsed = false;
   }
 
   bool _tabExists(DocTab t) => switch (t.kind) {
@@ -1035,15 +1072,21 @@ class AppState extends ChangeNotifier {
     _saveTabs();
   }
 
-  /// Opens (or focuses) the strip tab of note [uid] and shows the note in
-  /// the detail pane. The "+" button's new note is opened this way.
+  /// Opens (or focuses) the main tab of note [uid]. A peek of the same note
+  /// closes (one place per note). The "+" button's new note opens this way.
   void openNoteTab(String uid) {
     if (tree.find(uid) == null) return;
     final t = DocTab.note(uid);
     if (_tabs.add(t)) _saveTabs();
-    select(uid);
-    _activeViewTab = t;
-    notifyListeners();
+    _show(t);
+  }
+
+  /// Moves the peek note ([uid] by default) to the main area as a note tab
+  /// and shows it there. The peek empties; the note's edit draft goes along.
+  void promote([String? uid]) {
+    uid ??= peekUid;
+    if (uid == null || tree.find(uid) == null) return;
+    openNoteTab(uid);
   }
 
   /// Title of a tab: the note's title or the view's name.
@@ -1058,11 +1101,7 @@ class AppState extends ChangeNotifier {
       isFolder(tree.find(t.id)!.note);
 
   /// Whether the tab's note has unsaved edits.
-  bool tabDirty(DocTab t) =>
-      t.kind == TabKind.note &&
-      draft != null &&
-      draft!.uid == t.id &&
-      draft!.dirty;
+  bool tabDirty(DocTab t) => t.kind == TabKind.note && dirtyFor(t.id);
 
   SavedView? _viewByUid(String uid) {
     for (final v in savedViews) {
@@ -1071,27 +1110,29 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  /// Shows [t] (null: home) without asking about unsaved edits.
+  /// Shows [t] (null: home) in the main pane without asking about edits.
   void _show(DocTab? t) {
     if (t == null) {
-      _fullPage = false;
       _activeViewTab = null;
       notifyListeners();
     } else if (t.kind == TabKind.note) {
       if (tree.find(t.id) == null) return;
-      _fullPage = false;
-      select(t.id);
       _activeViewTab = t;
+      if (peekUid == t.id) _setPeek(null);
+      notifyListeners();
     } else {
       final v = _viewByUid(t.id);
       if (v != null) applyView(v);
     }
   }
 
-  /// Focuses [t] (null: the home tab), asking first about unsaved edits.
+  /// Focuses [t] (null: the home tab). Every note keeps its own draft, so
+  /// only applying a view (which closes the peek) asks about the peek's.
   Future<void> activateTab(DocTab? t) {
     if (t == activeTab) return Future.value();
-    return guarded(() => _show(t));
+    if (t != null && t.kind == TabKind.view) return guarded(() => _show(t));
+    _show(t);
+    return Future.value();
   }
 
   /// Closes [t]. Unsaved edits in its note are asked about first. If it was
@@ -1102,19 +1143,13 @@ class AppState extends ChangeNotifier {
       final wasActive = activeTab == t;
       final next = _tabs.remove(t);
       if (_activeViewTab == t) _activeViewTab = null;
+      if (t.kind == TabKind.note && peekUid != t.id) _drafts.remove(t.id);
       _saveTabs();
-      if (wasActive) {
-        _show(next);
-        if (next == null && t.kind == TabKind.note && selectedUid == t.id) {
-          select(null);
-        }
-      }
+      if (wasActive) _show(next);
       notifyListeners();
     }
 
-    // The open draft always belongs to the selected note, so [guarded]
-    // asks exactly when this tab's note has unsaved edits.
-    return tabDirty(t) ? guarded(close) : Future.sync(close);
+    return tabDirty(t) ? guarded(close, uids: [t.id]) : Future.sync(close);
   }
 
   /// Closes the focused document tab (not the home tab).
@@ -1123,42 +1158,35 @@ class AppState extends ChangeNotifier {
     if (t != null) await closeTab(t);
   }
 
-  // --- Full page and in-place editing ---
+  // --- In-place editing ---
+  //
+  // One draft per note, kept while the note is open anywhere, so the peek
+  // and a main tab never hold two sessions of one note.
 
-  bool _fullPage = false;
+  final Map<String, NoteDraft> _drafts = {};
 
-  /// The detail pane fills the whole content area, hiding the strip, list or
-  /// board and top bar (not persisted). Ends by itself when nothing is
-  /// selected.
-  bool get maximised => _fullPage && selected != null;
+  /// Every open edit (the tab strip listens to them for its dirty dots).
+  List<NoteDraft> get drafts => List.unmodifiable(_drafts.values);
 
-  void maximise() {
-    if (selected == null) return;
-    _fullPage = true;
-    notifyListeners();
-  }
+  NoteDraft? draftFor(String uid) => _drafts[uid];
+  bool dirtyFor(String uid) => _drafts[uid]?.dirty ?? false;
 
-  void minimise() {
-    if (!_fullPage) return;
-    _fullPage = false;
-    notifyListeners();
-  }
-
-  /// The open edit session, if it belongs to the selected note.
-  NoteDraft? draft;
-  NoteDraft? get activeDraft =>
-      draft != null && draft!.uid == selectedUid ? draft : null;
-  bool get dirty => activeDraft?.dirty ?? false;
+  /// The peek note's edit session, if any.
+  NoteDraft? get draft => peekUid == null ? null : _drafts[peekUid];
+  NoteDraft? get activeDraft => draft;
+  bool get dirty => draft?.dirty ?? false;
 
   /// Asks the user what to do with unsaved edits; set by the shell.
   Future<DraftChoice> Function()? leaveGuard;
 
-  void startEdit() {
-    final n = selected;
-    if (n == null || !editable || activeDraft != null) return;
-    _dropDraft();
+  /// Starts editing note [uid] (the peek note by default).
+  void startEdit([String? uid]) {
+    uid ??= peekUid;
+    if (uid == null) return;
+    final n = tree.find(uid)?.note;
+    if (n == null || !editable || _drafts.containsKey(uid)) return;
     final p = PlanItem.fromNote(n);
-    draft = NoteDraft(
+    _drafts[uid] = NoteDraft(
       uid: n.uid,
       title: n.summary,
       body: p.text,
@@ -1171,21 +1199,19 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _dropDraft() {
+  void discardDraft([String? uid]) {
     // The fields may still be on screen until the next frame, so the
     // controllers are left to the garbage collector, not disposed.
-    draft = null;
-  }
-
-  void discardDraft() {
-    _dropDraft();
+    _drafts.remove(uid ?? peekUid);
     notifyListeners();
   }
 
-  /// Saves the open edit through [updateNote] (and [setStatus] when the
-  /// status changed). False if nothing was saved (empty title, failure).
-  Future<bool> saveDraft() async {
-    final d = activeDraft;
+  /// Saves the edit of note [uid] (the peek note by default) through
+  /// [updateNote] (and [setStatus] when the status changed). False if
+  /// nothing was saved (empty title, failure).
+  Future<bool> saveDraft([String? uid]) async {
+    final key = uid ?? peekUid;
+    final d = key == null ? null : _drafts[key];
     if (d == null || d.titleEmpty) return false;
     await updateNote(
       d.uid,
@@ -1199,37 +1225,45 @@ class AppState extends ChangeNotifier {
       await setStatus(d.uid, d.status!);
     }
     if (error != null) return false;
-    if (draft == d) _dropDraft();
+    if (_drafts[key] == d) _drafts.remove(key);
     notifyListeners();
     return true;
   }
 
-  /// Runs [action] (a navigation away from the note) once unsaved edits are
-  /// settled: saved or discarded as the user chooses, or not run at all.
-  Future<void> guarded(void Function() action) async {
-    if (await _settleDraft()) action();
+  /// Runs [action] once unsaved edits are settled: saved or discarded as the
+  /// user chooses, or not run at all. Settles the drafts of [uids] (the peek
+  /// note by default: navigating away from the peek).
+  Future<void> guarded(void Function() action, {Iterable<String>? uids}) async {
+    if (await _settleDrafts(uids ?? [?peekUid])) action();
   }
 
-  /// True once unsaved edits are settled (nothing to settle, saved, or
-  /// discarded as the user chose); false when the user keeps editing.
-  Future<bool> _settleDraft() async {
+  /// True once the drafts of [uids] are settled (nothing to settle, saved,
+  /// or discarded as the user chose); false when the user keeps editing.
+  Future<bool> _settleDrafts(Iterable<String> uids) async {
     final g = leaveGuard;
-    if (!dirty || g == null) return true;
-    switch (await g()) {
-      case DraftChoice.keep:
-        return false;
-      case DraftChoice.save:
-        return saveDraft();
-      case DraftChoice.discard:
-        _dropDraft();
-        return true;
+    for (final u in uids) {
+      if (!dirtyFor(u) || g == null) continue;
+      switch (await g()) {
+        case DraftChoice.keep:
+          return false;
+        case DraftChoice.save:
+          if (!await saveDraft(u)) return false;
+        case DraftChoice.discard:
+          _drafts.remove(u);
+      }
     }
+    return true;
   }
 
-  Note? get selected =>
-      selectedUid == null ? null : tree.find(selectedUid!)?.note;
+  Note? get peek => peekUid == null ? null : tree.find(peekUid!)?.note;
 
+  /// Shows note [uid] in the peek (null closes it). A note that has a main
+  /// tab is focused there instead: it lives in one place.
   void select(String? uid) {
+    if (uid != null && _tabs.contains(DocTab.note(uid))) {
+      _show(DocTab.note(uid));
+      return;
+    }
     // Showing a note outside the open folder leaves the folder.
     if (uid != null &&
         scopeUid != null &&
@@ -1237,19 +1271,12 @@ class AppState extends ChangeNotifier {
         !tree.descendants(scopeUid!).any((n) => n.uid == uid)) {
       scopeUid = null;
     }
-    selectedUid = uid;
-    if (uid == null) _fullPage = false;
-    final f = _activeViewTab;
-    if (f != null && f.kind == TabKind.note && f.id != uid) {
-      _activeViewTab = null;
-    }
-    if (draft != null && draft!.uid != uid) _dropDraft();
+    _setPeek(uid);
     notifyListeners();
   }
 
   void setView(ViewMode v) {
     view = v;
-    _fullPage = false;
     notifyListeners();
   }
 

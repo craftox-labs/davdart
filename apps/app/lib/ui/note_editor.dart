@@ -59,7 +59,7 @@ class EditBar extends StatelessWidget {
                 variant: FButtonVariant.outline,
                 size: FButtonSizeVariant.sm,
                 mainAxisSize: MainAxisSize.min,
-                onPress: state.discardDraft,
+                onPress: () => state.discardDraft(draft.uid),
                 child: Text(dirty ? 'Discard' : 'Done'),
               ),
               SizedBox(width: t.space.sm),
@@ -67,7 +67,9 @@ class EditBar extends StatelessWidget {
                 key: const Key('edit-save'),
                 size: FButtonSizeVariant.sm,
                 mainAxisSize: MainAxisSize.min,
-                onPress: dirty && !draft.titleEmpty ? state.saveDraft : null,
+                onPress: dirty && !draft.titleEmpty
+                    ? () => state.saveDraft(draft.uid)
+                    : null,
                 child: const Text('Save'),
               ),
             ],

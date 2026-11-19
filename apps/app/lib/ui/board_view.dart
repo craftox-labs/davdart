@@ -85,7 +85,7 @@ class _Card extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final p = PlanItem.fromNote(note);
-    final selected = state.selectedUid == note.uid;
+    final selected = state.peekUid == note.uid;
     return Padding(
       padding: EdgeInsets.only(bottom: t.space.md),
       child: FTappable(
