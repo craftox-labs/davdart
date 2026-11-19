@@ -12,6 +12,7 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
   final password = TextEditingController();
   var replace = false;
   List<FoundCollection>? found;
+  String? picked; // the path last chosen from the list
   String? finding; // null idle, '' searching, else the error
   return showDialog<void>(
     context: context,
@@ -22,7 +23,7 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
           Navigator.of(ctx).pop();
           state.connect(
             path.text,
-            user.text,
+            user.text.trim(),
             password.text,
             replaceLocal: replace,
           );
@@ -36,11 +37,13 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
           setLocal(() => finding = '');
           try {
             final r = await state.discoverCollections(user.text, password.text);
+            if (!ctx.mounted) return;
             setLocal(() {
               found = r;
               finding = null;
             });
           } catch (e) {
+            if (!ctx.mounted) return;
             setLocal(() => finding = 'Could not list collections: $e');
           }
         }
@@ -56,12 +59,24 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
                   key: const Key('connect-user'),
                   controller: user,
                   autofocus: true,
+                  onChanged: (_) => setLocal(() {
+                    // A list found for another login no longer applies.
+                    if (found != null && path.text == picked) path.text = '';
+                    found = null;
+                    picked = null;
+                  }),
                   decoration: const InputDecoration(labelText: 'User'),
                 ),
                 TextField(
                   key: const Key('connect-password'),
                   controller: password,
                   obscureText: true,
+                  onChanged: (_) => setLocal(() {
+                    // A list found for another login no longer applies.
+                    if (found != null && path.text == picked) path.text = '';
+                    found = null;
+                    picked = null;
+                  }),
                   decoration: const InputDecoration(labelText: 'Password'),
                   onSubmitted: (_) => submit(),
                 ),
@@ -96,7 +111,10 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
                                 ),
                               ),
                           ],
-                          onChanged: (v) => setLocal(() => path.text = v ?? ''),
+                          onChanged: (v) => setLocal(() {
+                            picked = v;
+                            path.text = v ?? '';
+                          }),
                         ),
                 TextField(
                   key: const Key('connect-path'),
