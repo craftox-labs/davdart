@@ -175,6 +175,31 @@ void main() {
       expect(s.activeTab, const DocTab.note('a'));
     });
 
+    testWidgets('a collapsed peek shows again below the wide layout', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      s.setPeekCollapsed(true);
+      t.view.physicalSize = const Size(500, 900);
+      await _settle(t);
+      expect(find.text('Alpha body'), findsOneWidget);
+    });
+
+    testWidgets('a new folder asks before dropping the peek draft', (t) async {
+      final s = await _pump(t);
+      await t.tap(_k('edit-note'));
+      await _settle(t);
+      await _type(t, 'edit-title', 'Changed');
+      final f = s.addFolder('F');
+      await _settle(t);
+      expect(_k('leave-discard'), findsOneWidget);
+      await t.tap(find.text('Keep editing'));
+      await _settle(t);
+      await f;
+      expect(s.peekUid, 'a');
+      expect(s.dirtyFor('a'), isTrue);
+    });
+
     testWidgets('narrow layout has no Promote and no main tab page', (t) async {
       final s = await _pump(t, size: const Size(500, 900));
       expect(_k('peek-promote'), findsNothing);

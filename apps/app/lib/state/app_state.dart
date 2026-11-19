@@ -579,6 +579,9 @@ class AppState extends ChangeNotifier {
     tree = NoteTree.build(notes);
     if (scopeUid != null && tree.find(scopeUid!) == null) scopeUid = null;
     if (_tabsLoaded) _pruneTabs();
+    if (peekUid != null && tree.find(peekUid!) == null) peekUid = null;
+    if (peekUid == null) peekCollapsed = false;
+    _drafts.removeWhere((u, _) => tree.find(u) == null);
   }
 
   /// Notes with this tag are folders: containers that may carry text (for
@@ -703,7 +706,7 @@ class AppState extends ChangeNotifier {
       lastModified: now,
     );
     await _save(n);
-    if (error == null) openFolder(n.uid);
+    if (error == null) await guarded(() => openFolder(n.uid));
   }
 
   bool loading = false;
@@ -996,7 +999,7 @@ class AppState extends ChangeNotifier {
       if (inTab) {
         openNoteTab(n.uid);
       } else {
-        select(n.uid);
+        await guarded(() => select(n.uid));
       }
     }
   }
@@ -1149,7 +1152,12 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
 
-    return tabDirty(t) ? guarded(close, uids: [t.id]) : Future.sync(close);
+    // Closing the focused tab may land on a view tab, which closes the peek.
+    final peekAtRisk =
+        activeTab == t &&
+        _tabs.tabs.any((o) => o != t && o.kind == TabKind.view);
+    final uids = [if (tabDirty(t)) t.id, if (peekAtRisk) ?peekUid];
+    return uids.isEmpty ? Future.sync(close) : guarded(close, uids: uids);
   }
 
   /// Closes the focused document tab (not the home tab).

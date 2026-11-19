@@ -103,18 +103,21 @@ class Shell extends StatelessWidget {
           // The peek (single side slot) and the main pane are independent.
           // Collapsed, the peek keeps its note but takes no room.
           final peekUid = state.peekUid;
-          final hasDetail = state.peek != null && !state.peekCollapsed;
-          final collapsedPeek = state.peek != null && state.peekCollapsed;
-          // Main note tabs need the strip, so only where it shows (wide).
-          final mainNote = wide ? state.mainNoteUid : null;
+          // Only the wide header row has the expand button, so below it a
+          // collapsed peek shows again.
+          final collapsedPeek =
+              wide && state.peek != null && state.peekCollapsed;
+          final hasDetail = state.peek != null && !collapsedPeek;
+          final mainNote = state.mainNoteUid;
 
           Widget main() => mainNote != null
               ? DetailView(
                   key: const Key('main-note'),
                   state: state,
                   uid: mainNote,
-                  onClose: () => state.closeActiveTab(),
-                  full: true,
+                  // Below wide there is no strip: Back returns home.
+                  onClose: () => state.activateTab(null),
+                  full: wide,
                 )
               : Column(
                   children: [
@@ -198,7 +201,7 @@ class Shell extends StatelessWidget {
           Widget content = FScaffold(
             childPad: false,
             // A main note tab is a full page: no search or view switch.
-            header: mainNote != null
+            header: mainNote != null && wide
                 ? null
                 : TopBar(state: state, showMenu: !wide),
             child: body,
@@ -250,7 +253,7 @@ class Shell extends StatelessWidget {
               ),
             );
             final detail = detailW == null
-                ? (collapsedPeek && wide
+                ? (collapsedPeek
                       ? PeekExpandButton(state: state, mirror: mirror)
                       : null)
                 : DetailHeader(state: state, width: detailW, mirror: mirror);
