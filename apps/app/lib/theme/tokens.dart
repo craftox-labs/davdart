@@ -204,6 +204,10 @@ class SizeTokens {
     this.pageMax = 860,
     this.editorLines = 10,
     this.editorLinesFull = 26,
+    this.tabStrip = 40,
+    this.tabMin = 96,
+    this.tabMax = 200,
+    this.tabClose = 18,
   });
   final double rail, railItem, frameInset, sidebar, detail, topBar;
 
@@ -231,6 +235,11 @@ class SizeTokens {
   /// body editor's least height in lines in the peek pane and the full page.
   final double pageMax;
   final int editorLines, editorLinesFull;
+
+  /// Document tab strip: its height, the narrowest and widest a tab gets
+  /// (tabs shrink towards [tabMin], then the strip scrolls) and the square
+  /// of a tab's close button.
+  final double tabStrip, tabMin, tabMax, tabClose;
 }
 
 /// Design tokens shared with the web board (apps/web/lib/web_app.dart). One

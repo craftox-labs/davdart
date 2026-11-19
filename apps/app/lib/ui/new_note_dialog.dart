@@ -6,7 +6,11 @@ import 'parts.dart';
 import 'theme.dart';
 
 /// Asks for a title and adds the note, under the selected note if chosen.
-Future<void> showNewNoteDialog(BuildContext context, AppState state) {
+Future<void> showNewNoteDialog(
+  BuildContext context,
+  AppState state, {
+  bool inTab = false,
+}) {
   final parent = state.selected ?? state.scope;
   final title = TextEditingController();
   var underParent = parent != null;
@@ -18,6 +22,7 @@ Future<void> showNewNoteDialog(BuildContext context, AppState state) {
       text,
       parentUid: underParent ? parent?.uid : null,
       status: 'backlog',
+      inTab: inTab,
     );
   }
 

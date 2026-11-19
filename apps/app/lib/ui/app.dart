@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart' show LogicalKeyboardKey;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -19,6 +20,7 @@ import 'resize_handle.dart';
 import 'scope_bar.dart';
 import 'shell_frame.dart';
 import 'sidebar.dart';
+import 'tab_strip.dart';
 import 'theme.dart';
 
 /// The real app: Spaces kept in browser storage. `Planning` is filled once
@@ -188,6 +190,24 @@ class Shell extends StatelessWidget {
             header: TopBar(state: state, showMenu: !wide),
             child: body,
           );
+          if (split) {
+            // Document tabs sit above the top bar, across the content area
+            // (they need the full-page layout, so only on the widest screens).
+            content = CallbackShortcuts(
+              bindings: {
+                const SingleActivator(LogicalKeyboardKey.keyW, control: true):
+                    state.closeActiveTab,
+                const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+                    state.closeActiveTab,
+              },
+              child: Column(
+                children: [
+                  TabStrip(state: state),
+                  Expanded(child: content),
+                ],
+              ),
+            );
+          }
           if (wide && !state.sidebarCollapsed) {
             // Docked beside the content, on the side facing it: left of it
             // normally, right of it when the rail is on the right.
