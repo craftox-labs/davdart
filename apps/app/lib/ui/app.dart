@@ -146,9 +146,36 @@ Future<void> openSidebarSheet(BuildContext context, AppState state) =>
       useSafeArea: true,
       builder: (_) => ListenableBuilder(
         listenable: state,
-        builder: (_, _) => Sidebar(state: state, inDrawer: true),
+        builder: (_, _) =>
+            _CloseWhenWide(child: Sidebar(state: state, inDrawer: true)),
       ),
     );
+
+/// Pops the sheet it sits in once the window grows to the wide layout, where
+/// the sidebar is docked.
+class _CloseWhenWide extends StatefulWidget {
+  const _CloseWhenWide({required this.child});
+  final Widget child;
+
+  @override
+  State<_CloseWhenWide> createState() => _CloseWhenWideState();
+}
+
+class _CloseWhenWideState extends State<_CloseWhenWide> {
+  bool _closing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_closing &&
+        MediaQuery.sizeOf(context).width >= Tokens.wideBreakpoint) {
+      _closing = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) Navigator.of(context).maybePop();
+      });
+    }
+    return widget.child;
+  }
+}
 
 class TopBar extends StatelessWidget {
   const TopBar({super.key, required this.state, required this.showMenu});
