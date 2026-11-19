@@ -296,6 +296,35 @@ void main() {
       expect(s.notes, hasLength(3));
     });
 
+    testWidgets('detail lists earlier versions kept by a merge', (t) async {
+      t.view.physicalSize = const Size(1400, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+      await space.store.addRevision(
+        Revision(
+          uid: 'c',
+          at: DateTime.utc(2026, 11, 19, 10),
+          reason: 'overlapping edit',
+          summary: 'Loose note',
+          body: 'old words',
+        ),
+      );
+      await t.pumpWidget(
+        DavdartApp(source: SpaceNoteSource(space, seed: FakeSource(sample))),
+      );
+      await t.pumpAndSettle();
+      await t.tap(find.text('Loose note').first);
+      await t.pumpAndSettle();
+      expect(find.text('Earlier versions (1)'), findsOneWidget);
+      await t.tap(find.text('Earlier versions (1)'));
+      await t.pumpAndSettle();
+      expect(find.text('old words'), findsOneWidget);
+      await t.tap(find.text('Build decisions').first);
+      await t.pumpAndSettle();
+      expect(find.textContaining('Earlier versions'), findsNothing);
+    });
+
     testWidgets('edit dialog changes the title', (t) async {
       t.view.physicalSize = const Size(1400, 900);
       t.view.devicePixelRatio = 1;

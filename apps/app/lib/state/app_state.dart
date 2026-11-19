@@ -58,6 +58,10 @@ class AppState extends ChangeNotifier {
     return s is SpaceNoteSource ? s : null;
   }
 
+  /// Older text saved by sync merges for [uid] (empty if none or read-only).
+  Future<List<Revision>> revisionsFor(String uid) async =>
+      await _space?.revisions(uid) ?? const [];
+
   bool get canConnect => _space != null;
   bool get connected => _space?.connected ?? false;
   String? get serverLabel => _space?.serverLabel;

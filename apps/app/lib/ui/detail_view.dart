@@ -142,6 +142,61 @@ class DetailView extends StatelessWidget {
                 ],
                 const SizedBox(height: 16),
                 MarkdownLite(p.text),
+                FutureBuilder<List<Revision>>(
+                  key: ValueKey('rev-${note.uid}-${note.lastModified}'),
+                  future: state.revisionsFor(note.uid),
+                  builder: (context, snap) {
+                    final revs = snap.data ?? const <Revision>[];
+                    if (revs.isEmpty) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: ExpansionTile(
+                        key: const Key('revisions'),
+                        tilePadding: EdgeInsets.zero,
+                        title: Text(
+                          'Earlier versions (${revs.length})',
+                          style: TextStyle(fontSize: 13, color: t.muted),
+                        ),
+                        children: [
+                          for (final r in revs.reversed)
+                            Container(
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: t.surface,
+                                border: Border.all(color: t.line),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    '${r.at.toLocal().toString().substring(0, 16)}  ·  ${r.reason}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: t.muted,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    r.summary,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SelectableText(
+                                    r.body,
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),

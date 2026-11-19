@@ -184,4 +184,7 @@ class SpaceNoteSource implements EditableNoteSource {
 
   @override
   Future<void> delete(String uid) => space.delete(uid);
+
+  /// Earlier versions kept when a sync merge had to pick a winner.
+  Future<List<Revision>> revisions(String uid) => space.store.revisions(uid);
 }
