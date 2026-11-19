@@ -128,7 +128,15 @@ class FileNoteStore extends MemoryNoteStore {
     final store = FileNoteStore._(path);
     final f = File(path);
     if (f.existsSync()) {
-      final j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+      Map<String, dynamic> j;
+      try {
+        j = jsonDecode(await f.readAsString()) as Map<String, dynamic>;
+      } on FormatException {
+        // Truncated or damaged: keep it for inspection and start over, so the
+        // next sync repopulates from the server.
+        f.renameSync('$path.corrupt-${DateTime.now().millisecondsSinceEpoch}');
+        return store;
+      }
       store._token = j['syncToken'] as String?;
       for (final e in (j['notes'] as Map<String, dynamic>).entries) {
         final m = e.value as Map<String, dynamic>;
@@ -164,7 +172,7 @@ class FileNoteStore extends MemoryNoteStore {
 
   @override
   void changed() {
-    final tmp = File('$path.tmp');
+    final tmp = File('$path.$pid.tmp');
     tmp.parent.createSync(recursive: true);
     tmp.writeAsStringSync(jsonEncode({
       'syncToken': _token,

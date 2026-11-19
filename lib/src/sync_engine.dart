@@ -9,12 +9,15 @@ class SyncReport {
   int pushed = 0;
   int deleted = 0;
   int merged = 0;
+
+  /// Notes deleted locally but edited on the server, so they came back.
+  int restored = 0;
   final conflicts = <MergeConflict>[];
   final errors = <String>[];
 
   @override
   String toString() => 'pulled $pulled, pushed $pushed, deleted $deleted, '
-      'merged $merged, conflicts ${conflicts.length}, errors ${errors.length}';
+      'merged $merged, restored $restored, conflicts ${conflicts.length}, errors ${errors.length}';
 }
 
 /// Offline-first sync between a [NoteStore] and one CalDAV collection.
@@ -120,7 +123,15 @@ class SyncEngine {
     }
   }
 
+  bool _sameList(List<String> a, List<String> b) =>
+      a.length == b.length &&
+      [for (var i = 0; i < a.length; i++) a[i] == b[i]].every((x) => x);
+
   bool _sameContent(Note a, Note b) =>
+      _sameList(a.extraLines, b.extraLines) &&
+      a.propertyParams.length == b.propertyParams.length &&
+      a.propertyParams.entries
+          .every((e) => b.propertyParams[e.key] == e.value) &&
       a.summary == b.summary &&
       a.description == b.description &&
       a.status == b.status &&
@@ -135,7 +146,21 @@ class SyncEngine {
       return;
     }
     if (r.etag != null && s.base?.etag == r.etag) return; // our own push
-    if (!s.dirty || s.deleted) {
+    if (s.deleted) {
+      // Deleted here, edited there: the edit is someone's work, so the note
+      // comes back, and the event is recorded rather than silent.
+      await store.addRevision(Revision(
+        uid: r.uid,
+        at: _now().toUtc(),
+        reason: 'deleted locally, edited on the server; restored',
+        summary: s.local.summary,
+        body: s.local.description,
+      ));
+      await store.put(r.uid, StoredNote(local: r, base: r));
+      report.restored++;
+      return;
+    }
+    if (!s.dirty) {
       await store.put(r.uid, StoredNote(local: r, base: r));
       report.pulled++;
       return;
@@ -167,14 +192,37 @@ class SyncEngine {
         try {
           if (s.deleted) {
             await client.deleteNote(s.base!);
-            await store.remove(uid);
+            final cur = await store.get(uid);
+            if (cur != null && !cur.deleted) {
+              // Edited again while the delete was in flight: keep the edit
+              // and recreate it on the next push.
+              cur.base = null;
+              cur.local.etag = null;
+              cur.dirty = true;
+              await store.put(uid, cur);
+            } else {
+              await store.remove(uid);
+            }
             report.deleted++;
           } else {
             final stored = await client.putNote(s.local.copyWith()
               ..href = s.local.href
               ..etag = s.local.etag);
-            await store.put(
-                uid, StoredNote(local: stored, base: stored.copyWith()));
+            final cur = await store.get(uid);
+            if (cur != null &&
+                (cur.deleted ||
+                    cur.local.lastModified != s.local.lastModified)) {
+              // Edited or deleted while the PUT was in flight: keep that
+              // change, now on top of what was just stored.
+              cur.base = stored.copyWith();
+              cur.local.href = stored.href;
+              cur.local.etag = stored.etag;
+              cur.dirty = true;
+              await store.put(uid, cur);
+            } else {
+              await store.put(
+                  uid, StoredNote(local: stored, base: stored.copyWith()));
+            }
             report.pushed++;
           }
           break;

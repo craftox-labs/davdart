@@ -18,6 +18,9 @@ class FakeCalDav {
   static final collection = Uri.parse('https://fake.test/dav/c');
   late final MockClient client = MockClient(_handle);
 
+  /// Answers [req] directly, for tests that wrap the server in their own client.
+  Future<http.Response> respond(http.Request req) => _handle(req);
+
   String _name(Uri u) => u.pathSegments.last;
   static const _esc = HtmlEscape(HtmlEscapeMode.element);
 

@@ -136,6 +136,9 @@ TextMerge mergeText(String base, String local, String remote,
 }
 
 /// Merged note plus what had to be decided.
+bool _sameMap(Map<String, String> a, Map<String, String> b) =>
+    a.length == b.length && a.entries.every((e) => b[e.key] == e.value);
+
 class NoteMerge {
   NoteMerge(this.note, this.conflicts);
   final Note note;
@@ -163,12 +166,51 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
     return win;
   }
 
+  String? nullable(String what, String? b, String? l, String? r) {
+    if (l == r) return l;
+    if (l == b) return r;
+    if (r == b) return l;
+    final win = preferLocal ? l : r;
+    conflicts.add(MergeConflict(what, l ?? '', r ?? '', win ?? ''));
+    return win;
+  }
+
+  bool sameList(List<String> a, List<String> b) =>
+      a.length == b.length &&
+      [for (var i = 0; i < a.length; i++) a[i] == b[i]].every((x) => x);
+
   final bi = PlanItem.fromNote(base),
       li = PlanItem.fromNote(local),
       ri = PlanItem.fromNote(remote);
 
   final merged = remote.copyWith();
   merged.summary = scalar('title', base.summary, local.summary, remote.summary);
+  merged.status = nullable('status', base.status, local.status, remote.status);
+
+  // Raw lines this core does not model: take the side that changed them; if
+  // both did, the winner's copy.
+  if (!sameList(local.extraLines, remote.extraLines)) {
+    final pick = sameList(local.extraLines, base.extraLines)
+        ? remote.extraLines
+        : sameList(remote.extraLines, base.extraLines) || preferLocal
+            ? local.extraLines
+            : remote.extraLines;
+    final copy = List.of(pick);
+    merged.extraLines
+      ..clear()
+      ..addAll(copy);
+  }
+  if (!_sameMap(local.propertyParams, remote.propertyParams)) {
+    final pick = _sameMap(local.propertyParams, base.propertyParams)
+        ? remote.propertyParams
+        : _sameMap(remote.propertyParams, base.propertyParams) || preferLocal
+            ? local.propertyParams
+            : remote.propertyParams;
+    final copy = Map.of(pick);
+    merged.propertyParams
+      ..clear()
+      ..addAll(copy);
+  }
 
   // Tags as sets: a side's additions and removals both apply.
   final cats = <String>{...remote.categories};

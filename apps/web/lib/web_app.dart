@@ -18,7 +18,12 @@ Handler buildHandler(NoteLoader load) {
         return _html(_board(await load(), req.url.queryParameters['tag']));
       }
       if (path.startsWith('item/')) {
-        final uid = Uri.decodeComponent(path.substring(5));
+        final String uid;
+        try {
+          uid = Uri.decodeComponent(path.substring(5));
+        } on FormatException {
+          return _html(_page('Not found', '<p>Not found.</p>'), 404);
+        }
         final hit = (await load()).where((n) => n.uid == uid).firstOrNull;
         if (hit == null) {
           return _html(_page('Not found', '<p>No such note.</p>'), 404);

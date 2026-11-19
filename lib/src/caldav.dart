@@ -175,9 +175,9 @@ class CalDavClient {
         changed.add(n);
       } on ICalException catch (e) {
         if (e.message != 'no VJOURNAL found') onResourceError?.call(href, e);
-      } on CalDavException catch (e) {
-        onResourceError?.call(href, e);
       }
+      // A failed fetch (CalDavException, network error) is not caught: the
+      // whole sync fails, so the caller keeps its old token and retries.
     }
     return SyncResult(changed, deleted, newToken);
   }
