@@ -124,9 +124,23 @@ class SpaceNoteSource implements EditableNoteSource {
 
   /// Checks the login against the server, then attaches this Space to it.
   /// Throws (and changes nothing) if the server refuses.
-  Future<void> connect(String path, String user, String password) async {
+  ///
+  /// With [replaceLocal] the local notes are dropped first, so the Space
+  /// becomes a copy of the server's (nothing local is sent).
+  Future<void> connect(
+    String path,
+    String user,
+    String password, {
+    bool replaceLocal = false,
+  }) async {
     final client = _clientFor(path, user, password);
     await client.listNotes();
+    if (replaceLocal) {
+      for (final n in await space.store.all()) {
+        await space.store.remove(n.local.uid);
+      }
+      _markSeeded();
+    }
     await space.attach(client);
     _login = (path, user);
     flags?.write(

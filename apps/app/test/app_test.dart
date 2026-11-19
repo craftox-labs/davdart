@@ -254,6 +254,31 @@ void main() {
       },
     );
 
+    test('connect with replaceLocal takes the server copy only', () async {
+      final server = FakeCalDav();
+      server.external(
+        'z.ics',
+        'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\n'
+            'BEGIN:VJOURNAL\r\nUID:z\r\nDTSTAMP:20261119T000000Z\r\n'
+            'SUMMARY:Server note\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n',
+      );
+      final storage = MemoryStorage();
+      final s = AppState(
+        SpaceNoteSource(
+          Space(SpaceConfig(id: 's', name: 'S'), PersistentNoteStore(storage)),
+          seed: FakeSource(sample),
+          flags: storage,
+          davBase: Uri.parse('https://fake.test/dav/'),
+          httpClient: server.client,
+        ),
+      );
+      await s.load();
+      expect(s.notes, hasLength(3));
+      await s.connect('c/', 'tm', 'pw', replaceLocal: true);
+      expect(s.notes.map((n) => n.uid), ['z']);
+      expect(server.ics, hasLength(1));
+    });
+
     test('a refused login changes nothing', () async {
       final storage = MemoryStorage();
       final src = SpaceNoteSource(

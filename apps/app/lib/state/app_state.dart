@@ -62,14 +62,24 @@ class AppState extends ChangeNotifier {
   bool get connected => _space?.connected ?? false;
   String? get serverLabel => _space?.serverLabel;
 
-  Future<void> connect(String path, String user, String password) async {
+  Future<void> connect(
+    String path,
+    String user,
+    String password, {
+    bool replaceLocal = false,
+  }) async {
     final s = _space;
     if (s == null) return;
     syncing = true;
     syncMessage = 'Connecting…';
     notifyListeners();
     try {
-      await s.connect(path.trim(), user.trim(), password);
+      await s.connect(
+        path.trim(),
+        user.trim(),
+        password,
+        replaceLocal: replaceLocal,
+      );
     } catch (e) {
       syncing = false;
       syncMessage = 'Could not connect: $e';
