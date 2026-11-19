@@ -239,6 +239,7 @@ class AppState extends ChangeNotifier {
     syncing = false;
     _syncAgain = false;
     collapsed.clear();
+    _tagsOpen = false;
     scopeUid = null;
     savedViews.clear();
     _resetTabs();
@@ -743,6 +744,8 @@ class AppState extends ChangeNotifier {
       if (tag != null && !notes.any((n) => n.categories.contains(tag))) {
         tag = null;
       }
+      _restoreCollapsed();
+      _tagsOpen = prefs?.read(_tagsOpenKey) == 'true';
       _restoreTabs();
     } catch (e) {
       if (src != source) return;
@@ -1251,6 +1254,55 @@ class AppState extends ChangeNotifier {
 
   void toggle(String uid) {
     if (!collapsed.remove(uid)) collapsed.add(uid);
+    _saveCollapsed();
+    notifyListeners();
+  }
+
+  String get _spaceKey => catalog?.current ?? 'default';
+  String get _foldersKey => 'davdart.folders.collapsed.v1.$_spaceKey';
+  String get _tagsOpenKey => 'davdart.tags.open.v1.$_spaceKey';
+
+  void _saveCollapsed() {
+    if (collapsed.isEmpty) {
+      prefs?.remove(_foldersKey);
+    } else {
+      prefs?.write(_foldersKey, jsonEncode(collapsed.toList()));
+    }
+  }
+
+  /// Brings back the folders this Space had collapsed, dropping uids that no
+  /// longer exist. Nothing saved (or a corrupt value) means all expanded.
+  void _restoreCollapsed() {
+    collapsed.clear();
+    final raw = prefs?.read(_foldersKey);
+    if (raw == null) return;
+    try {
+      final v = jsonDecode(raw);
+      if (v is! List) return;
+      for (final u in v) {
+        if (u is String && tree.find(u) != null) collapsed.add(u);
+      }
+      if (collapsed.length != v.length) _saveCollapsed();
+    } catch (_) {
+      // Corrupt value: ignored, the next toggle overwrites it.
+    }
+  }
+
+  /// Whether the user left the Files tags list open in this Space.
+  bool get tagsOpen => _tagsOpen;
+  bool _tagsOpen = false;
+
+  /// The tags list shows open while a tag filter is active, so the active
+  /// tag stays visible.
+  bool get tagsExpanded => tagsOpen || tag != null;
+
+  void setTagsOpen(bool v) {
+    _tagsOpen = v;
+    if (v) {
+      prefs?.write(_tagsOpenKey, 'true');
+    } else {
+      prefs?.remove(_tagsOpenKey);
+    }
     notifyListeners();
   }
 
