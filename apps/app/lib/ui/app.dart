@@ -13,6 +13,7 @@ import 'detail_view.dart';
 import 'list_view.dart';
 import 'parts.dart';
 import 'scope_bar.dart';
+import 'shell_frame.dart';
 import 'sidebar.dart';
 import 'theme.dart';
 
@@ -118,11 +119,15 @@ class Shell extends StatelessWidget {
           }
 
           return SafeArea(
-            child: FScaffold(
-              childPad: false,
-              sidebar: wide ? Sidebar(state: state) : null,
-              header: TopBar(state: state, showMenu: !wide),
-              child: body,
+            child: ShellFrame(
+              state: state,
+              showRail: wide,
+              child: FScaffold(
+                childPad: false,
+                sidebar: wide ? Sidebar(state: state) : null,
+                header: TopBar(state: state, showMenu: !wide),
+                child: body,
+              ),
             ),
           );
         },

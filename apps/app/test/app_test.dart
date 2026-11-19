@@ -942,6 +942,52 @@ void main() {
     });
   });
 
+  group('shell frame', () {
+    Future<AppState> multi(WidgetTester t, Size size) async {
+      t.view.physicalSize = size;
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
+      c.add('Inbox');
+      final state = AppState(
+        c.sourceFor(c.current),
+        prefs: storage,
+        catalog: c,
+      );
+      await t.pumpWidget(DavdartApp(state: state));
+      await t.pumpAndSettle();
+      return state;
+    }
+
+    testWidgets('wide: rail and inset panel are shown', (t) async {
+      await pump(t);
+      expect(find.byKey(const Key('icon-rail')), findsOneWidget);
+      expect(find.byKey(const Key('shell-panel')), findsOneWidget);
+    });
+
+    testWidgets('rail opens the Space menu and search across Spaces', (
+      t,
+    ) async {
+      await multi(t, const Size(1400, 900));
+      await t.tap(find.byKey(const Key('rail-spaces')));
+      await t.pumpAndSettle();
+      expect(find.text('New space…'), findsOneWidget);
+      await t.tapAt(const Offset(900, 600));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('rail-search')));
+      await t.pumpAndSettle();
+      expect(find.byType(FDialog), findsOneWidget);
+    });
+
+    testWidgets('narrow: no rail, menu button remains', (t) async {
+      await pump(t, size: const Size(420, 800));
+      expect(find.byKey(const Key('icon-rail')), findsNothing);
+      expect(find.byKey(const Key('shell-panel')), findsNothing);
+      expect(byAction('Menu'), findsOneWidget);
+    });
+  });
+
   group('narrow layout', () {
     testWidgets('uses a drawer and a single pane', (t) async {
       await pump(t, size: const Size(420, 800));
