@@ -1,4 +1,5 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../data/browser_storage_stub.dart'
     if (dart.library.js_interop) '../data/browser_storage_web.dart';
@@ -10,35 +11,10 @@ import '../theme/tokens.dart';
 import 'board_view.dart';
 import 'detail_view.dart';
 import 'list_view.dart';
-import 'markdown_lite.dart';
+import 'parts.dart';
 import 'scope_bar.dart';
 import 'sidebar.dart';
-
-ThemeData buildTheme(Tokens t, Brightness b) {
-  final scheme = ColorScheme.fromSeed(seedColor: t.accent, brightness: b)
-      .copyWith(
-        surface: t.bg,
-        onSurface: t.fg,
-        primary: t.accent,
-        outline: t.line,
-        outlineVariant: t.line,
-      );
-  return ThemeData(
-    useMaterial3: true,
-    brightness: b,
-    colorScheme: scheme,
-    scaffoldBackgroundColor: t.bg,
-    canvasColor: t.bg,
-    dividerColor: t.line,
-    splashFactory: NoSplash.splashFactory,
-    extensions: [TokensTheme(t)],
-    textTheme: Typography.material2021().black.apply(
-      bodyColor: t.fg,
-      displayColor: t.fg,
-      fontFamily: 'Roboto',
-    ),
-  );
-}
+import 'theme.dart';
 
 /// The real app: Spaces kept in browser storage. `Planning` is filled once
 /// from the board server's feed; edits stay on this device until a server is
@@ -67,12 +43,23 @@ class DavdartApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return WidgetsApp(
       title: 'davdart',
+      color: Tokens.light.accent,
       debugShowCheckedModeBanner: false,
-      theme: buildTheme(Tokens.light, Brightness.light),
-      darkTheme: buildTheme(Tokens.dark, Brightness.dark),
-      themeMode: ThemeMode.system,
+      localizationsDelegates: FLocalizations.localizationsDelegates,
+      supportedLocales: FLocalizations.supportedLocales,
+      pageRouteBuilder: <T>(settings, builder) => PageRouteBuilder<T>(
+        settings: settings,
+        pageBuilder: (context, _, _) => builder(context),
+      ),
+      builder: (context, child) => FTheme(
+        data: buildTheme(
+          MediaQuery.platformBrightnessOf(context),
+          touch: isTouchPlatform,
+        ),
+        child: FToaster(child: FTooltipGroup(child: child!)),
+      ),
       home: Shell(state: state),
     );
   }
@@ -91,7 +78,7 @@ class Shell extends StatelessWidget {
       listenable: state,
       builder: (context, _) => LayoutBuilder(
         builder: (context, c) {
-          final t = Theme.of(context).extension<TokensTheme>()!.tokens;
+          final t = tokensOf(context);
           final wide = c.maxWidth >= Tokens.wideBreakpoint;
           final split = c.maxWidth >= Tokens.splitBreakpoint;
           final hasDetail = state.selected != null;
@@ -113,7 +100,7 @@ class Shell extends StatelessWidget {
               children: [
                 Expanded(child: main()),
                 if (hasDetail) ...[
-                  VerticalDivider(width: 1, color: t.line),
+                  Container(width: 1, color: t.line),
                   SizedBox(
                     width: Tokens.detailWidth,
                     child: DetailView(
@@ -130,37 +117,12 @@ class Shell extends StatelessWidget {
             body = main();
           }
 
-          final content = Column(
-            children: [
-              TopBar(state: state, showMenu: !wide),
-              Divider(height: 1, color: t.line),
-              Expanded(child: body),
-            ],
-          );
-
-          return Scaffold(
-            drawer: wide
-                ? null
-                : Drawer(
-                    width: Tokens.sidebarWidth,
-                    backgroundColor: t.bg,
-                    child: SafeArea(
-                      child: Sidebar(state: state, inDrawer: true),
-                    ),
-                  ),
-            body: SafeArea(
-              child: wide
-                  ? Row(
-                      children: [
-                        SizedBox(
-                          width: Tokens.sidebarWidth,
-                          child: Sidebar(state: state),
-                        ),
-                        VerticalDivider(width: 1, color: t.line),
-                        Expanded(child: content),
-                      ],
-                    )
-                  : content,
+          return SafeArea(
+            child: FScaffold(
+              childPad: false,
+              sidebar: wide ? Sidebar(state: state) : null,
+              header: TopBar(state: state, showMenu: !wide),
+              child: body,
             ),
           );
         },
@@ -169,6 +131,20 @@ class Shell extends StatelessWidget {
   }
 }
 
+/// Opens the sidebar as a sheet from the left edge (the narrow-screen drawer).
+Future<void> openSidebarSheet(BuildContext context, AppState state) =>
+    showFSheet<void>(
+      context: context,
+      side: FLayout.ltr,
+      mainAxisMaxRatio: null,
+      constraints: const BoxConstraints(maxWidth: Tokens.sidebarWidth),
+      useSafeArea: true,
+      builder: (_) => ListenableBuilder(
+        listenable: state,
+        builder: (_, _) => Sidebar(state: state, inDrawer: true),
+      ),
+    );
+
 class TopBar extends StatelessWidget {
   const TopBar({super.key, required this.state, required this.showMenu});
   final AppState state;
@@ -176,68 +152,70 @@ class TopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).extension<TokensTheme>()!.tokens;
-    return SizedBox(
-      height: 52,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: Row(
-          children: [
-            if (showMenu)
-              Builder(
-                builder: (ctx) => IconButton(
+    final t = tokensOf(context);
+    final narrow = MediaQuery.sizeOf(context).width < 440;
+    final board = state.view == ViewMode.board;
+    Widget toggle(String label, ViewMode mode) => FButton(
+      variant: state.view == mode
+          ? FButtonVariant.secondary
+          : FButtonVariant.outline,
+      size: FButtonSizeVariant.sm,
+      mainAxisSize: MainAxisSize.min,
+      selected: state.view == mode,
+      onPress: () => state.setView(mode),
+      child: Text(label),
+    );
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: t.line)),
+      ),
+      child: SizedBox(
+        height: 52,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              if (showMenu)
+                IconAction(
+                  key: const Key('menu'),
                   tooltip: 'Menu',
-                  icon: const Icon(Icons.menu),
-                  onPressed: () => Scaffold.of(ctx).openDrawer(),
+                  icon: FLucideIcons.menu,
+                  onPress: () => openSidebarSheet(context, state),
+                ),
+              const SizedBox(width: 4),
+              Text(
+                board ? 'Board' : 'List',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-            const SizedBox(width: 4),
-            Text(
-              state.view == ViewMode.board ? 'Board' : 'List',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(width: 12),
-            if (state.loading)
-              const SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            const Spacer(),
-            if (MediaQuery.sizeOf(context).width >= 440)
-              SegmentedButton<ViewMode>(
-                showSelectedIcon: false,
-                style: SegmentedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  side: BorderSide(color: t.line),
+              const SizedBox(width: 12),
+              if (state.loading)
+                const SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: FCircularProgress(),
                 ),
-                segments: const [
-                  ButtonSegment(value: ViewMode.board, label: Text('Board')),
-                  ButtonSegment(value: ViewMode.list, label: Text('List')),
-                ],
-                selected: {state.view},
-                onSelectionChanged: (s) => state.setView(s.first),
-              ),
-            if (MediaQuery.sizeOf(context).width < 440)
-              IconButton(
-                tooltip: state.view == ViewMode.board
-                    ? 'Show list'
-                    : 'Show board',
-                icon: Icon(
-                  state.view == ViewMode.board
-                      ? Icons.list
-                      : Icons.view_kanban_outlined,
+              const Spacer(),
+              if (!narrow) ...[
+                toggle('Board', ViewMode.board),
+                const SizedBox(width: 4),
+                toggle('List', ViewMode.list),
+              ] else
+                IconAction(
+                  tooltip: board ? 'Show list' : 'Show board',
+                  icon: board ? FLucideIcons.list : FLucideIcons.squareKanban,
+                  onPress: () =>
+                      state.setView(board ? ViewMode.list : ViewMode.board),
                 ),
-                onPressed: () => state.setView(
-                  state.view == ViewMode.board ? ViewMode.list : ViewMode.board,
-                ),
+              IconAction(
+                tooltip: 'Reload',
+                icon: FLucideIcons.refreshCw,
+                onPress: state.load,
               ),
-            IconButton(
-              tooltip: 'Reload',
-              icon: const Icon(Icons.refresh),
-              onPressed: state.load,
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
