@@ -1,32 +1,47 @@
 import 'dart:math' as math;
+import 'dart:typed_data' show Float64List;
 
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../theme/tokens.dart';
 import 'logo.dart';
 import 'sidebar.dart';
 import 'theme.dart';
 
 /// The window-filling frame in the frame colour. On a wide screen it
-/// holds the [IconRail] and the content in a rounded, bordered panel inset
-/// from the frame edge; otherwise the content fills the frame. With
-/// [LayoutSide.end] the rail sits on the right edge and the panel to its left.
+/// holds the [IconRail], a header row in the frame tone (the document tabs)
+/// and below it the content in one rounded, bordered panel, with the frame
+/// margin on all four sides; otherwise the content fills the frame. The
+/// active header tab is panel-coloured and sits flush on the panel's top
+/// edge, covering the border there. With [LayoutSide.end] the rail sits on
+/// the right edge and the panel to its left.
+///
+/// [header] builds the header row for a panel of the given outer width; it
+/// has [headerHeight] below the margin and is drawn above the panel.
 class ShellFrame extends StatelessWidget {
   const ShellFrame({
     super.key,
     required this.state,
     required this.showRail,
     required this.child,
+    this.header,
   });
   final AppState state;
   final bool showRail;
   final Widget child;
+  final Widget Function(BuildContext context, double panelWidth)? header;
+
+  /// Header row height: the top margin plus the tab height. The panel starts
+  /// right below it.
+  static double headerHeight(Tokens t) => t.sizes.frameInset + t.sizes.tabStrip;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final mirror = state.layoutSide == LayoutSide.end;
+    final top = header == null ? t.sizes.frameInset : headerHeight(t);
     if (!showRail) {
       return ColoredBox(color: t.frame, child: child);
     }
@@ -38,10 +53,11 @@ class ShellFrame extends StatelessWidget {
           Positioned.fill(
             left: mirror ? 0 : t.sizes.rail,
             right: mirror ? t.sizes.rail : 0,
+            top: top,
             child: Padding(
               padding: EdgeInsets.fromLTRB(
                 mirror ? t.sizes.frameInset : 0,
-                t.sizes.frameInset,
+                0,
                 mirror ? 0 : t.sizes.frameInset,
                 t.sizes.frameInset,
               ),
@@ -64,6 +80,26 @@ class ShellFrame extends StatelessWidget {
               ),
             ),
           ),
+          if (header != null)
+            Positioned(
+              left: mirror ? 0 : t.sizes.rail,
+              right: mirror ? t.sizes.rail : 0,
+              top: 0,
+              // One hairline lower than the panel's top, so the active tab
+              // reaches over the border.
+              height: top + t.borders.hairline,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(
+                  mirror ? t.sizes.frameInset : 0,
+                  t.sizes.frameInset,
+                  mirror ? 0 : t.sizes.frameInset,
+                  0,
+                ),
+                child: LayoutBuilder(
+                  builder: (context, c) => header!(context, c.maxWidth),
+                ),
+              ),
+            ),
           // The rail sits above the panel so the active tab can paint over
           // the panel's border on the rail side.
           Positioned(
@@ -121,9 +157,16 @@ class RailTabPainter extends CustomPainter {
     required this.radius,
     required this.margin,
     this.flip = false,
+    this.vertical = false,
   });
   final Color fill, border;
   final double borderWidth, radius, margin;
+
+  /// A header tab: the tab sits above the panel and opens downwards into its
+  /// top edge (the painting is the rail tab turned a quarter, so [margin] and
+  /// [flip] are in that turned frame: the tab box ends at the panel's outer
+  /// top edge, so [margin] is normally 0).
+  final bool vertical;
 
   /// Mirrors the tab to open leftwards (the rail is on the right).
   final bool flip;
@@ -138,6 +181,13 @@ class RailTabPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (vertical) {
+      // Swap the axes: the item's width runs along the panel edge.
+      canvas.transform(
+        Float64List.fromList([0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]),
+      );
+      size = Size(size.height, size.width);
+    }
     if (flip) {
       canvas
         ..translate(size.width, 0)
@@ -188,7 +238,8 @@ class RailTabPainter extends CustomPainter {
       borderWidth != old.borderWidth ||
       radius != old.radius ||
       margin != old.margin ||
-      flip != old.flip;
+      flip != old.flip ||
+      vertical != old.vertical;
 }
 
 /// One rail or selector button: an icon in a rounded square that takes the
@@ -437,6 +488,50 @@ class SectionBar extends StatelessWidget {
             ),
         ],
       ),
+    );
+  }
+}
+
+/// A header tab. Active, it is a panel-coloured [RailTabPainter] tab that
+/// ends flush on the panel's top edge, covering the panel border and flaring
+/// into it with concave corners; inactive, it is [child] on the frame tone
+/// with [hovered] feedback. The box is [tabStrip] high and its bottom edge is
+/// the panel's outer top edge.
+class JoinedTab extends StatelessWidget {
+  const JoinedTab({
+    super.key,
+    required this.active,
+    required this.child,
+    this.hovered = false,
+  });
+  final bool active;
+  final bool hovered;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final box = SizedBox(height: t.sizes.tabStrip, child: child);
+    if (active) {
+      return CustomPaint(
+        key: const Key('joined-tab'),
+        painter: RailTabPainter(
+          fill: t.panel,
+          border: t.panelBorder,
+          borderWidth: t.borders.hairline,
+          radius: t.radii.tab,
+          margin: 0,
+          vertical: true,
+        ),
+        child: box,
+      );
+    }
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: hovered ? t.hover : null,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(t.radii.tab)),
+      ),
+      child: box,
     );
   }
 }
