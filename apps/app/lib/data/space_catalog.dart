@@ -194,8 +194,13 @@ class SpaceCatalog {
     ];
   }
 
-  static String _norm(String p) =>
-      p.replaceAll(RegExp('^/+'), '').replaceAll(RegExp('/+\$'), '');
+  static String _norm(String p) {
+    var n = p.replaceAll(RegExp('^/+'), '').replaceAll(RegExp('/+\$'), '');
+    try {
+      n = Uri.decodeFull(n); // 'a%20b' and 'a b' name the same collection
+    } catch (_) {}
+    return n;
+  }
 
   KeyValueStorage _scoped(String id) =>
       id == planningId ? storage : PrefixedStorage(storage, 'sp.$id.');
@@ -301,6 +306,9 @@ class SpaceCatalog {
     // The list may have changed while the server answered.
     final j = spaces.indexWhere((s) => s.id == id);
     if (j < 0) return null;
+    if (spaces.any((s) => s.id != id && s.name == n)) {
+      return 'Another space took that name meanwhile';
+    }
     spaces[j] = SpaceInfo(id, n, collection: spaces[j].collection);
     _save();
     return null;
@@ -340,7 +348,7 @@ class SpaceCatalog {
       spaces[i] = SpaceInfo(s.id, s.name);
       // It is a plain local copy now: forget the sync bases, so signing in
       // again merges by note id and never replays local deletes to the server.
-      final own = PrefixedStorage(storage, 'sp.${s.id}.');
+      final own = _scoped(s.id);
       own.write(SpaceNoteSource.lastServerKey, '');
       own.write(SpaceNoteSource.loginKey, '');
     }
@@ -352,7 +360,7 @@ class SpaceCatalog {
   bool remove(String id) {
     if (id == planningId || !spaces.any((s) => s.id == id)) return false;
     _deleted.add(id);
-    final scoped = PrefixedStorage(storage, 'sp.$id.');
+    final scoped = PrefixedStorage(storage, 'sp.$id.'); // never Planning
     for (final k in scoped.keys.toList()) {
       scoped.remove(k);
     }

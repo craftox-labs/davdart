@@ -634,6 +634,10 @@ void main() {
       expect(storage.read('davdart.server.v1'), isNot(contains('pw')));
       expect(s.connected, isTrue);
       expect(s.notes, hasLength(3));
+      // Signing out of a linked Planning forgets its sync bases too.
+      await s.signOut();
+      expect(storage.read('davdart.lastserver.v1'), isEmpty);
+      expect(storage.read('davdart.server.v1'), isEmpty);
     });
 
     testWidgets('detail lists earlier versions kept by a merge', (t) async {
