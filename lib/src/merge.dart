@@ -186,6 +186,8 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
   final merged = remote.copyWith();
   merged.summary = scalar('title', base.summary, local.summary, remote.summary);
   merged.status = nullable('status', base.status, local.status, remote.status);
+  merged.parentUid =
+      nullable('parent', base.parentUid, local.parentUid, remote.parentUid);
 
   // Raw lines this core does not model: take the side that changed them; if
   // both did, the winner's copy.

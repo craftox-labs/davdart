@@ -184,7 +184,7 @@ _Calendar _splitCalendar(String text) {
 
 /// Builds a Note from the lines of one VJOURNAL component (BEGIN..END).
 Note _journalFromLines(List<String> lines) {
-  String? uid, summary, description, status;
+  String? uid, summary, description, status, parent;
   DateTime? created, modified, stamp;
   final cats = <String>[];
   final extra = <String>[];
@@ -227,6 +227,18 @@ Note _journalFromLines(List<String> lines) {
         }
       case 'STATUS':
         status = p.value.trim().toUpperCase();
+      case 'RELATED-TO':
+        // The first PARENT relation is the note's parent; any other relation
+        // (CHILD, SIBLING, further parents) stays as a raw line.
+        final type = RegExp(r'RELTYPE=([A-Za-z-]+)', caseSensitive: false)
+            .firstMatch(p.params)
+            ?.group(1)
+            ?.toUpperCase();
+        if (parent == null && (type == null || type == 'PARENT')) {
+          parent = p.value.trim();
+        } else {
+          extra.add(line);
+        }
       case 'CREATED' || 'LAST-MODIFIED':
         // Only plain UTC values are modelled. Anything else (TZID, floating,
         // date-only) is kept verbatim so a save cannot shift it.
@@ -257,6 +269,7 @@ Note _journalFromLines(List<String> lines) {
     description: description ?? '',
     categories: cats,
     status: status,
+    parentUid: parent,
     created: created,
     lastModified: modified,
     dtstamp: stamp,
@@ -326,6 +339,9 @@ String serializeNotes(Iterable<Note> notes) {
       w('CATEGORIES:${n.categories.map(escapeText).join(',')}');
     }
     if (n.status != null && n.status!.isNotEmpty) w('STATUS:${n.status}');
+    if (n.parentUid != null && n.parentUid!.isNotEmpty) {
+      w('RELATED-TO;RELTYPE=PARENT:${n.parentUid}');
+    }
     n.extraLines.forEach(w);
     w('END:VJOURNAL');
     n.siblingLines.forEach(w);

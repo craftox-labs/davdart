@@ -132,6 +132,7 @@ class SyncEngine {
       a.propertyParams.length == b.propertyParams.length &&
       a.propertyParams.entries
           .every((e) => b.propertyParams[e.key] == e.value) &&
+      a.parentUid == b.parentUid &&
       a.summary == b.summary &&
       a.description == b.description &&
       a.status == b.status &&

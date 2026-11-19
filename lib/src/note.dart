@@ -6,6 +6,7 @@ class Note {
     this.description = '',
     List<String>? categories,
     this.status,
+    this.parentUid,
     DateTime? created,
     DateTime? lastModified,
     DateTime? dtstamp,
@@ -32,6 +33,10 @@ class Note {
 
   /// DRAFT, FINAL or CANCELLED per RFC 5545, or null.
   String? status;
+
+  /// UID of the parent note (iCalendar `RELATED-TO;RELTYPE=PARENT`), or null
+  /// for a top-level note.
+  String? parentUid;
   DateTime? created;
   DateTime? lastModified;
   DateTime dtstamp;
@@ -61,6 +66,8 @@ class Note {
     List<String>? categories,
     String? status,
     bool clearStatus = false,
+    String? parentUid,
+    bool clearParent = false,
     DateTime? lastModified,
   }) =>
       Note(
@@ -69,6 +76,7 @@ class Note {
         description: description ?? this.description,
         categories: categories ?? List.of(this.categories),
         status: clearStatus ? null : (status ?? this.status),
+        parentUid: clearParent ? null : (parentUid ?? this.parentUid),
         created: created,
         lastModified: lastModified ?? this.lastModified,
         dtstamp: dtstamp,
