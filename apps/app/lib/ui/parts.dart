@@ -59,9 +59,10 @@ Future<T?> showAppDialog<T>(
               ),
             ),
             SizedBox(height: t.space.xl),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
               spacing: t.space.md,
+              runSpacing: t.space.md,
               children: actions,
             ),
           ],
