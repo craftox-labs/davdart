@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:davdart/davdart.dart';
 import 'package:davdart_web/web_app.dart';
 import 'package:shelf/shelf.dart';
@@ -40,6 +42,18 @@ void main() {
     expect(body, contains('Body &amp; text'));
     expect((await get('item/nope')).statusCode, 404);
     expect((await get('zzz')).statusCode, 404);
+  });
+
+  test('api/notes returns JSON without raw lines', () async {
+    final r = await get('api/notes');
+    expect(r.statusCode, 200);
+    expect(r.headers['content-type'], contains('application/json'));
+    final list = jsonDecode(await r.readAsString()) as List<dynamic>;
+    expect(list, hasLength(2));
+    final first = list.first as Map<String, dynamic>;
+    expect(first['uid'], 'a b');
+    expect(first['body'], contains('item_id: x-1'));
+    expect(first.keys, isNot(contains('extraLines')));
   });
 
   test('a server failure becomes a 502 page', () async {

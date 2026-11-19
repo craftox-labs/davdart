@@ -17,6 +17,12 @@ Handler buildHandler(NoteLoader load) {
       if (path.isEmpty) {
         return _html(_board(await load(), req.url.queryParameters['tag']));
       }
+      if (path == 'api/notes') {
+        return Response.ok(jsonEncode(_notesJson(await load())), headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'no-store',
+        });
+      }
       if (path.startsWith('item/')) {
         final String uid;
         try {
@@ -36,6 +42,22 @@ Handler buildHandler(NoteLoader load) {
     }
   };
 }
+
+/// Read-only JSON for the Flutter app. Body text and fields only: raw
+/// iCalendar lines (recordings and the like) are not sent.
+List<Map<String, Object?>> _notesJson(List<Note> notes) => [
+      for (final n in notes)
+        {
+          'uid': n.uid,
+          'title': n.summary,
+          'body': n.description,
+          'tags': n.categories,
+          'status': n.status,
+          'parent': n.parentUid,
+          'created': n.created?.toIso8601String(),
+          'modified': n.lastModified?.toIso8601String(),
+        }
+    ];
 
 Response _html(String body, [int status = 200]) =>
     Response(status, body: body, headers: {

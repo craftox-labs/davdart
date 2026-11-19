@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:davdart/davdart.dart';
 import 'package:davdart/io.dart';
 import 'package:davdart_web/web_app.dart';
+import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
+import 'package:shelf_static/shelf_static.dart';
 
 /// Read-only board. Binds to loopback only. Usage: dart run bin/server.dart [port]
 /// (default 8800). Login comes from the davdart config file or environment.
@@ -28,7 +30,24 @@ Future<void> main(List<String> args) async {
   }
 
   final port = args.isEmpty ? 8800 : int.parse(args.first);
-  final server =
-      await io.serve(buildHandler(load), InternetAddress.loopbackIPv4, port);
+  // The Flutter web build, when present, is served at /app/ (same origin as
+  // /api/notes, so the browser needs no cross-origin access).
+  final board = buildHandler(load);
+  final appDir = Directory('../app/build/web');
+  final app = appDir.existsSync()
+      ? createStaticHandler(appDir.path, defaultDocument: 'index.html')
+      : null;
+  Future<Response> handler(Request req) async {
+    final path = req.url.path;
+    if (app != null && path == 'app') {
+      return Response.found('/app/');
+    }
+    if (app != null && path.startsWith('app/')) {
+      return app(req.change(path: 'app'));
+    }
+    return board(req);
+  }
+
+  final server = await io.serve(handler, InternetAddress.loopbackIPv4, port);
   stdout.writeln('davdart board on http://127.0.0.1:${server.port}/');
 }
