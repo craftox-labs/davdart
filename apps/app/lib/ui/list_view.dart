@@ -1,9 +1,10 @@
 import 'package:davdart/davdart.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'chips.dart';
-import 'markdown_lite.dart';
+import 'theme.dart';
 
 /// Notes as an indented tree; a flat list of matches while searching.
 class NoteListView extends StatelessWidget {
@@ -12,7 +13,7 @@ class NoteListView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).extension<TokensTheme>()!.tokens;
+    final t = tokensOf(context);
     if (state.error != null && state.notes.isEmpty) {
       return Center(
         child: Text(state.error!, style: TextStyle(color: t.muted)),
@@ -41,13 +42,13 @@ class NoteListView extends StatelessWidget {
     }
     return ListView.separated(
       itemCount: rows.length,
-      separatorBuilder: (_, _) => Divider(height: 1, color: t.line),
+      separatorBuilder: (_, _) => Container(height: 1, color: t.line),
       itemBuilder: (context, i) {
         final (n, depth) = rows[i];
         final p = PlanItem.fromNote(n);
         final kids = state.tree.find(n.uid)?.children.isNotEmpty ?? false;
-        return InkWell(
-          onTap: () => state.select(n.uid),
+        return FTappable(
+          onPress: () => state.select(n.uid),
           child: Container(
             color: state.selectedUid == n.uid ? t.surface : null,
             padding: EdgeInsets.fromLTRB(12 + depth * 20.0, 10, 12, 10),
@@ -56,12 +57,13 @@ class NoteListView extends StatelessWidget {
                 SizedBox(
                   width: 24,
                   child: kids && !filtering
-                      ? InkWell(
+                      ? GestureDetector(
+                          behavior: HitTestBehavior.opaque,
                           onTap: () => state.toggle(n.uid),
                           child: Icon(
                             state.collapsed.contains(n.uid)
-                                ? Icons.chevron_right
-                                : Icons.expand_more,
+                                ? FLucideIcons.chevronRight
+                                : FLucideIcons.chevronDown,
                             size: 18,
                             color: t.muted,
                           ),

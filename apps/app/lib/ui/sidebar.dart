@@ -1,9 +1,11 @@
 import 'package:davdart/davdart.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
-import 'markdown_lite.dart';
+import 'parts.dart';
+import 'theme.dart';
 import 'account_dialog.dart';
 import 'connect_dialog.dart';
 import 'new_folder_dialog.dart';
@@ -24,33 +26,24 @@ class Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).extension<TokensTheme>()!.tokens;
-    final label = TextStyle(
-      fontSize: 11,
-      letterSpacing: .8,
-      color: t.muted,
-      fontWeight: FontWeight.w600,
-    );
+    final t = tokensOf(context);
 
     Widget item(IconData icon, String text, bool on, VoidCallback tap) =>
-        InkWell(
-          onTap: tap,
-          borderRadius: BorderRadius.circular(6),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: on ? t.surface : null,
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Row(
-              children: [
-                Icon(icon, size: 16, color: on ? t.accent : t.muted),
-                const SizedBox(width: 10),
-                Expanded(child: Text(text, overflow: TextOverflow.ellipsis)),
-              ],
-            ),
-          ),
+        FSidebarItem(
+          icon: Icon(icon),
+          label: Text(text, overflow: TextOverflow.ellipsis),
+          selected: on,
+          onPress: tap,
         );
+
+    Widget note(String text) => Padding(
+      padding: const EdgeInsets.fromLTRB(10, 2, 6, 0),
+      child: Text(
+        text,
+        style: TextStyle(fontSize: 11, color: t.muted),
+        overflow: TextOverflow.ellipsis,
+      ),
+    );
 
     final tree = <Widget>[];
     void walk(List<NoteNode> nodes, int depth) {
@@ -58,8 +51,8 @@ class Sidebar extends StatelessWidget {
         final kids = n.children.isNotEmpty;
         final open = !state.collapsed.contains(n.note.uid);
         tree.add(
-          InkWell(
-            onTap: () {
+          FTappable(
+            onPress: () {
               if (AppState.isFolder(n.note)) {
                 state.openFolder(n.note.uid);
               } else {
@@ -67,7 +60,6 @@ class Sidebar extends StatelessWidget {
               }
               _close(context);
             },
-            borderRadius: BorderRadius.circular(6),
             child: Container(
               padding: EdgeInsets.fromLTRB(4 + depth * 14.0, 5, 8, 5),
               decoration: BoxDecoration(
@@ -83,10 +75,13 @@ class Sidebar extends StatelessWidget {
                   SizedBox(
                     width: 20,
                     child: kids
-                        ? InkWell(
+                        ? GestureDetector(
+                            behavior: HitTestBehavior.opaque,
                             onTap: () => state.toggle(n.note.uid),
                             child: Icon(
-                              open ? Icons.expand_more : Icons.chevron_right,
+                              open
+                                  ? FLucideIcons.chevronDown
+                                  : FLucideIcons.chevronRight,
                               size: 16,
                               color: t.muted,
                             ),
@@ -95,7 +90,9 @@ class Sidebar extends StatelessWidget {
                   ),
                   if (AppState.isFolder(n.note)) ...[
                     Icon(
-                      open && kids ? Icons.folder_open : Icons.folder_outlined,
+                      open && kids
+                          ? FLucideIcons.folderOpen
+                          : FLucideIcons.folder,
                       size: 15,
                       color: t.muted,
                     ),
@@ -120,298 +117,299 @@ class Sidebar extends StatelessWidget {
 
     walk(state.tree.roots, 0);
 
-    return Padding(
-      padding: const EdgeInsets.all(10),
+    Widget spaceMenu() => FPopoverMenu(
+      menuAnchor: Alignment.topLeft,
+      childAnchor: Alignment.bottomLeft,
+      menuBuilder: (ctx, controller, _) {
+        void pick(VoidCallback act) {
+          controller.hide();
+          _close(context);
+          act();
+        }
+
+        return [
+          FItemGroup(
+            children: [
+              for (final sp in state.spaces)
+                FItem(
+                  key: Key('space-${sp.id}'),
+                  selected: sp.id == state.currentSpaceId,
+                  title: Text(sp.name, overflow: TextOverflow.ellipsis),
+                  suffix: sp.onServer
+                      ? Icon(FLucideIcons.cloud, size: 14, color: t.muted)
+                      : null,
+                  onPress: () => pick(() => state.switchSpace(sp.id)),
+                ),
+            ],
+          ),
+          FItemGroup(
+            children: [
+              FItem(
+                title: const Text('New space…'),
+                onPress: () => pick(() => showNewSpaceDialog(context, state)),
+              ),
+              FItem(
+                title: const Text('Rename this space…'),
+                onPress: () =>
+                    pick(() => showRenameSpaceDialog(context, state)),
+              ),
+              if (state.currentSpaceId != SpaceCatalog.planningId)
+                FItem(
+                  title: const Text('Delete this space…'),
+                  onPress: () =>
+                      pick(() => showDeleteSpaceDialog(context, state)),
+                ),
+            ],
+          ),
+        ];
+      },
+      builder: (ctx, controller, _) => FTappable(
+        key: const Key('space-menu'),
+        semanticsLabel: 'Switch space',
+        onPress: controller.toggle,
+        child: Row(
+          children: [
+            Flexible(
+              child: Text(
+                state.currentSpaceName ?? 'davdart',
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            Icon(FLucideIcons.chevronDown, size: 18, color: t.muted),
+          ],
+        ),
+      ),
+    );
+
+    return FSidebar.raw(
+      style: const .delta(
+        constraints: BoxConstraints.tightFor(width: Tokens.sidebarWidth),
+      ),
+      header: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(2, 6, 2, 12),
+              child: state.spaces.isEmpty
+                  ? const Text(
+                      'davdart',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    )
+                  : spaceMenu(),
+            ),
+            field(
+              controller: state.searchController,
+              onChange: state.setQuery,
+              hint: 'Search',
+              prefixIcon: FLucideIcons.search,
+            ),
+            if (state.spaces.length > 1)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: FButton(
+                  key: const Key('search-all'),
+                  variant: FButtonVariant.ghost,
+                  size: FButtonSizeVariant.sm,
+                  mainAxisSize: MainAxisSize.min,
+                  onPress: () {
+                    _close(context);
+                    showSearchAllDialog(context, state);
+                  },
+                  child: const Flexible(
+                    child: Text(
+                      'Search all spaces…',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+      footer: state.tags.isEmpty
+          ? null
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'TAGS',
+                    style: TextStyle(
+                      fontSize: 11,
+                      letterSpacing: .8,
+                      color: t.muted,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final tag in state.tags)
+                        GestureDetector(
+                          onTap: () => state.setTag(tag),
+                          child: FBadge(
+                            variant: state.tag == tag
+                                ? FBadgeVariant.secondary
+                                : FBadgeVariant.outline,
+                            child: Text(tag),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(6, 6, 6, 12),
-            child: state.spaces.isEmpty
-                ? const Text(
-                    'davdart',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
-                  )
-                : PopupMenuButton<String>(
-                    key: const Key('space-menu'),
-                    tooltip: 'Switch space',
-                    padding: EdgeInsets.zero,
-                    onSelected: (v) {
-                      if (v == '\u0000new') {
-                        _close(context);
-                        showNewSpaceDialog(context, state);
-                      } else if (v == '\u0000rename') {
-                        _close(context);
-                        showRenameSpaceDialog(context, state);
-                      } else if (v == '\u0000delete') {
-                        _close(context);
-                        showDeleteSpaceDialog(context, state);
-                      } else {
-                        state.switchSpace(v);
-                        _close(context);
-                      }
-                    },
-                    itemBuilder: (_) => [
-                      for (final sp in state.spaces)
-                        PopupMenuItem(
-                          value: sp.id,
-                          child: Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  sp.name,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    fontWeight: sp.id == state.currentSpaceId
-                                        ? FontWeight.w700
-                                        : FontWeight.w400,
-                                  ),
-                                ),
-                              ),
-                              if (sp.onServer) ...[
-                                const SizedBox(width: 6),
-                                Icon(
-                                  Icons.cloud_outlined,
-                                  size: 14,
-                                  color: t.muted,
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      const PopupMenuDivider(),
-                      const PopupMenuItem(
-                        value: '\u0000new',
-                        child: Text('New space…'),
-                      ),
-                      const PopupMenuItem(
-                        value: '\u0000rename',
-                        child: Text('Rename this space…'),
-                      ),
-                      if (state.currentSpaceId != SpaceCatalog.planningId)
-                        const PopupMenuItem(
-                          value: '\u0000delete',
-                          child: Text('Delete this space…'),
-                        ),
-                    ],
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: Text(
-                            state.currentSpaceName ?? 'davdart',
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Icon(Icons.expand_more, size: 18, color: t.muted),
-                      ],
-                    ),
-                  ),
-          ),
-          TextField(
-            controller: state.searchController,
-            onChanged: state.setQuery,
-            style: const TextStyle(fontSize: 14),
-            decoration: InputDecoration(
-              isDense: true,
-              hintText: 'Search',
-              prefixIcon: Icon(Icons.search, size: 18, color: t.muted),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(Tokens.radius),
-                borderSide: BorderSide(color: t.line),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(Tokens.radius),
-                borderSide: BorderSide(color: t.line),
-              ),
-            ),
-          ),
-          if (state.spaces.length > 1)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton(
-                key: const Key('search-all'),
-                onPressed: () {
-                  _close(context);
-                  showSearchAllDialog(context, state);
-                },
-                child: const Text('Search all spaces…'),
-              ),
-            ),
-          const SizedBox(height: 14),
-          Padding(
-            padding: const EdgeInsets.only(left: 6, bottom: 4),
-            child: Text('VIEWS', style: label),
-          ),
-          item(
-            Icons.view_kanban_outlined,
-            'Board',
-            state.view == ViewMode.board,
-            () {
-              state.setView(ViewMode.board);
-              state.select(null);
-              _close(context);
-            },
-          ),
-          item(Icons.list, 'List', state.view == ViewMode.list, () {
-            state.setView(ViewMode.list);
-            state.select(null);
-            _close(context);
-          }),
-          for (final v in state.savedViews)
-            Row(
-              children: [
-                Expanded(
-                  child: item(Icons.bookmark_border, v.name, false, () {
-                    state.applyView(v);
-                    _close(context);
-                  }),
-                ),
-                IconButton(
-                  tooltip: 'Remove saved view',
-                  iconSize: 16,
-                  visualDensity: VisualDensity.compact,
-                  icon: Icon(Icons.close, color: t.muted),
-                  onPressed: () => state.deleteView(v.name),
-                ),
-              ],
-            ),
-          if (state.hasFilter)
-            item(Icons.bookmark_add_outlined, 'Save this view', false, () {
-              showSaveViewDialog(context, state);
-            }),
-          if (state.canSignIn) ...[
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.only(left: 6, bottom: 4),
-              child: Text('ACCOUNT', style: label),
-            ),
-            if (state.accountUser == null)
-              item(Icons.account_circle_outlined, 'Sign in…', false, () {
-                _close(context);
-                showAccountDialog(context, state);
-              })
-            else ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 2, 6, 4),
-                child: Text(
-                  'Signed in as ${state.accountUser}',
-                  key: const Key('account-label'),
-                  style: TextStyle(fontSize: 11, color: t.muted),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              item(Icons.refresh, 'Refresh spaces', false, state.refreshSpaces),
-              item(Icons.logout, 'Sign out', false, state.signOut),
-            ],
-          ],
-          if (state.canConnect) ...[
-            const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.only(left: 6, bottom: 4),
-              child: Text('SERVER', style: label),
-            ),
-            if (!state.connected && state.currentOnServer)
-              item(Icons.cloud_sync_outlined, 'Retry connecting', false, () {
-                state.load();
-              })
-            else if (!state.connected)
+          FSidebarGroup(
+            label: const Text('VIEWS'),
+            children: [
               item(
-                Icons.cloud_outlined,
-                'Connect a collection by path',
-                false,
+                FLucideIcons.squareKanban,
+                'Board',
+                state.view == ViewMode.board,
                 () {
+                  state.setView(ViewMode.board);
+                  state.select(null);
                   _close(context);
-                  showConnectDialog(context, state);
                 },
-              )
-            else ...[
-              item(
-                Icons.sync,
-                state.syncing ? 'Syncing…' : 'Sync now',
-                false,
-                state.sync,
               ),
-              if (!state.currentOnServer)
-                item(Icons.cloud_off_outlined, 'Disconnect', false, () {
-                  state.disconnect();
+              item(FLucideIcons.list, 'List', state.view == ViewMode.list, () {
+                state.setView(ViewMode.list);
+                state.select(null);
+                _close(context);
+              }),
+              for (final v in state.savedViews)
+                Row(
+                  children: [
+                    Expanded(
+                      child: item(FLucideIcons.bookmark, v.name, false, () {
+                        state.applyView(v);
+                        _close(context);
+                      }),
+                    ),
+                    IconAction(
+                      tooltip: 'Remove saved view',
+                      icon: FLucideIcons.x,
+                      onPress: () => state.deleteView(v.name),
+                    ),
+                  ],
+                ),
+              if (state.hasFilter)
+                item(FLucideIcons.bookmarkPlus, 'Save this view', false, () {
+                  showSaveViewDialog(context, state);
                 }),
             ],
-            if (state.connected && state.serverLabel != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 2, 6, 0),
-                child: Text(
-                  state.serverLabel!,
-                  style: TextStyle(fontSize: 11, color: t.muted),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            if (state.syncMessage != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(10, 2, 6, 0),
-                child: Text(
-                  state.syncMessage!,
-                  key: const Key('sync-message'),
-                  style: TextStyle(fontSize: 11, color: t.muted),
-                ),
-              ),
-          ],
-          const SizedBox(height: 14),
-          Padding(
-            padding: const EdgeInsets.only(left: 6, bottom: 4),
-            child: Text('NOTES', style: label),
           ),
-          if (state.editable)
-            item(Icons.add, 'New note', false, () {
-              _close(context);
-              showNewNoteDialog(context, state);
-            }),
-          if (state.editable)
-            item(Icons.create_new_folder_outlined, 'New folder', false, () {
-              _close(context);
-              showNewFolderDialog(context, state);
-            }),
-          Expanded(child: ListView(children: tree)),
-          if (state.tags.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.only(left: 6, top: 8, bottom: 4),
-              child: Text('TAGS', style: label),
-            ),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
+          if (state.canSignIn)
+            FSidebarGroup(
+              label: const Text('ACCOUNT'),
               children: [
-                for (final tag in state.tags)
-                  InkWell(
-                    onTap: () => state.setTag(tag),
-                    borderRadius: BorderRadius.circular(99),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 9,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: state.tag == tag ? t.surface : null,
-                        border: Border.all(
-                          color: state.tag == tag ? t.fg : t.line,
-                        ),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        tag,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: state.tag == tag ? t.fg : t.muted,
-                        ),
-                      ),
+                if (state.accountUser == null)
+                  item(FLucideIcons.circleUser, 'Sign in…', false, () {
+                    _close(context);
+                    showAccountDialog(context, state);
+                  })
+                else ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 2, 6, 4),
+                    child: Text(
+                      'Signed in as ${state.accountUser}',
+                      key: const Key('account-label'),
+                      style: TextStyle(fontSize: 11, color: t.muted),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  item(
+                    FLucideIcons.refreshCw,
+                    'Refresh spaces',
+                    false,
+                    state.refreshSpaces,
+                  ),
+                  item(FLucideIcons.logOut, 'Sign out', false, state.signOut),
+                ],
+              ],
+            ),
+          if (state.canConnect)
+            FSidebarGroup(
+              label: const Text('SERVER'),
+              children: [
+                if (!state.connected && state.currentOnServer)
+                  item(
+                    FLucideIcons.cloudSync,
+                    'Retry connecting',
+                    false,
+                    state.load,
+                  )
+                else if (!state.connected)
+                  item(
+                    FLucideIcons.cloud,
+                    'Connect a collection by path',
+                    false,
+                    () {
+                      _close(context);
+                      showConnectDialog(context, state);
+                    },
+                  )
+                else ...[
+                  item(
+                    FLucideIcons.refreshCcw,
+                    state.syncing ? 'Syncing…' : 'Sync now',
+                    false,
+                    state.sync,
+                  ),
+                  if (!state.currentOnServer)
+                    item(FLucideIcons.cloudOff, 'Disconnect', false, () {
+                      state.disconnect();
+                    }),
+                ],
+                if (state.connected && state.serverLabel != null)
+                  note(state.serverLabel!),
+                if (state.syncMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 2, 6, 0),
+                    child: Text(
+                      state.syncMessage!,
+                      key: const Key('sync-message'),
+                      style: TextStyle(fontSize: 11, color: t.muted),
                     ),
                   ),
               ],
             ),
-          ],
+          FSidebarGroup(
+            label: const Text('NOTES'),
+            children: [
+              if (state.editable)
+                item(FLucideIcons.plus, 'New note', false, () {
+                  _close(context);
+                  showNewNoteDialog(context, state);
+                }),
+              if (state.editable)
+                item(FLucideIcons.folderPlus, 'New folder', false, () {
+                  _close(context);
+                  showNewFolderDialog(context, state);
+                }),
+            ],
+          ),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: tree,
+            ),
+          ),
         ],
       ),
     );

@@ -1,10 +1,11 @@
 import 'package:davdart/davdart.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
-import 'markdown_lite.dart';
+import 'theme.dart';
 
 Color statusColor(String? status, BuildContext context) {
-  final t = Theme.of(context).extension<TokensTheme>()!.tokens;
+  final t = tokensOf(context);
   switch (status) {
     case 'done':
       return const Color(0xFF3FA37A);
@@ -39,17 +40,8 @@ class TagChip extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    final t = Theme.of(context).extension<TokensTheme>()!.tokens;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 1),
-      decoration: BoxDecoration(
-        border: Border.all(color: t.line),
-        borderRadius: BorderRadius.circular(99),
-      ),
-      child: Text(label, style: TextStyle(fontSize: 12, color: t.muted)),
-    );
-  }
+  Widget build(BuildContext context) =>
+      FBadge(variant: FBadgeVariant.outline, child: Text(label));
 }
 
 /// Short label for a note: its item id when it has one, else its title.

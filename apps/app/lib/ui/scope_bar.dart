@@ -1,8 +1,10 @@
 import 'package:davdart/davdart.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
-import 'markdown_lite.dart';
+import 'parts.dart';
+import 'theme.dart';
 import 'edit_note_dialog.dart';
 import 'move_space_dialog.dart';
 
@@ -16,7 +18,7 @@ class ScopeBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final folder = state.scope;
     if (folder == null) return const SizedBox.shrink();
-    final t = Theme.of(context).extension<TokensTheme>()!.tokens;
+    final t = tokensOf(context);
     final path = <Note>[];
     for (var n = state.tree.find(folder.uid); n != null; n = n.parent) {
       path.insert(0, n.note);
@@ -32,7 +34,7 @@ class ScopeBar extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.folder_open, size: 18, color: t.accent),
+          Icon(FLucideIcons.folderOpen, size: 18, color: t.accent),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -66,34 +68,30 @@ class ScopeBar extends StatelessWidget {
           ),
           if (state.editable) ...[
             if (state.spaces.length > 1)
-              IconButton(
+              IconAction(
                 key: const Key('scope-move'),
                 tooltip: 'Move folder to another space',
-                visualDensity: VisualDensity.compact,
-                icon: const Icon(Icons.drive_file_move_outlined, size: 18),
-                onPressed: () => showMoveSpaceDialog(context, state, folder),
+                icon: FLucideIcons.folderInput,
+                onPress: () => showMoveSpaceDialog(context, state, folder),
               ),
-            IconButton(
+            IconAction(
               key: const Key('scope-edit'),
               tooltip: 'Edit folder',
-              visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              onPressed: () => showEditNoteDialog(context, state, folder),
+              icon: FLucideIcons.pencil,
+              onPress: () => showEditNoteDialog(context, state, folder),
             ),
-            IconButton(
+            IconAction(
               key: const Key('scope-delete'),
               tooltip: 'Delete folder',
-              visualDensity: VisualDensity.compact,
-              icon: const Icon(Icons.delete_outline, size: 18),
-              onPressed: () => confirmDeleteNote(context, state, folder),
+              icon: FLucideIcons.trash2,
+              onPress: () => confirmDeleteNote(context, state, folder),
             ),
           ],
-          IconButton(
+          IconAction(
             key: const Key('scope-close'),
             tooltip: 'Show the whole space',
-            visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.close, size: 18),
-            onPressed: () => state.openFolder(null),
+            icon: FLucideIcons.x,
+            onPress: () => state.openFolder(null),
           ),
         ],
       ),

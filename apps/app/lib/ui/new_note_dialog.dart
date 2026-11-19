@@ -1,67 +1,60 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import 'parts.dart';
 
 /// Asks for a title and adds the note, under the selected note if chosen.
 Future<void> showNewNoteDialog(BuildContext context, AppState state) {
   final parent = state.selected ?? state.scope;
   final title = TextEditingController();
   var underParent = parent != null;
-  return showDialog<void>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setLocal) {
-        void submit() {
-          final text = title.text;
-          if (text.trim().isEmpty) return;
-          Navigator.of(ctx).pop();
-          state.addNote(
-            text,
-            parentUid: underParent ? parent?.uid : null,
-            status: 'backlog',
-          );
-        }
+  void submit(BuildContext ctx) {
+    final text = title.text;
+    if (text.trim().isEmpty) return;
+    Navigator.of(ctx).pop();
+    state.addNote(
+      text,
+      parentUid: underParent ? parent?.uid : null,
+      status: 'backlog',
+    );
+  }
 
-        return AlertDialog(
-          title: const Text('New note'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              TextField(
-                key: const Key('new-note-title'),
-                controller: title,
-                autofocus: true,
-                decoration: const InputDecoration(hintText: 'Title'),
-                onSubmitted: (_) => submit(),
-              ),
-              if (parent != null)
-                CheckboxListTile(
-                  key: const Key('new-note-under'),
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  value: underParent,
-                  onChanged: (v) => setLocal(() => underParent = v ?? false),
-                  title: Text(
-                    'Under "${parent.summary}"',
-                    overflow: TextOverflow.ellipsis,
-                  ),
+  return showAppDialog(
+    context,
+    title: 'New note',
+    width: 420,
+    content: StatefulBuilder(
+      builder: (ctx, setLocal) {
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 12,
+          children: [
+            field(
+              key: const Key('new-note-title'),
+              controller: title,
+              autofocus: true,
+              hint: 'Title',
+              onSubmit: (_) => submit(ctx),
+            ),
+            if (parent != null)
+              FCheckbox(
+                key: const Key('new-note-under'),
+                value: underParent,
+                onChange: (v) => setLocal(() => underParent = v),
+                label: Text(
+                  'Under "${parent.summary}"',
+                  overflow: TextOverflow.ellipsis,
                 ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              key: const Key('new-note-add'),
-              onPressed: submit,
-              child: const Text('Add'),
-            ),
+              ),
           ],
         );
       },
     ),
+    actions: [
+      const CancelButton(),
+      ActionButton('Add', key: const Key('new-note-add'), onPress: submit),
+    ],
   );
 }

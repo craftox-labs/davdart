@@ -1,60 +1,49 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import 'parts.dart';
 
 /// Names a new local Space and opens it.
 Future<void> showNewSpaceDialog(BuildContext context, AppState state) {
   final name = TextEditingController();
   var onServer = state.accountUser != null;
-  return showDialog<void>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setLocal) {
-        void submit() {
-          if (name.text.trim().isEmpty) return;
-          Navigator.of(ctx).pop();
-          state.createSpace(name.text, onServer: onServer);
-        }
+  void submit(BuildContext ctx) {
+    if (name.text.trim().isEmpty) return;
+    Navigator.of(ctx).pop();
+    state.createSpace(name.text, onServer: onServer);
+  }
 
-        return AlertDialog(
-          title: const Text('New space'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                key: const Key('space-name'),
-                controller: name,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Name, for example Inbox',
-                ),
-                onSubmitted: (_) => submit(),
-              ),
-              if (state.accountUser != null)
-                CheckboxListTile(
-                  key: const Key('space-on-server'),
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  value: onServer,
-                  onChanged: (v) => setLocal(() => onServer = v ?? false),
-                  title: const Text('Create on the server and sync'),
-                ),
-            ],
+  return showAppDialog(
+    context,
+    title: 'New space',
+    content: StatefulBuilder(
+      builder: (ctx, setLocal) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 12,
+        children: [
+          field(
+            key: const Key('space-name'),
+            controller: name,
+            autofocus: true,
+            hint: 'Name, for example Inbox',
+            onSubmit: (_) => submit(ctx),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
+          if (state.accountUser != null)
+            FCheckbox(
+              key: const Key('space-on-server'),
+              value: onServer,
+              onChange: (v) => setLocal(() => onServer = v),
+              label: const Text('Create on the server and sync'),
             ),
-            FilledButton(
-              key: const Key('space-create'),
-              onPressed: submit,
-              child: const Text('Create'),
-            ),
-          ],
-        );
-      },
+        ],
+      ),
     ),
+    actions: [
+      const CancelButton(),
+      ActionButton('Create', key: const Key('space-create'), onPress: submit),
+    ],
   );
 }
 
@@ -62,75 +51,63 @@ Future<void> showNewSpaceDialog(BuildContext context, AppState state) {
 Future<void> showRenameSpaceDialog(BuildContext context, AppState state) {
   final name = TextEditingController(text: state.currentSpaceName ?? '');
   String? error;
-  return showDialog<void>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setState) {
-        Future<void> submit() async {
-          final err = await state.renameSpace(name.text);
-          if (!ctx.mounted) return;
-          if (err == null) {
-            Navigator.of(ctx).pop();
-          } else {
-            setState(() => error = err);
-          }
-        }
+  void Function(void Function())? setError;
+  Future<void> submit(BuildContext ctx) async {
+    final err = await state.renameSpace(name.text);
+    if (!ctx.mounted) return;
+    if (err == null) {
+      Navigator.of(ctx).pop();
+    } else {
+      setError?.call(() => error = err);
+    }
+  }
 
-        return AlertDialog(
-          title: const Text('Rename space'),
-          content: TextField(
-            key: const Key('space-rename-name'),
-            controller: name,
-            autofocus: true,
-            decoration: InputDecoration(errorText: error),
-            onSubmitted: (_) => submit(),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              key: const Key('space-rename'),
-              onPressed: submit,
-              child: const Text('Rename'),
-            ),
-          ],
+  return showAppDialog(
+    context,
+    title: 'Rename space',
+    content: StatefulBuilder(
+      builder: (ctx, setState) {
+        setError = setState;
+        return field(
+          key: const Key('space-rename-name'),
+          controller: name,
+          autofocus: true,
+          error: error,
+          onSubmit: (_) => submit(ctx),
         );
       },
     ),
+    actions: [
+      const CancelButton(),
+      ActionButton('Rename', key: const Key('space-rename'), onPress: submit),
+    ],
   );
 }
 
 /// Confirms deleting the open (non-Planning) Space.
 Future<void> showDeleteSpaceDialog(BuildContext context, AppState state) {
   final name = state.currentSpaceName ?? 'this space';
-  return showDialog<void>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: Text('Delete $name?'),
-      content: Text(
-        state.currentOnServer
-            ? 'This removes the space from this device only. The collection '
-                  'and its notes stay on the server, and Refresh spaces '
-                  'brings it back.'
-            : 'Its notes and saved views are removed from this device. A '
-                  'server collection it was connected to is not touched.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(ctx).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          key: const Key('space-delete'),
-          onPressed: () {
-            Navigator.of(ctx).pop();
-            state.deleteSpace();
-          },
-          child: const Text('Delete'),
-        ),
-      ],
+  return showAppDialog(
+    context,
+    title: 'Delete $name?',
+    content: Text(
+      state.currentOnServer
+          ? 'This removes the space from this device only. The collection '
+                'and its notes stay on the server, and Refresh spaces '
+                'brings it back.'
+          : 'Its notes and saved views are removed from this device. A '
+                'server collection it was connected to is not touched.',
     ),
+    actions: [
+      const CancelButton(),
+      ActionButton(
+        'Delete',
+        key: const Key('space-delete'),
+        onPress: (ctx) {
+          Navigator.of(ctx).pop();
+          state.deleteSpace();
+        },
+      ),
+    ],
   );
 }

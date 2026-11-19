@@ -1,6 +1,8 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../theme/tokens.dart';
+import 'theme.dart';
 
 /// Small renderer for the note text the planning notes use: `#` headings,
 /// `-` lists, numbered lists, `**bold**`, `` `code` `` and paragraphs.
@@ -10,8 +12,8 @@ class MarkdownLite extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).extension<TokensTheme>()!.tokens;
-    final base = Theme.of(context).textTheme.bodyMedium!.copyWith(color: t.fg);
+    final t = tokensOf(context);
+    final base = context.theme.typography.body.sm.copyWith(color: t.fg);
     final out = <Widget>[];
     final para = <String>[];
 
@@ -100,17 +102,4 @@ class MarkdownLite extends StatelessWidget {
     if (pos < s.length) spans.add(TextSpan(text: s.substring(pos)));
     return TextSpan(style: base, children: spans);
   }
-}
-
-/// Carries [Tokens] through the widget tree.
-class TokensTheme extends ThemeExtension<TokensTheme> {
-  const TokensTheme(this.tokens);
-  final Tokens tokens;
-
-  @override
-  TokensTheme copyWith({Tokens? tokens}) => TokensTheme(tokens ?? this.tokens);
-
-  @override
-  TokensTheme lerp(ThemeExtension<TokensTheme>? other, double t) =>
-      other is TokensTheme && t >= 0.5 ? other : this;
 }

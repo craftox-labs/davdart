@@ -1,10 +1,13 @@
 import 'package:davdart/davdart.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'chips.dart';
 import 'edit_note_dialog.dart';
 import 'markdown_lite.dart';
+import 'parts.dart';
+import 'theme.dart';
 import 'move_space_dialog.dart';
 
 class DetailView extends StatelessWidget {
@@ -14,7 +17,7 @@ class DetailView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).extension<TokensTheme>()!.tokens;
+    final t = tokensOf(context);
     final note = state.selected;
     if (note == null) return const SizedBox.shrink();
     final p = PlanItem.fromNote(note);
@@ -28,10 +31,10 @@ class DetailView extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(4, 4, 8, 0),
           child: Row(
             children: [
-              IconButton(
+              IconAction(
                 tooltip: 'Close',
-                icon: const Icon(Icons.arrow_back),
-                onPressed: onClose,
+                icon: FLucideIcons.arrowLeft,
+                onPress: onClose,
               ),
               Expanded(
                 child: Text(
@@ -43,23 +46,23 @@ class DetailView extends StatelessWidget {
               ),
               if (state.editable) ...[
                 if (state.spaces.length > 1)
-                  IconButton(
+                  IconAction(
                     key: const Key('move-note'),
                     tooltip: 'Move to another space',
-                    icon: const Icon(Icons.drive_file_move_outlined),
-                    onPressed: () => showMoveSpaceDialog(context, state, note),
+                    icon: FLucideIcons.folderInput,
+                    onPress: () => showMoveSpaceDialog(context, state, note),
                   ),
-                IconButton(
+                IconAction(
                   key: const Key('edit-note'),
                   tooltip: 'Edit',
-                  icon: const Icon(Icons.edit_outlined),
-                  onPressed: () => showEditNoteDialog(context, state, note),
+                  icon: FLucideIcons.pencil,
+                  onPress: () => showEditNoteDialog(context, state, note),
                 ),
-                IconButton(
+                IconAction(
                   key: const Key('delete-note'),
                   tooltip: 'Delete',
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () => confirmDeleteNote(context, state, note),
+                  icon: FLucideIcons.trash2,
+                  onPress: () => confirmDeleteNote(context, state, note),
                 ),
               ],
             ],
@@ -84,17 +87,25 @@ class DetailView extends StatelessWidget {
                     children: [
                       Text('Status', style: TextStyle(color: t.muted)),
                       const SizedBox(width: 12),
-                      DropdownButton<String>(
-                        key: const Key('status-menu'),
-                        value: boardOrder.contains(p.status) ? p.status : null,
-                        hint: const Text('none'),
-                        items: [
-                          for (final s in boardOrder)
-                            DropdownMenuItem(value: s, child: Text(s)),
-                        ],
-                        onChanged: (v) {
-                          if (v != null) state.setStatus(note.uid, v);
-                        },
+                      SizedBox(
+                        width: 160,
+                        child: FSelect<String>.rich(
+                          key: const Key('status-menu'),
+                          format: (v) => v,
+                          hint: 'none',
+                          control: FSelectControl.lifted(
+                            value: boardOrder.contains(p.status)
+                                ? p.status
+                                : null,
+                            onChange: (v) {
+                              if (v != null) state.setStatus(note.uid, v);
+                            },
+                          ),
+                          children: [
+                            for (final s in boardOrder)
+                              FSelectItem<String>(title: Text(s), value: s),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -158,48 +169,58 @@ class DetailView extends StatelessWidget {
                     if (revs.isEmpty) return const SizedBox.shrink();
                     return Padding(
                       padding: const EdgeInsets.only(top: 20),
-                      child: ExpansionTile(
+                      child: FAccordion(
                         key: const Key('revisions'),
-                        tilePadding: EdgeInsets.zero,
-                        title: Text(
-                          'Earlier versions (${revs.length})',
-                          style: TextStyle(fontSize: 13, color: t.muted),
-                        ),
                         children: [
-                          for (final r in revs.reversed)
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 8),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: t.surface,
-                                border: Border.all(color: t.line),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '${r.at.toLocal().toString().substring(0, 16)}  ·  ${r.reason}',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      color: t.muted,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    r.summary,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  SelectableText(
-                                    r.body,
-                                    style: const TextStyle(fontSize: 13),
-                                  ),
-                                ],
-                              ),
+                          FAccordionItem(
+                            title: Text(
+                              'Earlier versions (${revs.length})',
+                              style: TextStyle(fontSize: 13, color: t.muted),
                             ),
+                            child: Column(
+                              children: [
+                                for (final r in revs.reversed)
+                                  Container(
+                                    width: double.infinity,
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: t.surface,
+                                      border: Border.all(color: t.line),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          '${r.at.toLocal().toString().substring(0, 16)}  ·  ${r.reason}',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: t.muted,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          r.summary,
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        SelectableBody(
+                                          child: Text(
+                                            r.body,
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     );

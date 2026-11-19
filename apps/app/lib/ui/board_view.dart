@@ -1,10 +1,11 @@
 import 'package:davdart/davdart.dart';
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import 'chips.dart';
-import 'markdown_lite.dart';
+import 'theme.dart';
 
 class BoardView extends StatelessWidget {
   const BoardView({super.key, required this.state});
@@ -12,7 +13,7 @@ class BoardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).extension<TokensTheme>()!.tokens;
+    final t = tokensOf(context);
     if (state.error != null && state.notes.isEmpty) {
       return Center(
         child: Text(state.error!, style: TextStyle(color: t.muted)),
@@ -80,20 +81,19 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = Theme.of(context).extension<TokensTheme>()!.tokens;
+    final t = tokensOf(context);
     final p = PlanItem.fromNote(note);
     final selected = state.selectedUid == note.uid;
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Material(
-        color: t.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(Tokens.radius),
-          side: BorderSide(color: selected ? t.accent : t.line),
-        ),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(Tokens.radius),
-          onTap: () => state.select(note.uid),
+      child: FTappable(
+        onPress: () => state.select(note.uid),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: t.surface,
+            borderRadius: BorderRadius.circular(Tokens.radius),
+            border: Border.all(color: selected ? t.accent : t.line),
+          ),
           child: Padding(
             padding: const EdgeInsets.all(12),
             child: Column(

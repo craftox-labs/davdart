@@ -1,7 +1,9 @@
-import 'package:material_ui/material_ui.dart';
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../data/note_source.dart';
 import '../state/app_state.dart';
+import 'parts.dart';
 
 /// Connects the local Space to a CalDAV collection through the board
 /// server's /dav/ proxy. The first sync sends every local note and merges by
@@ -14,21 +16,22 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
   List<FoundCollection>? found;
   String? picked; // the path last chosen from the list
   String? finding; // null idle, '' searching, else the error
-  return showDialog<void>(
-    context: context,
-    builder: (ctx) => StatefulBuilder(
-      builder: (ctx, setLocal) {
-        void submit() {
-          if (path.text.trim().isEmpty || user.text.trim().isEmpty) return;
-          Navigator.of(ctx).pop();
-          state.connect(
-            path.text,
-            user.text.trim(),
-            password.text,
-            replaceLocal: replace,
-          );
-        }
+  void submit(BuildContext ctx) {
+    if (path.text.trim().isEmpty || user.text.trim().isEmpty) return;
+    Navigator.of(ctx).pop();
+    state.connect(
+      path.text,
+      user.text.trim(),
+      password.text,
+      replaceLocal: replace,
+    );
+  }
 
+  return showAppDialog(
+    context,
+    title: 'Connect server',
+    content: StatefulBuilder(
+      builder: (ctx, setLocal) {
         Future<void> find() async {
           if (user.text.trim().isEmpty) {
             setLocal(() => finding = 'Enter the user first');
@@ -48,111 +51,97 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
           }
         }
 
-        return AlertDialog(
-          title: const Text('Connect server'),
-          content: SizedBox(
-            width: 420,
-            child: Column(
+        void loginChanged(String _) => setLocal(() {
+          // A list found for another login no longer applies.
+          if (found != null && path.text == picked) path.text = '';
+          found = null;
+          picked = null;
+        });
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 12,
+          children: [
+            field(
+              key: const Key('connect-user'),
+              controller: user,
+              autofocus: true,
+              label: 'User',
+              onChange: loginChanged,
+            ),
+            field(
+              key: const Key('connect-password'),
+              controller: password,
+              obscure: true,
+              label: 'Password',
+              onChange: loginChanged,
+              onSubmit: (_) => submit(ctx),
+            ),
+            FButton(
+              key: const Key('connect-find'),
+              variant: FButtonVariant.outline,
+              size: FButtonSizeVariant.sm,
               mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  key: const Key('connect-user'),
-                  controller: user,
-                  autofocus: true,
-                  onChanged: (_) => setLocal(() {
-                    // A list found for another login no longer applies.
-                    if (found != null && path.text == picked) path.text = '';
-                    found = null;
-                    picked = null;
-                  }),
-                  decoration: const InputDecoration(labelText: 'User'),
-                ),
-                TextField(
-                  key: const Key('connect-password'),
-                  controller: password,
-                  obscureText: true,
-                  onChanged: (_) => setLocal(() {
-                    // A list found for another login no longer applies.
-                    if (found != null && path.text == picked) path.text = '';
-                    found = null;
-                    picked = null;
-                  }),
-                  decoration: const InputDecoration(labelText: 'Password'),
-                  onSubmitted: (_) => submit(),
-                ),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton(
-                    key: const Key('connect-find'),
-                    onPressed: finding == '' ? null : find,
-                    child: Text(
-                      finding == '' ? 'Looking…' : 'Find collections',
-                    ),
-                  ),
-                ),
-                if (finding != null && finding != '')
-                  Text(finding!, style: const TextStyle(fontSize: 12)),
-                if (found != null)
-                  found!.isEmpty
-                      ? const Text('No note collections for this user.')
-                      : DropdownButtonFormField<String>(
-                          key: const Key('connect-pick'),
-                          isExpanded: true,
-                          decoration: const InputDecoration(
-                            labelText: 'Collection',
-                          ),
-                          items: [
+              onPress: finding == '' ? null : find,
+              child: Text(finding == '' ? 'Looking…' : 'Find collections'),
+            ),
+            if (finding != null && finding != '')
+              Text(finding!, style: const TextStyle(fontSize: 12)),
+            if (found != null)
+              found!.isEmpty
+                  ? const Text('No note collections for this user.')
+                  : FSelect<String>.rich(
+                      key: const Key('connect-pick'),
+                      label: const Text('Collection'),
+                      format: (v) =>
+                          [
                             for (final c in found!)
-                              DropdownMenuItem(
-                                value: c.path,
-                                child: Text(
-                                  c.name,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                          ],
-                          onChanged: (v) => setLocal(() {
-                            picked = v;
-                            path.text = v ?? '';
-                          }),
-                        ),
-                TextField(
-                  key: const Key('connect-path'),
-                  controller: path,
-                  decoration: const InputDecoration(
-                    labelText: 'Collection path',
-                    hintText: 'or type it: user/collection/',
-                  ),
-                ),
-                CheckboxListTile(
-                  key: const Key('connect-replace'),
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  value: replace,
-                  onChanged: (v) => setLocal(() => replace = v ?? false),
-                  title: const Text('Start from the server (drop local notes)'),
-                ),
-                const Text(
-                  'Otherwise notes here are sent to this collection and merged with what '
-                  'it holds. The login is kept in this browser.',
-                  style: TextStyle(fontSize: 12),
-                ),
-              ],
+                              if (c.path == v) c.name,
+                          ].firstOrNull ??
+                          v,
+                      control: FSelectControl.lifted(
+                        value: picked,
+                        onChange: (v) => setLocal(() {
+                          picked = v;
+                          path.text = v ?? '';
+                        }),
+                      ),
+                      children: [
+                        for (final c in found!)
+                          FSelectItem<String>(
+                            title: Text(
+                              c.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            value: c.path,
+                          ),
+                      ],
+                    ),
+            field(
+              key: const Key('connect-path'),
+              controller: path,
+              label: 'Collection path',
+              hint: 'or type it: user/collection/',
             ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('Cancel'),
+            FCheckbox(
+              key: const Key('connect-replace'),
+              value: replace,
+              onChange: (v) => setLocal(() => replace = v),
+              label: const Text('Start from the server (drop local notes)'),
             ),
-            FilledButton(
-              key: const Key('connect-go'),
-              onPressed: submit,
-              child: const Text('Connect'),
+            const Text(
+              'Otherwise notes here are sent to this collection and merged with what '
+              'it holds. The login is kept in this browser.',
+              style: TextStyle(fontSize: 12),
             ),
           ],
         );
       },
     ),
+    actions: [
+      const CancelButton(),
+      ActionButton('Connect', key: const Key('connect-go'), onPress: submit),
+    ],
   );
 }
