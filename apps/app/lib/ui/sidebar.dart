@@ -112,6 +112,7 @@ class Sidebar extends StatelessWidget {
             ),
           ),
           TextField(
+            controller: state.searchController,
             onChanged: state.setQuery,
             style: const TextStyle(fontSize: 14),
             decoration: InputDecoration(

@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:davdart/davdart.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show TextEditingController;
 
 import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
@@ -77,6 +78,9 @@ class AppState extends ChangeNotifier {
     jsonEncode([for (final v in savedViews) v.toJson()]),
   );
 
+  /// Backs the sidebar search box so applying a saved view shows its text.
+  final searchController = TextEditingController();
+
   bool get hasFilter => query.trim().isNotEmpty || tag != null;
 
   /// Saves the current view and filters under [name] (replacing a same name).
@@ -93,7 +97,10 @@ class AppState extends ChangeNotifier {
   void applyView(SavedView v) {
     view = v.view;
     query = v.query;
-    tag = v.tag;
+    searchController.text = v.query;
+    tag = v.tag != null && notes.any((n) => n.categories.contains(v.tag))
+        ? v.tag
+        : null;
     selectedUid = null;
     notifyListeners();
   }
