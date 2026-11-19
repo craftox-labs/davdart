@@ -11,3 +11,4 @@ export 'src/space.dart';
 export 'src/store.dart';
 export 'src/sync_engine.dart';
 export 'src/plan_item.dart';
+export 'src/saved_view.dart';

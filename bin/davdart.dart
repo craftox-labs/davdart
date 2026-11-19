@@ -31,6 +31,7 @@ Future<void> main(List<String> args) async {
           if (args[i] == '--tag') tags.add(args[++i]);
         }
         for (final n in await c.listNotes()) {
+          if (isViewNote(n)) continue; // saved views are not items
           final p = PlanItem.fromNote(n);
           if (status != null && p.status != status) continue;
           if (!tags.every(n.categories.contains)) continue;
@@ -40,6 +41,7 @@ Future<void> main(List<String> args) async {
       case 'board':
         final cols = <String, List<PlanItem>>{};
         for (final n in await c.listNotes()) {
+          if (isStructuralNote(n)) continue; // folders and saved views
           final p = PlanItem.fromNote(n);
           (cols[p.status ?? 'no status'] ??= []).add(p);
         }

@@ -23,33 +23,72 @@ String _clock() {
   return '${two(n.hour)}:${two(n.minute)}';
 }
 
-/// A named combination of view, search text and tag filter.
+/// A named combination of view, search text, tag filter and folder scope.
+/// Stored as a `kind-view` note in the Space, so it syncs; the stored format
+/// is documented on [SavedViewSpec] in the core.
 class SavedView {
-  SavedView(this.name, this.view, this.query, this.tag);
+  SavedView(
+    this.name,
+    this.view,
+    this.query,
+    this.tags, {
+    this.folderUid,
+    this.uid = '',
+  });
   final String name;
   final ViewMode view;
   final String query;
-  final String? tag;
 
-  Map<String, Object?> toJson() => {
-    'name': name,
-    'view': view.name,
-    'query': query,
-    'tag': tag,
-  };
+  /// The tags the view filters by (the app filters by one at a time).
+  final List<String> tags;
 
-  static SavedView? fromJson(Object? j) {
+  /// The folder the view is scoped to; null means the whole Space.
+  final String? folderUid;
+
+  /// The uid of the note that stores the view.
+  final String uid;
+
+  String? get tag => tags.isEmpty ? null : tags.first;
+
+  SavedViewSpec toSpec() => SavedViewSpec(
+    uid: uid,
+    name: name,
+    mode: view.name,
+    search: query,
+    tags: tags,
+    folderUid: folderUid,
+  );
+
+  /// The note that stores this view.
+  Note toNote() => toSpec().toNote();
+
+  /// Reads a `kind-view` note; null for any other note.
+  static SavedView? fromNote(Note n) {
+    final s = SavedViewSpec.fromNote(n);
+    if (s == null) return null;
+    return SavedView(
+      s.name,
+      s.mode == 'list' ? ViewMode.list : ViewMode.board,
+      s.search,
+      s.tags,
+      folderUid: s.folderUid,
+      uid: s.uid,
+    );
+  }
+
+  /// Reads a view from the old local-prefs form (name, view, query, tag).
+  static SavedView? fromLegacyJson(Object? j) {
     if (j is! Map) return null;
     final name = j['name'];
-    if (name is! String || name.isEmpty) return null;
+    if (name is! String || name.trim().isEmpty) return null;
     return SavedView(
-      name,
+      name.trim(),
       ViewMode.values.firstWhere(
         (v) => v.name == j['view'],
         orElse: () => ViewMode.board,
       ),
       j['query'] is String ? j['query'] as String : '',
-      j['tag'] is String ? j['tag'] as String : null,
+      [if (j['tag'] is String && (j['tag'] as String).isNotEmpty) j['tag']],
     );
   }
 }
@@ -66,7 +105,6 @@ enum LayoutSide { start, end }
 
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
-    _loadViews();
     final saved = prefs?.read(_sectionKey);
     section = Section.values.firstWhere(
       (v) => v.name == saved,
@@ -198,7 +236,6 @@ class AppState extends ChangeNotifier {
     collapsed.clear();
     scopeUid = null;
     savedViews.clear();
-    _loadViews();
     await load();
   }
 
@@ -299,6 +336,7 @@ class AppState extends ChangeNotifier {
     // Open Planning first so nothing writes to the doomed Space afterwards.
     await switchSpace(SpaceCatalog.planningId);
     prefs?.remove(viewsKey);
+    prefs?.remove('$viewsKey.migrated');
     c.remove(id);
     notifyListeners();
   }
@@ -323,6 +361,7 @@ class AppState extends ChangeNotifier {
         }
       }
       for (final n in list) {
+        if (isViewNote(n)) continue;
         if (n.summary.toLowerCase().contains(needle) ||
             n.description.toLowerCase().contains(needle)) {
           hits.add(SpaceHit(sp, n));
@@ -339,9 +378,12 @@ class AppState extends ChangeNotifier {
     select(h.note.uid);
   }
 
-  /// Where saved views are kept; null means they last only this session.
+  /// Where the old local saved views (and the done-marker of their one-time
+  /// move into notes) are kept.
   final KeyValueStorage? prefs;
   static const _viewsKey = 'davdart.views.v1';
+
+  /// The saved views of the open Space, read from its `kind-view` notes.
   final List<SavedView> savedViews = [];
 
   String get _viewsKeyNow {
@@ -351,23 +393,45 @@ class AppState extends ChangeNotifier {
         : '$_viewsKey.$id';
   }
 
-  void _loadViews() {
-    try {
-      final raw = prefs?.read(_viewsKeyNow);
-      if (raw == null || raw.isEmpty) return;
-      for (final j in jsonDecode(raw) as List<dynamic>) {
-        final v = SavedView.fromJson(j);
-        if (v != null) savedViews.add(v);
+  /// Moves the views of the old prefs key into notes, once per Space, when
+  /// the source is writable. The old key stays until every view is saved,
+  /// then a marker says it is done, so nothing is duplicated (a view whose
+  /// name already exists as a note is skipped, which also covers a retry
+  /// after a partly failed run).
+  Future<void> _migrateViews(EditableNoteSource src) async {
+    final p = prefs;
+    if (p == null) return;
+    final key = _viewsKeyNow;
+    final done = '$key.migrated';
+    if (p.read(done) == '1') return;
+    final raw = p.read(key);
+    final old = <SavedView>[];
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        for (final j in jsonDecode(raw) as List<dynamic>) {
+          final v = SavedView.fromLegacyJson(j);
+          if (v != null) old.add(v);
+        }
+      } catch (_) {
+        // Unreadable old data: nothing to move; mark done below.
       }
-    } catch (_) {
-      savedViews.clear();
     }
+    final have = {for (final v in savedViews) v.name};
+    var stamp = DateTime.now().toUtc().microsecondsSinceEpoch;
+    for (final v in old) {
+      if (!have.add(v.name)) continue;
+      await src.save(
+        SavedView(
+          v.name,
+          v.view,
+          v.query,
+          v.tags,
+          uid: 'davdart-view-${stamp++}',
+        ).toNote(),
+      );
+    }
+    p.write(done, '1');
   }
-
-  void _storeViews() => prefs?.write(
-    _viewsKeyNow,
-    jsonEncode([for (final v in savedViews) v.toJson()]),
-  );
 
   /// Backs the sidebar search box so applying a saved view shows its text.
   final searchController = TextEditingController();
@@ -378,42 +442,121 @@ class AppState extends ChangeNotifier {
     super.dispose();
   }
 
-  bool get hasFilter => query.trim().isNotEmpty || tag != null;
+  bool get hasFilter =>
+      query.trim().isNotEmpty || tag != null || scopeUid != null;
 
-  /// Saves the current view and filters under [name] (replacing a same name).
-  void saveView(String name) {
-    final n = name.trim();
-    if (n.isEmpty) return;
-    savedViews
-      ..removeWhere((v) => v.name == n)
-      ..add(SavedView(n, view, query.trim(), tag));
-    _storeViews();
-    notifyListeners();
+  SavedView _current(String name, {String uid = ''}) => SavedView(
+    name,
+    view,
+    query.trim(),
+    [?tag],
+    folderUid: scopeUid,
+    uid: uid,
+  );
+
+  SavedView? _viewNamed(String name) {
+    for (final v in savedViews) {
+      if (v.name == name) return v;
+    }
+    return null;
   }
 
+  /// Saves the current view, search, tag and folder under [name]; a view
+  /// with that name is updated instead.
+  Future<void> saveView(String name) async {
+    final n = name.trim();
+    if (n.isEmpty || !_canEditViews()) return;
+    final old = _viewNamed(n);
+    if (old != null) return updateView(old);
+    final uid = 'davdart-view-${DateTime.now().toUtc().microsecondsSinceEpoch}';
+    await _save(_current(n, uid: uid).toNote());
+  }
+
+  /// Re-saves the current state into [v] (name unchanged).
+  Future<void> updateView(SavedView v) async {
+    if (!_canEditViews()) return;
+    final note = _viewNotes[v.uid];
+    if (note == null) return;
+    await _save(_current(v.name, uid: v.uid).toSpec().writeTo(note.copyWith()));
+  }
+
+  /// Renames [v]. Returns null when done, else why not.
+  Future<String?> renameView(SavedView v, String name) async {
+    final n = name.trim();
+    if (n.isEmpty) return 'Give the view a name';
+    if (n == v.name) return null;
+    if (_viewNamed(n) != null) return 'A view with that name exists';
+    if (!_canEditViews()) return 'This source is read-only';
+    final note = _viewNotes[v.uid];
+    if (note == null) return 'View not found';
+    final spec = SavedView.fromNote(note)!.toSpec();
+    final renamed = SavedViewSpec(
+      uid: spec.uid,
+      name: n,
+      mode: spec.mode,
+      search: spec.search,
+      tags: spec.tags,
+      folderUid: spec.folderUid,
+    );
+    await _save(renamed.writeTo(note.copyWith()));
+    return error;
+  }
+
+  final Map<String, Note> _viewNotes = {};
+
+  bool _canEditViews() {
+    if (editable) return true;
+    error = 'Save failed: this source is read-only';
+    notifyListeners();
+    return false;
+  }
+
+  /// Shows what [v] saved, including its folder (if it still exists).
   void applyView(SavedView v) {
     view = v.view;
     query = v.query;
     searchController.text = v.query;
-    tag = v.tag != null && notes.any((n) => n.categories.contains(v.tag))
-        ? v.tag
-        : null;
+    tag = v.tags.cast<String?>().firstWhere(
+      (t) => notes.any((n) => n.categories.contains(t)),
+      orElse: () => null,
+    );
     selectedUid = null;
-    scopeUid = null;
+    scopeUid = v.folderUid != null && tree.find(v.folderUid!) != null
+        ? v.folderUid
+        : null;
     notifyListeners();
   }
 
-  void deleteView(String name) {
-    savedViews.removeWhere((v) => v.name == name);
-    _storeViews();
-    notifyListeners();
+  Future<void> deleteView(String name) async {
+    final v = _viewNamed(name);
+    if (v == null || !_canEditViews()) return;
+    await _edit((src) => src.delete(v.uid));
   }
 
   List<Note> notes = [];
   NoteTree tree = NoteTree.build(const []);
 
   void _setNotes(List<Note> loaded) {
-    notes = loaded;
+    // Saved views are notes too, but they are not content: keep them out of
+    // the tree, lists and search.
+    notes = [
+      for (final n in loaded)
+        if (!isViewNote(n)) n,
+    ];
+    _viewNotes
+      ..clear()
+      ..addEntries([
+        for (final n in loaded)
+          if (isViewNote(n)) MapEntry(n.uid, n),
+      ]);
+    savedViews
+      ..clear()
+      ..addAll(
+        [
+          for (final n in loaded)
+            ?SavedView.fromNote(n),
+        ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())),
+      );
     tree = NoteTree.build(notes);
     if (scopeUid != null && tree.find(scopeUid!) == null) scopeUid = null;
   }
@@ -422,7 +565,7 @@ class AppState extends ChangeNotifier {
   /// example instructions for an agent). The `kind-` prefix is hidden from
   /// the tag list, like `status-`.
   static const folderTag = 'kind-folder';
-  static bool isFolder(Note n) => n.categories.contains(folderTag);
+  static bool isFolder(Note n) => isFolderNote(n);
 
   /// The folder whose notes Board and List show; null means the whole Space.
   String? scopeUid;
@@ -563,9 +706,20 @@ class AppState extends ChangeNotifier {
           syncMessage = 'Could not reach the server: $e';
         }
       }
-      final loaded = await src.load();
+      var loaded = await src.load();
       if (src != source) return; // another Space was opened meanwhile
       _setNotes(loaded);
+      if (src is EditableNoteSource) {
+        try {
+          await _migrateViews(src);
+          if (src != source) return;
+          loaded = await src.load();
+          if (src != source) return;
+          _setNotes(loaded);
+        } catch (_) {
+          // The old views stay in prefs; the next load tries again.
+        }
+      }
       if (tag != null && !notes.any((n) => n.categories.contains(tag))) {
         tag = null;
       }
