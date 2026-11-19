@@ -278,7 +278,7 @@ class DetailView extends StatelessWidget {
         ),
       ],
     );
-    // Ctrl/Cmd+S saves an open edit; Escape minimises.
+    // Ctrl/Cmd+S saves an open edit; the shell handles Escape (minimise).
     page = CallbackShortcuts(
       bindings: {
         if (draft != null) ...{
@@ -289,11 +289,8 @@ class DetailView extends StatelessWidget {
             if (draft.dirty) state.saveDraft();
           },
         },
-        if (full)
-          const SingleActivator(LogicalKeyboardKey.escape): () =>
-              state.guarded(state.minimise),
       },
-      child: Focus(autofocus: full, child: page),
+      child: page,
     );
     return page;
   }

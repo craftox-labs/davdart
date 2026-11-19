@@ -187,9 +187,9 @@ class TabItemState extends State<TabItem> {
   }
 
   @override
-  void didUpdateWidget(TabItem old) {
-    super.didUpdateWidget(old);
-    if (widget.active && !old.active) _reveal();
+  void didUpdateWidget(TabItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.active && !oldWidget.active) _reveal();
   }
 
   /// Scrolls the strip so the active tab is in view.

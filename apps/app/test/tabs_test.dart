@@ -93,35 +93,44 @@ void main() {
         find.descendant(of: _k('tab-home'), matching: find.text('Notes')),
         findsOneWidget,
       );
-      s.select('a');
-      s.openFullPage();
+      s.openNoteTab('a');
       await t.pumpAndSettle();
       expect(_k('tab-home'), findsOneWidget);
       expect(_close('tab-home'), findsNothing);
     });
 
-    testWidgets('expand opens a tab, focusing it again does not duplicate', (
+    testWidgets('maximise creates no strip tab; opening a note tab does', (
       t,
     ) async {
       final s = await _pump(t);
       s.select('a');
       await t.pumpAndSettle();
       expect(_k('tab-n:a'), findsNothing);
-      await t.tap(_k('expand-note'));
+      await t.tap(_k('pane-size'));
+      await t.pumpAndSettle();
+      expect(s.maximised, isTrue);
+      expect(s.tabs, isEmpty);
+      await t.tap(_k('pane-size'));
+      await t.pumpAndSettle();
+      expect(s.tabs, isEmpty);
+      s.openNoteTab('a');
+      s.openNoteTab('a');
       await t.pumpAndSettle();
       expect(_k('tab-n:a'), findsOneWidget);
       expect(s.activeTab, const DocTab.note('a'));
-      // Home shows the peek pane again; the tab stays open.
+      expect(s.maximised, isFalse);
+      // Home shows the list again; the tab stays open, note still selected.
       await t.tap(_k('tab-home'));
       await t.pumpAndSettle();
-      expect(s.fullPage, isFalse);
       expect(s.tabs, hasLength(1));
-      expect(_k('detail-pane'), findsOneWidget);
+      expect(s.activeTab, isNull);
       await t.tap(_k('tab-n:a'));
       await t.pumpAndSettle();
-      expect(s.fullPage, isTrue);
-      s.closeFullPage();
-      s.openFullPage();
+      expect(s.activeTab, const DocTab.note('a'));
+      expect(s.selectedUid, 'a');
+      // Maximise and minimise keep the strip tabs unchanged.
+      s.maximise();
+      s.minimise();
       expect(s.tabs, hasLength(1));
     });
 
@@ -129,9 +138,8 @@ void main() {
       t,
     ) async {
       final s = await _pump(t);
-      s.select('a');
-      s.openFullPage();
-      s.select('b');
+      s.openNoteTab('a');
+      s.openNoteTab('b');
       await t.pumpAndSettle();
       expect(s.tabs, [const DocTab.note('a'), const DocTab.note('b')]);
       expect(s.activeTab, const DocTab.note('b'));
@@ -143,21 +151,26 @@ void main() {
       await t.pumpAndSettle();
       expect(s.activeTab, isNull);
       expect(s.tabs, isEmpty);
-      expect(s.fullPage, isFalse);
+      expect(s.maximised, isFalse);
       expect(_k('tab-n:a'), findsNothing);
     });
 
     testWidgets('a dirty tab asks before closing', (t) async {
       final s = await _pump(t);
-      s.select('a');
-      await t.pumpAndSettle();
-      await t.tap(_k('expand-note'));
+      s.openNoteTab('a');
       await t.pumpAndSettle();
       await t.tap(_k('edit-note'));
       await t.pumpAndSettle();
       await t.enterText(_k('edit-title'), 'Changed');
       await t.pump();
-      expect(_k('tab-dirty'), findsOneWidget);
+      expect(
+        find.descendant(of: _k('tab-n:a'), matching: _k('tab-dirty')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: _k('detail-tab'), matching: _k('tab-dirty')),
+        findsOneWidget,
+      );
       await t.tap(_close('tab-n:a'));
       await t.pumpAndSettle();
       expect(_k('leave-discard'), findsOneWidget);
@@ -180,7 +193,7 @@ void main() {
       await t.enterText(_k('new-note-title'), 'Fresh');
       await t.tap(_k('new-note-add'));
       await t.pumpAndSettle();
-      expect(s.fullPage, isTrue);
+      expect(s.maximised, isFalse);
       expect(s.selected?.summary, 'Fresh');
       expect(s.activeTab, DocTab.note(s.selectedUid!));
       expect(s.tabs, hasLength(1));
@@ -213,8 +226,7 @@ void main() {
 
     testWidgets('Ctrl+W closes the active tab', (t) async {
       final s = await _pump(t);
-      s.select('a');
-      s.openFullPage();
+      s.openNoteTab('a');
       await t.pumpAndSettle();
       await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
       await t.sendKeyEvent(LogicalKeyboardKey.keyW);
@@ -226,8 +238,7 @@ void main() {
     testWidgets('many tabs shrink to the minimum and scroll', (t) async {
       final s = await _pump(t, size: const Size(1300, 900));
       for (final u in ['a', 'b', 'f']) {
-        s.select(u);
-        s.openFullPage();
+        s.openNoteTab(u);
       }
       await t.pumpAndSettle();
       expect(t.takeException(), isNull);
@@ -240,9 +251,8 @@ void main() {
       final prefs = MemoryStorage();
       final first = _state(prefs: prefs);
       await first.load();
-      first.select('a');
-      first.openFullPage();
-      first.select('b');
+      first.openNoteTab('a');
+      first.openNoteTab('b');
       expect(first.tabs, hasLength(2));
       final second = _state(prefs: prefs, skip: {'a'});
       await second.load();
@@ -257,13 +267,19 @@ void main() {
       expect(third.tabs, [const DocTab.note('b')]);
     });
 
-    testWidgets('mirrored layout keeps the strip and the full page', (t) async {
+    testWidgets('mirrored layout keeps the strip and the maximised pane', (
+      t,
+    ) async {
       final s = await _pump(t, side: LayoutSide.end);
-      s.select('a');
-      s.openFullPage();
+      s.openNoteTab('a');
       await t.pumpAndSettle();
       expect(_k('tab-strip'), findsOneWidget);
+      s.maximise();
+      await t.pumpAndSettle();
+      expect(_k('tab-strip'), findsNothing);
       expect(_k('full-page'), findsOneWidget);
+      s.minimise();
+      await t.pumpAndSettle();
       final panel = t.getRect(_k('shell-panel'));
       final strip = t.getRect(_k('tab-strip'));
       // The strip is in the header row, over the panel's top edge.
@@ -274,8 +290,7 @@ void main() {
 
     testWidgets('narrow layout has no strip', (t) async {
       final s = await _pump(t, size: const Size(400, 800));
-      s.select('a');
-      s.openFullPage();
+      s.openNoteTab('a');
       await t.pumpAndSettle();
       expect(_k('tab-strip'), findsNothing);
       expect(t.takeException(), isNull);

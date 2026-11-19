@@ -1240,8 +1240,9 @@ class AppState extends ChangeNotifier {
     selectedUid = uid;
     if (uid == null) _fullPage = false;
     final f = _activeViewTab;
-    if (f != null && f.kind == TabKind.note && f.id != uid)
+    if (f != null && f.kind == TabKind.note && f.id != uid) {
       _activeViewTab = null;
+    }
     if (draft != null && draft!.uid != uid) _dropDraft();
     notifyListeners();
   }

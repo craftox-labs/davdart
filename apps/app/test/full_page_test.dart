@@ -62,71 +62,88 @@ Future<List<String>> _titles() async => [
 ];
 
 void main() {
-  group('full page', () {
-    testWidgets('expand opens it, Back returns, selection unchanged', (
+  group('maximised pane', () {
+    testWidgets('Maximise fills the area, Minimise returns, same selection', (
       t,
     ) async {
       final s = await _pump(t);
       expect(_k('detail-pane'), findsOneWidget);
-      await t.tap(_k('expand-note'));
+      await t.tap(_k('pane-size'));
       await _settle(t);
-      expect(s.fullPage, isTrue);
+      expect(s.maximised, isTrue);
       expect(_k('full-page'), findsOneWidget);
       expect(_k('detail-pane'), findsNothing);
       expect(find.text('TODO'), findsNothing);
-      await t.tap(_k('back'));
+      expect(_k('back'), findsNothing);
+      await t.tap(_k('pane-size'));
       await _settle(t);
-      expect(s.fullPage, isFalse);
+      expect(s.maximised, isFalse);
       expect(s.selectedUid, 'a');
       expect(_k('detail-pane'), findsOneWidget);
       expect(find.text('TODO'), findsOneWidget);
     });
 
-    testWidgets('Escape goes back', (t) async {
+    testWidgets('Escape minimises', (t) async {
       final s = await _pump(t);
-      s.openFullPage();
+      s.maximise();
       await _settle(t);
       await t.sendKeyEvent(LogicalKeyboardKey.escape);
       await _settle(t);
-      expect(s.fullPage, isFalse);
+      expect(s.maximised, isFalse);
       expect(s.selectedUid, 'a');
     });
 
-    testWidgets('breadcrumb shows the folder path and the title', (t) async {
+    testWidgets('another selected note shows in the tab while maximised', (
+      t,
+    ) async {
       final s = await _pump(t);
-      s.openFullPage();
+      s.maximise();
       await _settle(t);
-      expect(t.widget<Text>(_k('breadcrumb')).data, 'Plans > Alpha');
+      s.select('b');
+      await _settle(t);
+      expect(s.maximised, isTrue);
+      expect(
+        find.descendant(of: _k('detail-tab'), matching: find.text('Beta')),
+        findsOneWidget,
+      );
     });
 
-    testWidgets('picking another note switches the page', (t) async {
+    testWidgets('closing the tab while maximised returns to the list', (
+      t,
+    ) async {
       final s = await _pump(t);
-      s.openFullPage();
+      s.maximise();
       await _settle(t);
-      await t.tap(find.text('Beta').first);
+      await t.tap(
+        find.descendant(of: _k('detail-tab'), matching: _k('tab-close')),
+      );
       await _settle(t);
-      expect(s.fullPage, isTrue);
-      expect(s.selectedUid, 'b');
-      expect(t.widget<Text>(_k('breadcrumb')).data, 'Beta');
+      expect(s.maximised, isFalse);
+      expect(s.selected, isNull);
+      expect(_k('tab-strip'), findsOneWidget);
     });
 
-    testWidgets('narrow layout has no Expand and no full page', (t) async {
+    testWidgets('narrow layout has no Maximise and no maximised pane', (
+      t,
+    ) async {
       final s = await _pump(t, size: const Size(500, 900));
-      expect(_k('expand-note'), findsNothing);
-      s.openFullPage();
+      expect(_k('pane-size'), findsNothing);
+      s.maximise();
       await _settle(t);
       expect(_k('full-page'), findsNothing);
       expect(find.text('Alpha body'), findsOneWidget);
     });
 
-    testWidgets('mirrored layout keeps the pane and the full page', (t) async {
+    testWidgets('mirrored layout keeps the pane and the maximised pane', (
+      t,
+    ) async {
       final s = await _pump(t, side: LayoutSide.end);
       final pane = t.getTopLeft(_k('detail-pane'));
       expect(pane.dx, lessThan(300));
-      s.openFullPage();
+      s.maximise();
       await _settle(t);
       expect(_k('full-page'), findsOneWidget);
-      await t.tap(_k('back'));
+      await t.tap(_k('pane-size'));
       await _settle(t);
       expect(t.getTopLeft(_k('detail-pane')), pane);
     });
@@ -271,26 +288,26 @@ void main() {
       await _settle(t);
       expect(s.selectedUid, 'b');
       expect(await _titles(), isNot(contains('Changed')));
-      // Save path, from the full page's Back.
+      // Save path, from Minimise.
       await t.tap(_k('edit-note'));
       await _settle(t);
       await _type(t, 'edit-title', 'Beta 2');
-      s.openFullPage();
+      s.maximise();
       await _settle(t);
-      await t.tap(_k('back'));
+      await t.tap(_k('pane-size'));
       await _settle(t);
       await t.tap(_k('leave-save'));
       await _settle(t);
-      expect(s.fullPage, isFalse);
+      expect(s.maximised, isFalse);
       expect(await _titles(), contains('Beta 2'));
     });
 
-    testWidgets('the draft survives expanding', (t) async {
+    testWidgets('the draft survives maximising', (t) async {
       final s = await _pump(t);
       await t.tap(_k('edit-note'));
       await _settle(t);
       await _type(t, 'edit-title', 'Kept');
-      await t.tap(_k('expand-note'));
+      await t.tap(_k('pane-size'));
       await _settle(t);
       expect(s.dirty, isTrue);
       expect(

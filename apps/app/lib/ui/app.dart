@@ -279,12 +279,21 @@ class Shell extends StatelessWidget {
                           LogicalKeyboardKey.keyW,
                           meta: true,
                         ): state.closeActiveTab,
+                        if (maxed)
+                          const SingleActivator(
+                            LogicalKeyboardKey.escape,
+                          ): () =>
+                              state.guarded(state.minimise),
                       },
-                      child: ShellFrame(
-                        state: state,
-                        showRail: true,
-                        header: header,
-                        child: content,
+                      // Focus so the shortcuts work before anything is clicked.
+                      child: Focus(
+                        autofocus: true,
+                        child: ShellFrame(
+                          state: state,
+                          showRail: true,
+                          header: header,
+                          child: content,
+                        ),
                       ),
                     )
                   : ShellFrame(state: state, showRail: false, child: content),
