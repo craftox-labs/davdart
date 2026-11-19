@@ -44,9 +44,15 @@ class Space {
   final DateTime Function()? _now;
   SyncEngine? _engine;
 
+  /// Set by [SpaceBook] so attach and detach are saved to disk.
+  void Function()? onConfigChanged;
+
   SyncEngine get _sync => _engine ??= SyncEngine(_client!, store, now: _now);
 
   bool get isLocalOnly => _client == null;
+
+  /// The Space has a server saved but no login in this session.
+  bool get needsPassword => config.hasServer && _client == null;
 
   SyncEngine get _local => SyncEngine(
         // Local edits never touch the network; a throwaway client is not
@@ -64,7 +70,12 @@ class Space {
   Future<void> delete(String uid) => (_engine ?? _local).delete(uid);
 
   /// Syncs with the attached server. Local-only Spaces have nothing to do.
-  Future<SyncReport?> sync() async => isLocalOnly ? null : _sync.sync();
+  Future<SyncReport?> sync() async {
+    if (needsPassword) {
+      throw StateError('${config.name} has a server but no login yet');
+    }
+    return isLocalOnly ? null : _sync.sync();
+  }
 
   /// Connects this Space to a CalDAV collection. Every note here counts as not
   /// yet on the server, so the first [sync] sends them all and merges with
@@ -87,6 +98,7 @@ class Space {
       }
     }
     await store.setSyncToken(null);
+    onConfigChanged?.call();
   }
 
   /// Disconnects from the server and keeps every note locally.
@@ -97,6 +109,7 @@ class Space {
       ..url = null
       ..user = null;
     await store.setSyncToken(null);
+    onConfigChanged?.call();
   }
 }
 
@@ -134,7 +147,8 @@ class SpaceBook {
     final config = SpaceConfig(id: id, name: name);
     _configs.add(config);
     _save();
-    return Space(config, await FileNoteStore.open('$dir/$id.json'));
+    return Space(config, await FileNoteStore.open('$dir/$id.json'))
+      ..onConfigChanged = _save;
   }
 
   /// Opens a saved Space. Pass [password] to reconnect one that has a server.
@@ -148,11 +162,8 @@ class SpaceBook {
           username: c.user ?? '',
           password: password);
     }
-    return Space(c, store, client: client);
+    return Space(c, store, client: client)..onConfigChanged = _save;
   }
-
-  /// Saves any change made through [Space.attach] or [Space.detach].
-  void saveConfigs() => _save();
 
   /// Removes a Space and its notes from this device. Server content stays.
   Future<void> remove(String id) async {

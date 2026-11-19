@@ -230,11 +230,18 @@ Note _journalFromLines(List<String> lines) {
       case 'RELATED-TO':
         // The first PARENT relation is the note's parent; any other relation
         // (CHILD, SIBLING, further parents) stays as a raw line.
-        final type = RegExp(r'RELTYPE=([A-Za-z-]+)', caseSensitive: false)
+        final type = RegExp(r'RELTYPE="?([A-Za-z-]+)"?', caseSensitive: false)
             .firstMatch(p.params)
             ?.group(1)
             ?.toUpperCase();
-        if (parent == null && (type == null || type == 'PARENT')) {
+        if (parent == null &&
+            p.value.trim().isNotEmpty &&
+            p.params
+                .replaceAll(
+                    RegExp(r'RELTYPE="?[A-Za-z-]+"?', caseSensitive: false), '')
+                .replaceAll(';', '')
+                .isEmpty &&
+            (type == null || type == 'PARENT')) {
           parent = p.value.trim();
         } else {
           extra.add(line);

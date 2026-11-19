@@ -20,6 +20,19 @@ void main() {
     expect(parseNote(out).parentUid, 'p');
   });
 
+  test('quoted and empty RELATED-TO values are not misread as a parent', () {
+    const src = 'BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\nUID:c\r\n'
+        'RELATED-TO;RELTYPE="CHILD":x\r\nRELATED-TO:\r\n'
+        'RELATED-TO;X-FOO=1;RELTYPE=PARENT:p\r\n'
+        'END:VJOURNAL\r\nEND:VCALENDAR\r\n';
+    final note = parseNote(src);
+    expect(note.parentUid, isNull);
+    final out = serializeNote(note);
+    expect(out, contains('RELTYPE="CHILD":x'));
+    expect(out, contains('RELATED-TO:\r\n'));
+    expect(out, contains('X-FOO=1;RELTYPE=PARENT:p'));
+  });
+
   test('builds a tree ordered by creation date', () {
     final t = NoteTree.build([n('b', 'a', 3), n('c', 'a', 2), n('a'), n('d')]);
     expect(t.roots.map((r) => r.note.uid), ['a', 'd']);

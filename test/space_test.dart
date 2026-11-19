@@ -42,10 +42,11 @@ void main() {
     expect(r!.errors, isEmpty);
     expect((await s.notes()).map((n) => n.uid).toSet(), {'l', 'r'});
     expect(server.ics.keys.toSet(), {'l.ics', 'r.ics'});
-    expect((await SpaceBook.open(dir.path)).configs.single.hasServer, isFalse,
-        reason: 'not on disk until the book is told to save');
-    book.saveConfigs();
-    expect((await SpaceBook.open(dir.path)).configs.single.hasServer, isTrue);
+    final reopened = await SpaceBook.open(dir.path);
+    expect(reopened.configs.single.hasServer, isTrue);
+    final back = await reopened.open_(reopened.configs.single.id);
+    expect(back.needsPassword, isTrue);
+    expect(back.sync(), throwsStateError);
   });
 
   test('detaching keeps every note and stops syncing', () async {
@@ -56,6 +57,7 @@ void main() {
     await s.attach(clientFor(server));
     await s.sync();
     await s.detach();
+    expect((await SpaceBook.open(dir.path)).configs.single.hasServer, isFalse);
     expect(s.isLocalOnly, isTrue);
     expect(await s.sync(), isNull);
     expect((await s.notes()).single.uid, 'a');
