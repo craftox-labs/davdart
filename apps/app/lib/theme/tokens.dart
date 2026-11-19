@@ -132,7 +132,7 @@ class RadiusTokens {
     this.control = 8,
     this.card = 8,
     this.panel = 12,
-    this.tab = 8,
+    this.tab = 4,
   });
 
   /// Chips, tree rows.
@@ -184,7 +184,7 @@ class SizeTokens {
     this.detailMin = 320,
     this.detailMax = 720,
     this.listMin = 280,
-    this.topBar = 52,
+    this.topBar = 44,
     this.boardColumn = 264,
     this.statusDot = 8,
     this.spinner = 14,
@@ -204,10 +204,10 @@ class SizeTokens {
     this.pageMax = 860,
     this.editorLines = 10,
     this.editorLinesFull = 26,
-    this.tabStrip = 40,
-    this.tabMin = 96,
-    this.tabMax = 200,
-    this.tabClose = 18,
+    this.tabStrip = 34,
+    this.tabMin = 88,
+    this.tabMax = 180,
+    this.tabClose = 16,
   });
   final double rail, railItem, frameInset, sidebar, detail, topBar;
 

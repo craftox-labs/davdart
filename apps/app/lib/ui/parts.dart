@@ -10,7 +10,11 @@ class IconAction extends StatelessWidget {
     required this.icon,
     required this.tooltip,
     required this.onPress,
+    this.compact = false,
   });
+
+  /// Extra-small button, for dense bars such as the top bar.
+  final bool compact;
   final IconData icon;
   final String tooltip;
   final VoidCallback? onPress;
@@ -20,7 +24,7 @@ class IconAction extends StatelessWidget {
     tipBuilder: (_, _) => Text(tooltip),
     child: FButton.icon(
       variant: FButtonVariant.ghost,
-      size: FButtonSizeVariant.sm,
+      size: compact ? FButtonSizeVariant.xs : FButtonSizeVariant.sm,
       semanticsLabel: tooltip,
       onPress: onPress,
       child: Icon(icon),

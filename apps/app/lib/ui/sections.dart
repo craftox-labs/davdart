@@ -193,7 +193,7 @@ class NotesSection extends _Section {
 
     walk(state.tree.roots, 0);
 
-    final heading = _title(state.currentSpaceName ?? 'davdart');
+    final heading = _title('Files');
 
     return _Panel(
       heading: heading,
@@ -223,6 +223,22 @@ class NotesSection extends _Section {
             )
           : null,
       children: [
+        if (state.currentSpaceName != null)
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              t.space.md,
+              0,
+              t.space.md,
+              t.space.sm,
+            ),
+            child: Text(
+              state.currentSpaceName!,
+              key: const Key('space-name'),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: t.type.bodyStyle.copyWith(color: t.muted),
+            ),
+          ),
         ...tree,
         if (state.tags.isNotEmpty) ...[
           _label(context, 'TAGS'),

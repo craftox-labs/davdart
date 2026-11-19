@@ -392,7 +392,7 @@ class TopBar extends StatelessWidget {
       variant: state.view == mode
           ? FButtonVariant.secondary
           : FButtonVariant.outline,
-      size: FButtonSizeVariant.sm,
+      size: FButtonSizeVariant.xs,
       mainAxisSize: MainAxisSize.min,
       selected: state.view == mode,
       onPress: () => state.setView(mode),
@@ -412,6 +412,7 @@ class TopBar extends StatelessWidget {
             children: [
               if (showMenu)
                 IconAction(
+                  compact: true,
                   key: const Key('menu'),
                   tooltip: 'Menu',
                   icon: FLucideIcons.menu,
@@ -433,12 +434,14 @@ class TopBar extends StatelessWidget {
                 toggle('List', ViewMode.list),
               ] else
                 IconAction(
+                  compact: true,
                   tooltip: board ? 'Show list' : 'Show board',
                   icon: board ? FLucideIcons.list : FLucideIcons.squareKanban,
                   onPress: () =>
                       state.setView(board ? ViewMode.list : ViewMode.board),
                 ),
               IconAction(
+                compact: true,
                 tooltip: 'Reload',
                 icon: FLucideIcons.refreshCw,
                 onPress: state.load,
