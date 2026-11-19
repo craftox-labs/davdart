@@ -11,8 +11,12 @@ import 'package:flutter/painting.dart' show TextStyle;
 //
 // COLOUR: edit the values of [Tokens.light] and [Tokens.dark]. The look is
 //   two-tone: `frame` fills the window, the rail and the margin; `panel` is
-//   the inset, rounded content area; `activeItem` is the third tone (selected
-//   rail icon); `card` and `field` sit on the panel. `barrier`, `destructive`
+//   the inset, rounded content area; `activeItem` fills the selected rail
+//   item (it defaults to the `panel` value so the item reads as a tab opening
+//   into the panel; give it another value for a plain highlight, which is
+//   also what shows while the side panel is collapsed); `card` and `field`
+//   sit on the panel. `tooltipBackground` and `tooltipText` colour every
+//   tooltip (inverted against the theme: dark bubble on light, light on dark). `barrier`, `destructive`
 //   and `error` (with their `on...` colours) feed forui's dialogs and errors.
 //   forui's own `card` colour also fills its text fields and popovers, so it
 //   is fed from [field]; our cards use [card] directly.
@@ -21,10 +25,12 @@ import 'package:flutter/painting.dart' show TextStyle;
 //   gets the family through `buildTheme`.
 // SPACING: [SpaceTokens], one scale (xxs to huge) for every padding, gap and
 //   margin.
-// RADIUS: [RadiusTokens] (small, control, card, panel); forui's own radii and
-//   border width are fed from them.
-// SIZES: [SizeTokens] (rail, inset, sidebar, detail, top bar, dialogs, board
-//   column, status dot, spinner, indents), [IconTokens] (icon sizes) and
+// RADIUS: [RadiusTokens] (small, control, card, panel, tab); forui's own radii
+//   and border width are fed from them. `tab` rounds the active rail tab and
+//   its concave joins into the panel.
+// SIZES: [SizeTokens] (rail, inset, sidebar with its min and max drag width,
+//   resize handle, detail, top bar, dialogs, board column, status dot,
+//   spinner, indents), [IconTokens] (icon sizes) and
 //   [BorderTokens] (border widths).
 // Layout breakpoints are the static constants at the end of [Tokens].
 
@@ -126,6 +132,7 @@ class RadiusTokens {
     this.control = 8,
     this.card = 8,
     this.panel = 12,
+    this.tab = 8,
   });
 
   /// Chips, tree rows.
@@ -139,6 +146,9 @@ class RadiusTokens {
 
   /// The inset content panel.
   final double panel;
+
+  /// The active rail tab and the concave corners joining it to the panel.
+  final double tab;
 }
 
 /// Border widths.
@@ -166,6 +176,10 @@ class SizeTokens {
     this.railItem = 36,
     this.frameInset = 6,
     this.sidebar = 280,
+    this.sidebarMin = 200,
+    this.sidebarMax = 520,
+    this.resizeHit = 8,
+    this.resizeLine = 2,
     this.detail = 440,
     this.topBar = 52,
     this.boardColumn = 264,
@@ -186,6 +200,15 @@ class SizeTokens {
     this.narrowBar = 440,
   });
   final double rail, railItem, frameInset, sidebar, detail, topBar;
+
+  /// Smallest and largest width the side panel can be dragged to; [sidebar]
+  /// is its default (and the width a double-click on the handle restores).
+  final double sidebarMin, sidebarMax;
+
+  /// Grab width of the drag handle on the side panel edge, and the width of
+  /// the line it shows on hover.
+  final double resizeHit, resizeLine;
+
   final double boardColumn, statusDot, spinner, statusField, metaLabel;
   final double chevronBox, listChevronBox, listMarker;
   final double treeIndent, listIndent;
@@ -223,6 +246,8 @@ class Tokens {
     required this.onDestructive,
     required this.error,
     required this.onError,
+    required this.tooltipBackground,
+    required this.tooltipText,
     this.type = const TypeTokens(),
     this.space = const SpaceTokens(),
     this.radii = const RadiusTokens(),
@@ -243,7 +268,9 @@ class Tokens {
   /// Thin separators inside the panel (top bar, list rows, detail edge).
   final Color divider;
 
-  /// Highlight of the active rail icon (a rounded square).
+  /// Fill of the active rail item: the tab that opens into the panel (same
+  /// value as [panel] by default), or a plain rounded highlight while the side
+  /// panel is collapsed.
   final Color activeItem;
 
   /// Icon colour on [activeItem].
@@ -295,6 +322,10 @@ class Tokens {
   final Color error;
   final Color onError;
 
+  /// Tooltip bubble and its text (inverted against the theme).
+  final Color tooltipBackground;
+  final Color tooltipText;
+
   final TypeTokens type;
   final SpaceTokens space;
   final RadiusTokens radii;
@@ -339,6 +370,8 @@ class Tokens {
     onDestructive: onDestructive,
     error: error,
     onError: onError,
+    tooltipBackground: tooltipBackground,
+    tooltipText: tooltipText,
     type: type ?? this.type,
     space: space ?? this.space,
     radii: radii ?? this.radii,
@@ -353,7 +386,7 @@ class Tokens {
     panel: Color(0xFFFFFFFF),
     panelBorder: Color(0xFFD9D9D9),
     divider: Color(0xFFE8E8E8),
-    activeItem: Color(0xFFD6D6D6),
+    activeItem: Color(0xFFFFFFFF),
     onActiveItem: Color(0xFF111111),
     rail: Color(0xFF666666),
     card: Color(0xFFF6F6F6),
@@ -373,6 +406,8 @@ class Tokens {
     onDestructive: Color(0xFFFAFAFA),
     error: Color(0xFFE7000B),
     onError: Color(0xFFFAFAFA),
+    tooltipBackground: Color(0xFF1B1B1B),
+    tooltipText: Color(0xFFF2F2F2),
   );
 
   static const dark = Tokens(
@@ -380,7 +415,7 @@ class Tokens {
     panel: Color(0xFF1A1A1A),
     panelBorder: Color(0xFF2C2C2C),
     divider: Color(0xFF2A2A2A),
-    activeItem: Color(0xFF303030),
+    activeItem: Color(0xFF1A1A1A),
     onActiveItem: Color(0xFFF2F2F2),
     rail: Color(0xFF8C8C8C),
     card: Color(0xFF222222),
@@ -400,6 +435,8 @@ class Tokens {
     onDestructive: Color(0xFFFAFAFA),
     error: Color(0xFFFF6467),
     onError: Color(0xFFFAFAFA),
+    tooltipBackground: Color(0xFFE6E6E6),
+    tooltipText: Color(0xFF1A1A1A),
   );
 
   /// Width at which the sidebar stays on screen instead of a drawer.

@@ -80,6 +80,11 @@ FThemeData buildTheme(Brightness b, {required bool touch, Tokens? tokens}) {
         typography: typography,
         touch: touch,
       ).copyWith(borderRadius: _radius(t), borderWidth: t.borders.hairline),
+    ).copyWith(
+      tooltipStyle: FTooltipStyleDelta.delta(
+        decoration: DecorationDelta.shapeDelta(color: t.tooltipBackground),
+        textStyle: TextStyleDelta.delta(color: t.tooltipText),
+      ),
     );
   }
 
