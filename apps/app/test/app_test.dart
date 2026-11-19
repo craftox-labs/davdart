@@ -14,12 +14,15 @@ import 'package:davdart_app/ui/list_view.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/semantics.dart';
 import 'package:forui/forui.dart';
 import 'package:davdart_app/ui/logo.dart';
 import 'package:davdart_app/ui/parts.dart';
+import 'package:davdart_app/ui/shell_frame.dart';
 import 'package:davdart_app/ui/sidebar.dart';
+import 'package:davdart_app/ui/theme.dart';
 import 'package:davdart_app/theme/tokens.dart';
 
 class FakeSource implements NoteSource {
@@ -977,18 +980,25 @@ void main() {
     ) async {
       final state = await multi(t, const Size(1400, 900));
       expect(state.section, Section.notes);
-      BoxDecoration deco(String key) =>
-          (t
-                  .widget<Container>(
-                    find.descendant(
-                      of: find.byKey(Key(key)),
-                      matching: find.byType(Container),
-                    ),
-                  )
-                  .decoration!
-              as BoxDecoration);
-      expect(deco('rail-notes').color, Tokens.light.activeItem);
-      expect(deco('rail-views').color, isNull);
+      // The active item is a tab painted in the activeItem token.
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('rail-notes')),
+          matching: find.byKey(const Key('rail-tab')),
+        ),
+        findsOneWidget,
+      );
+      final painter =
+          t.widget<CustomPaint>(find.byKey(const Key('rail-tab'))).painter!
+              as RailTabPainter;
+      expect(painter.fill, Tokens.light.activeItem);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('rail-views')),
+          matching: find.byKey(const Key('rail-tab')),
+        ),
+        findsNothing,
+      );
       await t.tap(find.byKey(const Key('rail-views')));
       await t.pumpAndSettle();
       expect(find.text('No saved views yet'), findsOneWidget);
@@ -998,6 +1008,180 @@ void main() {
       await t.tap(find.byKey(const Key('rail-notes')));
       await t.pumpAndSettle();
       expect(find.text('Core slice'), findsWidgets);
+    });
+
+    testWidgets('the open section collapses the panel and reopens', (t) async {
+      final state = await multi(t, const Size(1400, 900));
+      final prefs = state.prefs!;
+      expect(find.byType(Sidebar), findsOneWidget);
+      await t.tap(find.byKey(const Key('rail-notes')));
+      await t.pumpAndSettle();
+      expect(state.sidebarCollapsed, isTrue);
+      expect(find.byType(Sidebar), findsNothing);
+      expect(AppState(FakeSource(sample), prefs: prefs).sidebarCollapsed, true);
+      // The content takes the freed width.
+      expect(
+        t.getSize(find.byType(TopBar)).width,
+        t.getSize(find.byKey(const Key('shell-panel'))).width,
+      );
+      // Another icon while collapsed reopens that section.
+      await t.tap(find.byKey(const Key('rail-views')));
+      await t.pumpAndSettle();
+      expect(state.sidebarCollapsed, isFalse);
+      expect(state.section, Section.views);
+      expect(find.byType(Sidebar), findsOneWidget);
+      // The same icon again collapses; pressing it once more reopens it.
+      await t.tap(find.byKey(const Key('rail-views')));
+      await t.pumpAndSettle();
+      expect(find.byType(Sidebar), findsNothing);
+      await t.tap(find.byKey(const Key('rail-views')));
+      await t.pumpAndSettle();
+      expect(state.section, Section.views);
+      expect(find.byType(Sidebar), findsOneWidget);
+      expect(
+        AppState(FakeSource(sample), prefs: prefs).sidebarCollapsed,
+        false,
+      );
+    });
+
+    testWidgets('collapsed: the active icon is a plain highlight', (t) async {
+      final state = await multi(t, const Size(1400, 900));
+      await t.tap(find.byKey(const Key('rail-notes')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('rail-tab')), findsNothing);
+      final box =
+          t
+                  .widget<Container>(
+                    find.descendant(
+                      of: find.byKey(const Key('rail-notes')),
+                      matching: find.byType(Container),
+                    ),
+                  )
+                  .decoration!
+              as BoxDecoration;
+      expect(box.color, Tokens.light.activeItem);
+      expect(state.section, Section.notes);
+    });
+
+    testWidgets('the narrow sheet ignores the collapsed state', (t) async {
+      final state = await multi(t, const Size(500, 900));
+      state.setSidebarCollapsed(true);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('menu')));
+      await t.pumpAndSettle();
+      expect(find.byType(Sidebar), findsOneWidget);
+    });
+
+    testWidgets('dragging the edge resizes within limits and persists', (
+      t,
+    ) async {
+      final state = await multi(t, const Size(1400, 900));
+      final z = Tokens.light.sizes;
+      double width() => t.getSize(find.byType(DockedSidebar)).width;
+      final handle = find.byKey(const Key('sidebar-handle'));
+      expect(width(), z.sidebar);
+      await t.drag(handle, const Offset(100, 0));
+      await t.pumpAndSettle();
+      expect(width(), z.sidebar + 100);
+      expect(
+        AppState(FakeSource(sample), prefs: state.prefs).sidebarWidth,
+        z.sidebar + 100,
+      );
+      await t.drag(handle, const Offset(-900, 0));
+      await t.pumpAndSettle();
+      expect(width(), z.sidebarMin);
+      await t.drag(handle, const Offset(900, 0));
+      await t.pumpAndSettle();
+      expect(width(), z.sidebarMax);
+      // Double-click restores the default and forgets the saved width.
+      await t.tap(handle);
+      await t.pump(kDoubleTapMinTime);
+      await t.tap(handle);
+      await t.pumpAndSettle();
+      expect(width(), z.sidebar);
+      expect(
+        AppState(FakeSource(sample), prefs: state.prefs).sidebarWidth,
+        isNull,
+      );
+    });
+
+    testWidgets('a saved width outside the limits is clamped', (t) async {
+      final storage = MemoryStorage();
+      storage.write('davdart.sidebar.width.v1', '9999');
+      t.view.physicalSize = const Size(1400, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(
+        DavdartApp(state: AppState(FakeSource(sample), prefs: storage)),
+      );
+      await t.pumpAndSettle();
+      expect(
+        t.getSize(find.byType(DockedSidebar)).width,
+        Tokens.light.sizes.sidebarMax,
+      );
+    });
+
+    testWidgets('the active tab sits flush against the panel', (t) async {
+      await multi(t, const Size(1400, 900));
+      final tab = find.byKey(const Key('rail-tab'));
+      final p = t.widget<CustomPaint>(tab).painter! as RailTabPainter;
+      final box = t.getRect(tab);
+      final panel = t.getRect(find.byKey(const Key('shell-panel')));
+      final body = p.body(box.size).shift(box.topLeft);
+      // Its right edge ends at the panel's inner edge (over the border) and
+      // it is as tall as the item, so the panel border is covered there.
+      expect(body.right, panel.left + Tokens.light.borders.hairline);
+      expect(body.top, box.top);
+      expect(body.height, Tokens.light.sizes.railItem);
+      expect(p.fill, Tokens.light.panel);
+      expect(p.radius, Tokens.light.radii.tab);
+      // The tab spans the rail margin: item right + margin == panel left.
+      expect(box.right + p.margin, panel.left);
+    });
+
+    testWidgets('rail tooltips open to the right, centred on the icon', (
+      t,
+    ) async {
+      await multi(t, const Size(1400, 900));
+      final mouse = await t.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      await mouse.moveTo(t.getCenter(find.byKey(const Key('rail-settings'))));
+      await t.pump(const Duration(seconds: 1));
+      await t.pumpAndSettle();
+      final tip = find.text('Settings');
+      expect(tip, findsOneWidget);
+      final icon = t.getRect(find.byKey(const Key('rail-settings')));
+      final text = t.getRect(tip);
+      expect(text.left, greaterThan(icon.right));
+      expect(text.center.dy, closeTo(icon.center.dy, 1));
+      // Colours come from the tooltip tokens.
+      final tk = Tokens.light;
+      expect(DefaultTextStyle.of(t.element(tip)).style.color, tk.tooltipText);
+      final style = FTheme.of(t.element(tip)).tooltipStyle;
+      expect((style.decoration as ShapeDecoration).color, tk.tooltipBackground);
+    });
+
+    test('tooltip colours are inverted per theme and fed from tokens', () {
+      for (final b in Brightness.values) {
+        final tk = b == Brightness.dark ? Tokens.dark : Tokens.light;
+        final style = buildTheme(b, touch: false).tooltipStyle;
+        expect(
+          (style.decoration as ShapeDecoration).color,
+          tk.tooltipBackground,
+        );
+        expect(style.textStyle.color, tk.tooltipText);
+      }
+      expect(Tokens.light.tooltipBackground, isNot(Tokens.light.panel));
+      expect(Tokens.dark.tooltipBackground, isNot(Tokens.dark.panel));
+      expect(
+        Tokens.light.tooltipBackground.computeLuminance(),
+        lessThan(Tokens.light.panel.computeLuminance()),
+      );
+      expect(
+        Tokens.dark.tooltipBackground.computeLuminance(),
+        greaterThan(Tokens.dark.panel.computeLuminance()),
+      );
     });
 
     testWidgets('the section persists in prefs', (t) async {
