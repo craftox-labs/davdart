@@ -57,6 +57,31 @@ void main() {
       expect(s.tag, isNull);
     });
 
+    test('edits go through a local Space', () async {
+      final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+      final s = AppState(SpaceNoteSource(space, seed: FakeSource(sample)));
+      await s.load();
+      expect(s.editable, isTrue);
+      expect(s.notes, hasLength(3));
+      await s.setStatus('b', 'doing');
+      final b = (await space.notes()).firstWhere((n) => n.uid == 'b');
+      expect(PlanItem.fromNote(b).status, 'doing');
+      expect(b.categories, contains('status-doing'));
+      expect(b.categories, isNot(contains('status-backlog')));
+      await s.setStatus('c', 'todo');
+      expect(PlanItem.fromNote(s.tree.find('c')!.note).status, 'todo');
+      await s.addNote('  New idea ', parentUid: 'a', status: 'backlog');
+      expect(s.notes, hasLength(4));
+      expect(s.selected!.summary, 'New idea');
+      expect(s.selected!.parentUid, 'a');
+      expect(PlanItem.fromNote(s.selected!).status, 'backlog');
+      await s.addNote('   ');
+      expect(s.notes, hasLength(4));
+      // reload keeps the edits and does not re-seed
+      await s.load();
+      expect(s.notes, hasLength(4));
+    });
+
     test('keeps the error when loading fails', () async {
       final s = AppState(_Failing());
       await s.load();

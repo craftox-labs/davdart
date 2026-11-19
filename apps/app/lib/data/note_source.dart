@@ -53,3 +53,33 @@ List<Note> parseNotesJson(String body) {
   }
   return out;
 }
+
+/// A source the app can also write to.
+abstract class EditableNoteSource implements NoteSource {
+  Future<Note> save(Note note);
+}
+
+/// Notes held in a local [Space]. Edits go through the Space (and so the sync
+/// engine), never to the network. When the Space is empty and a [seed] source
+/// is given, its notes are copied in once.
+class SpaceNoteSource implements EditableNoteSource {
+  SpaceNoteSource(this.space, {this.seed});
+
+  final Space space;
+  final NoteSource? seed;
+
+  @override
+  Future<List<Note>> load() async {
+    var notes = await space.notes();
+    if (notes.isEmpty && seed != null) {
+      for (final n in await seed!.load()) {
+        await space.save(n);
+      }
+      notes = await space.notes();
+    }
+    return notes;
+  }
+
+  @override
+  Future<Note> save(Note note) => space.save(note);
+}

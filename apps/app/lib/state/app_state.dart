@@ -40,6 +40,61 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get editable => source is EditableNoteSource;
+
+  Future<void> _save(Note n) async {
+    final src = source;
+    if (src is! EditableNoteSource) {
+      throw StateError('This source is read-only');
+    }
+    try {
+      await src.save(n);
+      error = null;
+    } catch (e) {
+      error = 'Save failed: $e';
+      notifyListeners();
+      return;
+    }
+    notes = await source.load();
+    tree = NoteTree.build(notes);
+    notifyListeners();
+  }
+
+  /// Moves a note to another status (keeps the header and status tag in step).
+  Future<void> setStatus(String uid, String status) async {
+    final n = tree.find(uid)?.note;
+    if (n == null) return;
+    final copy = n.copyWith();
+    final p = PlanItem.fromNote(copy)..setStatus(status);
+    if (p.fields.isEmpty) p.setField('status', status);
+    await _save(p.apply());
+  }
+
+  /// Adds a note (a child of [parentUid] if given) and selects it.
+  Future<void> addNote(
+    String title, {
+    String? parentUid,
+    String? status,
+  }) async {
+    final t = title.trim();
+    if (t.isEmpty) return;
+    final now = DateTime.now().toUtc();
+    final n = Note(
+      uid: 'davdart-${now.microsecondsSinceEpoch}',
+      summary: t,
+      parentUid: parentUid,
+      created: now,
+      lastModified: now,
+    );
+    if (status != null) {
+      final p = PlanItem.fromNote(n)..setStatus(status);
+      p.setField('status', status);
+      p.apply();
+    }
+    await _save(n);
+    if (error == null) select(n.uid);
+  }
+
   Note? get selected =>
       selectedUid == null ? null : tree.find(selectedUid!)?.note;
 

@@ -55,6 +55,27 @@ class DetailView extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                if (state.editable) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text('Status', style: TextStyle(color: t.muted)),
+                      const SizedBox(width: 12),
+                      DropdownButton<String>(
+                        key: const Key('status-menu'),
+                        value: boardOrder.contains(p.status) ? p.status : null,
+                        hint: const Text('none'),
+                        items: [
+                          for (final s in boardOrder)
+                            DropdownMenuItem(value: s, child: Text(s)),
+                        ],
+                        onChanged: (v) {
+                          if (v != null) state.setStatus(note.uid, v);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
                 const SizedBox(height: 12),
                 if (p.fields.isNotEmpty)
                   Container(
