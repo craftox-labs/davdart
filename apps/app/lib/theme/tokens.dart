@@ -435,8 +435,8 @@ class Tokens {
     onDestructive: Color(0xFFFAFAFA),
     error: Color(0xFFFF6467),
     onError: Color(0xFFFAFAFA),
-    tooltipBackground: Color(0xFFE6E6E6),
-    tooltipText: Color(0xFF1A1A1A),
+    tooltipBackground: Color(0xFF2B2B2B),
+    tooltipText: Color(0xFFECECEC),
   );
 
   /// Width at which the sidebar stays on screen instead of a drawer.
