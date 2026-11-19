@@ -73,4 +73,23 @@ void main() {
     await book.remove(book.configs.single.id);
     expect(book.configs, isEmpty);
   });
+
+  test('connectExisting saves the server in the config and keeps notes clean',
+      () async {
+    final server = FakeCalDav();
+    final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+    var saved = 0;
+    space.onConfigChanged = () => saved++;
+    await space.save(Note(uid: 'x', summary: 'x'));
+    await space.attach(clientFor(server));
+    await space.sync();
+    await space.detach();
+    expect(space.config.hasServer, isFalse);
+    space.connectExisting(clientFor(server));
+    expect(space.config.hasServer, isTrue);
+    expect(saved, greaterThanOrEqualTo(3));
+    final r = await space.sync();
+    expect(r!.pushed, 0);
+    expect(server.ics, hasLength(1));
+  });
 }

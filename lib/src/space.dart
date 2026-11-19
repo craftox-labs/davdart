@@ -99,10 +99,15 @@ class Space {
   }
 
   /// Uses [client] for a server this Space is already attached to (for example
-  /// after an app restart), without marking any note as unsynced.
+  /// after an app restart or a reconnect to the same collection), without
+  /// marking any note as unsynced. The server is saved in the config again.
   void connectExisting(CalDavClient client) {
     _client = client;
     _engine = null;
+    config
+      ..url = client.collection.toString()
+      ..user = client.username;
+    onConfigChanged?.call();
   }
 
   /// Disconnects from the server and keeps every note locally.
