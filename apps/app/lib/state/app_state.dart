@@ -70,7 +70,8 @@ class AppState extends ChangeNotifier {
       orElse: () => Section.notes,
     );
     sidebarCollapsed = prefs?.read(_collapsedKey) == 'true';
-    sidebarWidth = double.tryParse(prefs?.read(_widthKey) ?? '');
+    final w = double.tryParse(prefs?.read(_widthKey) ?? '');
+    sidebarWidth = (w == null || !w.isFinite) ? null : w;
   }
 
   static const _sectionKey = 'davdart.section.v1';
@@ -328,6 +329,12 @@ class AppState extends ChangeNotifier {
 
   /// Backs the sidebar search box so applying a saved view shows its text.
   final searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
 
   bool get hasFilter => query.trim().isNotEmpty || tag != null;
 

@@ -63,9 +63,12 @@ class NoteListView extends StatelessWidget {
                 SizedBox(
                   width: t.sizes.listChevronBox,
                   child: kids && !filtering
-                      ? GestureDetector(
+                      ? FTappable(
+                          semanticsLabel: state.collapsed.contains(n.uid)
+                              ? 'Expand'
+                              : 'Collapse',
                           behavior: HitTestBehavior.opaque,
-                          onTap: () => state.toggle(n.uid),
+                          onPress: () => state.toggle(n.uid),
                           child: Icon(
                             state.collapsed.contains(n.uid)
                                 ? FLucideIcons.chevronRight
