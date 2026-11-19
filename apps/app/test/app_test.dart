@@ -282,6 +282,40 @@ void main() {
       },
     );
 
+    test(
+      'reconnecting does not resurrect notes deleted on the server',
+      () async {
+        final server = FakeCalDav();
+        final storage = MemoryStorage();
+        final s = AppState(
+          SpaceNoteSource(
+            Space(
+              SpaceConfig(id: 's', name: 'S'),
+              PersistentNoteStore(storage),
+            ),
+            seed: FakeSource(sample),
+            flags: storage,
+            davBase: Uri.parse('https://fake.test/dav/'),
+            httpClient: server.client,
+          ),
+        );
+        await s.load();
+        await s.connect('c/', 'tm', 'pw');
+        expect(server.ics, hasLength(3));
+        await s.disconnect();
+        // offline: server loses a note, we edit another
+        server.externalDelete(
+          server.ics.entries.firstWhere((e) => e.value.contains('UID:c')).key,
+        );
+        await s.setStatus('b', 'done');
+        await s.connect('c/', 'tm', 'pw');
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(s.notes.map((n) => n.uid).toSet(), {'a', 'b'});
+        expect(server.ics, hasLength(2));
+        expect(server.ics.values.any((v) => v.contains('status-done')), isTrue);
+      },
+    );
+
     test('connect with replaceLocal takes the server copy only', () async {
       final server = FakeCalDav();
       server.external(

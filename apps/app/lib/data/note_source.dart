@@ -107,6 +107,7 @@ class SpaceNoteSource implements EditableNoteSource {
 
   static const _seededKey = 'davdart.seeded.v1';
   static const _loginKey = 'davdart.server.v1';
+  static const _lastServerKey = 'davdart.lastserver.v1';
 
   bool get connected => _login != null;
 
@@ -141,7 +142,18 @@ class SpaceNoteSource implements EditableNoteSource {
       }
       _markSeeded();
     }
-    await space.attach(client);
+    // Reconnecting to the collection this Space last synced with keeps the
+    // sync bases, so notes deleted on the server meanwhile are removed here
+    // instead of being sent back, and edits made while offline merge normally.
+    final same =
+        !replaceLocal &&
+        flags?.read(_lastServerKey) == client.collection.toString();
+    if (same) {
+      space.connectExisting(client);
+    } else {
+      await space.attach(client);
+    }
+    flags?.write(_lastServerKey, client.collection.toString());
     _login = (path, user);
     flags?.write(
       _loginKey,
