@@ -3,16 +3,38 @@ import 'dart:math';
 
 import 'package:davdart/davdart.dart';
 
-/// Minimal CLI. Config from env: DAVDART_URL (collection), DAVDART_USER,
-/// DAVDART_PASSWORD. Commands: list, add TITLE [BODY], rm UID.
-Future<void> main(List<String> args) async {
+/// Minimal CLI. Config: a key=value file (url, user, password) or DAVDART_*
+/// environment variables, which win. Commands: list, add TITLE [BODY], rm UID.
+Map<String, String> _loadConfig() {
   final env = Platform.environment;
-  final url = env['DAVDART_URL'];
-  final user = env['DAVDART_USER'];
-  final pass = env['DAVDART_PASSWORD'];
+  final cfg = <String, String>{};
+  final file = File(
+      env['DAVDART_CONFIG'] ?? '${env['HOME']}/.config/davdart/credentials');
+  if (file.existsSync()) {
+    for (final line in file.readAsLinesSync()) {
+      final i = line.indexOf('=');
+      if (i > 0 && !line.trimLeft().startsWith('#')) {
+        cfg[line.substring(0, i).trim()] = line.substring(i + 1).trim();
+      }
+    }
+  }
+  for (final k in ['url', 'user', 'password']) {
+    final v = env['DAVDART_${k.toUpperCase()}'];
+    if (v != null && v.isNotEmpty) cfg[k] = v;
+  }
+  return cfg;
+}
+
+Future<void> main(List<String> args) async {
+  final cfg = _loadConfig();
+  final url = cfg['url'];
+  final user = cfg['user'];
+  final pass = cfg['password'];
   if (args.isEmpty || url == null || user == null || pass == null) {
-    stderr.writeln('usage: davdart list | add <title> [body] | rm <uid>\n'
-        'env: DAVDART_URL DAVDART_USER DAVDART_PASSWORD');
+    stderr
+        .writeln('usage: davdart list | show TEXT | add TITLE [BODY] | rm UID\n'
+            'config: url, user, password in ~/.config/davdart/credentials '
+            '(key=value lines) or DAVDART_URL, DAVDART_USER, DAVDART_PASSWORD');
     exit(2);
   }
   final c =
@@ -22,6 +44,21 @@ Future<void> main(List<String> args) async {
       case 'list':
         for (final n in await c.listNotes()) {
           stdout.writeln('${n.uid}\t${n.categories.join(",")}\t${n.summary}');
+        }
+      case 'show':
+        if (args.length < 2) {
+          stderr.writeln('show needs a uid or title text');
+          exit(2);
+        }
+        final q = args[1].toLowerCase();
+        final hits = (await c.listNotes()).where(
+            (n) => n.uid == args[1] || n.summary.toLowerCase().contains(q));
+        for (final n in hits) {
+          stdout.writeln('# ${n.summary}');
+          stdout.writeln('uid: ${n.uid}');
+          stdout.writeln('categories: ${n.categories.join(", ")}');
+          if (n.status != null) stdout.writeln('status: ${n.status}');
+          stdout.writeln('\n${n.description}\n');
         }
       case 'add':
         if (args.length < 2) {
