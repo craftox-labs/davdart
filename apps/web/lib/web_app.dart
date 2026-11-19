@@ -67,6 +67,7 @@ Response _html(String body, [int status = 200]) =>
 
 String _board(List<Note> notes, String? tag) {
   final items = notes
+      .where((n) => !isStructuralNote(n)) // folders and saved views
       .map(PlanItem.fromNote)
       .where((p) => tag == null || p.tags.contains(tag))
       .toList();
@@ -82,7 +83,7 @@ String _board(List<Note> notes, String? tag) {
   final allTags = {for (final n in notes) ...n.categories}.toList()..sort();
   final filter = StringBuffer('<nav class="tags">'
       '<a href="./"${tag == null ? ' class="on"' : ''}>all</a>');
-  for (final t in allTags.where((t) => !t.startsWith('status-'))) {
+  for (final t in allTags.where((t) => !t.startsWith('status-') && !t.startsWith('kind-'))) {
     filter.write(
         '<a href="./?tag=${Uri.encodeQueryComponent(t)}"${t == tag ? ' class="on"' : ''}>${_esc.convert(t)}</a>');
   }

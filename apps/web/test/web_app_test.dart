@@ -13,6 +13,11 @@ void main() {
         description: 'item_id: x-1\nstatus: todo\nowner: tm\n\nBody & text',
         categories: ['davdart', 'status-todo']),
     Note(uid: 'n', summary: 'Plain note', description: 'just text'),
+    Note(
+        uid: 'v',
+        summary: 'Hidden view',
+        description: 'mode: list',
+        categories: ['kind-view']),
   ];
   final h = buildHandler(() async => notes);
   Future<Response> get(String p) async =>
@@ -27,6 +32,12 @@ void main() {
     expect(body, contains('Item &lt;one&gt;'));
     expect(body, isNot(contains('Item <one>')));
     expect(body, contains('notes'));
+  });
+
+  test('saved views and folders are not board items or tags', () async {
+    final body = await (await get('')).readAsString();
+    expect(body, isNot(contains('Hidden view')));
+    expect(body, isNot(contains('kind-view')));
   });
 
   test('tag filter narrows the board', () async {
@@ -49,7 +60,7 @@ void main() {
     expect(r.statusCode, 200);
     expect(r.headers['content-type'], contains('application/json'));
     final list = jsonDecode(await r.readAsString()) as List<dynamic>;
-    expect(list, hasLength(2));
+    expect(list, hasLength(3)); // the feed keeps view notes; clients hide them
     final first = list.first as Map<String, dynamic>;
     expect(first['uid'], 'a b');
     expect(first['body'], contains('item_id: x-1'));
