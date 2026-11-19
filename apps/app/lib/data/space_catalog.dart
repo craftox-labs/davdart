@@ -161,6 +161,10 @@ class SpaceCatalog {
   /// collection the user has that is not here yet. Returns how many were
   /// added. Throws, changing nothing, if the server refuses.
   Future<int> signIn(String user, String password) async {
+    final cur = account;
+    if (cur != null && cur.user != user) {
+      throw StateError('Sign out of ${cur.user} first');
+    }
     final found = await _discover(user, password);
     account = Account(user, password);
     storage.write(
@@ -194,6 +198,7 @@ class SpaceCatalog {
     var added = 0;
     for (final f in found) {
       final id = 'srv-${Uri.encodeComponent(f.path)}';
+      _deleted.remove(id); // a Space removed earlier may come back
       if (spaces.any((s) => s.collection == f.path)) continue;
       final old = spaces.indexWhere((s) => s.id == id);
       if (old >= 0) {
@@ -213,9 +218,10 @@ class SpaceCatalog {
   Future<SpaceInfo> addOnServer(String name) async {
     final a = account;
     if (a == null) throw StateError('Not signed in');
+    final shown = _unique(name);
     final url = await CalDavClient.createCollection(
       _davBase.resolve('${Uri.encodeComponent(a.user)}/'),
-      name.trim(),
+      shown,
       username: a.user,
       password: a.password,
       client: httpClient,
@@ -223,9 +229,10 @@ class SpaceCatalog {
     final path = davPath(_davBase, url);
     final info = SpaceInfo(
       'srv-${Uri.encodeComponent(path)}',
-      _unique(name),
+      shown,
       collection: path,
     );
+    _deleted.remove(info.id);
     spaces.add(info);
     _save();
     return info;
@@ -237,7 +244,13 @@ class SpaceCatalog {
     storage.write(_accountKey, '');
     for (var i = 0; i < spaces.length; i++) {
       final s = spaces[i];
-      if (s.collection != null) spaces[i] = SpaceInfo(s.id, s.name);
+      if (s.collection == null) continue;
+      spaces[i] = SpaceInfo(s.id, s.name);
+      // It is a plain local copy now: forget the sync bases, so signing in
+      // again merges by note id and never replays local deletes to the server.
+      final own = PrefixedStorage(storage, 'sp.${s.id}.');
+      own.write(SpaceNoteSource.lastServerKey, '');
+      own.write(SpaceNoteSource.loginKey, '');
     }
     _save();
   }
@@ -248,7 +261,7 @@ class SpaceCatalog {
     final i = spaces.indexWhere((s) => s.id == id);
     if (i < 0 || n.isEmpty) return false;
     if (spaces.any((s) => s.id != id && s.name == n)) return false;
-    spaces[i] = SpaceInfo(id, n);
+    spaces[i] = SpaceInfo(id, n, collection: spaces[i].collection);
     _save();
     return true;
   }

@@ -97,7 +97,7 @@ class SpaceNoteSource implements EditableNoteSource {
     this.account,
     this.pendingPath,
   }) : davBase = davBase ?? Uri.base.resolve('/dav/') {
-    final saved = flags?.read(_loginKey);
+    final saved = flags?.read(loginKey);
     if (saved != null && saved.isNotEmpty) {
       try {
         final j = jsonDecode(saved) as Map<String, dynamic>;
@@ -110,7 +110,7 @@ class SpaceNoteSource implements EditableNoteSource {
         _login = (j['path'] as String, user);
         space.connectExisting(_clientFor(j['path'] as String, user, pw));
       } catch (_) {
-        flags?.write(_loginKey, '');
+        flags?.write(loginKey, '');
       }
     }
   }
@@ -134,8 +134,8 @@ class SpaceNoteSource implements EditableNoteSource {
   (String, String)? _login;
 
   static const _seededKey = 'davdart.seeded.v1';
-  static const _loginKey = 'davdart.server.v1';
-  static const _lastServerKey = 'davdart.lastserver.v1';
+  static const loginKey = 'davdart.server.v1';
+  static const lastServerKey = 'davdart.lastserver.v1';
 
   bool get connected => _login != null;
 
@@ -197,16 +197,16 @@ class SpaceNoteSource implements EditableNoteSource {
     // instead of being sent back, and edits made while offline merge normally.
     final same =
         !replaceLocal &&
-        flags?.read(_lastServerKey) == client.collection.toString();
+        flags?.read(lastServerKey) == client.collection.toString();
     if (same) {
       space.connectExisting(client);
     } else {
       await space.attach(client);
     }
-    flags?.write(_lastServerKey, client.collection.toString());
+    flags?.write(lastServerKey, client.collection.toString());
     _login = (path, user);
     flags?.write(
-      _loginKey,
+      loginKey,
       jsonEncode(
         viaAccount
             ? {'path': path, 'user': user, 'account': true}
@@ -218,7 +218,7 @@ class SpaceNoteSource implements EditableNoteSource {
   Future<void> disconnect() async {
     await space.detach();
     _login = null;
-    flags?.write(_loginKey, '');
+    flags?.write(loginKey, '');
   }
 
   Future<SyncReport?> sync() => space.sync();

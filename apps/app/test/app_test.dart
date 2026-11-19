@@ -563,6 +563,14 @@ void main() {
       expect(server.log.where((e) => e.startsWith('DELETE')), isEmpty);
       await s.refreshSpaces();
       expect(s.spaces.map((e) => e.name), contains('Work'));
+      // A re-added Space persists again (its writes were not left blocked).
+      await s.switchSpace(s.spaces.firstWhere((e) => e.name == 'Work').id);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(storage.keys.any((k) => k.startsWith('sp.${work.id}.')), isTrue);
+      // Renaming keeps it on the server.
+      expect(s.renameSpace('Work 2'), isTrue);
+      expect(s.currentOnServer, isTrue);
+      expect(s.renameSpace('Work'), isTrue);
       // Restart: still signed in, the space reconnects without asking again.
       final c2 = SpaceCatalog(
         storage,
@@ -575,6 +583,11 @@ void main() {
       expect(s.accountUser, isNull);
       expect(s.spaces.every((e) => !e.onServer), isTrue);
       expect(SpaceCatalog(storage).account, isNull);
+      // Another user cannot replace the account while one is signed in.
+      await s.signIn('tm', 'pw');
+      await s.signIn('other', 'pw');
+      expect(s.syncMessage, startsWith('Could not sign in'));
+      expect(s.accountUser, 'tm');
     });
 
     testWidgets('detail lists earlier versions kept by a merge', (t) async {

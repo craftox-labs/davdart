@@ -126,6 +126,15 @@ class AppState extends ChangeNotifier {
       syncMessage = n == 0
           ? 'Signed in; no new collections'
           : 'Signed in; added $n space${n == 1 ? '' : 's'}';
+      // The open Space may just have been linked to the server.
+      final src = source;
+      if (src is SpaceNoteSource &&
+          c.currentInfo.onServer &&
+          src.account == null) {
+        source = c.sourceFor(c.current);
+        notifyListeners();
+        await load();
+      }
     } catch (e) {
       syncMessage = 'Could not sign in: $e';
     }
