@@ -319,6 +319,65 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Moves note [uid] and everything under it to Space [targetId], at its
+  /// top level. The notes are copied into the other Space first and removed
+  /// here only after that worked, so a failure leaves a duplicate, never a
+  /// loss. The copies get new ids; earlier versions stay behind. A server
+  /// Space syncs the new notes the next time it is opened. Returns how many
+  /// notes moved, or null with [error] set.
+  Future<int?> moveToSpace(String uid, String targetId) async {
+    final c = catalog;
+    final src = source;
+    final node = tree.find(uid);
+    if (c == null || node == null || src is! EditableNoteSource) return null;
+    if (targetId == c.current || !c.spaces.any((s) => s.id == targetId)) {
+      return null;
+    }
+    final target = c.sourceFor(targetId);
+    final group = [node.note, ...tree.descendants(uid)];
+    final stamp = DateTime.now().toUtc().microsecondsSinceEpoch;
+    final fresh = {
+      for (var i = 0; i < group.length; i++) group[i].uid: 'davdart-$stamp-$i',
+    };
+    try {
+      for (final n in group) {
+        await target.save(
+          Note(
+            uid: fresh[n.uid]!,
+            summary: n.summary,
+            description: n.description,
+            categories: List.of(n.categories),
+            status: n.status,
+            parentUid: n.uid == uid ? null : fresh[n.parentUid],
+            created: n.created,
+            lastModified: DateTime.now().toUtc(),
+            extraLines: List.of(n.extraLines),
+          ),
+        );
+      }
+      for (final n in group.reversed) {
+        await src.delete(n.uid);
+      }
+      if (src != source) return group.length;
+      final loaded = await src.load();
+      if (src != source) return group.length;
+      _setNotes(loaded);
+      if (selectedUid != null && tree.find(selectedUid!) == null) {
+        selectedUid = null;
+      }
+      error = null;
+      notifyListeners();
+      if (connected) sync();
+      return group.length;
+    } catch (e) {
+      if (src == source) {
+        error = 'Move failed: $e';
+        notifyListeners();
+      }
+      return null;
+    }
+  }
+
   /// Adds a folder (a container note), optionally with text, and opens it.
   Future<void> addFolder(
     String title, {

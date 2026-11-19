@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../state/app_state.dart';
 import 'markdown_lite.dart';
 import 'edit_note_dialog.dart';
+import 'move_space_dialog.dart';
 
 /// Shown above Board and List while a folder is open: where you are, the
 /// folder's text, and a way back to the whole Space.
@@ -64,6 +65,14 @@ class ScopeBar extends StatelessWidget {
             ),
           ),
           if (state.editable) ...[
+            if (state.spaces.length > 1)
+              IconButton(
+                key: const Key('scope-move'),
+                tooltip: 'Move folder to another space',
+                visualDensity: VisualDensity.compact,
+                icon: const Icon(Icons.drive_file_move_outlined, size: 18),
+                onPressed: () => showMoveSpaceDialog(context, state, folder),
+              ),
             IconButton(
               key: const Key('scope-edit'),
               tooltip: 'Edit folder',

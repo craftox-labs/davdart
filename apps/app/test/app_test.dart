@@ -709,6 +709,39 @@ void main() {
       },
     );
 
+    test('move a folder and its notes to another space', () async {
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(storage);
+      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      await s.load();
+      await s.addFolder('Deploy', text: 'agents: be careful');
+      final folder = s.scope!;
+      await s.addNote('Ship', parentUid: folder.uid, status: 'doing');
+      final ship = s.notes.firstWhere((n) => n.summary == 'Ship');
+      await s.addNote('Check', parentUid: ship.uid, status: 'todo');
+      await s.createSpace('Other');
+      final otherId = s.currentSpaceId!;
+      await s.switchSpace('planning');
+      expect(s.notes, hasLength(3));
+      expect(await s.moveToSpace(folder.uid, 'planning'), isNull);
+      expect(await s.moveToSpace(folder.uid, otherId), 3);
+      expect(s.notes, isEmpty);
+      await s.switchSpace(otherId);
+      expect(s.notes.map((n) => n.summary).toSet(), {
+        'Deploy',
+        'Ship',
+        'Check',
+      });
+      final d = s.notes.firstWhere((n) => n.summary == 'Deploy');
+      expect(AppState.isFolder(d), isTrue);
+      expect(d.description, 'agents: be careful');
+      expect(s.tree.roots.single.note.uid, d.uid);
+      final sh = s.notes.firstWhere((n) => n.summary == 'Ship');
+      expect(s.tree.find(sh.uid)!.parent!.note.uid, d.uid);
+      expect(PlanItem.fromNote(sh).status, 'doing');
+      expect(s.tree.find(sh.uid)!.children.single.note.summary, 'Check');
+    });
+
     testWidgets('new folder dialog, scope bar and the sidebar tree', (t) async {
       t.view.physicalSize = const Size(1400, 900);
       t.view.devicePixelRatio = 1;

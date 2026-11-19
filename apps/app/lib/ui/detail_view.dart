@@ -5,6 +5,7 @@ import '../state/app_state.dart';
 import 'chips.dart';
 import 'edit_note_dialog.dart';
 import 'markdown_lite.dart';
+import 'move_space_dialog.dart';
 
 class DetailView extends StatelessWidget {
   const DetailView({super.key, required this.state, required this.onClose});
@@ -41,6 +42,13 @@ class DetailView extends StatelessWidget {
                 ),
               ),
               if (state.editable) ...[
+                if (state.spaces.length > 1)
+                  IconButton(
+                    key: const Key('move-note'),
+                    tooltip: 'Move to another space',
+                    icon: const Icon(Icons.drive_file_move_outlined),
+                    onPressed: () => showMoveSpaceDialog(context, state, note),
+                  ),
                 IconButton(
                   key: const Key('edit-note'),
                   tooltip: 'Edit',
