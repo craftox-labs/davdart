@@ -75,9 +75,10 @@ class Sidebar extends StatelessWidget {
                   SizedBox(
                     width: 20,
                     child: kids
-                        ? GestureDetector(
+                        ? FTappable(
+                            semanticsLabel: open ? 'Collapse' : 'Expand',
                             behavior: HitTestBehavior.opaque,
-                            onTap: () => state.toggle(n.note.uid),
+                            onPress: () => state.toggle(n.note.uid),
                             child: Icon(
                               open
                                   ? FLucideIcons.chevronDown
@@ -116,6 +117,41 @@ class Sidebar extends StatelessWidget {
     }
 
     walk(state.tree.roots, 0);
+
+    final tagBlock = <Widget>[
+      if (state.tags.isNotEmpty) ...[
+        const SizedBox(height: 12),
+        Text(
+          'TAGS',
+          style: TextStyle(
+            fontSize: 11,
+            letterSpacing: .8,
+            color: t.muted,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: [
+            for (final tag in state.tags)
+              FTappable(
+                key: Key('tag-$tag'),
+                semanticsLabel: 'Tag $tag',
+                onPress: () => state.setTag(tag),
+                child: FBadge(
+                  variant: state.tag == tag
+                      ? FBadgeVariant.secondary
+                      : FBadgeVariant.outline,
+                  child: Text(tag),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 12),
+      ],
+    ];
 
     Widget spaceMenu() => FPopoverMenu(
       menuAnchor: Alignment.topLeft,
@@ -198,42 +234,6 @@ class Sidebar extends StatelessWidget {
           ],
         ),
       ),
-      footer: state.tags.isEmpty
-          ? null
-          : Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'TAGS',
-                    style: TextStyle(
-                      fontSize: 11,
-                      letterSpacing: .8,
-                      color: t.muted,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      for (final tag in state.tags)
-                        GestureDetector(
-                          onTap: () => state.setTag(tag),
-                          child: FBadge(
-                            variant: state.tag == tag
-                                ? FBadgeVariant.secondary
-                                : FBadgeVariant.outline,
-                            child: Text(tag),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -370,7 +370,7 @@ class Sidebar extends StatelessWidget {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: tree,
+              children: [...tree, ...tagBlock],
             ),
           ),
         ],

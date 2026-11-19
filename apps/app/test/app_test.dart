@@ -15,8 +15,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/semantics.dart';
 import 'package:forui/forui.dart';
 import 'package:davdart_app/ui/parts.dart';
+import 'package:davdart_app/ui/sidebar.dart';
 
 class FakeSource implements NoteSource {
   FakeSource(this.notes);
@@ -1002,6 +1004,58 @@ void main() {
       await t.tap(byAction('Close'));
       await t.pumpAndSettle();
       expect(find.text('BACKLOG'), findsOneWidget);
+    });
+  });
+
+  group('sidebar fixes', () {
+    testWidgets('tags scroll with the list and activate by keyboard', (
+      t,
+    ) async {
+      final sem = t.ensureSemantics();
+      await pump(t, size: const Size(1400, 420));
+      expect(t.takeException(), isNull);
+      final tag = find.byKey(const Key('tag-planning'));
+      await t.scrollUntilVisible(
+        tag,
+        100,
+        scrollable: find.descendant(
+          of: find.descendant(
+            of: find.byType(Sidebar),
+            matching: find.byType(ListView),
+          ),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(tag, findsOneWidget);
+      final node = t.getSemantics(tag);
+      expect(node.label, contains('Tag planning'));
+      expect(node.flagsCollection.isButton, isTrue);
+      expect(node.getSemanticsData().hasAction(SemanticsAction.focus), isTrue);
+      expect(find.text('Save this view'), findsNothing);
+      await t.tap(tag);
+      await t.pumpAndSettle();
+      expect(find.text('Save this view'), findsOneWidget);
+      sem.dispose();
+    });
+
+    testWidgets('chevron toggles and is a labelled button', (t) async {
+      final sem = t.ensureSemantics();
+      await pump(t);
+      expect(find.bySemanticsLabel('Collapse'), findsWidgets);
+      await t.tap(find.bySemanticsLabel('Collapse').first);
+      await t.pumpAndSettle();
+      expect(find.bySemanticsLabel('Expand'), findsWidgets);
+      sem.dispose();
+    });
+
+    testWidgets('sheet closes when the window grows wide', (t) async {
+      await pump(t, size: const Size(420, 800));
+      await t.tap(byAction('Menu'));
+      await t.pumpAndSettle();
+      expect(find.text('NOTES'), findsOneWidget);
+      t.view.physicalSize = const Size(1400, 900);
+      await t.pumpAndSettle();
+      expect(find.byType(Sidebar), findsOneWidget); // docked only
     });
   });
 
