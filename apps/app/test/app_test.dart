@@ -1,4 +1,7 @@
 import 'package:davdart/davdart.dart';
+
+import '../../../test/support/fake_caldav.dart';
+
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/data/persistent_store.dart';
@@ -6,6 +9,8 @@ import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:davdart_app/ui/list_view.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:material_ui/material_ui.dart';
 
 class FakeSource implements NoteSource {
@@ -202,6 +207,68 @@ void main() {
       final again = open();
       await again.load();
       expect(again.notes, isEmpty);
+    });
+
+    test(
+      'connect, sync, edit syncs, restart keeps the login, disconnect',
+      () async {
+        final server = FakeCalDav();
+        final storage = MemoryStorage();
+        SpaceNoteSource open() => SpaceNoteSource(
+          Space(SpaceConfig(id: 's', name: 'S'), PersistentNoteStore(storage)),
+          seed: FakeSource(sample),
+          flags: storage,
+          davBase: Uri.parse('https://fake.test/dav/'),
+          httpClient: server.client,
+        );
+        final s = AppState(open());
+        await s.load();
+        expect(s.connected, isFalse);
+        await s.connect('c/', 'tm', 'pw');
+        expect(s.connected, isTrue);
+        expect(s.syncMessage, startsWith('Synced'));
+        expect(server.ics, hasLength(3));
+        await s.setStatus('b', 'doing');
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(
+          server.ics.values.any((v) => v.contains('status-doing')),
+          isTrue,
+        );
+        // another device adds a note; sync pulls it
+        server.external(
+          'z.ics',
+          'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//t//EN\r\n'
+              'BEGIN:VJOURNAL\r\nUID:z\r\nDTSTAMP:20261119T000000Z\r\n'
+              'SUMMARY:From elsewhere\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n',
+        );
+        await s.sync();
+        expect(s.notes.map((n) => n.uid), contains('z'));
+        // restart: login survives, no re-seed, nothing re-marked dirty
+        final r = AppState(open());
+        await r.load();
+        expect(r.connected, isTrue);
+        expect(r.notes, hasLength(4));
+        await r.disconnect();
+        expect(r.connected, isFalse);
+        expect(r.notes, hasLength(4));
+      },
+    );
+
+    test('a refused login changes nothing', () async {
+      final storage = MemoryStorage();
+      final src = SpaceNoteSource(
+        Space(SpaceConfig(id: 's', name: 'S'), PersistentNoteStore(storage)),
+        seed: FakeSource(sample),
+        flags: storage,
+        davBase: Uri.parse('https://fake.test/dav/'),
+        httpClient: MockClient((r) async => http.Response('no', 401)),
+      );
+      final s = AppState(src);
+      await s.load();
+      await s.connect('c/', 'tm', 'bad');
+      expect(s.connected, isFalse);
+      expect(s.syncMessage, startsWith('Could not connect'));
+      expect(s.notes, hasLength(3));
     });
 
     testWidgets('edit dialog changes the title', (t) async {

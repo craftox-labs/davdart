@@ -98,6 +98,13 @@ class Space {
     onConfigChanged?.call();
   }
 
+  /// Uses [client] for a server this Space is already attached to (for example
+  /// after an app restart), without marking any note as unsynced.
+  void connectExisting(CalDavClient client) {
+    _client = client;
+    _engine = null;
+  }
+
   /// Disconnects from the server and keeps every note locally.
   Future<void> detach() async {
     _client = null;

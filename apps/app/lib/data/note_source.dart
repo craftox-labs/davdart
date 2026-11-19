@@ -63,18 +63,85 @@ abstract class EditableNoteSource implements NoteSource {
 }
 
 /// Notes held in a local [Space]. Edits go through the Space (and so the sync
-/// engine), never to the network. The first time the Space is empty and a
-/// [seed] source is given, its notes are copied in once; [flags] remembers that
-/// across restarts so deleting every note does not bring the seed back.
+/// engine), never to the network, until a server is connected. The first time
+/// the Space is empty and a [seed] source is given, its notes are copied in
+/// once; [flags] remembers that (and the server login) across restarts, so
+/// deleting every note does not bring the seed back.
 class SpaceNoteSource implements EditableNoteSource {
-  SpaceNoteSource(this.space, {this.seed, this.flags});
+  SpaceNoteSource(
+    this.space, {
+    this.seed,
+    this.flags,
+    Uri? davBase,
+    this.httpClient,
+  }) : davBase = davBase ?? Uri.base.resolve('/dav/') {
+    final saved = flags?.read(_loginKey);
+    if (saved != null && saved.isNotEmpty) {
+      try {
+        final j = jsonDecode(saved) as Map<String, dynamic>;
+        _login = (j['path'] as String, j['user'] as String);
+        space.connectExisting(
+          _clientFor(
+            j['path'] as String,
+            j['user'] as String,
+            j['password'] as String,
+          ),
+        );
+      } catch (_) {
+        flags?.write(_loginKey, '');
+      }
+    }
+  }
 
   final Space space;
   final NoteSource? seed;
   final KeyValueStorage? flags;
+
+  /// For tests: the HTTP client the server connection uses.
+  final http.Client? httpClient;
+
+  /// Where the board server's `/dav/` proxy lives (same origin as the app).
+  final Uri davBase;
   bool _seeded = false;
+  (String, String)? _login;
 
   static const _seededKey = 'davdart.seeded.v1';
+  static const _loginKey = 'davdart.server.v1';
+
+  bool get connected => _login != null;
+
+  /// The server collection path and user, when connected.
+  String? get serverLabel =>
+      _login == null ? null : '${_login!.$2} @ ${_login!.$1}';
+
+  CalDavClient _clientFor(String path, String user, String password) =>
+      CalDavClient(
+        collection: davBase.resolve(path.replaceFirst(RegExp('^/+'), '')),
+        username: user,
+        password: password,
+        client: httpClient,
+      );
+
+  /// Checks the login against the server, then attaches this Space to it.
+  /// Throws (and changes nothing) if the server refuses.
+  Future<void> connect(String path, String user, String password) async {
+    final client = _clientFor(path, user, password);
+    await client.listNotes();
+    await space.attach(client);
+    _login = (path, user);
+    flags?.write(
+      _loginKey,
+      jsonEncode({'path': path, 'user': user, 'password': password}),
+    );
+  }
+
+  Future<void> disconnect() async {
+    await space.detach();
+    _login = null;
+    flags?.write(_loginKey, '');
+  }
+
+  Future<SyncReport?> sync() => space.sync();
 
   bool get _wasSeeded => _seeded || flags?.read(_seededKey) == '1';
 

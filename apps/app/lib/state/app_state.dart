@@ -7,6 +7,12 @@ enum ViewMode { board, list }
 
 const boardOrder = ['backlog', 'todo', 'doing', 'blocked', 'done'];
 
+String _clock() {
+  final n = DateTime.now();
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(n.hour)}:${two(n.minute)}';
+}
+
 class AppState extends ChangeNotifier {
   AppState(this.source);
 
@@ -38,9 +44,72 @@ class AppState extends ChangeNotifier {
     }
     loading = false;
     notifyListeners();
+    if (error == null && connected) sync();
   }
 
   bool get editable => source is EditableNoteSource;
+
+  /// Sync state for the sidebar: null when there is no server.
+  bool syncing = false;
+  String? syncMessage;
+
+  SpaceNoteSource? get _space {
+    final s = source;
+    return s is SpaceNoteSource ? s : null;
+  }
+
+  bool get canConnect => _space != null;
+  bool get connected => _space?.connected ?? false;
+  String? get serverLabel => _space?.serverLabel;
+
+  Future<void> connect(String path, String user, String password) async {
+    final s = _space;
+    if (s == null) return;
+    syncing = true;
+    syncMessage = 'Connecting…';
+    notifyListeners();
+    try {
+      await s.connect(path.trim(), user.trim(), password);
+    } catch (e) {
+      syncing = false;
+      syncMessage = 'Could not connect: $e';
+      notifyListeners();
+      return;
+    }
+    syncing = false;
+    await sync();
+  }
+
+  Future<void> disconnect() async {
+    await _space?.disconnect();
+    syncMessage = null;
+    notifyListeners();
+  }
+
+  /// Syncs with the server (if connected), then reloads.
+  Future<void> sync() async {
+    final s = _space;
+    if (s == null || !s.connected || syncing) return;
+    syncing = true;
+    syncMessage = 'Syncing…';
+    notifyListeners();
+    try {
+      final r = await s.sync();
+      syncMessage = r == null
+          ? null
+          : r.errors.isNotEmpty
+          ? 'Sync problem: ${r.errors.first}'
+          : r.conflicts.isNotEmpty
+          ? 'Synced; ${r.conflicts.length} overlapping edit(s) resolved, older text kept in history'
+          : 'Synced ${_clock()}';
+      notes = await source.load();
+      tree = NoteTree.build(notes);
+    } catch (e) {
+      syncMessage = 'Sync failed: $e';
+    }
+    syncing = false;
+    notifyListeners();
+  }
 
   Future<void> _save(Note n) => _edit((src) => src.save(n));
 
@@ -58,6 +127,7 @@ class AppState extends ChangeNotifier {
       error = 'Save failed: $e';
     }
     notifyListeners();
+    if (error == null && connected) sync();
   }
 
   /// Moves a note to another status (keeps the header and status tag in step).
