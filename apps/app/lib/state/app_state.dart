@@ -49,14 +49,12 @@ class AppState extends ChangeNotifier {
     }
     try {
       await src.save(n);
+      notes = await source.load();
+      tree = NoteTree.build(notes);
       error = null;
     } catch (e) {
       error = 'Save failed: $e';
-      notifyListeners();
-      return;
     }
-    notes = await source.load();
-    tree = NoteTree.build(notes);
     notifyListeners();
   }
 
@@ -66,7 +64,6 @@ class AppState extends ChangeNotifier {
     if (n == null) return;
     final copy = n.copyWith();
     final p = PlanItem.fromNote(copy)..setStatus(status);
-    if (p.fields.isEmpty) p.setField('status', status);
     await _save(p.apply());
   }
 
@@ -88,7 +85,6 @@ class AppState extends ChangeNotifier {
     );
     if (status != null) {
       final p = PlanItem.fromNote(n)..setStatus(status);
-      p.setField('status', status);
       p.apply();
     }
     await _save(n);
