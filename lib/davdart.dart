@@ -1,0 +1,7 @@
+/// UI-free core for notes and tasks over CalDAV, stored as VJOURNAL.
+library;
+
+export 'src/caldav.dart';
+export 'src/ical.dart'
+    show ICalException, parseNote, parseNotes, serializeNote, serializeNotes;
+export 'src/note.dart';
