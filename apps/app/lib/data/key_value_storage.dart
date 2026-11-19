@@ -3,6 +3,10 @@
 abstract class KeyValueStorage {
   String? read(String key);
   void write(String key, String value);
+  void remove(String key);
+
+  /// Every key currently stored.
+  Iterable<String> get keys;
 }
 
 class MemoryStorage implements KeyValueStorage {
@@ -11,4 +15,8 @@ class MemoryStorage implements KeyValueStorage {
   String? read(String key) => data[key];
   @override
   void write(String key, String value) => data[key] = value;
+  @override
+  void remove(String key) => data.remove(key);
+  @override
+  Iterable<String> get keys => data.keys.toList();
 }

@@ -91,6 +91,28 @@ class AppState extends ChangeNotifier {
     await switchSpace(c.add(name).id);
   }
 
+  /// Renames the open Space. False when the name is blank or taken.
+  bool renameSpace(String name) {
+    final c = catalog;
+    if (c == null) return false;
+    final ok = c.rename(c.current, name);
+    if (ok) notifyListeners();
+    return ok;
+  }
+
+  /// Deletes the open Space (never Planning) and opens Planning.
+  Future<void> deleteSpace() async {
+    final c = catalog;
+    if (c == null || c.current == SpaceCatalog.planningId) return;
+    final id = c.current;
+    final viewsKey = _viewsKeyNow;
+    // Open Planning first so nothing writes to the doomed Space afterwards.
+    await switchSpace(SpaceCatalog.planningId);
+    prefs?.remove(viewsKey);
+    c.remove(id);
+    notifyListeners();
+  }
+
   /// Where saved views are kept; null means they last only this session.
   final KeyValueStorage? prefs;
   static const _viewsKey = 'davdart.views.v1';

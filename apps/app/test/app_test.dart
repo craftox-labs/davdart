@@ -180,6 +180,33 @@ void main() {
       },
     );
 
+    test('rename a space; delete removes its data, never Planning', () async {
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
+      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      await s.load();
+      await s.createSpace('Inbox');
+      await s.addNote('doomed');
+      s.setQuery('x');
+      s.saveView('v');
+      final id = s.currentSpaceId!;
+      expect(s.renameSpace('  '), isFalse);
+      expect(s.renameSpace('Planning'), isFalse);
+      expect(s.renameSpace('Scratch'), isTrue);
+      expect(s.currentSpaceName, 'Scratch');
+      expect(SpaceCatalog(storage).spaces.last.name, 'Scratch');
+      expect(storage.keys.any((k) => k.startsWith('sp.$id.')), isTrue);
+      await s.deleteSpace();
+      expect(s.currentSpaceId, 'planning');
+      expect(s.notes, hasLength(3));
+      expect(s.spaces.map((e) => e.id), ['planning']);
+      expect(storage.keys.where((k) => k.contains(id)), isEmpty);
+      await s.deleteSpace(); // Planning: ignored
+      expect(s.spaces, hasLength(1));
+      expect(s.renameSpace('Work'), isTrue);
+      expect(s.currentSpaceName, 'Work');
+    });
+
     test(
       'a slow load from a space left behind does not overwrite the new one',
       () async {
@@ -520,6 +547,45 @@ void main() {
       await t.pumpAndSettle();
       expect(find.text('Inbox'), findsWidgets);
       expect(find.text('No notes'), findsWidgets);
+    });
+
+    testWidgets('space menu renames and deletes', (t) async {
+      t.view.physicalSize = const Size(1400, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
+      final state = AppState(
+        c.sourceFor(c.current),
+        prefs: storage,
+        catalog: c,
+      );
+      await t.pumpWidget(DavdartApp(state: state));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('space-menu')));
+      await t.pumpAndSettle();
+      expect(find.text('Delete this space…'), findsNothing);
+      await t.tap(find.text('New space…'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('space-name')), 'Inbox');
+      await t.tap(find.byKey(const Key('space-create')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('space-menu')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Rename this space…'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('space-rename-name')), 'Later');
+      await t.tap(find.byKey(const Key('space-rename')));
+      await t.pumpAndSettle();
+      expect(state.currentSpaceName, 'Later');
+      await t.tap(find.byKey(const Key('space-menu')));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Delete this space…'));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('space-delete')));
+      await t.pumpAndSettle();
+      expect(state.currentSpaceName, 'Planning');
+      expect(state.spaces, hasLength(1));
     });
 
     testWidgets('search narrows the list', (t) async {

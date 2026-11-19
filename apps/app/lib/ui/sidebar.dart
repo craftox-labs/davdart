@@ -6,6 +6,7 @@ import '../theme/tokens.dart';
 import 'markdown_lite.dart';
 import 'connect_dialog.dart';
 import 'new_note_dialog.dart';
+import '../data/space_catalog.dart';
 import 'new_space_dialog.dart';
 import 'save_view_dialog.dart';
 
@@ -120,6 +121,12 @@ class Sidebar extends StatelessWidget {
                       if (v == '\u0000new') {
                         _close(context);
                         showNewSpaceDialog(context, state);
+                      } else if (v == '\u0000rename') {
+                        _close(context);
+                        showRenameSpaceDialog(context, state);
+                      } else if (v == '\u0000delete') {
+                        _close(context);
+                        showDeleteSpaceDialog(context, state);
                       } else {
                         state.switchSpace(v);
                         _close(context);
@@ -143,6 +150,15 @@ class Sidebar extends StatelessWidget {
                         value: '\u0000new',
                         child: Text('New space…'),
                       ),
+                      const PopupMenuItem(
+                        value: '\u0000rename',
+                        child: Text('Rename this space…'),
+                      ),
+                      if (state.currentSpaceId != SpaceCatalog.planningId)
+                        const PopupMenuItem(
+                          value: '\u0000delete',
+                          child: Text('Delete this space…'),
+                        ),
                     ],
                     child: Row(
                       children: [

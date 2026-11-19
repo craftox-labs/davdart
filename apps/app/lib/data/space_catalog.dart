@@ -22,6 +22,13 @@ class PrefixedStorage implements KeyValueStorage {
   String? read(String key) => inner.read('$prefix$key');
   @override
   void write(String key, String value) => inner.write('$prefix$key', value);
+  @override
+  void remove(String key) => inner.remove('$prefix$key');
+  @override
+  Iterable<String> get keys => [
+    for (final k in inner.keys)
+      if (k.startsWith(prefix)) k.substring(prefix.length),
+  ];
 }
 
 /// The Spaces on this device and which one is open. The first, `planning`,
@@ -95,6 +102,31 @@ class SpaceCatalog {
     spaces.add(info);
     _save();
     return info;
+  }
+
+  /// Renames Space [id]; blank or already-used names are refused (false).
+  bool rename(String id, String name) {
+    final n = name.trim();
+    final i = spaces.indexWhere((s) => s.id == id);
+    if (i < 0 || n.isEmpty) return false;
+    if (spaces.any((s) => s.id != id && s.name == n)) return false;
+    spaces[i] = SpaceInfo(id, n);
+    _save();
+    return true;
+  }
+
+  /// Deletes a local Space and everything stored for it. The Planning Space
+  /// cannot be deleted. If it was open, Planning opens instead.
+  bool remove(String id) {
+    if (id == planningId || !spaces.any((s) => s.id == id)) return false;
+    final scoped = PrefixedStorage(storage, 'sp.$id.');
+    for (final k in scoped.keys.toList()) {
+      scoped.remove(k);
+    }
+    spaces.removeWhere((s) => s.id == id);
+    if (current == id) current = planningId;
+    _save();
+    return true;
   }
 
   void select(String id) {
