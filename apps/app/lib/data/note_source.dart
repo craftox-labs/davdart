@@ -67,6 +67,13 @@ abstract class EditableNoteSource implements NoteSource {
 /// the Space is empty and a [seed] source is given, its notes are copied in
 /// once; [flags] remembers that (and the server login) across restarts, so
 /// deleting every note does not bring the seed back.
+/// A collection offered in the Connect dialog.
+class FoundCollection {
+  const FoundCollection(this.name, this.path);
+  final String name;
+  final String path;
+}
+
 class SpaceNoteSource implements EditableNoteSource {
   SpaceNoteSource(
     this.space, {
@@ -122,6 +129,27 @@ class SpaceNoteSource implements EditableNoteSource {
         password: password,
         client: httpClient,
       );
+
+  /// Collections the login can see, by name, as paths [connect] accepts.
+  Future<List<FoundCollection>> discover(String user, String password) async {
+    final found = await CalDavClient.discover(
+      davBase.resolve('${Uri.encodeComponent(user)}/'),
+      username: user,
+      password: password,
+      client: httpClient,
+    );
+    final prefix = davBase.path;
+    return [
+      for (final c in found)
+        if (c.holdsNotes)
+          FoundCollection(
+            c.name,
+            c.href.path.startsWith(prefix)
+                ? c.href.path.substring(prefix.length)
+                : c.href.path.replaceFirst(RegExp('^/+'), ''),
+          ),
+    ];
+  }
 
   /// Checks the login against the server, then attaches this Space to it.
   /// Throws (and changes nothing) if the server refuses.

@@ -475,6 +475,31 @@ void main() {
       expect(s.notes, hasLength(3));
     });
 
+    test('discover offers collections by name as connectable paths', () async {
+      final storage = MemoryStorage();
+      final src = SpaceNoteSource(
+        Space(SpaceConfig(id: 's', name: 'S'), PersistentNoteStore(storage)),
+        flags: storage,
+        davBase: Uri.parse('https://fake.test/dav/'),
+        httpClient: MockClient((r) async {
+          expect(r.url.path, '/dav/tm/');
+          return http.Response(
+            '<multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
+            '<response><href>/dav/tm/</href><propstat><prop>'
+            '<resourcetype><collection/></resourcetype></prop></propstat></response>'
+            '<response><href>/dav/tm/abc-123/</href><propstat><prop>'
+            '<displayname>planning</displayname>'
+            '<resourcetype><collection/><C:calendar/></resourcetype>'
+            '</prop></propstat></response></multistatus>',
+            207,
+          );
+        }),
+      );
+      final s = AppState(src);
+      final found = await s.discoverCollections(' tm ', 'pw');
+      expect(found.map((c) => (c.name, c.path)), [('planning', 'tm/abc-123/')]);
+    });
+
     testWidgets('detail lists earlier versions kept by a merge', (t) async {
       t.view.physicalSize = const Size(1400, 900);
       t.view.devicePixelRatio = 1;

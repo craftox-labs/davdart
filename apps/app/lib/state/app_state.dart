@@ -271,6 +271,12 @@ class AppState extends ChangeNotifier {
   bool get connected => _space?.connected ?? false;
   String? get serverLabel => _space?.serverLabel;
 
+  /// Collections [user] can see on the server, for the Connect dialog.
+  Future<List<FoundCollection>> discoverCollections(
+    String user,
+    String password,
+  ) async => await _space?.discover(user.trim(), password) ?? const [];
+
   Future<void> connect(
     String path,
     String user,

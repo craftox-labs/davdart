@@ -33,6 +33,20 @@ class SyncResult {
   final String? syncToken;
 }
 
+/// A calendar collection found under a user's home.
+class CollectionInfo {
+  const CollectionInfo(this.href, this.name, {this.holdsNotes = true});
+
+  /// Absolute URL of the collection.
+  final Uri href;
+
+  /// The display name, or the last path segment when there is none.
+  final String name;
+
+  /// False when the server says the collection takes only events or tasks.
+  final bool holdsNotes;
+}
+
 /// CalDAV client for one collection that holds VJOURNAL resources.
 class CalDavClient {
   CalDavClient({
@@ -60,6 +74,59 @@ class CalDavClient {
         'Authorization':
             'Basic ${base64.encode(utf8.encode('$username:$password'))}',
       };
+
+  static const _discoverBody = '''<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:prop><d:displayname/><d:resourcetype/>
+  <c:supported-calendar-component-set/></d:prop>
+</d:propfind>''';
+
+  /// Lists the calendar collections one level below [home] (a user's home
+  /// URL, for example `/dav/bot/`), so a person can pick by name instead of
+  /// typing a collection id.
+  static Future<List<CollectionInfo>> discover(
+    Uri home, {
+    required String username,
+    required String password,
+    http.Client? client,
+  }) async {
+    final h = _withSlash(home);
+    final c = CalDavClient(
+        collection: h, username: username, password: password, client: client);
+    final r = await c._send('PROPFIND', h,
+        headers: {
+          'Depth': '1',
+          'Content-Type': 'application/xml; charset=utf-8',
+        },
+        body: _discoverBody);
+    if (r.statusCode != 207) {
+      throw CalDavException(r.statusCode, 'PROPFIND failed');
+    }
+    final out = <CollectionInfo>[];
+    for (final resp in XmlDocument.parse(utf8.decode(r.bodyBytes))
+        .descendantElements
+        .where((e) => e.name.local == 'response')) {
+      XmlElement? find(String name) => resp.descendantElements
+          .where((e) => e.name.local == name)
+          .firstOrNull;
+      final href = find('href')?.innerText.trim();
+      if (href == null || find('calendar') == null) continue;
+      final url = h.resolve(href);
+      if (url.path == h.path) continue;
+      final comps = resp.descendantElements
+          .where((e) => e.name.local == 'comp')
+          .map((e) => e.getAttribute('name'))
+          .toList();
+      final dn = find('displayname')?.innerText.trim() ?? '';
+      final segs = url.pathSegments.where((s) => s.isNotEmpty);
+      out.add(CollectionInfo(
+        _withSlash(url),
+        dn.isEmpty ? (segs.isEmpty ? url.path : segs.last) : dn,
+        holdsNotes: comps.isEmpty || comps.contains('VJOURNAL'),
+      ));
+    }
+    return out;
+  }
 
   Uri _resolve(String href) => collection.resolve(href);
 

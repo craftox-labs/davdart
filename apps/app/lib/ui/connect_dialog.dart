@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../data/note_source.dart';
 import '../state/app_state.dart';
 
 /// Connects the local Space to a CalDAV collection through the board
@@ -10,6 +11,8 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
   final user = TextEditingController();
   final password = TextEditingController();
   var replace = false;
+  List<FoundCollection>? found;
+  String? finding; // null idle, '' searching, else the error
   return showDialog<void>(
     context: context,
     builder: (ctx) => StatefulBuilder(
@@ -25,6 +28,23 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
           );
         }
 
+        Future<void> find() async {
+          if (user.text.trim().isEmpty) {
+            setLocal(() => finding = 'Enter the user first');
+            return;
+          }
+          setLocal(() => finding = '');
+          try {
+            final r = await state.discoverCollections(user.text, password.text);
+            setLocal(() {
+              found = r;
+              finding = null;
+            });
+          } catch (e) {
+            setLocal(() => finding = 'Could not list collections: $e');
+          }
+        }
+
         return AlertDialog(
           title: const Text('Connect server'),
           content: SizedBox(
@@ -33,17 +53,9 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
               mainAxisSize: MainAxisSize.min,
               children: [
                 TextField(
-                  key: const Key('connect-path'),
-                  controller: path,
-                  autofocus: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Collection path',
-                    hintText: 'user/collection/',
-                  ),
-                ),
-                TextField(
                   key: const Key('connect-user'),
                   controller: user,
+                  autofocus: true,
                   decoration: const InputDecoration(labelText: 'User'),
                 ),
                 TextField(
@@ -52,6 +64,47 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
                   obscureText: true,
                   decoration: const InputDecoration(labelText: 'Password'),
                   onSubmitted: (_) => submit(),
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: const Key('connect-find'),
+                    onPressed: finding == '' ? null : find,
+                    child: Text(
+                      finding == '' ? 'Looking…' : 'Find collections',
+                    ),
+                  ),
+                ),
+                if (finding != null && finding != '')
+                  Text(finding!, style: const TextStyle(fontSize: 12)),
+                if (found != null)
+                  found!.isEmpty
+                      ? const Text('No note collections for this user.')
+                      : DropdownButtonFormField<String>(
+                          key: const Key('connect-pick'),
+                          isExpanded: true,
+                          decoration: const InputDecoration(
+                            labelText: 'Collection',
+                          ),
+                          items: [
+                            for (final c in found!)
+                              DropdownMenuItem(
+                                value: c.path,
+                                child: Text(
+                                  c.name,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                          ],
+                          onChanged: (v) => setLocal(() => path.text = v ?? ''),
+                        ),
+                TextField(
+                  key: const Key('connect-path'),
+                  controller: path,
+                  decoration: const InputDecoration(
+                    labelText: 'Collection path',
+                    hintText: 'or type it: user/collection/',
+                  ),
                 ),
                 CheckboxListTile(
                   key: const Key('connect-replace'),
