@@ -31,10 +31,10 @@ Future<void> main(List<String> args) async {
   final user = cfg['user'];
   final pass = cfg['password'];
   if (args.isEmpty || url == null || user == null || pass == null) {
-    stderr
-        .writeln('usage: davdart list | show TEXT | add TITLE [BODY] | rm UID\n'
-            'config: url, user, password in ~/.config/davdart/credentials '
-            '(key=value lines) or DAVDART_URL, DAVDART_USER, DAVDART_PASSWORD');
+    stderr.writeln(
+        'usage: davdart list [--status S] [--tag T] | board | show TEXT | add TITLE [BODY] | rm UID\n'
+        'config: url, user, password in ~/.config/davdart/credentials '
+        '(key=value lines) or DAVDART_URL, DAVDART_USER, DAVDART_PASSWORD');
     exit(2);
   }
   final c =
@@ -42,8 +42,37 @@ Future<void> main(List<String> args) async {
   try {
     switch (args.first) {
       case 'list':
+        // Optional filters: --status WORD, --tag TAG (repeatable).
+        String? status;
+        final tags = <String>[];
+        for (var i = 1; i < args.length - 1; i++) {
+          if (args[i] == '--status') status = args[++i].toLowerCase();
+          if (args[i] == '--tag') tags.add(args[++i]);
+        }
         for (final n in await c.listNotes()) {
-          stdout.writeln('${n.uid}\t${n.categories.join(",")}\t${n.summary}');
+          final p = PlanItem.fromNote(n);
+          if (status != null && p.status != status) continue;
+          if (!tags.every(n.categories.contains)) continue;
+          stdout.writeln(
+              '${n.uid}\t${p.status ?? "-"}\t${n.categories.join(",")}\t${n.summary}');
+        }
+      case 'board':
+        final cols = <String, List<PlanItem>>{};
+        for (final n in await c.listNotes()) {
+          final p = PlanItem.fromNote(n);
+          (cols[p.status ?? 'no status'] ??= []).add(p);
+        }
+        const order = ['backlog', 'todo', 'doing', 'blocked', 'done'];
+        final keys = [
+          ...order.where(cols.containsKey),
+          ...cols.keys.where((k) => !order.contains(k)),
+        ];
+        for (final k in keys) {
+          stdout.writeln('\n== $k (${cols[k]!.length})');
+          for (final p in cols[k]!) {
+            final who = p.owner == null ? '' : '  [${p.owner}]';
+            stdout.writeln('  ${p.itemId ?? p.title}$who');
+          }
         }
       case 'show':
         if (args.length < 2) {

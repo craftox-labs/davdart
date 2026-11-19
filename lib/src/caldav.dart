@@ -19,6 +19,20 @@ class ConflictException extends CalDavException {
   ConflictException(String message) : super(412, message);
 }
 
+/// Thrown by [CalDavClient.sync] when the server rejects the sync token
+/// (RFC 6578 valid-sync-token). Callers should fall back to a full sync.
+class SyncTokenInvalid extends CalDavException {
+  SyncTokenInvalid(super.statusCode, super.message);
+}
+
+/// Result of [CalDavClient.sync].
+class SyncResult {
+  SyncResult(this.changed, this.deletedHrefs, this.syncToken);
+  final List<Note> changed;
+  final List<String> deletedHrefs;
+  final String? syncToken;
+}
+
 /// CalDAV client for one collection that holds VJOURNAL resources.
 class CalDavClient {
   CalDavClient({
@@ -82,6 +96,90 @@ class CalDavClient {
       throw CalDavException(r.statusCode, 'REPORT failed');
     }
     return parseMultistatus(utf8.decode(r.bodyBytes), onError: onResourceError);
+  }
+
+  /// Incremental sync (RFC 6578 sync-collection). A null or empty [syncToken]
+  /// is an initial sync. Throws [SyncTokenInvalid] if the server rejects the
+  /// token; fall back to `sync()` without a token then.
+  Future<SyncResult> sync({String? syncToken}) async {
+    final token =
+        const HtmlEscape(HtmlEscapeMode.element).convert(syncToken ?? '');
+    final body = '''<?xml version="1.0" encoding="utf-8"?>
+<d:sync-collection xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
+  <d:sync-token>$token</d:sync-token>
+  <d:sync-level>1</d:sync-level>
+  <d:prop><d:getetag/><c:calendar-data/></d:prop>
+</d:sync-collection>''';
+    final r = await _send('REPORT', collection,
+        headers: {
+          'Depth': '0',
+          'Content-Type': 'application/xml; charset=utf-8',
+        },
+        body: body);
+    final text = utf8.decode(r.bodyBytes, allowMalformed: true);
+    if ({403, 409, 412}.contains(r.statusCode) &&
+        text.contains('valid-sync-token')) {
+      throw SyncTokenInvalid(r.statusCode, 'sync token rejected');
+    }
+    if (r.statusCode != 207) {
+      throw CalDavException(r.statusCode, 'sync REPORT failed');
+    }
+    final doc = XmlDocument.parse(text);
+    final changed = <Note>[];
+    final deleted = <String>[];
+    String? newToken;
+    for (final e in doc.descendantElements) {
+      if (e.localName == 'sync-token' &&
+          e.parentElement?.localName == 'multistatus') {
+        newToken = e.innerText.trim();
+      }
+    }
+    for (final resp
+        in doc.descendantElements.where((e) => e.localName == 'response')) {
+      String? first(String name) => resp.descendantElements
+          .where((e) => e.localName == name)
+          .map((e) => e.innerText)
+          .firstOrNull;
+      final href = first('href')?.trim();
+      if (href == null || href.isEmpty) continue;
+      final respStatus = resp.childElements
+          .where((e) => e.localName == 'status')
+          .map((e) => e.innerText)
+          .firstOrNull;
+      final propStatuses = resp.descendantElements
+          .where((e) => e.localName == 'propstat')
+          .expand((p) => p.childElements.where((e) => e.localName == 'status'))
+          .map((e) => e.innerText)
+          .toList();
+      bool is404(String s) => RegExp(r'\s404(\s|$)').hasMatch(s);
+      bool ok(String s) => RegExp(r'\s2\d\d(\s|$)').hasMatch(s);
+      if ((respStatus != null && is404(respStatus)) ||
+          (propStatuses.isNotEmpty &&
+              !propStatuses.any(ok) &&
+              propStatuses.every(is404))) {
+        deleted.add(href);
+        continue;
+      }
+      if (_resolve(href).path == collection.path) continue;
+      final etag = first('getetag');
+      var data = first('calendar-data');
+      try {
+        Note n;
+        if (data == null || data.trim().isEmpty) {
+          n = await getNote(href);
+        } else {
+          n = parseNote(data)
+            ..href = href
+            ..etag = etag;
+        }
+        changed.add(n);
+      } on ICalException catch (e) {
+        if (e.message != 'no VJOURNAL found') onResourceError?.call(href, e);
+      } on CalDavException catch (e) {
+        onResourceError?.call(href, e);
+      }
+    }
+    return SyncResult(changed, deleted, newToken);
   }
 
   /// Fetches one note by href (absolute or relative to the collection).

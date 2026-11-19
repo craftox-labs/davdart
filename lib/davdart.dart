@@ -5,3 +5,4 @@ export 'src/caldav.dart';
 export 'src/ical.dart'
     show ICalException, parseNote, parseNotes, serializeNote, serializeNotes;
 export 'src/note.dart';
+export 'src/plan_item.dart';
