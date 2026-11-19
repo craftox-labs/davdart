@@ -42,13 +42,17 @@ ThemeData buildTheme(Tokens t, Brightness b) {
 
 /// The real app: a local Space kept in browser storage, filled once from the
 /// board server's feed. Edits stay on this device until a server is attached.
-NoteSource defaultSource() => SpaceNoteSource(
-  Space(
-    SpaceConfig(id: 'planning', name: 'Planning'),
-    PersistentNoteStore(defaultStorage()),
-  ),
-  seed: ApiNoteSource(),
-);
+NoteSource defaultSource() {
+  final storage = defaultStorage();
+  return SpaceNoteSource(
+    Space(
+      SpaceConfig(id: 'planning', name: 'Planning'),
+      PersistentNoteStore(storage),
+    ),
+    seed: ApiNoteSource(),
+    flags: storage,
+  );
+}
 
 class DavdartApp extends StatelessWidget {
   DavdartApp({super.key, NoteSource? source})

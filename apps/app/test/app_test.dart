@@ -184,6 +184,26 @@ void main() {
       expect(s.error, isNull);
     });
 
+    test('deleting every note does not bring the seed back', () async {
+      final storage = MemoryStorage();
+      AppState open() => AppState(
+        SpaceNoteSource(
+          Space(SpaceConfig(id: 's', name: 'S'), PersistentNoteStore(storage)),
+          seed: FakeSource(sample),
+          flags: storage,
+        ),
+      );
+      final s = open();
+      await s.load();
+      for (final n in [...s.notes]) {
+        await s.deleteNote(n.uid);
+      }
+      expect(s.notes, isEmpty);
+      final again = open();
+      await again.load();
+      expect(again.notes, isEmpty);
+    });
+
     testWidgets('edit dialog changes the title', (t) async {
       t.view.physicalSize = const Size(1400, 900);
       t.view.devicePixelRatio = 1;

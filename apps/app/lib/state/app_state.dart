@@ -106,7 +106,7 @@ class AppState extends ChangeNotifier {
       }
       await src.delete(uid);
     });
-    if (selectedUid == uid) selectedUid = null;
+    if (error == null && selectedUid == uid) selectedUid = null;
     notifyListeners();
   }
 

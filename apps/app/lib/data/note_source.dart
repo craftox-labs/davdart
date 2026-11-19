@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'package:davdart/davdart.dart';
 import 'package:http/http.dart' as http;
 
+import 'key_value_storage.dart';
+
 /// Where the app gets notes from. The dev build reads the board server's
 /// read-only feed; the real app will read a local Space.
 abstract class NoteSource {
@@ -61,21 +63,36 @@ abstract class EditableNoteSource implements NoteSource {
 }
 
 /// Notes held in a local [Space]. Edits go through the Space (and so the sync
-/// engine), never to the network. When the Space is empty and a [seed] source
-/// is given, its notes are copied in once.
+/// engine), never to the network. The first time the Space is empty and a
+/// [seed] source is given, its notes are copied in once; [flags] remembers that
+/// across restarts so deleting every note does not bring the seed back.
 class SpaceNoteSource implements EditableNoteSource {
-  SpaceNoteSource(this.space, {this.seed});
+  SpaceNoteSource(this.space, {this.seed, this.flags});
 
   final Space space;
   final NoteSource? seed;
+  final KeyValueStorage? flags;
+  bool _seeded = false;
+
+  static const _seededKey = 'davdart.seeded.v1';
+
+  bool get _wasSeeded => _seeded || flags?.read(_seededKey) == '1';
+
+  void _markSeeded() {
+    _seeded = true;
+    flags?.write(_seededKey, '1');
+  }
 
   @override
   Future<List<Note>> load() async {
     var notes = await space.notes();
-    if (notes.isEmpty && seed != null) {
+    if (notes.isNotEmpty) {
+      _markSeeded();
+    } else if (seed != null && !_wasSeeded) {
       for (final n in await seed!.load()) {
         await space.save(n);
       }
+      _markSeeded();
       notes = await space.notes();
     }
     return notes;
