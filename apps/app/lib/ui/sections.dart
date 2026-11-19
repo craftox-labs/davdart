@@ -125,11 +125,13 @@ class NotesSection extends _Section {
         tree.add(
           FTappable(
             onPress: () {
-              if (AppState.isFolder(n.note)) {
-                state.openFolder(n.note.uid);
-              } else {
-                state.select(n.note.uid);
-              }
+              state.guarded(() {
+                if (AppState.isFolder(n.note)) {
+                  state.openFolder(n.note.uid);
+                } else {
+                  state.select(n.note.uid);
+                }
+              });
               onPick();
             },
             child: Container(

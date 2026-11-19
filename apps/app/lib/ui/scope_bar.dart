@@ -93,7 +93,7 @@ class ScopeBar extends StatelessWidget {
             key: const Key('scope-close'),
             tooltip: 'Show the whole space',
             icon: FLucideIcons.x,
-            onPress: () => state.openFolder(null),
+            onPress: () => state.guarded(() => state.openFolder(null)),
           ),
         ],
       ),

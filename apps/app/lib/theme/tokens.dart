@@ -201,6 +201,9 @@ class SizeTokens {
     this.dialogLg = 480,
     this.dialogXl = 560,
     this.narrowBar = 440,
+    this.pageMax = 860,
+    this.editorLines = 10,
+    this.editorLinesFull = 26,
   });
   final double rail, railItem, frameInset, sidebar, detail, topBar;
 
@@ -223,6 +226,11 @@ class SizeTokens {
 
   /// Width below which the top bar swaps its view toggle for one icon.
   final double narrowBar;
+
+  /// Widest the full-page note grows (the text stays readable), and the
+  /// body editor's least height in lines in the peek pane and the full page.
+  final double pageMax;
+  final int editorLines, editorLinesFull;
 }
 
 /// Design tokens shared with the web board (apps/web/lib/web_app.dart). One

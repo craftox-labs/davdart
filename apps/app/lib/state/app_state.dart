@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart' show TextEditingController;
 import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
 import '../data/space_catalog.dart';
+import 'note_draft.dart';
 
 enum ViewMode { board, list }
 
@@ -942,6 +943,105 @@ class AppState extends ChangeNotifier {
     if (error == null) select(n.uid);
   }
 
+  // --- Full page and in-place editing ---
+
+  bool _fullPage = false;
+
+  /// The selected note fills the main area (not persisted). Ends by itself
+  /// when nothing is selected.
+  bool get fullPage => _fullPage && selected != null;
+
+  void openFullPage() {
+    if (selected == null) return;
+    _fullPage = true;
+    notifyListeners();
+  }
+
+  void closeFullPage() {
+    if (!_fullPage) return;
+    _fullPage = false;
+    notifyListeners();
+  }
+
+  /// The open edit session, if it belongs to the selected note.
+  NoteDraft? draft;
+  NoteDraft? get activeDraft =>
+      draft != null && draft!.uid == selectedUid ? draft : null;
+  bool get dirty => activeDraft?.dirty ?? false;
+
+  /// Asks the user what to do with unsaved edits; set by the shell.
+  Future<DraftChoice> Function()? leaveGuard;
+
+  void startEdit() {
+    final n = selected;
+    if (n == null || !editable || activeDraft != null) return;
+    _dropDraft();
+    final p = PlanItem.fromNote(n);
+    draft = NoteDraft(
+      uid: n.uid,
+      title: n.summary,
+      body: p.text,
+      tags: n.categories
+          .where((c) => !c.startsWith('status-') && !c.startsWith('kind-'))
+          .join(', '),
+      originalParent: tree.find(n.uid)?.parent?.note.uid,
+      originalStatus: boardOrder.contains(p.status) ? p.status : null,
+    );
+    notifyListeners();
+  }
+
+  void _dropDraft() {
+    // The fields may still be on screen until the next frame, so the
+    // controllers are left to the garbage collector, not disposed.
+    draft = null;
+  }
+
+  void discardDraft() {
+    _dropDraft();
+    notifyListeners();
+  }
+
+  /// Saves the open edit through [updateNote] (and [setStatus] when the
+  /// status changed). False if nothing was saved (empty title, failure).
+  Future<bool> saveDraft() async {
+    final d = activeDraft;
+    if (d == null || d.titleEmpty) return false;
+    await updateNote(
+      d.uid,
+      title: d.titleController.text,
+      text: d.bodyController.text,
+      tags: d.tagList,
+      setParent: d.parent != d.originalParent,
+      parentUid: d.parent,
+    );
+    if (error == null && d.status != null && d.status != d.originalStatus) {
+      await setStatus(d.uid, d.status!);
+    }
+    if (error != null) return false;
+    if (draft == d) _dropDraft();
+    notifyListeners();
+    return true;
+  }
+
+  /// Runs [action] (a navigation away from the note) once unsaved edits are
+  /// settled: saved or discarded as the user chooses, or not run at all.
+  Future<void> guarded(void Function() action) async {
+    final g = leaveGuard;
+    if (!dirty || g == null) {
+      action();
+      return;
+    }
+    switch (await g()) {
+      case DraftChoice.keep:
+        return;
+      case DraftChoice.save:
+        if (!await saveDraft()) return;
+      case DraftChoice.discard:
+        _dropDraft();
+    }
+    action();
+  }
+
   Note? get selected =>
       selectedUid == null ? null : tree.find(selectedUid!)?.note;
 
@@ -954,11 +1054,13 @@ class AppState extends ChangeNotifier {
       scopeUid = null;
     }
     selectedUid = uid;
+    if (draft != null && draft!.uid != uid) _dropDraft();
     notifyListeners();
   }
 
   void setView(ViewMode v) {
     view = v;
+    _fullPage = false;
     notifyListeners();
   }
 
