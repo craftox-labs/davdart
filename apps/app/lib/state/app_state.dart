@@ -352,8 +352,28 @@ class AppState extends ChangeNotifier {
             created: n.created,
             lastModified: DateTime.now().toUtc(),
             extraLines: List.of(n.extraLines),
+            propertyParams: Map.of(n.propertyParams),
           ),
         );
+      }
+      // Something may have changed the notes while they were being copied
+      // (an edit, a sync). Keep the originals then; nothing is lost.
+      final current = {for (final n in await src.load()) n.uid: n};
+      for (final n in group) {
+        final now = current[n.uid];
+        if (now == null ||
+            now.summary != n.summary ||
+            now.description != n.description ||
+            now.lastModified != n.lastModified ||
+            now.parentUid != n.parentUid) {
+          if (src == source) {
+            error =
+                'A note changed while moving. The copies are in the other '
+                'space; the originals were kept.';
+            notifyListeners();
+          }
+          return null;
+        }
       }
       for (final n in group.reversed) {
         await src.delete(n.uid);
@@ -371,6 +391,10 @@ class AppState extends ChangeNotifier {
       return group.length;
     } catch (e) {
       if (src == source) {
+        // Some originals may already be gone: show what is really there.
+        try {
+          _setNotes(await src.load());
+        } catch (_) {}
         error = 'Move failed: $e';
         notifyListeners();
       }
