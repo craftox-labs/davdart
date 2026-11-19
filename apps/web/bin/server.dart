@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:davdart/davdart.dart';
 import 'package:davdart/io.dart';
+import 'package:davdart_web/dav_proxy.dart';
 import 'package:davdart_web/web_app.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
@@ -37,8 +38,17 @@ Future<void> main(List<String> args) async {
   final app = appDir.existsSync()
       ? createStaticHandler(appDir.path, defaultDocument: 'index.html')
       : null;
+  // Off unless DAVDART_DAV_UPSTREAM (the Radicale base, e.g.
+  // http://127.0.0.1:5232) is set: then /dav/... reaches it for the app's sync.
+  final upstreamEnv = Platform.environment['DAVDART_DAV_UPSTREAM'];
+  final dav = (upstreamEnv == null || upstreamEnv.isEmpty)
+      ? null
+      : davProxy(Uri.parse(upstreamEnv));
   Future<Response> handler(Request req) async {
     final path = req.url.path;
+    if (dav != null && (path == 'dav' || path.startsWith('dav/'))) {
+      return dav(req);
+    }
     if (app != null && path == 'app') {
       return Response.found('/app/');
     }

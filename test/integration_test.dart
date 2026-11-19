@@ -59,5 +59,61 @@ void main() {
       final after = await client.listNotes();
       expect(after.map((n) => n.uid), isNot(contains(uid)));
     });
+
+    test('two devices: push, pull, merge disjoint edits, delete', () async {
+      final tag = DateTime.now().microsecondsSinceEpoch;
+      CalDavClient mk() => CalDavClient(
+            collection: Uri.parse(url!),
+            username: env['DAVDART_TEST_USER'] ?? '',
+            password: env['DAVDART_TEST_PASSWORD'] ?? '',
+          );
+      final a = SyncEngine(mk(), MemoryNoteStore());
+      final b = SyncEngine(mk(), MemoryNoteStore());
+      final uid = 'davdart-it-two-$tag';
+      try {
+        await a.save(Note(
+            uid: uid,
+            summary: 'live $tag',
+            description: 'item_id: it\nstatus: todo\n\nline1\nline2\nline3',
+            categories: ['status-todo']));
+        final ra = await a.sync();
+        expect(ra.errors, isEmpty);
+        expect(ra.pushed, 1);
+
+        final rb = await b.sync();
+        expect(rb.errors, isEmpty);
+        expect((await b.notes()).map((n) => n.uid), contains(uid));
+
+        // A edits the top line, B the bottom line; no overlap.
+        final na = (await a.notes()).firstWhere((n) => n.uid == uid);
+        await a.save(na.copyWith(
+            description: na.description.replaceFirst('line1', 'A1')));
+        final nb = (await b.notes()).firstWhere((n) => n.uid == uid);
+        await b.save(nb.copyWith(
+            description: nb.description.replaceFirst('line3', 'B3')));
+        expect((await a.sync()).errors, isEmpty);
+        final rb2 = await b.sync();
+        expect(rb2.errors, isEmpty);
+        expect(rb2.conflicts, isEmpty);
+        expect((await a.sync()).errors, isEmpty);
+        for (final e in [a, b]) {
+          final n = (await e.notes()).firstWhere((n) => n.uid == uid);
+          expect(n.description, contains('A1'));
+          expect(n.description, contains('B3'));
+          expect(n.description, contains('line2'));
+        }
+
+        await a.delete(uid);
+        expect((await a.sync()).errors, isEmpty);
+        expect((await b.sync()).errors, isEmpty);
+        expect((await b.notes()).map((n) => n.uid), isNot(contains(uid)));
+      } finally {
+        final c = mk();
+        for (final n in await c.listNotes()) {
+          if (n.uid == uid) await c.deleteNote(n);
+        }
+        c.close();
+      }
+    });
   });
 }
