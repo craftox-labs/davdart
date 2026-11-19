@@ -825,7 +825,7 @@ void main() {
       expect(find.textContaining('Earlier versions'), findsNothing);
     });
 
-    testWidgets('edit dialog changes the title', (t) async {
+    testWidgets('in-place edit changes the title', (t) async {
       t.view.physicalSize = const Size(1400, 900);
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
@@ -839,6 +839,7 @@ void main() {
       await t.tap(find.byKey(const Key('edit-note')));
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('edit-title')), 'Renamed');
+      await t.pump();
       await t.tap(find.byKey(const Key('edit-save')));
       await t.pumpAndSettle();
       expect((await space.notes()).map((n) => n.summary), contains('Renamed'));

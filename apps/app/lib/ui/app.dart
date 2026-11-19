@@ -9,6 +9,7 @@ import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
 import '../data/space_catalog.dart';
 import '../state/app_state.dart';
+import '../state/note_draft.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
 import 'detail_view.dart';
@@ -111,7 +112,15 @@ class Shell extends StatelessWidget {
 
           final mirror = state.layoutSide == LayoutSide.end;
           final Widget body;
-          if (split) {
+          if (split && state.fullPage) {
+            // The note fills the main panel; the peek pane is hidden.
+            body = DetailView(
+              key: const Key('full-page'),
+              state: state,
+              onClose: () => state.guarded(() => state.select(null)),
+              full: true,
+            );
+          } else if (split) {
             body = LayoutBuilder(
               builder: (context, bc) {
                 final z = t.sizes;
@@ -134,7 +143,8 @@ class Shell extends StatelessWidget {
                     children: [
                       DetailView(
                         state: state,
-                        onClose: () => state.select(null),
+                        onClose: () => state.guarded(() => state.select(null)),
+                        onExpand: state.openFullPage,
                       ),
                       Positioned(
                         top: 0,
@@ -165,7 +175,10 @@ class Shell extends StatelessWidget {
               },
             );
           } else if (hasDetail) {
-            body = DetailView(state: state, onClose: () => state.select(null));
+            body = DetailView(
+              state: state,
+              onClose: () => state.guarded(() => state.select(null)),
+            );
           } else {
             body = main();
           }
@@ -191,13 +204,66 @@ class Shell extends StatelessWidget {
             );
           }
 
-          return SafeArea(
-            child: ShellFrame(state: state, showRail: wide, child: content),
+          return _LeaveGuard(
+            state: state,
+            child: SafeArea(
+              child: ShellFrame(state: state, showRail: wide, child: content),
+            ),
           );
         },
       ),
     );
   }
+}
+
+/// Registers the dialog asked when leaving a note with unsaved edits.
+class _LeaveGuard extends StatefulWidget {
+  const _LeaveGuard({required this.state, required this.child});
+  final AppState state;
+  final Widget child;
+
+  @override
+  State<_LeaveGuard> createState() => _LeaveGuardState();
+}
+
+class _LeaveGuardState extends State<_LeaveGuard> {
+  @override
+  void initState() {
+    super.initState();
+    widget.state.leaveGuard = _ask;
+  }
+
+  @override
+  void dispose() {
+    if (widget.state.leaveGuard == _ask) widget.state.leaveGuard = null;
+    super.dispose();
+  }
+
+  Future<DraftChoice> _ask() async =>
+      await showAppDialog<DraftChoice>(
+        context,
+        title: 'Unsaved changes',
+        content: const Text('This note has edits that are not saved yet.'),
+        actions: [
+          const CancelButton(label: 'Keep editing'),
+          FButton(
+            key: const Key('leave-discard'),
+            variant: FButtonVariant.outline,
+            mainAxisSize: MainAxisSize.min,
+            onPress: () => Navigator.of(context).pop(DraftChoice.discard),
+            child: const Text('Discard'),
+          ),
+          ActionButton(
+            'Save',
+            key: const Key('leave-save'),
+            onPress: (ctx) => Navigator.of(ctx).pop(DraftChoice.save),
+          ),
+        ],
+      ) ??
+      DraftChoice.keep;
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// Opens the sidebar as a sheet from the left edge (the narrow-screen drawer).

@@ -89,7 +89,7 @@ class _Card extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: t.space.md),
       child: FTappable(
-        onPress: () => state.select(note.uid),
+        onPress: () => state.guarded(() => state.select(note.uid)),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: t.card,

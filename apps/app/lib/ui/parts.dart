@@ -29,13 +29,13 @@ class IconAction extends StatelessWidget {
 }
 
 /// Opens a forui dialog with a title, content and a row of actions.
-Future<void> showAppDialog(
+Future<T?> showAppDialog<T>(
   BuildContext context, {
   required String title,
   required Widget content,
   required List<Widget> actions,
   double? width,
-}) => showFDialog<void>(
+}) => showFDialog<T>(
   context: context,
   builder: (ctx, style, animation) => FDialog(
     animation: animation,

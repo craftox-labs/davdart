@@ -49,7 +49,7 @@ class NoteListView extends StatelessWidget {
         final p = PlanItem.fromNote(n);
         final kids = state.tree.find(n.uid)?.children.isNotEmpty ?? false;
         return FTappable(
-          onPress: () => state.select(n.uid),
+          onPress: () => state.guarded(() => state.select(n.uid)),
           child: Container(
             color: state.selectedUid == n.uid ? t.selected : null,
             padding: EdgeInsets.fromLTRB(
