@@ -231,12 +231,7 @@ class NotesSection extends _Section {
       children: [
         if (state.currentSpaceName != null)
           Padding(
-            padding: EdgeInsets.fromLTRB(
-              t.space.md,
-              0,
-              t.space.md,
-              t.space.sm,
-            ),
+            padding: EdgeInsets.fromLTRB(t.space.md, 0, t.space.md, t.space.sm),
             child: Text(
               state.currentSpaceName!,
               key: const Key('space-name'),
@@ -247,8 +242,25 @@ class NotesSection extends _Section {
           ),
         ...tree,
         if (state.tags.isNotEmpty) ...[
-          _label(context, 'TAGS'),
-          _TagWrap(state: state),
+          Padding(
+            padding: EdgeInsets.only(top: t.space.lg),
+            child: FAccordion(
+              key: const Key('tags-accordion'),
+              control: FAccordionControl.lifted(
+                expanded: (_) => state.tagsExpanded,
+                onChange: (_, open) => state.setTagsOpen(open),
+              ),
+              children: [
+                FAccordionItem(
+                  title: Text(
+                    'Tags (${state.tags.length})',
+                    style: t.type.labelStyle.copyWith(color: t.muted),
+                  ),
+                  child: _TagWrap(state: state),
+                ),
+              ],
+            ),
+          ),
           SizedBox(height: t.space.lg),
         ],
       ],

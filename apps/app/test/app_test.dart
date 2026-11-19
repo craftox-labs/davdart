@@ -1460,17 +1460,19 @@ void main() {
       await pump(t, size: const Size(1400, 420));
       expect(t.takeException(), isNull);
       final tag = find.byKey(const Key('tag-planning'));
-      await t.scrollUntilVisible(
-        tag,
-        100,
-        scrollable: find.descendant(
-          of: find.descendant(
-            of: find.byType(Sidebar),
-            matching: find.byType(ListView),
-          ),
-          matching: find.byType(Scrollable),
+      final list = find.descendant(
+        of: find.descendant(
+          of: find.byType(Sidebar),
+          matching: find.byType(ListView),
         ),
+        matching: find.byType(Scrollable),
       );
+      // Tags start collapsed: open the accordion first.
+      final head = find.textContaining('Tags (');
+      await t.scrollUntilVisible(head, 100, scrollable: list);
+      await t.tap(head);
+      await t.pumpAndSettle();
+      await t.scrollUntilVisible(tag, 100, scrollable: list);
       expect(tag, findsOneWidget);
       final node = t.getSemantics(tag);
       expect(node.label, contains('Tag planning'));
