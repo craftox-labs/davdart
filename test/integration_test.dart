@@ -1,6 +1,9 @@
 import 'dart:io';
 
+import 'dart:convert';
+
 import 'package:davdart/davdart.dart';
+import 'package:http/http.dart' as http;
 import 'package:test/test.dart';
 
 /// Live round trip. Runs only when DAVDART_TEST_URL (plus DAVDART_TEST_USER
@@ -115,5 +118,34 @@ void main() {
         c.close();
       }
     });
+  });
+
+  test('create a collection, find it by name, delete it', skip: skipReason,
+      () async {
+    final user = env['DAVDART_TEST_USER'] ?? '';
+    final pw = env['DAVDART_TEST_PASSWORD'] ?? '';
+    final home = Uri.parse(url!).resolve('../');
+    final name = 'davdart-it-tmp-${DateTime.now().microsecondsSinceEpoch}';
+    final made = await CalDavClient.createCollection(home, name,
+        username: user, password: pw);
+    try {
+      final found =
+          await CalDavClient.discover(home, username: user, password: pw);
+      final mine = found.where((c) => c.name == name).toList();
+      expect(mine, hasLength(1));
+      expect(mine.single.holdsNotes, isTrue);
+      // It takes notes.
+      final c = CalDavClient(collection: made, username: user, password: pw);
+      final n = await c.putNote(Note(uid: 'x1', summary: 'hi'));
+      expect((await c.listNotes()).map((e) => e.summary), ['hi']);
+      c.close();
+      expect(n.etag, isNotNull);
+    } finally {
+      final r = await http.Request('DELETE', made)
+        ..headers['Authorization'] =
+            'Basic ${base64.encode(utf8.encode('$user:$pw'))}';
+      final resp = await http.Response.fromStream(await r.send());
+      expect(resp.statusCode, anyOf(200, 204));
+    }
   });
 }

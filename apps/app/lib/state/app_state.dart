@@ -91,12 +91,74 @@ class AppState extends ChangeNotifier {
     await load();
   }
 
-  /// Creates a local Space and opens it.
-  Future<void> createSpace(String name) async {
+  /// Creates a Space and opens it. With [onServer] (and an account) the
+  /// collection is created on the server too; otherwise it stays local.
+  Future<void> createSpace(String name, {bool onServer = false}) async {
     final c = catalog;
     if (c == null || name.trim().isEmpty) return;
-    await switchSpace(c.add(name).id);
+    if (!(onServer && c.account != null)) {
+      await switchSpace(c.add(name).id);
+      return;
+    }
+    syncMessage = 'Creating on server…';
+    notifyListeners();
+    try {
+      final info = await c.addOnServer(name);
+      await switchSpace(info.id);
+    } catch (e) {
+      syncMessage = 'Could not create on server: $e';
+      notifyListeners();
+    }
   }
+
+  /// The signed-in account's user name, if any.
+  String? get accountUser => catalog?.account?.user;
+  bool get canSignIn => catalog != null;
+
+  /// Signs in at the account level and adds a Space per collection.
+  Future<void> signIn(String user, String password) async {
+    final c = catalog;
+    if (c == null) return;
+    syncMessage = 'Signing in…';
+    notifyListeners();
+    try {
+      final n = await c.signIn(user.trim(), password);
+      syncMessage = n == 0
+          ? 'Signed in; no new collections'
+          : 'Signed in; added $n space${n == 1 ? '' : 's'}';
+    } catch (e) {
+      syncMessage = 'Could not sign in: $e';
+    }
+    notifyListeners();
+  }
+
+  /// Picks up collections created elsewhere since sign-in.
+  Future<void> refreshSpaces() async {
+    final c = catalog;
+    if (c == null || c.account == null) return;
+    try {
+      final n = await c.refresh();
+      syncMessage = n == 0 ? 'No new collections' : 'Added $n';
+    } catch (e) {
+      syncMessage = 'Could not refresh: $e';
+    }
+    notifyListeners();
+  }
+
+  /// Signs out. Account Spaces stay here as local copies.
+  Future<void> signOut() async {
+    final c = catalog;
+    if (c == null || c.account == null) return;
+    c.signOut();
+    source = c.sourceFor(c.current);
+    syncMessage = null;
+    syncing = false;
+    _syncAgain = false;
+    await load();
+  }
+
+  /// Whether the open Space belongs to the account (its notes sync).
+  bool get currentOnServer => catalog?.currentInfo.onServer ?? false;
 
   /// Renames the open Space. False when the name is blank or taken.
   bool renameSpace(String name) {
@@ -236,6 +298,14 @@ class AppState extends ChangeNotifier {
     error = null;
     notifyListeners();
     try {
+      if (src is SpaceNoteSource && src.needsFirstConnect) {
+        try {
+          await src.connectAccount();
+        } catch (e) {
+          if (src != source) return;
+          syncMessage = 'Could not reach the server: $e';
+        }
+      }
       final loaded = await src.load();
       if (src != source) return; // another Space was opened meanwhile
       notes = loaded;

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
@@ -126,6 +127,48 @@ class CalDavClient {
       ));
     }
     return out;
+  }
+
+  /// Creates a new collection for notes under [home] (a user's home URL),
+  /// named [name], and returns its URL. The id in the path is random; the
+  /// name lives in the display name, so renaming never moves anything.
+  static Future<Uri> createCollection(
+    Uri home,
+    String name, {
+    required String username,
+    required String password,
+    http.Client? client,
+    String? id,
+  }) async {
+    final h = _withSlash(home);
+    final c = CalDavClient(
+        collection: h, username: username, password: password, client: client);
+    final rnd = Random.secure();
+    final cid = id ??
+        List.generate(
+                16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0'))
+            .join();
+    final url = h.resolve('$cid/');
+    final b = XmlBuilder();
+    b.element('c:mkcalendar', nest: () {
+      b.namespace('DAV:', 'd');
+      b.namespace('urn:ietf:params:xml:ns:caldav', 'c');
+      b.element('d:set', nest: () {
+        b.element('d:prop', nest: () {
+          b.element('d:displayname', nest: name);
+          b.element('c:supported-calendar-component-set', nest: () {
+            b.element('c:comp', attributes: {'name': 'VJOURNAL'});
+          });
+        });
+      });
+    });
+    final r = await c._send('MKCALENDAR', url,
+        headers: {'Content-Type': 'application/xml; charset=utf-8'},
+        body: b.buildDocument().toXmlString());
+    if (r.statusCode != 201) {
+      throw CalDavException(r.statusCode, 'MKCALENDAR failed');
+    }
+    return url;
   }
 
   Uri _resolve(String href) => collection.resolve(href);

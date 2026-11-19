@@ -67,6 +67,19 @@ abstract class EditableNoteSource implements NoteSource {
 /// the Space is empty and a [seed] source is given, its notes are copied in
 /// once; [flags] remembers that (and the server login) across restarts, so
 /// deleting every note does not bring the seed back.
+/// The server login shared by every account Space on this device.
+class Account {
+  const Account(this.user, this.password);
+  final String user;
+  final String password;
+}
+
+/// [href] as a path relative to the proxy root [base], the form
+/// [SpaceNoteSource.connect] accepts.
+String davPath(Uri base, Uri href) => href.path.startsWith(base.path)
+    ? href.path.substring(base.path.length)
+    : href.path.replaceFirst(RegExp('^/+'), '');
+
 /// A collection offered in the Connect dialog.
 class FoundCollection {
   const FoundCollection(this.name, this.path);
@@ -81,19 +94,21 @@ class SpaceNoteSource implements EditableNoteSource {
     this.flags,
     Uri? davBase,
     this.httpClient,
+    this.account,
+    this.pendingPath,
   }) : davBase = davBase ?? Uri.base.resolve('/dav/') {
     final saved = flags?.read(_loginKey);
     if (saved != null && saved.isNotEmpty) {
       try {
         final j = jsonDecode(saved) as Map<String, dynamic>;
-        _login = (j['path'] as String, j['user'] as String);
-        space.connectExisting(
-          _clientFor(
-            j['path'] as String,
-            j['user'] as String,
-            j['password'] as String,
-          ),
-        );
+        // An account Space keeps no password of its own: it borrows the
+        // account's, and goes back to local when that is signed out.
+        final pw = j['account'] == true
+            ? account!.password
+            : j['password'] as String;
+        final user = j['account'] == true ? account!.user : j['user'] as String;
+        _login = (j['path'] as String, user);
+        space.connectExisting(_clientFor(j['path'] as String, user, pw));
       } catch (_) {
         flags?.write(_loginKey, '');
       }
@@ -101,6 +116,12 @@ class SpaceNoteSource implements EditableNoteSource {
   }
 
   final Space space;
+
+  /// Set for a Space that belongs to the signed-in account.
+  final Account? account;
+
+  /// The collection an account Space syncs with, before its first connect.
+  final String? pendingPath;
   final NoteSource? seed;
   final KeyValueStorage? flags;
 
@@ -117,6 +138,13 @@ class SpaceNoteSource implements EditableNoteSource {
   static const _lastServerKey = 'davdart.lastserver.v1';
 
   bool get connected => _login != null;
+
+  /// An account Space that has not synced yet and must attach first.
+  bool get needsFirstConnect =>
+      _login == null && account != null && pendingPath != null;
+
+  Future<void> connectAccount() =>
+      connect(pendingPath!, account!.user, account!.password, viaAccount: true);
 
   /// The server collection path and user, when connected.
   String? get serverLabel =>
@@ -138,16 +166,9 @@ class SpaceNoteSource implements EditableNoteSource {
       password: password,
       client: httpClient,
     );
-    final prefix = davBase.path;
     return [
       for (final c in found)
-        if (c.holdsNotes)
-          FoundCollection(
-            c.name,
-            c.href.path.startsWith(prefix)
-                ? c.href.path.substring(prefix.length)
-                : c.href.path.replaceFirst(RegExp('^/+'), ''),
-          ),
+        if (c.holdsNotes) FoundCollection(c.name, davPath(davBase, c.href)),
     ];
   }
 
@@ -161,6 +182,7 @@ class SpaceNoteSource implements EditableNoteSource {
     String user,
     String password, {
     bool replaceLocal = false,
+    bool viaAccount = false,
   }) async {
     final client = _clientFor(path, user, password);
     await client.listNotes();
@@ -185,7 +207,11 @@ class SpaceNoteSource implements EditableNoteSource {
     _login = (path, user);
     flags?.write(
       _loginKey,
-      jsonEncode({'path': path, 'user': user, 'password': password}),
+      jsonEncode(
+        viaAccount
+            ? {'path': path, 'user': user, 'account': true}
+            : {'path': path, 'user': user, 'password': password},
+      ),
     );
   }
 

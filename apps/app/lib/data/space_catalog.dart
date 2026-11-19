@@ -8,9 +8,14 @@ import 'note_source.dart';
 import 'persistent_store.dart';
 
 class SpaceInfo {
-  const SpaceInfo(this.id, this.name);
+  const SpaceInfo(this.id, this.name, {this.collection});
   final String id;
   final String name;
+
+  /// The server collection (path under /dav/) of an account Space; null for
+  /// a local Space.
+  final String? collection;
+  bool get onServer => collection != null;
 }
 
 /// Storage whose keys all start with [prefix].
@@ -50,6 +55,7 @@ class SpaceCatalog {
     this.httpClient,
   }) {
     _load();
+    _loadAccount();
   }
 
   final KeyValueStorage storage;
@@ -58,6 +64,24 @@ class SpaceCatalog {
   final http.Client? httpClient;
 
   static const planningId = 'planning';
+  static const _accountKey = 'davdart.account.v1';
+
+  /// The signed-in server account, if any. Its collections are the account
+  /// Spaces; its password lives here once, not in every Space.
+  Account? account;
+
+  void _loadAccount() {
+    try {
+      final raw = storage.read(_accountKey);
+      if (raw == null || raw.isEmpty) return;
+      final j = jsonDecode(raw) as Map<String, dynamic>;
+      account = Account(j['user'] as String, j['password'] as String);
+    } catch (_) {
+      account = null;
+    }
+  }
+
+  Uri get _davBase => davBase ?? Uri.base.resolve('/dav/');
   static const _listKey = 'davdart.spaces.v1';
   static const _currentKey = 'davdart.currentspace.v1';
 
@@ -71,7 +95,15 @@ class SpaceCatalog {
       if (raw != null && raw.isNotEmpty) {
         for (final j in jsonDecode(raw) as List<dynamic>) {
           if (j is Map && j['id'] is String && j['name'] is String) {
-            spaces.add(SpaceInfo(j['id'] as String, j['name'] as String));
+            spaces.add(
+              SpaceInfo(
+                j['id'] as String,
+                j['name'] as String,
+                collection: j['collection'] is String
+                    ? j['collection'] as String
+                    : null,
+              ),
+            );
           }
         }
       }
@@ -92,7 +124,12 @@ class SpaceCatalog {
     storage.write(
       _listKey,
       jsonEncode([
-        for (final s in spaces) {'id': s.id, 'name': s.name},
+        for (final s in spaces)
+          {
+            'id': s.id,
+            'name': s.name,
+            if (s.collection != null) 'collection': s.collection,
+          },
       ]),
     );
     storage.write(_currentKey, current);
@@ -100,17 +137,109 @@ class SpaceCatalog {
 
   SpaceInfo get currentInfo => spaces.firstWhere((s) => s.id == current);
 
-  /// Adds a local Space named [name] and returns it.
-  SpaceInfo add(String name) {
+  String _unique(String name) {
     var n = name.trim();
     final base = n;
     for (var i = 2; spaces.any((s) => s.name == n); i++) {
       n = '$base $i';
     }
-    final info = SpaceInfo('sp-${DateTime.now().microsecondsSinceEpoch}', n);
+    return n;
+  }
+
+  /// Adds a local Space named [name] and returns it.
+  SpaceInfo add(String name) {
+    final info = SpaceInfo(
+      'sp-${DateTime.now().microsecondsSinceEpoch}',
+      _unique(name),
+    );
     spaces.add(info);
     _save();
     return info;
+  }
+
+  /// Checks the login, remembers it, and adds a Space for every note
+  /// collection the user has that is not here yet. Returns how many were
+  /// added. Throws, changing nothing, if the server refuses.
+  Future<int> signIn(String user, String password) async {
+    final found = await _discover(user, password);
+    account = Account(user, password);
+    storage.write(
+      _accountKey,
+      jsonEncode({'user': user, 'password': password}),
+    );
+    return _addFound(found);
+  }
+
+  /// Finds collections created elsewhere since sign-in.
+  Future<int> refresh() async {
+    final a = account;
+    if (a == null) return 0;
+    return _addFound(await _discover(a.user, a.password));
+  }
+
+  Future<List<FoundCollection>> _discover(String user, String password) async {
+    final found = await CalDavClient.discover(
+      _davBase.resolve('${Uri.encodeComponent(user)}/'),
+      username: user,
+      password: password,
+      client: httpClient,
+    );
+    return [
+      for (final c in found)
+        if (c.holdsNotes) FoundCollection(c.name, davPath(_davBase, c.href)),
+    ];
+  }
+
+  int _addFound(List<FoundCollection> found) {
+    var added = 0;
+    for (final f in found) {
+      final id = 'srv-${Uri.encodeComponent(f.path)}';
+      if (spaces.any((s) => s.collection == f.path)) continue;
+      final old = spaces.indexWhere((s) => s.id == id);
+      if (old >= 0) {
+        // A local copy left by an earlier sign-out: link it back.
+        spaces[old] = SpaceInfo(id, spaces[old].name, collection: f.path);
+        added++;
+        continue;
+      }
+      spaces.add(SpaceInfo(id, _unique(f.name), collection: f.path));
+      added++;
+    }
+    _save();
+    return added;
+  }
+
+  /// Creates a new collection on the server and a Space for it.
+  Future<SpaceInfo> addOnServer(String name) async {
+    final a = account;
+    if (a == null) throw StateError('Not signed in');
+    final url = await CalDavClient.createCollection(
+      _davBase.resolve('${Uri.encodeComponent(a.user)}/'),
+      name.trim(),
+      username: a.user,
+      password: a.password,
+      client: httpClient,
+    );
+    final path = davPath(_davBase, url);
+    final info = SpaceInfo(
+      'srv-${Uri.encodeComponent(path)}',
+      _unique(name),
+      collection: path,
+    );
+    spaces.add(info);
+    _save();
+    return info;
+  }
+
+  /// Signs out. Account Spaces stay on this device as local copies.
+  void signOut() {
+    account = null;
+    storage.write(_accountKey, '');
+    for (var i = 0; i < spaces.length; i++) {
+      final s = spaces[i];
+      if (s.collection != null) spaces[i] = SpaceInfo(s.id, s.name);
+    }
+    _save();
   }
 
   /// Renames Space [id]; blank or already-used names are refused (false).
@@ -158,6 +287,8 @@ class SpaceCatalog {
     return SpaceNoteSource(
       Space(SpaceConfig(id: id, name: info.name), PersistentNoteStore(scoped)),
       seed: id == planningId ? planningSeed : null,
+      account: info.onServer ? account : null,
+      pendingPath: info.collection,
       flags: scoped,
       davBase: davBase,
       httpClient: httpClient,

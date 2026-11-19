@@ -500,6 +500,83 @@ void main() {
       expect(found.map((c) => (c.name, c.path)), [('planning', 'tm/abc-123/')]);
     });
 
+    test('account: sign in lists collections as spaces, create, remove, sign out', () async {
+      final server = FakeCalDav();
+      server.external(
+        'one.ics',
+        serializeNote(Note(uid: 'one', summary: 'From server')),
+      );
+      final seen = <String>[];
+      final client = MockClient((r) async {
+        seen.add('${r.method} ${r.url.path}');
+        if (r.method == 'PROPFIND' && r.url.path == '/dav/tm/') {
+          return http.Response(
+            '<multistatus xmlns="DAV:" xmlns:C="urn:ietf:params:xml:ns:caldav">'
+            '<response><href>/dav/tm/</href><propstat><prop>'
+            '<resourcetype><collection/></resourcetype></prop></propstat></response>'
+            '<response><href>/dav/c/</href><propstat><prop>'
+            '<displayname>Work</displayname>'
+            '<resourcetype><collection/><C:calendar/></resourcetype>'
+            '</prop></propstat></response></multistatus>',
+            207,
+          );
+        }
+        if (r.method == 'MKCALENDAR') return http.Response('', 201);
+        if (r.url.path == '/dav/tm/' && r.method == 'REPORT') {
+          return http.Response('', 404);
+        }
+        return server.respond(r);
+      });
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(
+        storage,
+        davBase: Uri.parse('https://fake.test/dav/'),
+        httpClient: client,
+      );
+      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      await s.load();
+      await s.signIn(' tm ', 'pw');
+      expect(s.accountUser, 'tm');
+      expect(s.spaces.map((e) => e.name), ['Planning', 'Work']);
+      final work = s.spaces.last;
+      expect(work.onServer, isTrue);
+      // Opening it attaches and pulls the server's notes.
+      await s.switchSpace(work.id);
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      expect(s.connected, isTrue);
+      expect(s.notes.map((n) => n.summary), ['From server']);
+      // Its login holds no password of its own.
+      expect(
+        storage.read('sp.${work.id}.davdart.server.v1'),
+        isNot(contains('pw')),
+      );
+      // New space on the server.
+      await s.createSpace('Fresh', onServer: true);
+      expect(seen.any((e) => e.startsWith('MKCALENDAR /dav/tm/')), isTrue);
+      expect(s.currentSpaceName, 'Fresh');
+      expect(s.currentOnServer, isTrue);
+      // Removing an account space is local only; refresh brings it back.
+      server.log.clear();
+      await s.switchSpace(work.id);
+      await s.deleteSpace();
+      expect(s.spaces.map((e) => e.name), ['Planning', 'Fresh']);
+      expect(server.log.where((e) => e.startsWith('DELETE')), isEmpty);
+      await s.refreshSpaces();
+      expect(s.spaces.map((e) => e.name), contains('Work'));
+      // Restart: still signed in, the space reconnects without asking again.
+      final c2 = SpaceCatalog(
+        storage,
+        davBase: Uri.parse('https://fake.test/dav/'),
+        httpClient: client,
+      );
+      expect(c2.account?.user, 'tm');
+      // Sign out keeps the spaces as local copies.
+      await s.signOut();
+      expect(s.accountUser, isNull);
+      expect(s.spaces.every((e) => !e.onServer), isTrue);
+      expect(SpaceCatalog(storage).account, isNull);
+    });
+
     testWidgets('detail lists earlier versions kept by a merge', (t) async {
       t.view.physicalSize = const Size(1400, 900);
       t.view.devicePixelRatio = 1;

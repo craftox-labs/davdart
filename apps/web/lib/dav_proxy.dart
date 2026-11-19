@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shelf/shelf.dart';
 
 const _methods = {
-  'OPTIONS', 'PROPFIND', 'REPORT', 'GET', 'PUT', 'DELETE', //
+  'OPTIONS', 'PROPFIND', 'REPORT', 'GET', 'PUT', 'DELETE', 'MKCALENDAR', //
 };
 
 /// Notes are small; this only stops runaway uploads.

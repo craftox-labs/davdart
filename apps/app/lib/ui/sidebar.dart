@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import 'markdown_lite.dart';
+import 'account_dialog.dart';
 import 'connect_dialog.dart';
 import 'new_note_dialog.dart';
 import '../data/space_catalog.dart';
@@ -137,13 +138,28 @@ class Sidebar extends StatelessWidget {
                       for (final sp in state.spaces)
                         PopupMenuItem(
                           value: sp.id,
-                          child: Text(
-                            sp.name,
-                            style: TextStyle(
-                              fontWeight: sp.id == state.currentSpaceId
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                            ),
+                          child: Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  sp.name,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: sp.id == state.currentSpaceId
+                                        ? FontWeight.w700
+                                        : FontWeight.w400,
+                                  ),
+                                ),
+                              ),
+                              if (sp.onServer) ...[
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.cloud_outlined,
+                                  size: 14,
+                                  color: t.muted,
+                                ),
+                              ],
+                            ],
                           ),
                         ),
                       const PopupMenuDivider(),
@@ -250,17 +266,51 @@ class Sidebar extends StatelessWidget {
             item(Icons.bookmark_add_outlined, 'Save this view', false, () {
               showSaveViewDialog(context, state);
             }),
+          if (state.canSignIn) ...[
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.only(left: 6, bottom: 4),
+              child: Text('ACCOUNT', style: label),
+            ),
+            if (state.accountUser == null)
+              item(Icons.account_circle_outlined, 'Sign in…', false, () {
+                _close(context);
+                showAccountDialog(context, state);
+              })
+            else ...[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(10, 2, 6, 4),
+                child: Text(
+                  'Signed in as ${state.accountUser}',
+                  key: const Key('account-label'),
+                  style: TextStyle(fontSize: 11, color: t.muted),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              item(Icons.refresh, 'Refresh spaces', false, state.refreshSpaces),
+              item(Icons.logout, 'Sign out', false, state.signOut),
+            ],
+          ],
           if (state.canConnect) ...[
             const SizedBox(height: 14),
             Padding(
               padding: const EdgeInsets.only(left: 6, bottom: 4),
               child: Text('SERVER', style: label),
             ),
-            if (!state.connected)
-              item(Icons.cloud_outlined, 'Connect server', false, () {
-                _close(context);
-                showConnectDialog(context, state);
+            if (!state.connected && state.currentOnServer)
+              item(Icons.cloud_sync_outlined, 'Retry connecting', false, () {
+                state.load();
               })
+            else if (!state.connected)
+              item(
+                Icons.cloud_outlined,
+                'Connect a collection by path',
+                false,
+                () {
+                  _close(context);
+                  showConnectDialog(context, state);
+                },
+              )
             else ...[
               item(
                 Icons.sync,
@@ -268,9 +318,10 @@ class Sidebar extends StatelessWidget {
                 false,
                 state.sync,
               ),
-              item(Icons.cloud_off_outlined, 'Disconnect', false, () {
-                state.disconnect();
-              }),
+              if (!state.currentOnServer)
+                item(Icons.cloud_off_outlined, 'Disconnect', false, () {
+                  state.disconnect();
+                }),
             ],
             if (state.connected && state.serverLabel != null)
               Padding(

@@ -44,7 +44,7 @@ void main() {
   });
 
   test('refuses other methods and path tricks', () async {
-    expect((await h(rq('MKCALENDAR', 'dav/u/x/'))).statusCode, 405);
+    expect((await h(rq('MKCOL', 'dav/u/x/'))).statusCode, 405);
     expect((await h(rq('POST', 'dav/u/'))).statusCode, 405);
     // Dart's Uri resolves dot segments (encoded too) before the proxy sees
     // them, so these cannot climb above the upstream root.
