@@ -70,7 +70,7 @@ class DetailView extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                if (state.editable) ...[
+                if (state.editable && !AppState.isFolder(note)) ...[
                   const SizedBox(height: 8),
                   Row(
                     children: [

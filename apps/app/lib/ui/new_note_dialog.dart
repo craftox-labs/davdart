@@ -4,7 +4,7 @@ import '../state/app_state.dart';
 
 /// Asks for a title and adds the note, under the selected note if chosen.
 Future<void> showNewNoteDialog(BuildContext context, AppState state) {
-  final parent = state.selected;
+  final parent = state.selected ?? state.scope;
   final title = TextEditingController();
   var underParent = parent != null;
   return showDialog<void>(

@@ -6,6 +6,7 @@ import '../theme/tokens.dart';
 import 'markdown_lite.dart';
 import 'account_dialog.dart';
 import 'connect_dialog.dart';
+import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
 import '../data/space_catalog.dart';
 import 'new_space_dialog.dart';
@@ -59,14 +60,22 @@ class Sidebar extends StatelessWidget {
         tree.add(
           InkWell(
             onTap: () {
-              state.select(n.note.uid);
+              if (AppState.isFolder(n.note)) {
+                state.openFolder(n.note.uid);
+              } else {
+                state.select(n.note.uid);
+              }
               _close(context);
             },
             borderRadius: BorderRadius.circular(6),
             child: Container(
               padding: EdgeInsets.fromLTRB(4 + depth * 14.0, 5, 8, 5),
               decoration: BoxDecoration(
-                color: state.selectedUid == n.note.uid ? t.surface : null,
+                color:
+                    (state.selectedUid == n.note.uid ||
+                        state.scopeUid == n.note.uid)
+                    ? t.surface
+                    : null,
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
@@ -84,6 +93,14 @@ class Sidebar extends StatelessWidget {
                           )
                         : null,
                   ),
+                  if (AppState.isFolder(n.note)) ...[
+                    Icon(
+                      open && kids ? Icons.folder_open : Icons.folder_outlined,
+                      size: 15,
+                      color: t.muted,
+                    ),
+                    const SizedBox(width: 6),
+                  ],
                   Expanded(
                     child: Text(
                       n.note.summary,
@@ -351,6 +368,11 @@ class Sidebar extends StatelessWidget {
             item(Icons.add, 'New note', false, () {
               _close(context);
               showNewNoteDialog(context, state);
+            }),
+          if (state.editable)
+            item(Icons.create_new_folder_outlined, 'New folder', false, () {
+              _close(context);
+              showNewFolderDialog(context, state);
             }),
           Expanded(child: ListView(children: tree)),
           if (state.tags.isNotEmpty) ...[

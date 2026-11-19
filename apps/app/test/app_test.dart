@@ -640,6 +640,100 @@ void main() {
       expect(storage.read('davdart.server.v1'), isEmpty);
     });
 
+    test(
+      'folders: contain notes, scope Board and List, move, delete',
+      () async {
+        final storage = MemoryStorage();
+        final src = SpaceNoteSource(
+          Space(SpaceConfig(id: 's', name: 'S'), PersistentNoteStore(storage)),
+          flags: storage,
+        );
+        final s = AppState(src);
+        await s.load();
+        await s.addFolder('Deployment', text: 'Agents: deploy on Fridays');
+        final folder = s.scope!;
+        expect(AppState.isFolder(folder), isTrue);
+        expect(s.scopeUid, folder.uid);
+        expect(s.selectedUid, isNull);
+        await s.addNote('Ship it', parentUid: folder.uid, status: 'todo');
+        await s.addNote('Elsewhere', status: 'todo');
+        expect(s.tree.roots.map((n) => n.note.summary), [
+          'Deployment',
+          'Elsewhere',
+        ]);
+        // Board and List show notes, never folders, and only inside the scope.
+        expect(s.filtered.map((n) => n.summary), ['Ship it']);
+        expect(s.tags, isEmpty); // kind-folder is not a user tag
+        s.openFolder(null);
+        expect(s.filtered.map((n) => n.summary).toSet(), {
+          'Ship it',
+          'Elsewhere',
+        });
+        // Move a note into the folder, then back to the top.
+        final other = s.notes.firstWhere((n) => n.summary == 'Elsewhere');
+        await s.updateNote(other.uid, setParent: true, parentUid: folder.uid);
+        expect(s.tree.find(other.uid)!.parent!.note.uid, folder.uid);
+        // Cannot move a folder into its own child.
+        final child = s.notes.firstWhere((n) => n.summary == 'Ship it');
+        await s.updateNote(folder.uid, setParent: true, parentUid: child.uid);
+        expect(s.tree.find(folder.uid)!.parent, isNull);
+        await s.updateNote(other.uid, setParent: true, parentUid: null);
+        expect(s.tree.find(other.uid)!.parent, isNull);
+        // Editing tags keeps the folder marker.
+        await s.updateNote(folder.uid, tags: ['infra']);
+        expect(AppState.isFolder(s.tree.find(folder.uid)!.note), isTrue);
+        expect(s.tags, ['infra']);
+        // Deleting the open folder clears the scope; its notes move up.
+        s.openFolder(folder.uid);
+        await s.deleteNote(folder.uid);
+        expect(s.scopeUid, isNull);
+        expect(s.tree.roots.map((n) => n.note.summary).toSet(), {
+          'Ship it',
+          'Elsewhere',
+        });
+      },
+    );
+
+    testWidgets('new folder dialog, scope bar and the sidebar tree', (t) async {
+      t.view.physicalSize = const Size(1400, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final storage = MemoryStorage();
+      final src = SpaceNoteSource(
+        Space(SpaceConfig(id: 's', name: 'S'), PersistentNoteStore(storage)),
+        flags: storage,
+      );
+      final state = AppState(src);
+      await t.pumpWidget(DavdartApp(state: state));
+      await t.pumpAndSettle();
+      await t.tap(find.text('New folder'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('new-folder-title')), 'Planning');
+      await t.enterText(
+        find.byKey(const Key('new-folder-text')),
+        'Keep it short',
+      );
+      await t.tap(find.byKey(const Key('new-folder-add')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('scope-bar')), findsOneWidget);
+      expect(find.byKey(const Key('scope-text')), findsOneWidget);
+      expect(find.byIcon(Icons.folder_open), findsWidgets);
+      // A note made now lands inside the open folder.
+      await t.tap(find.text('New note'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('new-note-title')), 'Inside');
+      await t.tap(find.byKey(const Key('new-note-add')));
+      await t.pumpAndSettle();
+      final inside = state.notes.firstWhere((n) => n.summary == 'Inside');
+      expect(state.tree.find(inside.uid)!.parent!.note.summary, 'Planning');
+      // Closing the scope bar shows the whole space.
+      state.select(null);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('scope-close')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('scope-bar')), findsNothing);
+    });
+
     testWidgets('detail lists earlier versions kept by a merge', (t) async {
       t.view.physicalSize = const Size(1400, 900);
       t.view.devicePixelRatio = 1;

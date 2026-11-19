@@ -11,6 +11,7 @@ import 'board_view.dart';
 import 'detail_view.dart';
 import 'list_view.dart';
 import 'markdown_lite.dart';
+import 'scope_bar.dart';
 import 'sidebar.dart';
 
 ThemeData buildTheme(Tokens t, Brightness b) {
@@ -95,9 +96,16 @@ class Shell extends StatelessWidget {
           final split = c.maxWidth >= Tokens.splitBreakpoint;
           final hasDetail = state.selected != null;
 
-          Widget main() => state.view == ViewMode.board
-              ? BoardView(state: state)
-              : NoteListView(state: state);
+          Widget main() => Column(
+            children: [
+              ScopeBar(state: state),
+              Expanded(
+                child: state.view == ViewMode.board
+                    ? BoardView(state: state)
+                    : NoteListView(state: state),
+              ),
+            ],
+          );
 
           final Widget body;
           if (split) {

@@ -86,6 +86,7 @@ class AppState extends ChangeNotifier {
     syncing = false;
     _syncAgain = false;
     collapsed.clear();
+    scopeUid = null;
     savedViews.clear();
     _loadViews();
     await load();
@@ -293,6 +294,52 @@ class AppState extends ChangeNotifier {
 
   List<Note> notes = [];
   NoteTree tree = NoteTree.build(const []);
+
+  void _setNotes(List<Note> loaded) {
+    notes = loaded;
+    tree = NoteTree.build(notes);
+    if (scopeUid != null && tree.find(scopeUid!) == null) scopeUid = null;
+  }
+
+  /// Notes with this tag are folders: containers that may carry text (for
+  /// example instructions for an agent). The `kind-` prefix is hidden from
+  /// the tag list, like `status-`.
+  static const folderTag = 'kind-folder';
+  static bool isFolder(Note n) => n.categories.contains(folderTag);
+
+  /// The folder whose notes Board and List show; null means the whole Space.
+  String? scopeUid;
+  Note? get scope => scopeUid == null ? null : tree.find(scopeUid!)?.note;
+
+  /// Shows only what is inside folder [uid] (null: the whole Space).
+  void openFolder(String? uid) {
+    scopeUid = uid;
+    selectedUid = null;
+    notifyListeners();
+  }
+
+  /// Adds a folder (a container note), optionally with text, and opens it.
+  Future<void> addFolder(
+    String title, {
+    String? parentUid,
+    String text = '',
+  }) async {
+    final t = title.trim();
+    if (t.isEmpty) return;
+    final now = DateTime.now().toUtc();
+    final n = Note(
+      uid: 'davdart-${now.microsecondsSinceEpoch}',
+      summary: t,
+      description: text.trim(),
+      categories: [folderTag],
+      parentUid: parentUid,
+      created: now,
+      lastModified: now,
+    );
+    await _save(n);
+    if (error == null) openFolder(n.uid);
+  }
+
   bool loading = false;
   String? error;
 
@@ -318,8 +365,7 @@ class AppState extends ChangeNotifier {
       }
       final loaded = await src.load();
       if (src != source) return; // another Space was opened meanwhile
-      notes = loaded;
-      tree = NoteTree.build(notes);
+      _setNotes(loaded);
       if (tag != null && !notes.any((n) => n.categories.contains(tag))) {
         tag = null;
       }
@@ -416,8 +462,7 @@ class AppState extends ChangeNotifier {
           : 'Synced ${_clock()}';
       final loaded = await s.load();
       if (s != _space) return;
-      notes = loaded;
-      tree = NoteTree.build(notes);
+      _setNotes(loaded);
     } catch (e) {
       if (s != _space) return;
       syncMessage = 'Sync failed: $e';
@@ -443,8 +488,7 @@ class AppState extends ChangeNotifier {
       await change(src);
       final loaded = await src.load();
       if (src != source) return;
-      notes = loaded;
-      tree = NoteTree.build(notes);
+      _setNotes(loaded);
       error = null;
     } catch (e) {
       if (src != source) return;
@@ -469,19 +513,33 @@ class AppState extends ChangeNotifier {
     String? title,
     String? text,
     List<String>? tags,
+    bool setParent = false,
+    String? parentUid,
   }) async {
     final n = tree.find(uid)?.note;
     if (n == null) return;
     final t = title?.trim();
     if (t != null && t.isEmpty) return;
-    final copy = n.copyWith(summary: t);
+    if (setParent && !tree.canMove(uid, parentUid)) return;
+    final copy = n.copyWith(
+      summary: t,
+      parentUid: setParent ? parentUid : null,
+      clearParent: setParent && parentUid == null,
+    );
     final p = PlanItem.fromNote(copy);
     if (text != null) p.text = text;
     if (tags != null) {
       // Status tags are managed by the status menu, not here.
       copy.categories = [
-        ...copy.categories.where((c) => c.startsWith('status-')),
-        ...tags.where((c) => c.isNotEmpty && !c.startsWith('status-')),
+        ...copy.categories.where(
+          (c) => c.startsWith('status-') || c.startsWith('kind-'),
+        ),
+        ...tags.where(
+          (c) =>
+              c.isNotEmpty &&
+              !c.startsWith('status-') &&
+              !c.startsWith('kind-'),
+        ),
       ];
     }
     await _save(p.apply());
@@ -560,7 +618,7 @@ class AppState extends ChangeNotifier {
   List<String> get tags => ({
     for (final n in notes)
       for (final c in n.categories)
-        if (!c.startsWith('status-')) c,
+        if (!c.startsWith('status-') && !c.startsWith('kind-')) c,
   }.toList()..sort());
 
   bool matches(Note n) {
@@ -572,10 +630,18 @@ class AppState extends ChangeNotifier {
   }
 
   /// Notes after search and tag filters.
-  List<Note> get filtered => [
-    for (final n in notes)
-      if (matches(n)) n,
-  ]..sort(NoteTree.byCreated);
+  List<Note> get filtered {
+    final inScope = scopeUid == null
+        ? null
+        : {for (final n in tree.descendants(scopeUid!)) n.uid};
+    return [
+      for (final n in notes)
+        if (!isFolder(n) &&
+            (inScope == null || inScope.contains(n.uid)) &&
+            matches(n))
+          n,
+    ]..sort(NoteTree.byCreated);
+  }
 
   /// Board columns in a stable order; notes with no status go last.
   List<(String, List<Note>)> get columns {
