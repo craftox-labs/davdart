@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../state/app_state.dart';
 import 'chips.dart';
+import 'edit_note_dialog.dart';
 import 'markdown_lite.dart';
 
 class DetailView extends StatelessWidget {
@@ -39,6 +40,20 @@ class DetailView extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: t.muted),
                 ),
               ),
+              if (state.editable) ...[
+                IconButton(
+                  key: const Key('edit-note'),
+                  tooltip: 'Edit',
+                  icon: const Icon(Icons.edit_outlined),
+                  onPressed: () => showEditNoteDialog(context, state, note),
+                ),
+                IconButton(
+                  key: const Key('delete-note'),
+                  tooltip: 'Delete',
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: () => confirmDeleteNote(context, state, note),
+                ),
+              ],
             ],
           ),
         ),

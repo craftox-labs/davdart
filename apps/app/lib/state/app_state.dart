@@ -42,13 +42,15 @@ class AppState extends ChangeNotifier {
 
   bool get editable => source is EditableNoteSource;
 
-  Future<void> _save(Note n) async {
+  Future<void> _save(Note n) => _edit((src) => src.save(n));
+
+  Future<void> _edit(Future<void> Function(EditableNoteSource) change) async {
     final src = source;
     if (src is! EditableNoteSource) {
       throw StateError('This source is read-only');
     }
     try {
-      await src.save(n);
+      await change(src);
       notes = await source.load();
       tree = NoteTree.build(notes);
       error = null;
@@ -65,6 +67,47 @@ class AppState extends ChangeNotifier {
     final copy = n.copyWith();
     final p = PlanItem.fromNote(copy)..setStatus(status);
     await _save(p.apply());
+  }
+
+  /// Changes a note's title and/or body text (the header lines stay).
+  Future<void> updateNote(
+    String uid, {
+    String? title,
+    String? text,
+    List<String>? tags,
+  }) async {
+    final n = tree.find(uid)?.note;
+    if (n == null) return;
+    final t = title?.trim();
+    if (t != null && t.isEmpty) return;
+    final copy = n.copyWith(summary: t);
+    final p = PlanItem.fromNote(copy);
+    if (text != null) p.text = text;
+    if (tags != null) {
+      // Status tags are managed by the status menu, not here.
+      copy.categories = [
+        ...copy.categories.where((c) => c.startsWith('status-')),
+        ...tags.where((c) => c.isNotEmpty && !c.startsWith('status-')),
+      ];
+    }
+    await _save(p.apply());
+  }
+
+  /// Deletes a note; its children move up to its parent so none are lost.
+  Future<void> deleteNote(String uid) async {
+    final node = tree.find(uid);
+    if (node == null) return;
+    final parent = node.note.parentUid;
+    final kids = [for (final c in node.children) c.note.copyWith()];
+    await _edit((src) async {
+      for (final k in kids) {
+        k.parentUid = parent;
+        await src.save(k);
+      }
+      await src.delete(uid);
+    });
+    if (selectedUid == uid) selectedUid = null;
+    notifyListeners();
   }
 
   /// Adds a note (a child of [parentUid] if given) and selects it.

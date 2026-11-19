@@ -161,6 +161,56 @@ void main() {
       expect(find.text('Fresh idea'), findsWidgets);
     });
 
+    test('updateNote keeps the header; deleteNote moves children up', () async {
+      final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+      final s = AppState(SpaceNoteSource(space, seed: FakeSource(sample)));
+      await s.load();
+      await s.updateNote('b', title: ' Core slice 2 ', text: 'New text');
+      final b = s.tree.find('b')!.note;
+      expect(b.summary, 'Core slice 2');
+      expect(
+        b.description,
+        'item_id: davdart-slice-1\nstatus: backlog\n\nNew text',
+      );
+      await s.updateNote('b', tags: ['x', 'status-done', '']);
+      expect(s.tree.find('b')!.note.categories, ['status-backlog', 'x']);
+      await s.updateNote('b', title: '   ');
+      expect(s.tree.find('b')!.note.summary, 'Core slice 2');
+      s.select('a');
+      await s.deleteNote('a');
+      expect(s.notes.map((n) => n.uid).toSet(), {'b', 'c'});
+      expect(s.tree.find('b')!.note.parentUid, isNull);
+      expect(s.selectedUid, isNull);
+      expect(s.error, isNull);
+    });
+
+    testWidgets('edit dialog changes the title', (t) async {
+      t.view.physicalSize = const Size(1400, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+      await t.pumpWidget(
+        DavdartApp(source: SpaceNoteSource(space, seed: FakeSource(sample))),
+      );
+      await t.pumpAndSettle();
+      await t.tap(find.text('Loose note').first);
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('edit-note')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('edit-title')), 'Renamed');
+      await t.tap(find.byKey(const Key('edit-save')));
+      await t.pumpAndSettle();
+      expect((await space.notes()).map((n) => n.summary), contains('Renamed'));
+      await t.tap(find.byKey(const Key('delete-note')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('delete-confirm')));
+      await t.pumpAndSettle();
+      expect(
+        (await space.notes()).map((n) => n.summary),
+        isNot(contains('Renamed')),
+      );
+    });
+
     testWidgets('search narrows the list', (t) async {
       await pump(t);
       await t.tap(find.text('List').first);

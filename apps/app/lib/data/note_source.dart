@@ -57,6 +57,7 @@ List<Note> parseNotesJson(String body) {
 /// A source the app can also write to.
 abstract class EditableNoteSource implements NoteSource {
   Future<Note> save(Note note);
+  Future<void> delete(String uid);
 }
 
 /// Notes held in a local [Space]. Edits go through the Space (and so the sync
@@ -82,4 +83,7 @@ class SpaceNoteSource implements EditableNoteSource {
 
   @override
   Future<Note> save(Note note) => space.save(note);
+
+  @override
+  Future<void> delete(String uid) => space.delete(uid);
 }
