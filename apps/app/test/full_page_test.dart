@@ -288,17 +288,15 @@ void main() {
       await _settle(t);
       expect(s.selectedUid, 'b');
       expect(await _titles(), isNot(contains('Changed')));
-      // Save path, from Minimise.
+      // Save path, from changing the selection.
       await t.tap(_k('edit-note'));
       await _settle(t);
       await _type(t, 'edit-title', 'Beta 2');
-      s.maximise();
-      await _settle(t);
-      await t.tap(_k('pane-size'));
+      await t.tap(find.text('Alpha').first);
       await _settle(t);
       await t.tap(_k('leave-save'));
       await _settle(t);
-      expect(s.maximised, isFalse);
+      expect(s.selectedUid, 'a');
       expect(await _titles(), contains('Beta 2'));
     });
 

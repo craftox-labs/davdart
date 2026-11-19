@@ -71,7 +71,7 @@ class DetailHeader extends StatelessWidget {
       key: const Key('pane-size'),
       tooltip: max ? 'Minimise' : 'Maximise',
       icon: max ? FLucideIcons.minimize : FLucideIcons.maximize,
-      onPress: max ? () => state.guarded(state.minimise) : state.maximise,
+      onPress: max ? () => state.minimise() : state.maximise,
     );
     return SizedBox(
       key: const Key('detail-header'),

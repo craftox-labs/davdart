@@ -283,7 +283,7 @@ class Shell extends StatelessWidget {
                           const SingleActivator(
                             LogicalKeyboardKey.escape,
                           ): () =>
-                              state.guarded(state.minimise),
+                              state.minimise(),
                       },
                       // Focus so the shortcuts work before anything is clicked.
                       child: Focus(

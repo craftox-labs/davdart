@@ -228,7 +228,7 @@ void main() {
       expect(tip(), 'Minimise');
     });
 
-    testWidgets('Minimise keeps the dirty guard', (t) async {
+    testWidgets('Minimise keeps the open draft without prompting', (t) async {
       final s = await _pump(t);
       s.select('a');
       s.maximise();
@@ -239,15 +239,10 @@ void main() {
       await t.pump();
       await t.tap(_k('pane-size'));
       await t.pumpAndSettle();
-      expect(_k('leave-save'), findsOneWidget);
-      await t.tap(find.text('Keep editing'));
-      await t.pumpAndSettle();
-      expect(s.maximised, isTrue);
-      await t.tap(_k('pane-size'));
-      await t.pumpAndSettle();
-      await t.tap(_k('leave-discard'));
-      await t.pumpAndSettle();
+      expect(_k('leave-save'), findsNothing);
       expect(s.maximised, isFalse);
+      expect(s.dirty, isTrue);
+      expect(s.selectedUid, 'a');
     });
 
     testWidgets('mirrored: the header is on the left, Maximise at its end', (
