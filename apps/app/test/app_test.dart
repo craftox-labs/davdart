@@ -194,12 +194,19 @@ void main() {
       expect(s.renameSpace('Planning'), isFalse);
       expect(s.renameSpace('Scratch'), isTrue);
       expect(s.currentSpaceName, 'Scratch');
+      expect(storage.keys, contains('davdart.views.v1.$id'));
+      expect(storage.read('davdart.views.v1'), isNull);
+      final doomed = c.sourceFor(id);
       expect(SpaceCatalog(storage).spaces.last.name, 'Scratch');
       expect(storage.keys.any((k) => k.startsWith('sp.$id.')), isTrue);
       await s.deleteSpace();
       expect(s.currentSpaceId, 'planning');
       expect(s.notes, hasLength(3));
       expect(s.spaces.map((e) => e.id), ['planning']);
+      expect(storage.keys.where((k) => k.contains(id)), isEmpty);
+      await doomed.save(
+        Note(uid: 'late', summary: 'late', description: ''),
+      ); // a save still running after delete must not leave data behind
       expect(storage.keys.where((k) => k.contains(id)), isEmpty);
       await s.deleteSpace(); // Planning: ignored
       expect(s.spaces, hasLength(1));

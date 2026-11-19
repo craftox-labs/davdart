@@ -126,10 +126,12 @@ class AppState extends ChangeNotifier {
     final c = catalog;
     if (needle.isEmpty || c == null) return const [];
     final hits = <SpaceHit>[];
+    final cur = c.current; // snapshot: the user may switch while we search
+    final curNotes = List.of(notes);
     for (final sp in List.of(c.spaces)) {
       List<Note> list;
-      if (sp.id == c.current) {
-        list = notes;
+      if (sp.id == cur) {
+        list = curNotes;
       } else {
         try {
           list = await c.sourceFor(sp.id).load();
@@ -149,6 +151,7 @@ class AppState extends ChangeNotifier {
 
   /// Opens a search hit: switches to its Space and selects the note.
   Future<void> openHit(SpaceHit h) async {
+    if (catalog?.spaces.any((s) => s.id == h.space.id) != true) return;
     await switchSpace(h.space.id);
     select(h.note.uid);
   }
@@ -179,7 +182,7 @@ class AppState extends ChangeNotifier {
   }
 
   void _storeViews() => prefs?.write(
-    _viewsKey,
+    _viewsKeyNow,
     jsonEncode([for (final v in savedViews) v.toJson()]),
   );
 

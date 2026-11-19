@@ -15,13 +15,21 @@ class SpaceInfo {
 
 /// Storage whose keys all start with [prefix].
 class PrefixedStorage implements KeyValueStorage {
-  PrefixedStorage(this.inner, this.prefix);
+  PrefixedStorage(this.inner, this.prefix, {this.dead});
   final KeyValueStorage inner;
   final String prefix;
+
+  /// When this returns true the storage ignores writes (its Space was
+  /// deleted while a save or sync was still running).
+  final bool Function()? dead;
   @override
   String? read(String key) => inner.read('$prefix$key');
   @override
-  void write(String key, String value) => inner.write('$prefix$key', value);
+  void write(String key, String value) {
+    if (dead?.call() ?? false) return;
+    inner.write('$prefix$key', value);
+  }
+
   @override
   void remove(String key) => inner.remove('$prefix$key');
   @override
@@ -54,6 +62,7 @@ class SpaceCatalog {
   static const _currentKey = 'davdart.currentspace.v1';
 
   final List<SpaceInfo> spaces = [];
+  final Set<String> _deleted = {};
   String current = planningId;
 
   void _load() {
@@ -119,6 +128,7 @@ class SpaceCatalog {
   /// cannot be deleted. If it was open, Planning opens instead.
   bool remove(String id) {
     if (id == planningId || !spaces.any((s) => s.id == id)) return false;
+    _deleted.add(id);
     final scoped = PrefixedStorage(storage, 'sp.$id.');
     for (final k in scoped.keys.toList()) {
       scoped.remove(k);
@@ -140,7 +150,11 @@ class SpaceCatalog {
     final info = spaces.firstWhere((s) => s.id == id);
     final scoped = id == planningId
         ? storage
-        : PrefixedStorage(storage, 'sp.$id.');
+        : PrefixedStorage(
+            storage,
+            'sp.$id.',
+            dead: () => _deleted.contains(id),
+          );
     return SpaceNoteSource(
       Space(SpaceConfig(id: id, name: info.name), PersistentNoteStore(scoped)),
       seed: id == planningId ? planningSeed : null,
