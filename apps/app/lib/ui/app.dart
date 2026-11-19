@@ -213,8 +213,12 @@ class Shell extends StatelessWidget {
                 ? 0.0
                 : sidebarWidthOf(context, state);
             final contentW = panelWidth - dockW;
+            // Beside the list the tab spans the pane; where the note replaces
+            // the list (not split) it is a compact tab at the end of the row.
             final detailW = hasDetail && !state.fullPage
-                ? detailWidthFor(t, state, contentW)
+                ? (split
+                      ? detailWidthFor(t, state, contentW)
+                      : t.sizes.detailTab.clamp(0.0, contentW))
                 : null;
             // Clear of the panel's rounded corner where the strip starts at
             // the panel edge, else just the concave corner.

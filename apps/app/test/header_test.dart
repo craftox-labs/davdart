@@ -178,6 +178,12 @@ void main() {
       // The note replaces the list, as before.
       expect(_k('detail-pane'), findsNothing);
       expect(_k('detail-header'), findsOneWidget);
+      // Compact tab at the end of the row, not sized for an absent pane.
+      expect(
+        t.getSize(_k('detail-header')).width,
+        Tokens.light.sizes.detailTab,
+      );
+      expect(t.getSize(_k('tab-strip')).width, greaterThan(300));
       await t.tap(_k('expand-note'));
       await t.pumpAndSettle();
       expect(s.fullPage, isTrue);
