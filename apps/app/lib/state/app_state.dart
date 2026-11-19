@@ -283,6 +283,7 @@ class AppState extends ChangeNotifier {
         ? v.tag
         : null;
     selectedUid = null;
+    scopeUid = null;
     notifyListeners();
   }
 
@@ -520,11 +521,13 @@ class AppState extends ChangeNotifier {
     if (n == null) return;
     final t = title?.trim();
     if (t != null && t.isEmpty) return;
-    if (setParent && !tree.canMove(uid, parentUid)) return;
+    // A move that is no longer valid (the parent went away, or a sync put
+    // the note under its own child) is dropped; the rest of the edit saves.
+    final move = setParent && tree.canMove(uid, parentUid);
     final copy = n.copyWith(
       summary: t,
-      parentUid: setParent ? parentUid : null,
-      clearParent: setParent && parentUid == null,
+      parentUid: move ? parentUid : null,
+      clearParent: move && parentUid == null,
     );
     final p = PlanItem.fromNote(copy);
     if (text != null) p.text = text;
@@ -590,6 +593,13 @@ class AppState extends ChangeNotifier {
       selectedUid == null ? null : tree.find(selectedUid!)?.note;
 
   void select(String? uid) {
+    // Showing a note outside the open folder leaves the folder.
+    if (uid != null &&
+        scopeUid != null &&
+        uid != scopeUid &&
+        !tree.descendants(scopeUid!).any((n) => n.uid == uid)) {
+      scopeUid = null;
+    }
     selectedUid = uid;
     notifyListeners();
   }

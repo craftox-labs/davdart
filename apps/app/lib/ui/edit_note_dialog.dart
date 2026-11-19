@@ -33,7 +33,8 @@ Future<void> showEditNoteDialog(
   }
 
   collect(state.tree.roots, 0);
-  var parent = state.tree.find(note.uid)?.parent?.note.uid;
+  final originalParent = state.tree.find(note.uid)?.parent?.note.uid;
+  var parent = originalParent;
   if (!targets.any((e) => e.$1 == parent)) parent = null;
   final isFolder = AppState.isFolder(note);
   return showDialog<void>(

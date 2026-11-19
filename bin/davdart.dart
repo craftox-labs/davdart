@@ -13,7 +13,7 @@ Future<void> main(List<String> args) async {
   final pass = cfg['password'];
   if (args.isEmpty || url == null || user == null || pass == null) {
     stderr.writeln(
-        'usage: davdart list [--status S] [--tag T] | board | show TEXT | add TITLE [BODY] | new TITLE [--id I --status S --owner O --decided-by D --github-ref R --tags a,b] (body on stdin) | set-status MATCH STATUS | append MATCH (text on stdin) | export DIR | rm UID\n'
+        'usage: davdart list [--status S] [--tag T] | board | show TEXT | add TITLE [BODY] | new TITLE [--id I --status S --owner O --decided-by D --github-ref R --tags a,b] (body on stdin) | set-status MATCH STATUS | append MATCH (text on stdin) | folder TITLE [--under MATCH] (text on stdin) | move MATCH TARGET|top | export DIR | rm UID\n'
         'config: url, user, password in ~/.config/davdart/credentials '
         '(key=value lines) or DAVDART_URL, DAVDART_USER, DAVDART_PASSWORD');
     exit(2);
@@ -142,7 +142,10 @@ Future<void> main(List<String> args) async {
                 .trim();
         final now = DateTime.now();
         final status = opt('status');
+        final parent =
+            opt('under') == null ? null : await _one(c, opt('under')!);
         final note = Note(
+          parentUid: parent?.uid,
           uid:
               '${now.microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32).toRadixString(16)}@davdart',
           summary: args[1],
@@ -168,6 +171,48 @@ Future<void> main(List<String> args) async {
         p.apply();
         final saved = await c.putNote(note);
         stdout.writeln('created ${saved.uid}');
+      case 'folder':
+        if (args.length < 2) {
+          stderr.writeln('folder needs a TITLE; text on stdin');
+          exit(2);
+        }
+        final ftext =
+            (await stdin.transform(const SystemEncoding().decoder).join())
+                .trim();
+        final fi = args.indexOf('--under');
+        final fparent =
+            fi > 0 && fi + 1 < args.length ? await _one(c, args[fi + 1]) : null;
+        final fnow = DateTime.now();
+        final folder = Note(
+          uid:
+              '${fnow.microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32).toRadixString(16)}@davdart',
+          summary: args[1],
+          description: ftext,
+          categories: ['kind-folder'],
+          parentUid: fparent?.uid,
+          created: fnow,
+          lastModified: fnow,
+        );
+        final fsaved = await c.putNote(folder);
+        stdout.writeln('folder ${fsaved.uid}');
+      case 'move':
+        if (args.length < 3) {
+          stderr.writeln('move needs MATCH and TARGET (a note, or "top")');
+          exit(2);
+        }
+        final mv = await _one(c, args[1]);
+        final target = args[2] == 'top' ? null : await _one(c, args[2]);
+        final tree = NoteTree.build(await c.listNotes());
+        if (!tree.canMove(mv.uid, target?.uid)) {
+          stderr.writeln('cannot move ${mv.summary} there');
+          exit(1);
+        }
+        final moved = mv.copyWith(
+          parentUid: target?.uid,
+          clearParent: target == null,
+        );
+        await c.putNote(moved);
+        stdout.writeln('${mv.summary}: now under ${target?.summary ?? 'top'}');
       case 'rm':
         if (args.length < 2) {
           stderr.writeln('rm needs a uid');

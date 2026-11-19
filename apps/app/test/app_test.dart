@@ -656,7 +656,9 @@ void main() {
         expect(s.scopeUid, folder.uid);
         expect(s.selectedUid, isNull);
         await s.addNote('Ship it', parentUid: folder.uid, status: 'todo');
-        await s.addNote('Elsewhere', status: 'todo');
+        await s.addNote('Elsewhere', status: 'todo'); // selecting it leaves
+        expect(s.scopeUid, isNull); // the folder, as it is outside it
+        s.openFolder(folder.uid);
         expect(s.tree.roots.map((n) => n.note.summary), [
           'Deployment',
           'Elsewhere',
@@ -679,6 +681,19 @@ void main() {
         expect(s.tree.find(folder.uid)!.parent, isNull);
         await s.updateNote(other.uid, setParent: true, parentUid: null);
         expect(s.tree.find(other.uid)!.parent, isNull);
+        // An invalid move is dropped but the rest of the edit still saves.
+        await s.updateNote(
+          folder.uid,
+          title: 'Deploy',
+          setParent: true,
+          parentUid: child.uid,
+        );
+        expect(s.tree.find(folder.uid)!.note.summary, 'Deploy');
+        expect(s.tree.find(folder.uid)!.parent, isNull);
+        // Showing a note outside the open folder leaves the folder.
+        s.openFolder(folder.uid);
+        s.select(other.uid);
+        expect(s.scopeUid, isNull);
         // Editing tags keeps the folder marker.
         await s.updateNote(folder.uid, tags: ['infra']);
         expect(AppState.isFolder(s.tree.find(folder.uid)!.note), isTrue);
