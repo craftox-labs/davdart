@@ -10,7 +10,8 @@ import 'theme.dart';
 
 /// The window-filling frame in the frame colour. On a wide screen it
 /// holds the [IconRail] and the content in a rounded, bordered panel inset
-/// from the frame edge; otherwise the content fills the frame.
+/// from the frame edge; otherwise the content fills the frame. With
+/// [LayoutSide.end] the rail sits on the right edge and the panel to its left.
 class ShellFrame extends StatelessWidget {
   const ShellFrame({
     super.key,
@@ -25,6 +26,7 @@ class ShellFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
+    final mirror = state.layoutSide == LayoutSide.end;
     if (!showRail) {
       return ColoredBox(color: t.frame, child: child);
     }
@@ -34,12 +36,13 @@ class ShellFrame extends StatelessWidget {
         fit: StackFit.expand,
         children: [
           Positioned.fill(
-            left: t.sizes.rail,
+            left: mirror ? 0 : t.sizes.rail,
+            right: mirror ? t.sizes.rail : 0,
             child: Padding(
               padding: EdgeInsets.fromLTRB(
-                0,
+                mirror ? t.sizes.frameInset : 0,
                 t.sizes.frameInset,
-                t.sizes.frameInset,
+                mirror ? 0 : t.sizes.frameInset,
                 t.sizes.frameInset,
               ),
               child: DecoratedBox(
@@ -62,9 +65,10 @@ class ShellFrame extends StatelessWidget {
             ),
           ),
           // The rail sits above the panel so the active tab can paint over
-          // the panel's left border.
+          // the panel's border on the rail side.
           Positioned(
-            left: 0,
+            left: mirror ? null : 0,
+            right: mirror ? 0 : null,
             top: 0,
             bottom: 0,
             width: t.sizes.rail,
@@ -116,25 +120,35 @@ class RailTabPainter extends CustomPainter {
     required this.borderWidth,
     required this.radius,
     required this.margin,
+    this.flip = false,
   });
   final Color fill, border;
   final double borderWidth, radius, margin;
+
+  /// Mirrors the tab to open leftwards (the rail is on the right).
+  final bool flip;
 
   /// How far the tab reaches past the item box: the margin plus the panel's
   /// border, so its right edge ends flush with the panel's inner edge.
   double get reach => margin + borderWidth;
 
   /// The tab body in the item's coordinates.
-  Rect body(Size size) => Rect.fromLTWH(0, 0, size.width + reach, size.height);
+  Rect body(Size size) =>
+      Rect.fromLTWH(flip ? -reach : 0, 0, size.width + reach, size.height);
 
   @override
   void paint(Canvas canvas, Size size) {
+    if (flip) {
+      canvas
+        ..translate(size.width, 0)
+        ..scale(-1, 1);
+    }
     final edge = size.width + margin; // x of the panel's outer left edge
     final r = radius;
     final fillPaint = Paint()..color = fill;
     canvas.drawRRect(
       RRect.fromRectAndCorners(
-        body(size),
+        Rect.fromLTWH(0, 0, size.width + reach, size.height),
         topLeft: Radius.circular(r),
         bottomLeft: Radius.circular(r),
       ),
@@ -173,7 +187,8 @@ class RailTabPainter extends CustomPainter {
       border != old.border ||
       borderWidth != old.borderWidth ||
       radius != old.radius ||
-      margin != old.margin;
+      margin != old.margin ||
+      flip != old.flip;
 }
 
 /// One rail or selector button: an icon in a rounded square that takes the
@@ -191,6 +206,7 @@ class RailButton extends StatelessWidget {
     this.tab = false,
     this.tabMargin = 0,
     this.tipRight = false,
+    this.mirror = false,
   });
   final IconData icon;
   final String label;
@@ -200,13 +216,21 @@ class RailButton extends StatelessWidget {
   final double tabMargin;
   final bool tipRight;
 
+  /// The rail is on the right edge: the tab opens leftwards and the tooltip
+  /// opens to the left of the icon.
+  final bool mirror;
+
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final asTab = active && tab;
     return FTooltip(
-      tipAnchor: tipRight ? Alignment.centerLeft : Alignment.bottomCenter,
-      childAnchor: tipRight ? Alignment.centerRight : Alignment.topCenter,
+      tipAnchor: tipRight
+          ? (mirror ? Alignment.centerRight : Alignment.centerLeft)
+          : Alignment.bottomCenter,
+      childAnchor: tipRight
+          ? (mirror ? Alignment.centerLeft : Alignment.centerRight)
+          : Alignment.topCenter,
       tipBuilder: (_, _) => Text(label),
       child: FTappable(
         semanticsLabel: label,
@@ -231,6 +255,7 @@ class RailButton extends StatelessWidget {
                   borderWidth: t.borders.hairline,
                   radius: t.radii.tab,
                   margin: tabMargin,
+                  flip: mirror,
                 ),
                 child: Center(child: glyph),
               ),
@@ -265,6 +290,7 @@ class SectionButton extends StatelessWidget {
     this.tab = false,
     this.tabMargin = 0,
     this.tipRight = false,
+    this.mirror = false,
   });
   final Section section;
   final bool active;
@@ -272,6 +298,7 @@ class SectionButton extends StatelessWidget {
   final bool tab;
   final double tabMargin;
   final bool tipRight;
+  final bool mirror;
 
   @override
   Widget build(BuildContext context) {
@@ -284,6 +311,7 @@ class SectionButton extends StatelessWidget {
       tab: tab,
       tabMargin: tabMargin,
       tipRight: tipRight,
+      mirror: mirror,
     );
   }
 }
@@ -297,18 +325,24 @@ class SpacesMenuButton extends StatelessWidget {
     super.key,
     required this.state,
     this.below = false,
+    this.mirror = false,
     this.onPick,
   });
   final AppState state;
   final bool below;
+
+  /// The rail is on the right edge: the menu opens to the left of the icon.
+  final bool mirror;
 
   /// Runs before a manage action opens a dialog (closes the narrow sheet).
   final VoidCallback? onPick;
 
   @override
   Widget build(BuildContext context) => FPopoverMenu(
-    menuAnchor: Alignment.topLeft,
-    childAnchor: below ? Alignment.bottomLeft : Alignment.topRight,
+    menuAnchor: mirror ? Alignment.topRight : Alignment.topLeft,
+    childAnchor: below
+        ? Alignment.bottomLeft
+        : (mirror ? Alignment.topLeft : Alignment.topRight),
     menuBuilder: (ctx, controller, _) =>
         spaceMenuGroups(ctx, state, controller, onPick: onPick),
     builder: (ctx, controller, _) => RailButton(
@@ -316,6 +350,7 @@ class SpacesMenuButton extends StatelessWidget {
       label: spacesLabel,
       active: false,
       tipRight: !below,
+      mirror: mirror,
       onPress: controller.toggle,
     ),
   );
@@ -330,6 +365,7 @@ class IconRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
+    final mirror = state.layoutSide == LayoutSide.end;
     Widget button(Section s) => SectionButton(
       key: Key('rail-${s.name}'),
       section: s,
@@ -337,6 +373,7 @@ class IconRail extends StatelessWidget {
       tab: !state.sidebarCollapsed,
       tabMargin: (t.sizes.rail - t.sizes.railItem) / 2,
       tipRight: true,
+      mirror: mirror,
       onPress: () => state.pressRail(s),
     );
     return SizedBox(
@@ -349,7 +386,11 @@ class IconRail extends StatelessWidget {
           children: [
             const LogoSlot(),
             SizedBox(height: t.space.xs),
-            SpacesMenuButton(key: const Key('rail-spaces'), state: state),
+            SpacesMenuButton(
+              key: const Key('rail-spaces'),
+              state: state,
+              mirror: mirror,
+            ),
             for (final s in topSections()) button(s),
             const Spacer(),
             for (final s in bottomSections(state)) button(s),

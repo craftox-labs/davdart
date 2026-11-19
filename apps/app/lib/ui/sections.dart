@@ -459,7 +459,36 @@ class SettingsSection extends _Section {
         _syncMessage(state),
       ],
       _label(context, 'APPEARANCE'),
-      const _Muted('Theme follows the system. More options later.'),
+      const _Muted('Theme follows the system.'),
+      Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: tokensOf(context).space.md,
+          vertical: tokensOf(context).space.xs,
+        ),
+        child: FSelectGroup<LayoutSide>(
+          key: const Key('layout-side'),
+          label: const Text('Layout side'),
+          description: const Text('Which edge the icon rail sits on.'),
+          control: FMultiValueControl.lifted(
+            value: {state.layoutSide},
+            onChange: (v) {
+              // A lifted group adds to the set: take the newly picked one.
+              final picked = v.where((x) => x != state.layoutSide);
+              if (picked.isNotEmpty) state.setLayoutSide(picked.first);
+            },
+          ),
+          children: [
+            FSelectGroupItemMixin.radio<LayoutSide>(
+              value: LayoutSide.start,
+              label: const Text('Start'),
+            ),
+            FSelectGroupItemMixin.radio<LayoutSide>(
+              value: LayoutSide.end,
+              label: const Text('End'),
+            ),
+          ],
+        ),
+      ),
       _label(context, 'ABOUT'),
       const _Muted('davdart: notes and plans, kept in Spaces.'),
     ],
