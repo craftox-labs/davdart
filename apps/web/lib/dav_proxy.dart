@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
@@ -6,6 +7,9 @@ import 'package:shelf/shelf.dart';
 const _methods = {
   'OPTIONS', 'PROPFIND', 'REPORT', 'GET', 'PUT', 'DELETE', //
 };
+
+/// Notes are small; this only stops runaway uploads.
+const _maxBody = 2 * 1024 * 1024;
 const _forwardRequest = {
   'authorization', 'content-type', 'depth', 'if-match', 'if-none-match',
   'accept', //
@@ -50,14 +54,29 @@ Handler davProxy(Uri upstream, {http.Client? client}) {
       query: req.url.query.isEmpty ? null : req.url.query,
     );
     final out = http.Request(req.method, target)
+      ..followRedirects = false
       ..headers['X-Script-Name'] = '/dav';
     req.headers.forEach((k, v) {
       if (_forwardRequest.contains(k.toLowerCase())) out.headers[k] = v;
     });
-    out.bodyBytes = Uint8List.fromList(
-      [for (final chunk in await req.read().toList()) ...chunk],
-    );
-    final res = await http.Response.fromStream(await c.send(out));
+    final declared = req.contentLength;
+    if (declared != null && declared > _maxBody) {
+      return Response(413, body: 'too large');
+    }
+    final body = <int>[];
+    await for (final chunk in req.read()) {
+      body.addAll(chunk);
+      if (body.length > _maxBody) return Response(413, body: 'too large');
+    }
+    out.bodyBytes = Uint8List.fromList(body);
+    final http.Response res;
+    try {
+      res = await http.Response.fromStream(
+        await c.send(out).timeout(const Duration(seconds: 30)),
+      );
+    } on TimeoutException {
+      return Response(504, body: 'upstream timed out');
+    }
     return Response(
       res.statusCode,
       body: res.bodyBytes,

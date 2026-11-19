@@ -89,7 +89,11 @@ class AppState extends ChangeNotifier {
   /// Syncs with the server (if connected), then reloads.
   Future<void> sync() async {
     final s = _space;
-    if (s == null || !s.connected || syncing) return;
+    if (s == null || !s.connected) return;
+    if (syncing) {
+      _syncAgain = true; // an edit landed mid-sync: run once more after it
+      return;
+    }
     syncing = true;
     syncMessage = 'Syncing…';
     notifyListeners();
@@ -109,7 +113,13 @@ class AppState extends ChangeNotifier {
     }
     syncing = false;
     notifyListeners();
+    if (_syncAgain) {
+      _syncAgain = false;
+      await sync();
+    }
   }
+
+  bool _syncAgain = false;
 
   Future<void> _save(Note n) => _edit((src) => src.save(n));
 
