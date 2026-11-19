@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import 'markdown_lite.dart';
+import 'new_note_dialog.dart';
 
 class Sidebar extends StatelessWidget {
   const Sidebar({super.key, required this.state, this.inDrawer = false});
@@ -150,6 +151,11 @@ class Sidebar extends StatelessWidget {
             padding: const EdgeInsets.only(left: 6, bottom: 4),
             child: Text('NOTES', style: label),
           ),
+          if (state.editable)
+            item(Icons.add, 'New note', false, () {
+              _close(context);
+              showNewNoteDialog(context, state);
+            }),
           Expanded(child: ListView(children: tree)),
           if (state.tags.isNotEmpty) ...[
             Padding(

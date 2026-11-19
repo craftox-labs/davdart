@@ -139,6 +139,28 @@ void main() {
       expect(find.text('Loose note'), findsWidgets);
     });
 
+    testWidgets('new note dialog adds a note and selects it', (t) async {
+      t.view.physicalSize = const Size(1400, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+      await t.pumpWidget(
+        DavdartApp(source: SpaceNoteSource(space, seed: FakeSource(sample))),
+      );
+      await t.pumpAndSettle();
+      await t.tap(find.text('New note'));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('new-note-title')), 'Fresh idea');
+      await t.tap(find.byKey(const Key('new-note-add')));
+      await t.pumpAndSettle();
+      final saved = (await space.notes()).where(
+        (n) => n.summary == 'Fresh idea',
+      );
+      expect(saved, hasLength(1));
+      expect(PlanItem.fromNote(saved.single).status, 'backlog');
+      expect(find.text('Fresh idea'), findsWidgets);
+    });
+
     testWidgets('search narrows the list', (t) async {
       await pump(t);
       await t.tap(find.text('List').first);
