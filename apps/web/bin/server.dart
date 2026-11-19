@@ -33,7 +33,7 @@ Future<void> main(List<String> args) async {
   // The Flutter web build, when present, is served at /app/ (same origin as
   // /api/notes, so the browser needs no cross-origin access).
   final board = buildHandler(load);
-  final appDir = Directory('../app/build/web');
+  final appDir = Directory('../app/build/web'); // relative to apps/web
   final app = appDir.existsSync()
       ? createStaticHandler(appDir.path, defaultDocument: 'index.html')
       : null;

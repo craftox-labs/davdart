@@ -13,7 +13,7 @@ class NoteListView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = Theme.of(context).extension<TokensTheme>()!.tokens;
-    if (state.error != null) {
+    if (state.error != null && state.notes.isEmpty) {
       return Center(
         child: Text(state.error!, style: TextStyle(color: t.muted)),
       );

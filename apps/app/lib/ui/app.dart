@@ -175,19 +175,34 @@ class TopBar extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             const Spacer(),
-            SegmentedButton<ViewMode>(
-              showSelectedIcon: false,
-              style: SegmentedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                side: BorderSide(color: t.line),
+            if (MediaQuery.sizeOf(context).width >= 440)
+              SegmentedButton<ViewMode>(
+                showSelectedIcon: false,
+                style: SegmentedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  side: BorderSide(color: t.line),
+                ),
+                segments: const [
+                  ButtonSegment(value: ViewMode.board, label: Text('Board')),
+                  ButtonSegment(value: ViewMode.list, label: Text('List')),
+                ],
+                selected: {state.view},
+                onSelectionChanged: (s) => state.setView(s.first),
               ),
-              segments: const [
-                ButtonSegment(value: ViewMode.board, label: Text('Board')),
-                ButtonSegment(value: ViewMode.list, label: Text('List')),
-              ],
-              selected: {state.view},
-              onSelectionChanged: (s) => state.setView(s.first),
-            ),
+            if (MediaQuery.sizeOf(context).width < 440)
+              IconButton(
+                tooltip: state.view == ViewMode.board
+                    ? 'Show list'
+                    : 'Show board',
+                icon: Icon(
+                  state.view == ViewMode.board
+                      ? Icons.list
+                      : Icons.view_kanban_outlined,
+                ),
+                onPressed: () => state.setView(
+                  state.view == ViewMode.board ? ViewMode.list : ViewMode.board,
+                ),
+              ),
             IconButton(
               tooltip: 'Reload',
               icon: const Icon(Icons.refresh),

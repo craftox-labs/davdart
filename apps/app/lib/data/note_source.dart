@@ -28,12 +28,19 @@ class ApiNoteSource implements NoteSource {
   }
 }
 
+/// Reads the feed, skipping entries that are not usable (no uid, bad date)
+/// instead of failing the whole load.
 List<Note> parseNotesJson(String body) {
-  DateTime? date(Object? v) => v == null ? null : DateTime.parse(v as String);
-  return [
-    for (final j in jsonDecode(body) as List<dynamic>)
+  DateTime? date(Object? v) => v is String ? DateTime.tryParse(v) : null;
+  final out = <Note>[];
+  final seen = <String>{};
+  for (final j in jsonDecode(body) as List<dynamic>) {
+    if (j is! Map<String, dynamic>) continue;
+    final uid = j['uid'];
+    if (uid is! String || uid.isEmpty || !seen.add(uid)) continue;
+    out.add(
       Note(
-        uid: (j as Map<String, dynamic>)['uid'] as String,
+        uid: uid,
         summary: (j['title'] as String?) ?? '',
         description: (j['body'] as String?) ?? '',
         categories: [for (final t in (j['tags'] as List<dynamic>? ?? [])) '$t'],
@@ -42,5 +49,7 @@ List<Note> parseNotesJson(String body) {
         created: date(j['created']),
         lastModified: date(j['modified']),
       ),
-  ];
+    );
+  }
+  return out;
 }

@@ -30,6 +30,9 @@ class AppState extends ChangeNotifier {
     try {
       notes = await source.load();
       tree = NoteTree.build(notes);
+      if (tag != null && !notes.any((n) => n.categories.contains(tag))) {
+        tag = null;
+      }
     } catch (e) {
       error = '$e';
     }

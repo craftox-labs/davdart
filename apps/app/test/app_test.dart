@@ -123,6 +123,33 @@ void main() {
     });
   });
 
+  testWidgets('a 320px phone does not overflow', (t) async {
+    await pump(t, size: const Size(320, 640));
+    expect(t.takeException(), isNull);
+    await t.tap(find.byTooltip('Show list'));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+  });
+
+  test('a bad feed entry is skipped, not fatal', () {
+    final notes = parseNotesJson(
+      '[{"uid":null},{"uid":"ok","title":"T",'
+      '"created":"garbage"},{"uid":"ok"},5]',
+    );
+    expect(notes.map((n) => n.uid), ['ok']);
+    expect(notes.single.created, isNull);
+  });
+
+  test('a filter tag that no longer exists is cleared on reload', () async {
+    final src = FakeSource(sample);
+    final s = AppState(src);
+    await s.load();
+    s.setTag('planning');
+    src.notes.removeWhere((n) => n.uid == 'a');
+    await s.load();
+    expect(s.tag, isNull);
+  });
+
   test('parses the JSON feed', () {
     final notes = parseNotesJson(
       '[{"uid":"x","title":"T","body":"b",'
