@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:davdart/davdart.dart';
+import 'package:davdart/io.dart';
 import 'package:davdart_web/web_app.dart';
 import 'package:shelf/shelf_io.dart' as io;
 

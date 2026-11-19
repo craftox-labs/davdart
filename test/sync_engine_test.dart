@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:davdart/davdart.dart';
+import 'package:davdart/io.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:test/test.dart';

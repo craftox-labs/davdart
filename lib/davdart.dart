@@ -2,7 +2,6 @@
 library;
 
 export 'src/caldav.dart';
-export 'src/config.dart';
 export 'src/ical.dart'
     show ICalException, parseNote, parseNotes, serializeNote, serializeNotes;
 export 'src/merge.dart';

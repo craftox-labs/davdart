@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:davdart/davdart.dart';
+import 'package:davdart/io.dart';
 
 /// Minimal CLI. Config: a key=value file (url, user, password) or DAVDART_*
 /// environment variables, which win. Commands: list, add TITLE [BODY], rm UID.

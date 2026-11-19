@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:davdart/davdart.dart';
+import 'package:davdart/io.dart';
 import 'package:test/test.dart';
 
 import 'support/fake_caldav.dart';
