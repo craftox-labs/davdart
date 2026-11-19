@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:davdart/davdart.dart';
 
 import '../../../test/support/fake_caldav.dart';
@@ -19,6 +21,13 @@ class FakeSource implements NoteSource {
   final List<Note> notes;
   @override
   Future<List<Note>> load() async => notes;
+}
+
+class SlowSource implements NoteSource {
+  SlowSource(this.result);
+  final Future<List<Note>> result;
+  @override
+  Future<List<Note>> load() => result;
 }
 
 final sample = [
@@ -168,6 +177,49 @@ void main() {
         expect(r.notes.map((n) => n.summary), ['Only here']);
         await r.createSpace('   ');
         expect(r.spaces, hasLength(2));
+      },
+    );
+
+    test(
+      'a slow load from a space left behind does not overwrite the new one',
+      () async {
+        final storage = MemoryStorage();
+        final gate = Completer<List<Note>>();
+        final c = SpaceCatalog(storage, planningSeed: SlowSource(gate.future));
+        final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+        final first = s.load(); // planning seed is still loading
+        await s.createSpace('Inbox');
+        await s.addNote('mine');
+        gate.complete(sample);
+        await first;
+        expect(s.currentSpaceName, 'Inbox');
+        expect(s.notes.map((n) => n.summary), ['mine']);
+      },
+    );
+
+    test(
+      'duplicate space names get a number; saved views are per space',
+      () async {
+        final storage = MemoryStorage();
+        final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
+        final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+        await s.load();
+        s.setQuery('x');
+        s.saveView('mine');
+        await s.createSpace('Planning');
+        await s.createSpace('Planning');
+        expect(s.spaces.map((e) => e.name), [
+          'Planning',
+          'Planning 2',
+          'Planning 3',
+        ]);
+        expect(s.savedViews, isEmpty);
+        await s.switchSpace('planning');
+        expect(s.savedViews.map((v) => v.name), ['mine']);
+        storage.write('davdart.spaces.v1', '{broken');
+        final c2 = SpaceCatalog(storage);
+        expect(c2.spaces.map((e) => e.id), ['planning']);
+        expect(storage.read('davdart.spaces.v1.unreadable'), '{broken');
       },
     );
 

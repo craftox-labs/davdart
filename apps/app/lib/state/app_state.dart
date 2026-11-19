@@ -77,6 +77,10 @@ class AppState extends ChangeNotifier {
     tag = null;
     syncMessage = null;
     syncing = false;
+    _syncAgain = false;
+    collapsed.clear();
+    savedViews.clear();
+    _loadViews();
     await load();
   }
 
@@ -92,9 +96,16 @@ class AppState extends ChangeNotifier {
   static const _viewsKey = 'davdart.views.v1';
   final List<SavedView> savedViews = [];
 
+  String get _viewsKeyNow {
+    final id = catalog?.current;
+    return id == null || id == SpaceCatalog.planningId
+        ? _viewsKey
+        : '$_viewsKey.$id';
+  }
+
   void _loadViews() {
     try {
-      final raw = prefs?.read(_viewsKey);
+      final raw = prefs?.read(_viewsKeyNow);
       if (raw == null || raw.isEmpty) return;
       for (final j in jsonDecode(raw) as List<dynamic>) {
         final v = SavedView.fromJson(j);
@@ -155,16 +166,20 @@ class AppState extends ChangeNotifier {
   final Set<String> collapsed = {};
 
   Future<void> load() async {
+    final src = source;
     loading = true;
     error = null;
     notifyListeners();
     try {
-      notes = await source.load();
+      final loaded = await src.load();
+      if (src != source) return; // another Space was opened meanwhile
+      notes = loaded;
       tree = NoteTree.build(notes);
       if (tag != null && !notes.any((n) => n.categories.contains(tag))) {
         tag = null;
       }
     } catch (e) {
+      if (src != source) return;
       error = '$e';
     }
     loading = false;
@@ -210,11 +225,13 @@ class AppState extends ChangeNotifier {
         replaceLocal: replaceLocal,
       );
     } catch (e) {
+      if (s != _space) return;
       syncing = false;
       syncMessage = 'Could not connect: $e';
       notifyListeners();
       return;
     }
+    if (s != _space) return;
     syncing = false;
     await sync();
   }
@@ -238,6 +255,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       final r = await s.sync();
+      if (s != _space) return;
       syncMessage = r == null
           ? null
           : r.errors.isNotEmpty
@@ -245,9 +263,12 @@ class AppState extends ChangeNotifier {
           : r.conflicts.isNotEmpty
           ? 'Synced; ${r.conflicts.length} overlapping edit(s) resolved, older text kept in history'
           : 'Synced ${_clock()}';
-      notes = await source.load();
+      final loaded = await s.load();
+      if (s != _space) return;
+      notes = loaded;
       tree = NoteTree.build(notes);
     } catch (e) {
+      if (s != _space) return;
       syncMessage = 'Sync failed: $e';
     }
     syncing = false;
@@ -269,10 +290,13 @@ class AppState extends ChangeNotifier {
     }
     try {
       await change(src);
-      notes = await source.load();
+      final loaded = await src.load();
+      if (src != source) return;
+      notes = loaded;
       tree = NoteTree.build(notes);
       error = null;
     } catch (e) {
+      if (src != source) return;
       error = 'Save failed: $e';
     }
     notifyListeners();

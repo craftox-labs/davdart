@@ -60,6 +60,9 @@ class SpaceCatalog {
         }
       }
     } catch (_) {
+      // Keep the unreadable value for recovery instead of overwriting it.
+      final raw = storage.read(_listKey);
+      if (raw != null) storage.write('$_listKey.unreadable', raw);
       spaces.clear();
     }
     if (!spaces.any((s) => s.id == planningId)) {
@@ -83,7 +86,11 @@ class SpaceCatalog {
 
   /// Adds a local Space named [name] and returns it.
   SpaceInfo add(String name) {
-    final n = name.trim();
+    var n = name.trim();
+    final base = n;
+    for (var i = 2; spaces.any((s) => s.name == n); i++) {
+      n = '$base $i';
+    }
     final info = SpaceInfo('sp-${DateTime.now().microsecondsSinceEpoch}', n);
     spaces.add(info);
     _save();
