@@ -8,6 +8,7 @@ import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
 import '../data/space_catalog.dart';
 import 'note_draft.dart';
+import 'tab_state.dart';
 
 enum ViewMode { board, list }
 
@@ -237,6 +238,7 @@ class AppState extends ChangeNotifier {
     collapsed.clear();
     scopeUid = null;
     savedViews.clear();
+    _resetTabs();
     await load();
   }
 
@@ -522,9 +524,16 @@ class AppState extends ChangeNotifier {
       orElse: () => null,
     );
     selectedUid = null;
+    _fullPage = false;
     scopeUid = v.folderUid != null && tree.find(v.folderUid!) != null
         ? v.folderUid
         : null;
+    if (v.uid.isNotEmpty) {
+      final t = DocTab.view(v.uid);
+      _tabs.add(t);
+      _activeViewTab = t;
+      _saveTabs();
+    }
     notifyListeners();
   }
 
@@ -554,12 +563,12 @@ class AppState extends ChangeNotifier {
       ..clear()
       ..addAll(
         [
-          for (final n in loaded)
-            ?SavedView.fromNote(n),
+          for (final n in loaded) ?SavedView.fromNote(n),
         ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())),
       );
     tree = NoteTree.build(notes);
     if (scopeUid != null && tree.find(scopeUid!) == null) scopeUid = null;
+    if (_tabsLoaded) _pruneTabs();
   }
 
   /// Notes with this tag are folders: containers that may carry text (for
@@ -576,6 +585,7 @@ class AppState extends ChangeNotifier {
   void openFolder(String? uid) {
     scopeUid = uid;
     selectedUid = null;
+    _fullPage = false;
     notifyListeners();
   }
 
@@ -724,6 +734,7 @@ class AppState extends ChangeNotifier {
       if (tag != null && !notes.any((n) => n.categories.contains(tag))) {
         tag = null;
       }
+      _restoreTabs();
     } catch (e) {
       if (src != source) return;
       error = '$e';
@@ -924,6 +935,7 @@ class AppState extends ChangeNotifier {
     String title, {
     String? parentUid,
     String? status,
+    bool inTab = false,
   }) async {
     final t = title.trim();
     if (t.isEmpty) return;
@@ -940,7 +952,153 @@ class AppState extends ChangeNotifier {
       p.apply();
     }
     await _save(n);
-    if (error == null) select(n.uid);
+    if (error == null) {
+      select(n.uid);
+      if (inTab) openFullPage();
+    }
+  }
+
+  // --- Document tabs ---
+  //
+  // The strip shows a fixed home tab (the Board or List, with the peek pane)
+  // and one closable tab per note opened full page or saved view applied.
+  // Rules: opening a note full page, or applying a saved view, opens its tab
+  // or focuses it if open; the home tab shows whatever the main area holds,
+  // so leaving a tab for home keeps the current filters; Back leaves the
+  // full page for the home tab. Open tabs are saved per Space (by uid).
+
+  final TabList _tabs = TabList();
+  DocTab? _activeViewTab;
+  bool _tabsLoaded = false;
+
+  /// The open document tabs in strip order (the home tab is not in it).
+  List<DocTab> get tabs => List.unmodifiable(_tabs.tabs);
+
+  /// The focused document tab; null means the home tab.
+  DocTab? get activeTab {
+    if (fullPage) return DocTab.note(selectedUid!);
+    final v = _activeViewTab;
+    return v != null && _tabs.contains(v) ? v : null;
+  }
+
+  String get _tabsKey => 'davdart.tabs.v1.${catalog?.current ?? 'default'}';
+
+  void _saveTabs() {
+    if (!_tabsLoaded) return;
+    if (_tabs.tabs.isEmpty) {
+      prefs?.remove(_tabsKey);
+    } else {
+      prefs?.write(_tabsKey, _tabs.encode());
+    }
+  }
+
+  void _resetTabs() {
+    _tabsLoaded = false;
+    _tabs.tabs.clear();
+    _activeViewTab = null;
+    _fullPage = false;
+  }
+
+  bool _tabExists(DocTab t) => switch (t.kind) {
+    TabKind.note => tree.find(t.id) != null,
+    TabKind.view => _viewNotes.containsKey(t.id),
+  };
+
+  void _pruneTabs() {
+    if (_tabs.retain(_tabExists)) _saveTabs();
+    if (_activeViewTab != null && !_tabs.contains(_activeViewTab!)) {
+      _activeViewTab = null;
+    }
+  }
+
+  /// Brings back the tabs saved for this Space, dropping any whose note or
+  /// view is gone. Home is always the focused tab after a restore.
+  void _restoreTabs() {
+    _tabs.decode(prefs?.read(_tabsKey));
+    _tabsLoaded = true;
+    _pruneTabs();
+    _saveTabs();
+  }
+
+  void _openNoteTab(String uid) {
+    if (_tabs.add(DocTab.note(uid))) _saveTabs();
+  }
+
+  /// Title of a tab: the note's title or the view's name.
+  String tabTitle(DocTab t) => switch (t.kind) {
+    TabKind.note => tree.find(t.id)?.note.summary ?? '',
+    TabKind.view => _viewByUid(t.id)?.name ?? '',
+  };
+
+  bool tabIsFolder(DocTab t) =>
+      t.kind == TabKind.note &&
+      tree.find(t.id) != null &&
+      isFolder(tree.find(t.id)!.note);
+
+  /// Whether the tab's note has unsaved edits.
+  bool tabDirty(DocTab t) =>
+      t.kind == TabKind.note &&
+      draft != null &&
+      draft!.uid == t.id &&
+      draft!.dirty;
+
+  SavedView? _viewByUid(String uid) {
+    for (final v in savedViews) {
+      if (v.uid == uid) return v;
+    }
+    return null;
+  }
+
+  /// Shows [t] (null: home) without asking about unsaved edits.
+  void _show(DocTab? t) {
+    if (t == null) {
+      _fullPage = false;
+      _activeViewTab = null;
+      notifyListeners();
+    } else if (t.kind == TabKind.note) {
+      if (tree.find(t.id) == null) return;
+      _activeViewTab = null;
+      _fullPage = true;
+      select(t.id);
+    } else {
+      final v = _viewByUid(t.id);
+      if (v != null) applyView(v);
+    }
+  }
+
+  /// Focuses [t] (null: the home tab), asking first about unsaved edits.
+  Future<void> activateTab(DocTab? t) {
+    if (t == activeTab) return Future.value();
+    return guarded(() => _show(t));
+  }
+
+  /// Closes [t]. Unsaved edits in its note are asked about first. If it was
+  /// focused, its right neighbour (else left, else home) takes over.
+  Future<void> closeTab(DocTab t) {
+    if (!_tabs.contains(t)) return Future.value();
+    void close() {
+      final wasActive = activeTab == t;
+      final next = _tabs.remove(t);
+      if (_activeViewTab == t) _activeViewTab = null;
+      _saveTabs();
+      if (wasActive) {
+        _show(next);
+        if (next == null && t.kind == TabKind.note && selectedUid == t.id) {
+          select(null);
+        }
+      }
+      notifyListeners();
+    }
+
+    // The open draft always belongs to the selected note, so [guarded]
+    // asks exactly when this tab's note has unsaved edits.
+    return tabDirty(t) ? guarded(close) : Future.sync(close);
+  }
+
+  /// Closes the focused document tab (not the home tab).
+  Future<void> closeActiveTab() async {
+    final t = activeTab;
+    if (t != null) await closeTab(t);
   }
 
   // --- Full page and in-place editing ---
@@ -952,8 +1110,10 @@ class AppState extends ChangeNotifier {
   bool get fullPage => _fullPage && selected != null;
 
   void openFullPage() {
-    if (selected == null) return;
+    final n = selected;
+    if (n == null) return;
     _fullPage = true;
+    _openNoteTab(n.uid);
     notifyListeners();
   }
 
@@ -1054,6 +1214,9 @@ class AppState extends ChangeNotifier {
       scopeUid = null;
     }
     selectedUid = uid;
+    if (uid == null) _fullPage = false;
+    // Showing another note while a note fills the page opens its tab.
+    if (uid != null && _fullPage) _openNoteTab(uid);
     if (draft != null && draft!.uid != uid) _dropDraft();
     notifyListeners();
   }
