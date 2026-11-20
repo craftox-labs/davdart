@@ -23,6 +23,8 @@ class CollapsibleSection extends StatefulWidget {
     this.fill = false,
     this.headerPadding = EdgeInsets.zero,
     this.upper = true,
+    this.initiallyCollapsed = false,
+    this.leading,
   });
   final String id;
   final String title;
@@ -34,6 +36,12 @@ class CollapsibleSection extends StatefulWidget {
 
   /// Upper-case the label.
   final bool upper;
+
+  /// Starts collapsed when [prefKey] holds no saved state.
+  final bool initiallyCollapsed;
+
+  /// Shown between the chevron and the label.
+  final Widget? leading;
   final Widget child;
 
   @override
@@ -41,8 +49,9 @@ class CollapsibleSection extends StatefulWidget {
 }
 
 class _CollapsibleSectionState extends State<CollapsibleSection> {
-  late bool _collapsed =
-      widget.prefKey != null && widget.prefs?.read(widget.prefKey!) == 'true';
+  late bool _collapsed = widget.prefKey != null
+      ? widget.prefs?.read(widget.prefKey!) == 'true'
+      : widget.initiallyCollapsed;
 
   void _toggle() {
     setState(() => _collapsed = !_collapsed);
@@ -73,34 +82,43 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
               semanticsLabel:
                   '${_collapsed ? 'Expand' : 'Collapse'} ${widget.title}',
               onPress: _toggle,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _collapsed
-                        ? FLucideIcons.chevronRight
-                        : FLucideIcons.chevronDown,
-                    size: t.icons.lg,
-                    color: t.muted,
-                  ),
-                  SizedBox(width: t.space.sm),
-                  Flexible(
-                    child: OverflowTip(
-                      title,
-                      style: t.type.labelStyle.copyWith(
-                        fontSize: t.type.caption,
-                        color: t.muted,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: narrowLayout(context) ? t.sizes.touchTarget : 0,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _collapsed
+                          ? FLucideIcons.chevronRight
+                          : FLucideIcons.chevronDown,
+                      size: t.icons.lg,
+                      color: t.muted,
+                    ),
+                    SizedBox(width: t.space.sm),
+                    if (widget.leading != null) ...[
+                      widget.leading!,
+                      SizedBox(width: t.space.sm),
+                    ],
+                    Flexible(
+                      child: OverflowTip(
+                        title,
+                        style: t.type.labelStyle.copyWith(
+                          fontSize: t.type.caption,
+                          color: t.muted,
+                        ),
                       ),
                     ),
-                  ),
-                  if (widget.count != null) ...[
-                    SizedBox(width: t.space.sm),
-                    Text(
-                      '${widget.count}',
-                      style: t.type.captionStyle.copyWith(color: t.muted),
-                    ),
+                    if (widget.count != null) ...[
+                      SizedBox(width: t.space.sm),
+                      Text(
+                        '${widget.count}',
+                        style: t.type.captionStyle.copyWith(color: t.muted),
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),

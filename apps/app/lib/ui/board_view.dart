@@ -9,6 +9,7 @@ import '../state/note_drag.dart';
 import '../theme/tokens.dart';
 import 'drag_drop.dart';
 import 'chips.dart';
+import 'collapsible_section.dart';
 import 'content_grid.dart';
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
@@ -118,6 +119,49 @@ class BoardView extends StatelessWidget {
         ],
       ),
     );
+    // Phone widths: one column, a collapsible section per status, cards
+    // with the title only. Doing (else the first status with notes) starts
+    // open. Cards of a collapsed section are not built.
+    if (MediaQuery.sizeOf(context).width < Tokens.stackBreakpoint) {
+      final open = cols.any((c) => c.$1 == 'doing' && c.$2.isNotEmpty)
+          ? 'doing'
+          : cols
+                .firstWhere((c) => c.$2.isNotEmpty, orElse: () => cols.first)
+                .$1;
+      return ListView(
+        key: const Key('board-accordion'),
+        padding: EdgeInsets.all(gap),
+        children: [
+          for (final (name, notes) in cols)
+            _drop(
+              name,
+              context,
+              CollapsibleSection(
+                key: ValueKey('board-acc-$name'),
+                id: 'board-acc-$name',
+                title: name,
+                count: notes.length,
+                initiallyCollapsed: name != open,
+                leading: StatusDot(name == 'notes' ? null : name),
+                headerPadding: EdgeInsets.only(bottom: t.space.sm),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final n in notes)
+                      _Card(
+                        state: state,
+                        note: n,
+                        column: name,
+                        home: keyboard,
+                        compact: true,
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      );
+    }
     return ContentCap(
       child: LayoutBuilder(
         builder: (context, c) {
@@ -195,8 +239,12 @@ class _Card extends StatelessWidget {
     required this.note,
     required this.column,
     this.home = false,
+    this.compact = false,
   });
   final bool home;
+
+  /// Narrow layout: the title alone, no id, description or owner line.
+  final bool compact;
   final AppState state;
   final Note note;
 
@@ -238,30 +286,36 @@ class _Card extends StatelessWidget {
                 ),
                 child: Padding(
                   padding: EdgeInsets.all(t.space.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        p.itemId ?? note.summary,
-                        style: t.type.semiboldStyle,
-                      ),
-                      if (p.itemId != null) ...[
-                        SizedBox(height: t.space.xxs),
-                        OverflowTip(
-                          note.summary,
-                          maxLines: 2,
-                          style: t.type.bodyStyle.copyWith(color: t.muted),
+                  child: compact
+                      ? Text(note.summary, style: t.type.semiboldStyle)
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.itemId ?? note.summary,
+                              style: t.type.semiboldStyle,
+                            ),
+                            if (p.itemId != null) ...[
+                              SizedBox(height: t.space.xxs),
+                              OverflowTip(
+                                note.summary,
+                                maxLines: 2,
+                                style: t.type.bodyStyle.copyWith(
+                                  color: t.muted,
+                                ),
+                              ),
+                            ],
+                            if (p.owner != null) ...[
+                              SizedBox(height: t.space.sm),
+                              Text(
+                                p.owner!,
+                                style: t.type.captionStyle.copyWith(
+                                  color: t.muted,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ],
-                      if (p.owner != null) ...[
-                        SizedBox(height: t.space.sm),
-                        Text(
-                          p.owner!,
-                          style: t.type.captionStyle.copyWith(color: t.muted),
-                        ),
-                      ],
-                    ],
-                  ),
                 ),
               ),
             ),
