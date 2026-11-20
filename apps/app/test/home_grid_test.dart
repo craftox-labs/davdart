@@ -76,16 +76,17 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
-  testWidgets('Today panels line up with two columns each', (t) async {
+  testWidgets('Today cards share the width and stay inside the grid', (
+    t,
+  ) async {
     await _pump(t, _four, w: 1700);
     final cols = _cols(t);
-    final doing = _r(t, 'home-today-doing');
-    final recent = _r(t, 'home-today-tasks');
-    expect(doing.left, closeTo(cols[0].left, 0.5));
-    expect(doing.right, closeTo(cols[1].right, 0.5));
-    expect(recent.left, closeTo(cols[2].left, 0.5));
-    expect(recent.right, closeTo(cols[3].right, 0.5));
-    expect(recent.left - doing.right, closeTo(_t.space.lg, 0.5));
+    final tasks = _r(t, 'home-today-tasks');
+    final events = _r(t, 'home-today-events');
+    expect(tasks.left, closeTo(cols[0].left, 0.5));
+    expect(events.right, closeTo(cols[3].right, 0.5));
+    expect(tasks.width, closeTo(events.width, 0.5));
+    expect(events.left - tasks.right, closeTo(_t.space.lg, 0.5));
   });
 
   testWidgets('falls back to scrolling below the minimum width', (t) async {
@@ -125,27 +126,6 @@ void main() {
     await t.pumpAndSettle();
     expect(_k('board-drop-todo'), findsOneWidget);
     expect(prefs.read('davdart.home.board.collapsed.v1'), isNull);
-  });
-
-  testWidgets('each Today panel collapses on its own and persists', (t) async {
-    final prefs = MemoryStorage();
-    await _pump(t, _four, prefs: prefs);
-    await t.tap(_k('home-today-doing-toggle'));
-    await t.pumpAndSettle();
-    expect(_k('home-today-doing-n2'), findsNothing);
-    expect(_k('home-today-tasks'), findsOneWidget);
-    expect(prefs.read('davdart.home.today.doing.collapsed.v1'), 'true');
-    await _pump(t, _four, prefs: prefs);
-    expect(_k('home-today-doing-n2'), findsNothing);
-    expect(_k('home-today-doing-toggle'), findsOneWidget);
-  });
-
-  testWidgets('Home with no Today rows still has the board', (t) async {
-    await _pump(t, []);
-    // No notes in progress: only the Tasks panel (quick add) is left.
-    expect(_k('home-today-doing'), findsNothing);
-    expect(_k('home-today-tasks'), findsOneWidget);
-    expect(_k('home-board-toggle'), findsOneWidget);
   });
 
   for (final w in [320.0, 480.0, 880.0, 1280.0, 1911.0]) {

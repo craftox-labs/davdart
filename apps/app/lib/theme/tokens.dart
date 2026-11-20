@@ -546,6 +546,6 @@ class Tokens {
   /// Width at which the detail opens beside the list instead of replacing it.
   static const double splitBreakpoint = 1280;
 
-  /// Width below which the Home Today panels stack in one column.
+  /// Width below which the Home Today cards stack in one column.
   static const double stackBreakpoint = 600;
 }

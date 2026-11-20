@@ -1,36 +1,12 @@
 import 'package:davdart/davdart.dart';
-import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/theme/tokens.dart';
-import 'package:davdart_app/ui/app.dart';
 import 'package:davdart_app/ui/task_parts.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 
 import 'tasks_helper.dart';
-
-final _now = DateTime.now().toUtc();
-
-List<Note> _notes() => [
-  Note(uid: 'f', summary: 'Plans', categories: ['kind-folder']),
-  Note(
-    uid: 'a',
-    summary: 'Alpha',
-    parentUid: 'f',
-    description: 'status: doing\nbody',
-    categories: ['status-doing'],
-    lastModified: _now.subtract(const Duration(hours: 2)),
-  ),
-  Note(
-    uid: 'b',
-    summary: 'Beta',
-    description: 'status: backlog\nbody',
-    categories: ['status-backlog'],
-    lastModified: _now.subtract(const Duration(days: 1, hours: 1)),
-  ),
-];
 
 Finder _k(String k) => find.byKey(Key(k));
 
@@ -73,54 +49,42 @@ void main() {
     expect(dueOfDay(day), ICalDate.date(2026, 12, 5));
   });
 
-  testWidgets('shows Doing rows and the Tasks panel, no Recently changed', (
-    t,
-  ) async {
-    await pumpTasksApp(t, notes: _notes());
-    expect(_k('home-today'), findsOneWidget);
-    expect(_k('home-today-doing-a'), findsOneWidget);
-    expect(_k('home-today-doing-b'), findsNothing);
-    expect(_k('home-today-tasks'), findsOneWidget);
-    expect(_k('home-today-recently-changed'), findsNothing);
-    expect(_k('home-tasks-empty'), findsOneWidget);
-    expect(_k('task-quick-add'), findsOneWidget);
+  testWidgets('two cards, equal width and height, empty states', (t) async {
+    await pumpTasksApp(t);
+    expect(_k('home-today-doing'), findsNothing);
+    expect(find.text('Nothing due today'), findsOneWidget);
+    expect(find.text('No events today'), findsOneWidget);
+    final a = t.getRect(_k('home-today-tasks'));
+    final b = t.getRect(_k('home-today-events'));
+    expect(a.width, closeTo(b.width, 0.5));
+    expect(a.height, closeTo(b.height, 0.5));
+    expect(a.top, b.top);
+    expect(b.left, greaterThan(a.right));
+    expect(_k('home-today-tasks-toggle'), findsNothing);
   });
 
-  testWidgets('Tasks panel: overdue, today, then next by due date, max 6', (
-    t,
-  ) async {
+  testWidgets('Tasks card: overdue then today only, overdue marked', (t) async {
     await pumpTasksApp(
       t,
       tasks: [
         mkTask('later', days: 9),
         mkTask('nodate'),
+        mkTask('tomorrow', days: 1),
         mkTask('late', days: -2),
         mkTask('today', days: 0),
-        mkTask('soon', days: 2),
-        mkTask('w2', days: 3),
-        mkTask('w3', days: 4),
-        mkTask('w4', days: 5),
-        mkTask('done', days: -5, status: 'COMPLETED'),
+        mkTask('done', days: 0, status: 'COMPLETED'),
       ],
     );
-    final order = [
-      for (final e
-          in find
-              .byWidgetPredicate(
-                (w) =>
-                    w.key is ValueKey<String> &&
-                    (w.key as ValueKey<String>).value.startsWith(
-                      'home-today-tasks-',
-                    ),
-              )
-              .evaluate())
-        (e.widget.key as ValueKey<String>).value.substring(17),
-    ]..remove('toggle');
-    expect(order, ['late', 'today', 'soon', 'w2', 'w3', 'w4']);
-    expect(_k('home-today-tasks-done'), findsNothing);
-    expect(_k('home-tasks-all'), findsOneWidget);
-    expect(find.text('All tasks (8 open)'), findsOneWidget);
-    // Overdue chip uses the error colour, due today the muted one.
+    expect(_k('home-today-tasks-late'), findsOneWidget);
+    expect(_k('home-today-tasks-today'), findsOneWidget);
+    for (final n in ['later', 'nodate', 'tomorrow', 'done']) {
+      expect(_k('home-today-tasks-$n'), findsNothing);
+    }
+    expect(
+      t.getTopLeft(_k('home-today-tasks-late')).dy,
+      lessThan(t.getTopLeft(_k('home-today-tasks-today')).dy),
+    );
+    expect(t.widget<Text>(_k('home-today-tasks-count')).data, '2');
     Color chipColor(String uid) => t
         .widget<Text>(
           find.descendant(of: _k('due-$uid'), matching: find.byType(Text)),
@@ -129,102 +93,60 @@ void main() {
         .color!;
     expect(chipColor('late'), Tokens.light.error);
     expect(chipColor('today'), Tokens.light.muted);
-    expect(find.text('Today'), findsWidgets);
+    expect(find.text('Nothing due today'), findsNothing);
   });
 
-  testWidgets('checkbox completes a task and it leaves the panel', (t) async {
+  testWidgets('Tasks card caps at 6 rows with "and N more"', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      tasks: [for (var i = 0; i < 8; i++) mkTask('k$i', days: 0)],
+    );
+    expect(_k('home-today-tasks-more'), findsOneWidget);
+    expect(find.text('and 2 more'), findsOneWidget);
+    await t.tap(_k('home-today-tasks-more'));
+    await t.pumpAndSettle();
+    expect(s.section, Section.tasks);
+  });
+
+  testWidgets('checkbox completes a task and it leaves the card', (t) async {
     final s = await pumpTasksApp(t, tasks: [mkTask('a', days: 0)]);
     await t.tap(_k('task-check-a'));
     await t.pumpAndSettle();
     expect(s.taskById('a')!.isCompleted, isTrue);
     expect(_k('home-today-tasks-a'), findsNothing);
+    expect(find.text('Nothing due today'), findsOneWidget);
   });
 
-  testWidgets('a repeating task has a disabled checkbox with a reason', (
+  testWidgets('tap opens a task per the setting; All tasks switches rail', (
     t,
   ) async {
-    final s = await pumpTasksApp(
-      t,
-      tasks: [mkTask('r', days: 0, rrule: 'FREQ=WEEKLY')],
-    );
-    expect(t.widget<FCheckbox>(_k('task-check-r')).enabled, isFalse);
-    expect(_k('task-check-tip-r'), findsOneWidget);
-    await t.tap(_k('task-check-r'), warnIfMissed: false);
+    final s = await pumpTasksApp(t, tasks: [mkTask('k', days: 0)]);
+    await t.tap(find.text('k').first);
     await t.pumpAndSettle();
-    expect(s.taskById('r')!.isCompleted, isFalse);
-    expect(s.taskCompletionBlockerFor('r'), isNotNull);
+    expect(s.peekUid, 'k');
+    expect(_k('task-detail'), findsOneWidget);
+    await t.tap(_k('home-today-tasks-all'));
+    await t.pumpAndSettle();
+    expect(s.section, Section.tasks);
   });
 
-  testWidgets('quick add creates an open task with no due date', (t) async {
+  testWidgets('+ adds a task due today', (t) async {
     final s = await pumpTasksApp(t);
-    await t.enterText(_k('task-quick-add'), 'Buy milk');
-    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.tap(_k('home-today-tasks-add'));
     await t.pumpAndSettle();
-    final k = s.tasks.single;
-    expect(k.summary, 'Buy milk');
-    expect(k.due, isNull);
-    expect(k.isClosed, isFalse);
-    expect(_k('home-today-tasks-${k.uid}'), findsOneWidget);
-  });
-
-  testWidgets('empty Space: Tasks panel with quick add, no Doing', (t) async {
-    await pumpTasksApp(t);
-    expect(_k('home-today-doing'), findsNothing);
-    expect(_k('home-today-tasks'), findsOneWidget);
-    expect(_k('home-tasks-all'), findsNothing);
-  });
-
-  testWidgets('hidden when read-only and without tasks', (t) async {
-    t.view.physicalSize = const Size(1280, 900);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.reset);
-    final s = AppState(SeedNotes(const []), prefs: MemoryStorage());
-    await t.pumpWidget(DavdartApp(state: s));
+    await t.enterText(_k('new-task-title'), 'Buy milk');
+    await t.tap(_k('new-task-add'));
     await t.pumpAndSettle();
-    expect(_k('home-today'), findsNothing);
-  });
-
-  testWidgets('read-only Space with tasks still lists them, checkbox off', (
-    t,
-  ) async {
-    await pumpTasksApp(t, tasks: [mkTask('a', days: 0)], readOnly: true);
-    expect(_k('home-today-tasks-a'), findsOneWidget);
-    expect(t.widget<FCheckbox>(_k('task-check-a')).enabled, isFalse);
-    expect(_k('task-quick-add'), findsNothing);
-  });
-
-  testWidgets('Doing panel hidden when nothing is doing', (t) async {
-    await pumpTasksApp(t, notes: [_notes()[2]]);
-    expect(_k('home-today-doing'), findsNothing);
-    expect(_k('home-today-tasks'), findsOneWidget);
-  });
-
-  testWidgets('collapse persists', (t) async {
-    final prefs = MemoryStorage();
-    await pumpTasksApp(t, notes: _notes(), prefs: prefs);
-    await t.tap(_k('home-today-toggle'));
-    await t.pumpAndSettle();
-    expect(_k('home-today-doing'), findsNothing);
-    expect(_k('home-today'), findsOneWidget);
-    expect(prefs.read('davdart.home.today.collapsed.v1'), 'true');
-    await pumpTasksApp(t, notes: _notes(), prefs: prefs);
-    expect(_k('home-today-doing'), findsNothing);
-    expect(_k('home-today-toggle'), findsOneWidget);
-  });
-
-  testWidgets('Tasks panel collapses on its own', (t) async {
-    final prefs = MemoryStorage();
-    await pumpTasksApp(t, tasks: [mkTask('a', days: 0)], prefs: prefs);
-    await t.tap(_k('home-today-tasks-toggle'));
-    await t.pumpAndSettle();
-    expect(_k('home-today-tasks-a'), findsNothing);
-    expect(prefs.read('davdart.home.today.tasks.collapsed.v1'), 'true');
+    expect(s.tasks.single.summary, 'Buy milk');
+    expect(_k('home-today-tasks-${s.tasks.single.uid}'), findsOneWidget);
   });
 
   testWidgets('respects folder scope', (t) async {
     final s = await pumpTasksApp(
       t,
-      notes: _notes(),
+      notes: [
+        Note(uid: 'f', summary: 'Plans', categories: ['kind-folder']),
+      ],
       tasks: [
         mkTask('in', days: 0, parent: 'f'),
         mkTask('out', days: 0),
@@ -237,23 +159,57 @@ void main() {
     expect(_k('home-today-tasks-out'), findsNothing);
   });
 
-  testWidgets('click opens the note, and a task per the setting', (t) async {
-    final s = await pumpTasksApp(
+  testWidgets('Events card: today only, all-day first, then by time', (
+    t,
+  ) async {
+    await pumpTasksApp(
       t,
-      notes: _notes(),
-      tasks: [mkTask('k', days: 0)],
+      events: [
+        mkEvent('late', summary: 'Late', hour: 18),
+        mkEvent('early', summary: 'Early', hour: 8, location: 'Room 4'),
+        mkEvent('holiday', summary: 'Holiday', allDay: true),
+        mkEvent('off', summary: 'Called off', hour: 10, status: 'CANCELLED'),
+        mkEvent('daily', summary: 'Daily', hour: 12, rrule: 'FREQ=DAILY'),
+        mkEvent('tmrw', summary: 'Tomorrow thing', days: 1),
+      ],
     );
-    await t.tap(_k('home-today-doing-a'));
+    expect(_k('event-row-tmrw'), findsNothing);
+    double y(String k) => t.getTopLeft(find.byKey(Key(k))).dy;
+    expect(y('event-row-holiday'), lessThan(y('event-row-early')));
+    expect(y('event-row-early'), lessThan(y('event-row-off')));
+    expect(y('event-row-off'), lessThan(y('event-row-late')));
+    expect(find.text('All day'), findsOneWidget);
+    expect(_k('event-location-early'), findsOneWidget);
+    expect(_k('event-repeat-daily'), findsOneWidget);
+    expect(t.widget<Text>(_k('home-today-events-count')).data, '5');
+    expect(find.text('No events today'), findsNothing);
+  });
+
+  testWidgets('event tap opens it; All events switches rail', (t) async {
+    final s = await pumpTasksApp(t, events: [mkEvent('e', summary: 'Sync')]);
+    await t.tap(find.text('Sync').first);
     await t.pumpAndSettle();
-    expect(s.peekUid ?? s.mainNoteUid, 'a');
-    await t.tap(find.text('k').first);
+    expect(s.peekUid, 'e');
+    await t.tap(_k('home-today-events-all'));
     await t.pumpAndSettle();
-    expect(s.peekUid, 'k');
-    expect(_k('task-detail'), findsOneWidget);
+    expect(s.section, Section.events);
+  });
+
+  testWidgets('read-only Space: no add buttons, still listed', (t) async {
+    await pumpTasksApp(
+      t,
+      tasks: [mkTask('a', days: 0)],
+      events: [mkEvent('e')],
+      readOnly: true,
+    );
+    expect(_k('home-today-tasks-add'), findsNothing);
+    expect(_k('home-today-events-add'), findsNothing);
+    expect(_k('home-today-tasks-a'), findsOneWidget);
+    expect(t.widget<FCheckbox>(_k('task-check-a')).enabled, isFalse);
   });
 
   testWidgets('not shown on a saved-view tab', (t) async {
-    final s = await pumpTasksApp(t, notes: _notes());
+    final s = await pumpTasksApp(t);
     await t.runAsync(() => s.saveView('V'));
     s.applyView(s.savedViews.single);
     await t.pumpAndSettle();
@@ -261,14 +217,30 @@ void main() {
     expect(_k('home-today'), findsNothing);
   });
 
+  testWidgets('narrow width stacks the cards, same width', (t) async {
+    await pumpTasksApp(t, size: const Size(400, 900));
+    final a = t.getRect(_k('home-today-tasks'));
+    final b = t.getRect(_k('home-today-events'));
+    expect(b.top, greaterThanOrEqualTo(a.bottom));
+    expect(a.width, closeTo(b.width, 0.5));
+    expect(t.takeException(), isNull);
+  });
+
   for (final w in [320.0, 880.0, 1280.0, 1911.0]) {
     testWidgets('no overflow at $w', (t) async {
       await pumpTasksApp(
         t,
-        notes: _notes(),
         tasks: [
           mkTask('late', summary: 'A rather long overdue task title', days: -2),
           mkTask('today', days: 0, tags: ['home']),
+        ],
+        events: [
+          mkEvent(
+            'e',
+            summary: 'A rather long event title indeed',
+            location: 'Somewhere far away',
+            rrule: 'FREQ=DAILY',
+          ),
         ],
         size: Size(w, 900),
       );

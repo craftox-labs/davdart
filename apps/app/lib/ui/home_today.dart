@@ -3,27 +3,25 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
-import '../state/note_drag.dart';
 import '../theme/tokens.dart';
-import 'chips.dart';
-import 'collapsible_section.dart';
 import 'content_grid.dart';
-import 'drag_drop.dart';
-import 'note_menu.dart';
+import 'event_menu.dart';
+import 'events_panel.dart';
+import 'overflow_tip.dart';
+import 'parts.dart';
+import 'task_menu.dart';
 import 'task_parts.dart';
 import 'theme.dart';
-import 'overflow_tip.dart';
 
-// A small "Today" strip on Home: Doing (notes) and Tasks (overdue, due today,
-// next open). A pure view over AppState.filtered and AppState.tasks. To
+// The "Today" section on Home: equal-width cards (Tasks, Events) for what
+// falls on today. A pure view over AppState. The cards are a plain list in
+// [HomeToday]; a later calendar card is one more [TodayCard] in that list. To
 // remove: delete this file, its tests and the one `HomeToday(...)` line in
 // app.dart.
 
-const _prefKey = 'davdart.home.today.collapsed.v1';
-const _maxRows = 5;
-const _maxTaskRows = 6;
+const _maxRows = 6;
 
-class HomeToday extends StatefulWidget {
+class HomeToday extends StatelessWidget {
   const HomeToday({super.key, required this.state, this.now});
   final AppState state;
 
@@ -31,181 +29,168 @@ class HomeToday extends StatefulWidget {
   final DateTime? now;
 
   @override
-  State<HomeToday> createState() => _HomeTodayState();
-}
-
-class _HomeTodayState extends State<HomeToday> {
-  static int _newest(Note a, Note b) {
-    final x = a.lastModified, y = b.lastModified;
-    if (x == null && y == null) return 0;
-    if (x == null) return 1;
-    if (y == null) return -1;
-    return y.compareTo(x);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final state = widget.state;
     final t = tokensOf(context);
     return ListenableBuilder(
       listenable: state,
       builder: (context, _) {
-        final all = [
-          for (final n in state.filtered)
-            if (!n.categories.any((c) => c.startsWith('kind-'))) n,
-        ]..sort(_newest);
-        final doing = [
-          for (final n in all)
-            if (PlanItem.fromNote(n).status == 'doing') n,
-        ].take(_maxRows).toList();
-        final now = widget.now ?? DateTime.now();
-        final scope = state.scopeUid;
-        final open = [
-          for (final k in state.openTasks(now))
-            if (scope == null || state.taskIsUnder(k, scope)) k,
-        ];
-        // Read-only Space without tasks: nothing to add, nothing to show.
-        final showTasks = state.tasksEditable || state.tasks.isNotEmpty;
-        if (doing.isEmpty && !showTasks) return const SizedBox.shrink();
-        final panels = [
-          if (doing.isNotEmpty)
-            _Panel(
-              'Doing',
-              state,
-              count: doing.length,
-              rows: [
-                for (final n in doing)
-                  _Row(
-                    key: Key('home-today-doing-${n.uid}'),
-                    state: state,
-                    note: n,
-                  ),
-              ],
-            ),
-          if (showTasks)
-            _Panel(
-              'Tasks',
-              state,
-              count: open.length,
-              rows: [
-                if (open.isEmpty)
-                  Padding(
-                    padding: EdgeInsets.all(t.space.xs),
-                    child: Text(
-                      'No open tasks',
-                      key: const Key('home-tasks-empty'),
-                      style: t.type.captionStyle.copyWith(color: t.muted),
-                    ),
-                  ),
-                for (final k in open.take(_maxTaskRows))
-                  TaskRow(
-                    key: Key('home-today-tasks-${k.uid}'),
-                    state: state,
-                    task: k,
-                    now: now,
-                  ),
-              ],
-              footer: state.tasksEditable || open.length > _maxTaskRows
-                  ? Padding(
-                      padding: EdgeInsets.only(top: t.space.sm),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TaskQuickAdd(state: state),
-                          if (state.tasks.isNotEmpty)
-                            Align(
-                              alignment: Alignment.centerLeft,
-                              child: FTappable(
-                                key: const Key('home-tasks-all'),
-                                onPress: state.openTasksPanel,
-                                child: Padding(
-                                  padding: EdgeInsets.only(top: t.space.sm),
-                                  child: Text(
-                                    open.length > _maxTaskRows
-                                        ? 'All tasks (${open.length} open)'
-                                        : 'All tasks',
-                                    style: t.type.captionStyle.copyWith(
-                                      color: t.accent,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    )
-                  : null,
-            ),
+        final clock = now ?? DateTime.now();
+        // The seam: add further cards (a calendar) to this list.
+        final cards = <Widget>[
+          _tasksCard(context, clock),
+          _eventsCard(context, clock),
         ];
         return ContentCap(
           child: Padding(
             key: const Key('home-today'),
             padding: EdgeInsets.fromLTRB(t.space.lg, t.space.md, t.space.lg, 0),
-            child: CollapsibleSection(
-              id: 'home-today',
-              title: 'Today',
-              prefs: state.prefs,
-              prefKey: _prefKey,
-              child: Padding(
-                padding: EdgeInsets.only(top: t.space.sm),
-                child: LayoutBuilder(
-                  builder: (context, c) {
-                    final gap = t.space.lg;
-                    if (c.maxWidth < Tokens.stackBreakpoint) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (var i = 0; i < panels.length; i++) ...[
-                            if (i > 0) SizedBox(height: gap),
-                            panels[i],
-                          ],
-                        ],
-                      );
-                    }
-                    // Always two half-width slots, so a lone panel keeps its
-                    // place and lines up with the board columns below.
-                    return Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        for (var i = 0; i < 2; i++) ...[
-                          if (i > 0) SizedBox(width: gap),
-                          Expanded(
-                            child: i < panels.length
-                                ? panels[i]
-                                : const SizedBox.shrink(),
-                          ),
-                        ],
+            child: LayoutBuilder(
+              builder: (context, c) {
+                final gap = t.space.lg;
+                if (c.maxWidth < Tokens.stackBreakpoint) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < cards.length; i++) ...[
+                        if (i > 0) SizedBox(height: gap),
+                        cards[i],
                       ],
-                    );
-                  },
-                ),
-              ),
+                    ],
+                  );
+                }
+                return IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < cards.length; i++) ...[
+                        if (i > 0) SizedBox(width: gap),
+                        Expanded(child: cards[i]),
+                      ],
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         );
       },
     );
   }
+
+  Widget _tasksCard(BuildContext context, DateTime clock) {
+    final scope = state.scopeUid;
+    bool inScope(Task k) => scope == null || state.taskIsUnder(k, scope);
+    // Overdue first, then due today; each already in compareTasks order.
+    final due = [
+      ...state.overdueTasks(clock).where(inScope),
+      ...state.dueTodayTasks(clock).where(inScope),
+    ];
+    return TodayCard(
+      slug: 'tasks',
+      title: 'Tasks',
+      count: due.length,
+      link: 'All tasks',
+      onLink: state.openTasksPanel,
+      add: state.tasksEditable
+          ? IconAction(
+              compact: true,
+              key: const Key('home-today-tasks-add'),
+              tooltip: 'New task',
+              icon: FLucideIcons.plus,
+              onPress: () => showNewTaskDialog(
+                context,
+                state,
+                due: dueOfDay(dayFromToday(0, clock)),
+              ),
+            )
+          : null,
+      emptyText: 'Nothing due today',
+      total: due.length,
+      onMore: state.openTasksPanel,
+      rows: [
+        for (final k in due.take(_maxRows))
+          TaskRow(
+            key: Key('home-today-tasks-${k.uid}'),
+            state: state,
+            task: k,
+            now: clock,
+          ),
+      ],
+    );
+  }
+
+  Widget _eventsCard(BuildContext context, DateTime clock) {
+    final today = <EventOccurrence>[
+      for (final g in state.upcomingOccurrences(clock, 1))
+        if (g.id == 'today') ...g.items,
+    ];
+    // All-day first, then by start (the sort is stable).
+    final sorted = [
+      ...today.where((o) => o.allDay),
+      ...today.where((o) => !o.allDay),
+    ];
+    return TodayCard(
+      slug: 'events',
+      title: 'Events',
+      count: sorted.length,
+      link: 'All events',
+      onLink: state.openEventsPanel,
+      add: state.eventsEditable
+          ? IconAction(
+              compact: true,
+              key: const Key('home-today-events-add'),
+              tooltip: 'New event',
+              icon: FLucideIcons.plus,
+              onPress: () async {
+                final uid = await showNewEventDialog(context, state);
+                if (uid != null) await state.clickEvent(uid);
+              },
+            )
+          : null,
+      emptyText: 'No events today',
+      total: sorted.length,
+      onMore: state.openEventsPanel,
+      rows: [
+        for (final o in sorted.take(_maxRows))
+          EventRow(key: eventRowKey(o), state: state, occurrence: o),
+      ],
+    );
+  }
 }
 
-class _Panel extends StatelessWidget {
-  const _Panel(
-    this.title,
-    this.state, {
+/// One card of the Today section: header (title, count, optional "All" link
+/// and add button), then [rows], or [emptyText] when [total] is 0. Rows past
+/// the cap end in "and N more". Cards do not collapse.
+class TodayCard extends StatelessWidget {
+  const TodayCard({
+    super.key,
+    required this.slug,
+    required this.title,
     required this.count,
     required this.rows,
-    this.footer,
+    required this.total,
+    required this.emptyText,
+    this.link,
+    this.onLink,
+    this.onMore,
+    this.add,
   });
+  final String slug;
   final String title;
-  final AppState state;
   final int count;
   final List<Widget> rows;
-  final Widget? footer;
+  final int total;
+  final String emptyText;
+  final String? link;
+  final VoidCallback? onLink;
+  final VoidCallback? onMore;
+  final Widget? add;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final slug = title.toLowerCase().replaceAll(' ', '-');
+    final muted = t.type.captionStyle.copyWith(color: t.muted);
+    final hidden = total - rows.length;
     return DecoratedBox(
       key: Key('home-today-$slug'),
       decoration: BoxDecoration(
@@ -218,59 +203,65 @@ class _Panel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            CollapsibleSection(
-              id: 'home-today-$slug',
-              title: title,
-              upper: false,
-              count: count,
-              prefs: state.prefs,
-              prefKey: 'davdart.home.today.$slug.collapsed.v1',
-              headerPadding: EdgeInsets.all(t.space.xs),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [...rows, ?footer],
+            Padding(
+              padding: EdgeInsets.all(t.space.xs),
+              child: Row(
+                children: [
+                  Flexible(
+                    child: OverflowTip(
+                      title,
+                      style: t.type.labelStyle.copyWith(
+                        fontSize: t.type.caption,
+                        color: t.muted,
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: t.space.sm),
+                  Text(
+                    '$count',
+                    key: Key('home-today-$slug-count'),
+                    style: muted,
+                  ),
+                  const Spacer(),
+                  if (link != null)
+                    Flexible(
+                      child: FTappable(
+                        key: Key('home-today-$slug-all'),
+                        onPress: onLink,
+                        child: OverflowTip(
+                          link!,
+                          style: muted.copyWith(color: t.accent),
+                        ),
+                      ),
+                    ),
+                  if (add != null) ...[SizedBox(width: t.space.sm), add!],
+                ],
               ),
             ),
+            if (total == 0)
+              Padding(
+                padding: EdgeInsets.all(t.space.xs),
+                child: Text(
+                  emptyText,
+                  key: Key('home-today-$slug-empty'),
+                  style: muted,
+                ),
+              )
+            else
+              ...rows,
+            if (hidden > 0)
+              FTappable(
+                key: Key('home-today-$slug-more'),
+                onPress: onMore,
+                child: Padding(
+                  padding: EdgeInsets.all(t.space.xs),
+                  child: Text(
+                    'and $hidden more',
+                    style: muted.copyWith(color: t.accent),
+                  ),
+                ),
+              ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _Row extends StatelessWidget {
-  const _Row({super.key, required this.state, required this.note});
-  final AppState state;
-  final Note note;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    final p = PlanItem.fromNote(note);
-    final selected = state.peekUid == note.uid;
-    return NoteContextMenu(
-      state: state,
-      uid: note.uid,
-      child: NoteDraggable(
-        uid: note.uid,
-        source: NoteDragSource.list,
-        label: note.summary,
-        child: FTappable(
-          onPress: () => state.clickNote(note.uid),
-          child: Container(
-            color: selected ? t.selected : null,
-            padding: EdgeInsets.symmetric(
-              horizontal: t.space.xs,
-              vertical: t.space.sm,
-            ),
-            child: Row(
-              children: [
-                StatusDot(p.status),
-                SizedBox(width: t.space.md),
-                Expanded(child: OverflowTip(p.itemId ?? note.summary)),
-              ],
-            ),
-          ),
         ),
       ),
     );

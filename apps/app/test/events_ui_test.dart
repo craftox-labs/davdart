@@ -162,8 +162,8 @@ void main() {
           reason: '$d',
         );
       }
-      expect(_k('event-repeat-daily'), findsNWidgets(3));
-      expect(_k('event-repeat-standup'), findsNothing);
+      expect(_p('event-repeat-daily'), findsNWidgets(3));
+      expect(_p('event-repeat-standup'), findsNothing);
       // Upcoming and Past rows carry the day
       expect(_k('event-day-review'), findsOneWidget);
       expect(_k('event-day-standup'), findsNothing);
@@ -255,7 +255,7 @@ void main() {
       expect(e.dtend!.value, endsWith('T100000'));
       expect(s.peekUid, e.uid);
       expect(_k('new-event-title'), findsNothing);
-      expect(_k('event-row-${e.uid}'), findsOneWidget);
+      expect(_p('event-row-${e.uid}'), findsOneWidget);
       await _end(t);
     });
 
@@ -287,7 +287,7 @@ void main() {
     testWidgets('read-only Space has no New event', (t) async {
       await _panel(t, readOnly: true);
       expect(_k('new-event'), findsNothing);
-      expect(_k('event-row-standup'), findsOneWidget);
+      expect(_p('event-row-standup'), findsOneWidget);
       await _end(t);
     });
   });

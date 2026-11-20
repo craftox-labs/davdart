@@ -2447,6 +2447,7 @@ class AppState extends ChangeNotifier {
 
   /// Shows the Tasks list in the side panel (opens the panel if folded).
   void openTasksPanel() => setSection(Section.tasks);
+  void openEventsPanel() => setSection(Section.events);
 
   /// Opens (or focuses) the main tab of note [uid]. A peek of the same note
   /// closes (one place per note). The "+" button's new note opens this way.
