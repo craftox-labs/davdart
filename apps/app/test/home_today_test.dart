@@ -1,7 +1,9 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/theme/tokens.dart';
+import 'package:davdart_app/ui/home_today.dart';
 import 'package:davdart_app/ui/task_parts.dart';
+import 'package:davdart_app/ui/theme.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -141,22 +143,75 @@ void main() {
     expect(_k('home-today-tasks-${s.tasks.single.uid}'), findsOneWidget);
   });
 
-  testWidgets('respects folder scope', (t) async {
+  testWidgets('ignores panel filters and the folder scope', (t) async {
     final s = await pumpTasksApp(
       t,
       notes: [
         Note(uid: 'f', summary: 'Plans', categories: ['kind-folder']),
       ],
       tasks: [
-        mkTask('in', days: 0, parent: 'f'),
-        mkTask('out', days: 0),
+        mkTask('in', days: 0, parent: 'f', tags: ['a']),
+        mkTask('out', days: 0, tags: ['b']),
+      ],
+      events: [
+        mkEvent('e1', summary: 'Tagged', tags: ['x']),
+        mkEvent('e2', summary: 'Plain', hour: 11),
       ],
     );
-    expect(_k('home-today-tasks-out'), findsOneWidget);
+    s.setTaskTagFilter('a');
+    s.setTaskFolderFilter('f');
+    s.setEventTagFilter('x');
     s.openFolder('f');
     await t.pumpAndSettle();
     expect(_k('home-today-tasks-in'), findsOneWidget);
-    expect(_k('home-today-tasks-out'), findsNothing);
+    expect(_k('home-today-tasks-out'), findsOneWidget);
+    expect(_k('home-today-events-count'), findsOneWidget);
+    expect(t.widget<Text>(_k('home-today-events-count')).data, '2');
+  });
+
+  testWidgets('rolls over at local midnight (fake clock)', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      tasks: [
+        Task(uid: 'd21', summary: 'd21', due: ICalDate.date(2026, 11, 21)),
+        Task(uid: 'd22', summary: 'd22', due: ICalDate.date(2026, 11, 22)),
+      ],
+    );
+    var clock = DateTime(2026, 11, 20, 23, 59, 30);
+    final tk = Tokens.light;
+    await t.pumpWidget(
+      FTheme(
+        data: buildTheme(Brightness.light, touch: false, tokens: tk),
+        child: Directionality(
+          textDirection: TextDirection.ltr,
+          child: TokensScope(
+            tokens: tk,
+            child: Overlay(
+              initialEntries: [
+                OverlayEntry(
+                  builder: (_) => SingleChildScrollView(
+                    child: HomeToday(state: s, now: () => clock),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Nothing due today'), findsOneWidget);
+    await t.pump(const Duration(seconds: 20));
+    expect(find.text('Nothing due today'), findsOneWidget);
+    clock = DateTime(2026, 11, 21, 0, 0, 1);
+    await t.pump(const Duration(seconds: 11));
+    expect(_k('home-today-tasks-d21'), findsOneWidget);
+    expect(_k('home-today-tasks-d22'), findsNothing);
+    // Re-armed for the next midnight.
+    clock = DateTime(2026, 11, 22, 0, 0, 1);
+    await t.pump(const Duration(hours: 24));
+    expect(_k('home-today-tasks-d22'), findsOneWidget);
+    // Disposed: no timer left pending.
+    await t.pumpWidget(const SizedBox());
   });
 
   testWidgets('Events card: today only, all-day first, then by time', (

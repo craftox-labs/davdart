@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -6,6 +8,7 @@ import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import 'content_grid.dart';
 import 'event_menu.dart';
+import '../state/event_rules.dart';
 import 'events_panel.dart';
 import 'overflow_tip.dart';
 import 'parts.dart';
@@ -21,12 +24,59 @@ import 'theme.dart';
 
 const _maxRows = 6;
 
-class HomeToday extends StatelessWidget {
+// Home ignores the panel filters (Tasks and Events tags, the Tasks folder
+// filter, the Board folder scope): it shows literally today's items.
+
+class HomeToday extends StatefulWidget {
   const HomeToday({super.key, required this.state, this.now});
   final AppState state;
 
-  /// Clock override for tests.
-  final DateTime? now;
+  /// Clock override for tests (a function so the time can advance).
+  final DateTime Function()? now;
+
+  @override
+  State<HomeToday> createState() => _HomeTodayState();
+}
+
+class _HomeTodayState extends State<HomeToday> {
+  Timer? _timer;
+
+  AppState get state => widget.state;
+  DateTime _now() => (widget.now ?? DateTime.now)();
+
+  @override
+  void initState() {
+    super.initState();
+    _arm();
+  }
+
+  // One-shot timer to the next local midnight, re-armed on each fire. The app
+  // has no lifecycle hook to refresh on resume, so a stale day after sleep is
+  // corrected when this timer fires.
+  void _arm() {
+    _timer?.cancel();
+    final n = _now();
+    final next = DateTime(n.year, n.month, n.day + 1);
+    var wait = next.difference(n);
+    if (wait < const Duration(seconds: 1)) wait = const Duration(seconds: 1);
+    _timer = Timer(wait, () {
+      if (!mounted) return;
+      setState(() {});
+      _arm();
+    });
+  }
+
+  @override
+  void didUpdateWidget(HomeToday old) {
+    super.didUpdateWidget(old);
+    if (old.now != widget.now) _arm();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +84,7 @@ class HomeToday extends StatelessWidget {
     return ListenableBuilder(
       listenable: state,
       builder: (context, _) {
-        final clock = now ?? DateTime.now();
+        final clock = _now();
         // The seam: add further cards (a calendar) to this list.
         final cards = <Widget>[
           _tasksCard(context, clock),
@@ -78,13 +128,8 @@ class HomeToday extends StatelessWidget {
   }
 
   Widget _tasksCard(BuildContext context, DateTime clock) {
-    final scope = state.scopeUid;
-    bool inScope(Task k) => scope == null || state.taskIsUnder(k, scope);
     // Overdue first, then due today; each already in compareTasks order.
-    final due = [
-      ...state.overdueTasks(clock).where(inScope),
-      ...state.dueTodayTasks(clock).where(inScope),
-    ];
+    final due = [...state.overdueTasks(clock), ...state.dueTodayTasks(clock)];
     return TodayCard(
       slug: 'tasks',
       title: 'Tasks',
@@ -121,7 +166,7 @@ class HomeToday extends StatelessWidget {
 
   Widget _eventsCard(BuildContext context, DateTime clock) {
     final today = <EventOccurrence>[
-      for (final g in state.upcomingOccurrences(clock, 1))
+      for (final g in upcomingGroups(state.events, clock, 1))
         if (g.id == 'today') ...g.items,
     ];
     // All-day first, then by start (the sort is stable).
