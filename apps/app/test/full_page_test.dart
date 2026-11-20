@@ -185,17 +185,14 @@ void main() {
       expect(find.text('Alpha body'), findsOneWidget);
     });
 
-    testWidgets('a new folder asks before dropping the peek draft', (t) async {
+    testWidgets('a new folder leaves the peek and its draft alone', (t) async {
       final s = await _pump(t);
       await t.tap(_k('edit-note'));
       await _settle(t);
       await _type(t, 'edit-title', 'Changed');
-      final f = s.addFolder('F');
+      await s.addFolder('F');
       await _settle(t);
-      expect(_k('leave-discard'), findsOneWidget);
-      await t.tap(find.text('Keep editing'));
-      await _settle(t);
-      await f;
+      expect(_k('leave-discard'), findsNothing);
       expect(s.peekUid, 'a');
       expect(s.dirtyFor('a'), isTrue);
     });

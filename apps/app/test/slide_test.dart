@@ -203,7 +203,6 @@ void main() {
       t,
     ) async {
       final s = await _pump(t);
-      expect(s, isNotNull);
       t.view.physicalSize = const Size(700, 900);
       await t.pumpAndSettle();
       expect(_k('dock-pane'), findsNothing);
@@ -211,6 +210,8 @@ void main() {
       await t.pump();
       final w = t.getSize(_k('dock-pane')).width;
       expect(w, sidebarWidthOf(t.element(_k('dock-pane')), s));
+      // Nothing is animating: a settle needs no further frames.
+      expect(await t.pumpAndSettle(), 1);
     });
   });
 }

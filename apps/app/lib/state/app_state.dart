@@ -704,7 +704,7 @@ class AppState extends ChangeNotifier {
       lastModified: now,
     );
     await _save(n);
-    if (error == null) await guarded(() => openFolder(n.uid));
+    if (error == null) openFolder(n.uid);
   }
 
   bool loading = false;
