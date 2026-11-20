@@ -11,6 +11,9 @@ const _upperPath =
 const _markWidth = 539.32;
 const _markHeight = 566.93;
 
+/// Height over width of the mark.
+const logoAspect = _markHeight / _markWidth;
+
 /// Parses absolute M, L, C and Z path data (the only commands the logo uses).
 Path parseMarkPath(String d) {
   final path = Path();
@@ -89,7 +92,9 @@ class LogoMark extends StatelessWidget {
   }
 }
 
-/// The logo slot at the top of the rail: the mark on the rail background.
+/// The logo slot at the top of the rail: the mark on the rail background,
+/// as wide as the rail icon glyphs ([IconTokens.rail]), centred in a
+/// [SizedBox] the size of a rail item so the slot's height is unchanged.
 /// Not tappable.
 class LogoSlot extends StatelessWidget {
   const LogoSlot({super.key});
@@ -99,7 +104,24 @@ class LogoSlot extends StatelessWidget {
     final t = tokensOf(context);
     return KeyedSubtree(
       key: const Key('logo-slot'),
-      child: LogoMark(extent: t.sizes.railItem, padding: t.space.xs),
+      child: SizedBox(
+        width: t.sizes.railItem,
+        height: t.sizes.railItem,
+        child: Center(
+          child: Semantics(
+            label: 'davdart',
+            image: true,
+            child: SizedBox(
+              key: const Key('logo-mark'),
+              width: t.icons.rail,
+              height: t.icons.rail * logoAspect,
+              child: CustomPaint(
+                painter: LogoPainter(lower: t.logoLower, upper: t.logoUpper),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

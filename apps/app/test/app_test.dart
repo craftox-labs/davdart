@@ -1405,6 +1405,19 @@ void main() {
         ),
         findsOneWidget,
       );
+      // The mark is as wide as the rail icon glyphs, on the same centre line.
+      final tk = tokensOf(t.element(find.byKey(const Key('icon-rail'))));
+      final mark = find.byKey(const Key('logo-mark'));
+      expect(t.getSize(mark).width, tk.icons.rail);
+      final glyph = find.descendant(
+        of: find.byKey(const Key('rail-notes')),
+        matching: find.byType(Icon),
+      );
+      expect(t.getSize(glyph).width, tk.icons.rail);
+      expect(
+        (t.getCenter(mark).dx - t.getCenter(glyph).dx).abs(),
+        lessThan(1),
+      );
       final keys = [
         'logo-slot',
         'rail-spaces',
