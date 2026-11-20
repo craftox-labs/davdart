@@ -36,6 +36,68 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
         c.findAncestorWidgetOfExactType<EditableText>() != null;
   }
 
+  KeyBindings? _table;
+  bool? _tableVim;
+  String? _tableSpaces;
+
+  /// The binding table, rebuilt only when the Vim setting or the Space list
+  /// changes (shortcut labels are otherwise fixed; `enabled` runs at key
+  /// time).
+  KeyBindings get _bindings {
+    final sig = state.spaces.map((s) => s.id).join('\u0000');
+    if (_table == null || _tableVim != state.vimKeys || _tableSpaces != sig) {
+      _table = KeyBindings(buildActions(state), vim: state.vimKeys);
+      _tableVim = state.vimKeys;
+      _tableSpaces = sig;
+    }
+    return _table!;
+  }
+
+  /// A focused control other than the key catcher (a button, chip, toggle):
+  /// Enter and Space belong to it.
+  bool get _control {
+    final f = FocusManager.instance.primaryFocus;
+    return f != null && f != nav.node && f is! FocusScopeNode;
+  }
+
+  bool _restoring = false;
+
+  void _focusChanged() {
+    final f = FocusManager.instance.primaryFocus;
+    if (f != null && f is! FocusScopeNode) return;
+    _restoreSoon();
+  }
+
+  /// Puts the focus back on the key catcher when it would otherwise be lost
+  /// (a field or dialog closed, a click on empty space).
+  void _restoreSoon() {
+    if (_restoring) return;
+    _restoring = true;
+    Future.microtask(() {
+      _restoring = false;
+      if (!mounted) return;
+      final route = ModalRoute.of(context);
+      if (route != null && !route.isCurrent) return;
+      final f = FocusManager.instance.primaryFocus;
+      if (f != null && f is! FocusScopeNode) return;
+      if (nav.node.context != null && nav.node.canRequestFocus) {
+        nav.node.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    FocusManager.instance.addListener(_focusChanged);
+  }
+
+  @override
+  void dispose() {
+    FocusManager.instance.removeListener(_focusChanged);
+    super.dispose();
+  }
+
   KeyEventResult _key(FocusNode node, KeyEvent e) {
     if (e is KeyUpEvent) return KeyEventResult.ignored;
     final route = ModalRoute.of(context);
@@ -55,6 +117,12 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
     if (token == null) return KeyEventResult.ignored;
     final pending = nav.pending;
 
+    // Enter and Space activate a focused control; the cursor row's Enter
+    // applies only when the key catcher itself holds the focus.
+    if ((token == 'Enter' || token == ' ') && _control) {
+      return KeyEventResult.ignored;
+    }
+
     // Esc first clears a half-typed sequence or count.
     if (token == 'Esc' && (pending.isNotEmpty || nav.count > 0)) {
       nav.clearPending();
@@ -69,8 +137,7 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
       nav.setPending(const [], count: (nav.count * 10 + int.parse(token)));
       return KeyEventResult.handled;
     }
-    final bindings = KeyBindings(buildActions(state), vim: state.vimKeys);
-    final step = bindings.resolve(pending, token);
+    final step = _bindings.resolve(pending, token);
     if (step.keys != null) {
       nav.setPending(step.keys!);
       return KeyEventResult.handled;
@@ -112,42 +179,48 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
       canRequestFocus: false,
       skipTraversal: true,
       onKeyEvent: _key,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          widget.child,
-          Positioned(
-            left: t.space.lg,
-            bottom: t.space.lg,
-            child: IgnorePointer(
-              child: ListenableBuilder(
-                listenable: nav,
-                builder: (context, _) {
-                  final label = nav.pendingLabel;
-                  if (label.isEmpty) return const SizedBox.shrink();
-                  return DecoratedBox(
-                    key: const Key('key-pending'),
-                    decoration: BoxDecoration(
-                      color: t.card,
-                      border: Border.all(color: t.cardBorder),
-                      borderRadius: BorderRadius.circular(t.radii.small),
-                    ),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: t.space.md,
-                        vertical: t.space.xs,
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        // A press on empty space drops the focus to the scope; take it back.
+        onPointerDown: (_) =>
+            WidgetsBinding.instance.addPostFrameCallback((_) => _restoreSoon()),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            widget.child,
+            Positioned(
+              left: t.space.lg,
+              bottom: t.space.lg,
+              child: IgnorePointer(
+                child: ListenableBuilder(
+                  listenable: nav,
+                  builder: (context, _) {
+                    final label = nav.pendingLabel;
+                    if (label.isEmpty) return const SizedBox.shrink();
+                    return DecoratedBox(
+                      key: const Key('key-pending'),
+                      decoration: BoxDecoration(
+                        color: t.card,
+                        border: Border.all(color: t.cardBorder),
+                        borderRadius: BorderRadius.circular(t.radii.small),
                       ),
-                      child: Text(
-                        label,
-                        style: t.type.captionStyle.copyWith(color: t.fg),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: t.space.md,
+                          vertical: t.space.xs,
+                        ),
+                        child: Text(
+                          label,
+                          style: t.type.captionStyle.copyWith(color: t.fg),
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

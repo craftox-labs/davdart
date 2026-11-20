@@ -455,6 +455,7 @@ void main() {
       expect(find.text('Delete task?'), findsNothing);
       await _press(t, LogicalKeyboardKey.escape);
       expect(FocusManager.instance.primaryFocus, s.nav.node);
+      s.nav.pointerIn(NavArea.panel);
       await _press(t, _j);
       expect(s.nav.cursorId('tasks'), isNotNull);
     });
@@ -480,6 +481,95 @@ void main() {
       expect(s.nav.cursorId('notes'), isNull);
       expect(s.peekCollapsed, isFalse);
       expect(s.peekUid, 'n');
+    });
+  });
+
+  group('focus', () {
+    testWidgets('Enter on a focused filter chip activates it, not the row', (
+      t,
+    ) async {
+      final s = await pumpTasksApp(t, tasks: [mkTask('a'), mkTask('b')]);
+      s.setSection(Section.tasks);
+      await t.pumpAndSettle();
+      await _press(t, _j);
+      final row = s.nav.cursorId('tasks');
+      expect(row, isNotNull);
+      final before = s.peekUid;
+      Focus.of(
+        t.element(
+          find
+              .descendant(
+                of: _k('tasks-filter-all'),
+                matching: find.text('All'),
+              )
+              .first,
+        ),
+      ).requestFocus();
+      await t.pump(_ms);
+      expect(s.taskFilter, isNot(TaskFilter.all));
+      await _press(t, LogicalKeyboardKey.enter);
+      expect(s.taskFilter, TaskFilter.all);
+      expect(s.peekUid, before);
+      // Back on the catcher, Enter opens the cursor row again.
+      s.nav.node.requestFocus();
+      await t.pump(_ms);
+      await _press(t, LogicalKeyboardKey.enter);
+      expect(s.peekUid, row);
+    });
+
+    testWidgets('finishing an edit leaves keys working', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        notes: [
+          Note(uid: 'n', summary: 'Note'),
+          Note(uid: 'm', summary: 'M'),
+        ],
+      );
+      s.select('n');
+      await t.pumpAndSettle();
+      s.startEdit('n');
+      await t.pump(const Duration(milliseconds: 300));
+      await t.tap(_k('edit-title'));
+      await t.pump(_ms);
+      await t.enterText(_k('edit-title'), 'Renamed');
+      await t.pump(_ms);
+      await t.tap(_k('edit-save'));
+      await t.pumpAndSettle();
+      expect(_k('edit-title'), findsNothing);
+      s.nav.pointerIn(NavArea.panel);
+      expect(FocusManager.instance.primaryFocus, s.nav.node);
+      await _press(t, _j);
+      expect(s.nav.cursorId('notes'), isNotNull);
+    });
+
+    testWidgets('closing the palette leaves keys working', (t) async {
+      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      s.setSection(Section.tasks);
+      await t.pumpAndSettle();
+      await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.keyK);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await t.pump(_ms);
+      expect(_k('palette'), findsOneWidget);
+      await _press(t, LogicalKeyboardKey.escape);
+      await t.pumpAndSettle();
+      await _press(t, _j);
+      expect(s.nav.cursorId('tasks'), isNotNull);
+    });
+
+    testWidgets('a click on empty space leaves keys working', (t) async {
+      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      s.setSection(Section.tasks);
+      await t.pumpAndSettle();
+      await t.tap(_k('task-quick-add'));
+      await t.pump(_ms);
+      FocusManager.instance.primaryFocus?.unfocus();
+      await t.pump(_ms);
+      await t.tapAt(const Offset(640, 880));
+      await t.pumpAndSettle();
+      s.nav.pointerIn(NavArea.panel);
+      await _press(t, _j);
+      expect(s.nav.cursorId('tasks'), isNotNull);
     });
   });
 

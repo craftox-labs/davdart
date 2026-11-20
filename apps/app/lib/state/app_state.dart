@@ -428,6 +428,7 @@ class AppState extends ChangeNotifier {
     _taskDrafts.clear();
     _eventDrafts.clear();
     c.select(id);
+    nav.clearPending();
     await _openCurrent();
     return true;
   }

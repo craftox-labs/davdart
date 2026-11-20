@@ -395,16 +395,8 @@ List<AppAction> buildActions(AppState state) {
       },
       group: 'Selected item',
       keywords: const ['done', 'finish', 'check', 'reopen', 'task'],
-      enabled: (s) {
-        final t = targetItem(s);
-        return t is Task &&
-            s.tasksEditable &&
-            (t.isClosed || s.taskCompletionBlockerFor(t.uid) == null);
-      },
-      run: (c) async {
-        final u = actionTargetUid(c.state);
-        if (u != null) await c.state.toggleTask(u);
-      },
+      enabled: _canToggleTask,
+      run: (c) => _toggleTask(c.state),
     ),
     AppAction(
       id: 'item.move-space',
@@ -462,14 +454,11 @@ List<AppAction> buildActions(AppState state) {
       shortcuts: const ['x'],
       listed: false,
       enabled: (s) =>
-          _a(s, 'task.toggle').enabled(s) ||
+          _canToggleTask(s) ||
           (s.nav.area == NavArea.main && s.activeTab != null),
-      run: (c) {
-        final toggle = _a(c.state, 'task.toggle');
-        return toggle.enabled(c.state)
-            ? toggle.run(c)
-            : c.state.closeActiveTab();
-      },
+      run: (c) => _canToggleTask(c.state)
+          ? _toggleTask(c.state)
+          : c.state.closeActiveTab(),
     ),
     AppAction(
       id: 'item.new',
@@ -577,8 +566,17 @@ List<AppAction> buildActions(AppState state) {
   ];
 }
 
-AppAction _a(AppState s, String id) =>
-    buildActions(s).firstWhere((a) => a.id == id);
+bool _canToggleTask(AppState s) {
+  final t = targetItem(s);
+  return t is Task &&
+      s.tasksEditable &&
+      (t.isClosed || s.taskCompletionBlockerFor(t.uid) == null);
+}
+
+Future<void> _toggleTask(AppState s) async {
+  final u = actionTargetUid(s);
+  if (u != null) await s.toggleTask(u);
+}
 
 /// Home, then the document tabs in order, as one ring: focuses the one
 /// [by] places after the current one.
