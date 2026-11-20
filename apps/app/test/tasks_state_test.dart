@@ -136,6 +136,16 @@ void main() {
       expect(t.summary, 'Two');
     });
 
+    test('a cancelled task is reopened by the checkbox', () async {
+      final s = await _open(MemoryStorage(), seed: _Seed());
+      final uid = (await s.addTask('Do'))!;
+      expect(await s.setTaskStatus(uid, 'cancelled'), isTrue);
+      expect(s.taskById(uid)!.status, 'CANCELLED');
+      expect(await s.toggleTask(uid), isTrue);
+      expect(s.taskById(uid)!.status, 'NEEDS-ACTION');
+      expect(s.taskById(uid)!.isClosed, isFalse);
+    });
+
     test('complete, reopen, repeating tasks stay open with a reason', () async {
       final s = await _open(MemoryStorage(), seed: _Seed());
       final uid = (await s.addTask('Do'))!;

@@ -1653,7 +1653,8 @@ class AppState extends ChangeNotifier {
     final t = _taskById(uid);
     if (t == null) return false;
     if (done && taskCompletionBlocker(t) != null) return false;
-    if (done == t.isCompleted) return false;
+    // Reopening also applies to a cancelled task.
+    if (done ? t.isCompleted : !t.isClosed) return false;
     final copy = t.copyWith();
     if (done) {
       copy.complete(DateTime.now());
