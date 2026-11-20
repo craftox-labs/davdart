@@ -1399,19 +1399,36 @@ class AppState extends ChangeNotifier {
     final key = uid ?? peekUid;
     final d = key == null ? null : _drafts[key];
     if (d == null || d.titleEmpty) return false;
+    // What this save sends; text typed while it runs is newer than this.
+    final title = d.titleController.text;
+    final body = d.bodyController.text;
+    final tagText = d.tagsController.text;
+    final parent = d.parent;
+    final status = d.status;
     await updateNote(
       d.uid,
-      title: d.titleController.text,
-      text: d.bodyController.text,
+      title: title,
+      text: body,
       tags: d.tagList,
-      setParent: d.parent != d.originalParent,
-      parentUid: d.parent,
+      setParent: parent != d.originalParent,
+      parentUid: parent,
     );
-    if (error == null && d.status != null && d.status != d.originalStatus) {
-      await setStatus(d.uid, d.status!);
+    if (error == null && status != null && status != d.originalStatus) {
+      await setStatus(d.uid, status);
     }
     if (error != null) return false;
-    if (_drafts[key] == d) _drafts.remove(key);
+    if (_drafts[key] == d) {
+      d.markSaved(
+        title: title,
+        body: body,
+        tags: tagText,
+        parent: parent,
+        status: status ?? d.originalStatus,
+      );
+      // Nothing typed meanwhile: the edit is done. Otherwise the newer text
+      // stays as the draft, still dirty.
+      if (!d.dirty) _drafts.remove(key);
+    }
     notifyListeners();
     return true;
   }

@@ -28,8 +28,8 @@ class NoteDraft extends ChangeNotifier {
   }
 
   final String uid;
-  final String originalTitle, originalBody, originalTags;
-  final String? originalParent, originalStatus;
+  String originalTitle, originalBody, originalTags;
+  String? originalParent, originalStatus;
   final TextEditingController titleController, bodyController, tagsController;
 
   String? parent;
@@ -42,6 +42,23 @@ class NoteDraft extends ChangeNotifier {
 
   void setStatus(String? v) {
     status = v;
+    notifyListeners();
+  }
+
+  /// Records that the given values were saved: the draft is dirty only for
+  /// what was typed or changed after them.
+  void markSaved({
+    required String title,
+    required String body,
+    required String tags,
+    required String? parent,
+    required String? status,
+  }) {
+    originalTitle = title;
+    originalBody = body;
+    originalTags = tags;
+    originalParent = parent;
+    originalStatus = status;
     notifyListeners();
   }
 
