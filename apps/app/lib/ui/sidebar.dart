@@ -51,6 +51,11 @@ class Sidebar extends StatelessWidget {
     return FSidebar.raw(
       style: .delta(
         constraints: BoxConstraints.tightFor(width: width ?? t.sizes.sidebar),
+        // No top inset: the section's header row starts at the panel top,
+        // level with the main area's top bar.
+        contentPadding: EdgeInsetsGeometryDelta.value(
+          EdgeInsets.only(bottom: t.space.sm),
+        ),
         decoration: mirror
             ? DecorationDelta.value(
                 BoxDecoration(

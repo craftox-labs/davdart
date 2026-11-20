@@ -32,6 +32,47 @@ class IconAction extends StatelessWidget {
   );
 }
 
+/// The one header row every pane starts with (side panel section title, top
+/// bar, peek toolbar): [Sizes.topBar] tall with a hairline under it and
+/// children centred, so rows side by side share top, centreline and bottom.
+class PaneHeaderRow extends StatelessWidget {
+  const PaneHeaderRow({
+    super.key,
+    required this.children,
+    this.startPad,
+    this.endPad,
+  });
+  final List<Widget> children;
+
+  /// Horizontal insets; both default to the standard medium space.
+  final double? startPad, endPad;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return SizedBox(
+      height: t.sizes.topBar,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: t.divider, width: t.borders.hairline),
+          ),
+        ),
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: startPad ?? t.space.md,
+            right: endPad ?? t.space.md,
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: children,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Opens a forui dialog with a title, content and a row of actions.
 Future<T?> showAppDialog<T>(
   BuildContext context, {

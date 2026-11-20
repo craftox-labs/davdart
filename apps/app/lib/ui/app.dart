@@ -258,7 +258,9 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     );
 
     // A main note tab is a full page: no search or view switch.
-    final showTopBar = !(mainNote != null && wide);
+    // Where the peeked note replaces the main area it brings its own
+    // toolbar row, level with the side panel's header.
+    final showTopBar = !(wide && (mainNote != null || (hasDetail && !split)));
     final mirror = state.layoutSide == LayoutSide.end;
     final Widget body;
     if (split) {
@@ -595,58 +597,46 @@ class TopBar extends StatelessWidget {
       onPress: () => state.setView(mode),
       child: Text(label),
     );
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: t.divider, width: t.borders.hairline),
-        ),
-      ),
-      child: SizedBox(
-        height: t.sizes.topBar,
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: t.space.md),
-          child: Row(
-            children: [
-              if (showMenu)
-                IconAction(
-                  compact: true,
-                  key: const Key('menu'),
-                  tooltip: 'Menu',
-                  icon: FLucideIcons.menu,
-                  onPress: () => openSidebarSheet(context, state),
-                ),
-              SizedBox(width: t.space.xs),
-              Text(board ? 'Board' : 'List', style: t.type.titleStyle),
-              SizedBox(width: t.space.lg),
-              if (state.loading)
-                SizedBox(
-                  width: t.sizes.spinner,
-                  height: t.sizes.spinner,
-                  child: const FCircularProgress(),
-                ),
-              const Spacer(),
-              if (!narrow) ...[
-                toggle('Board', ViewMode.board),
-                SizedBox(width: t.space.xs),
-                toggle('List', ViewMode.list),
-              ] else
-                IconAction(
-                  compact: true,
-                  tooltip: board ? 'Show list' : 'Show board',
-                  icon: board ? FLucideIcons.list : FLucideIcons.squareKanban,
-                  onPress: () =>
-                      state.setView(board ? ViewMode.list : ViewMode.board),
-                ),
-              IconAction(
-                compact: true,
-                tooltip: 'Reload',
-                icon: FLucideIcons.refreshCw,
-                onPress: state.load,
-              ),
-            ],
+    return PaneHeaderRow(
+      key: const Key('top-bar'),
+      children: [
+        if (showMenu)
+          IconAction(
+            compact: true,
+            key: const Key('menu'),
+            tooltip: 'Menu',
+            icon: FLucideIcons.menu,
+            onPress: () => openSidebarSheet(context, state),
           ),
+        SizedBox(width: t.space.xs),
+        Text(board ? 'Board' : 'List', style: t.type.titleStyle),
+        SizedBox(width: t.space.lg),
+        if (state.loading)
+          SizedBox(
+            width: t.sizes.spinner,
+            height: t.sizes.spinner,
+            child: const FCircularProgress(),
+          ),
+        const Spacer(),
+        if (!narrow) ...[
+          toggle('Board', ViewMode.board),
+          SizedBox(width: t.space.xs),
+          toggle('List', ViewMode.list),
+        ] else
+          IconAction(
+            compact: true,
+            tooltip: board ? 'Show list' : 'Show board',
+            icon: board ? FLucideIcons.list : FLucideIcons.squareKanban,
+            onPress: () =>
+                state.setView(board ? ViewMode.list : ViewMode.board),
+          ),
+        IconAction(
+          compact: true,
+          tooltip: 'Reload',
+          icon: FLucideIcons.refreshCw,
+          onPress: state.load,
         ),
-      ),
+      ],
     );
   }
 }

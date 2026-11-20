@@ -48,51 +48,50 @@ class DetailView extends StatelessWidget {
     final draft = state.draftFor(uid);
     Widget page = Column(
       children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(t.space.xs, t.space.xs, t.space.md, 0),
-          child: Row(
-            children: [
-              if (!full && !inHeader)
-                IconAction(
-                  tooltip: 'Close',
-                  icon: FLucideIcons.arrowLeft,
-                  onPress: onClose,
-                ),
-              Expanded(
-                child: full
-                    ? const SizedBox.shrink()
-                    : Text(
-                        key: const Key('breadcrumb'),
-                        path.map((n) => n.summary).join('  /  '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: t.type.captionStyle.copyWith(color: t.muted),
-                      ),
+        PaneHeaderRow(
+          key: const Key('peek-toolbar'),
+          startPad: t.space.xs,
+          children: [
+            if (!full && !inHeader)
+              IconAction(
+                tooltip: 'Close',
+                icon: FLucideIcons.arrowLeft,
+                onPress: onClose,
               ),
-              if (state.editable) ...[
-                if (state.spaces.length > 1)
-                  IconAction(
-                    key: const Key('move-note'),
-                    tooltip: 'Move to another space',
-                    icon: FLucideIcons.folderInput,
-                    onPress: () => showMoveSpaceDialog(context, state, note),
-                  ),
-                if (draft == null)
-                  IconAction(
-                    key: const Key('edit-note'),
-                    tooltip: 'Edit',
-                    icon: FLucideIcons.pencil,
-                    onPress: () => state.startEdit(uid),
-                  ),
+            Expanded(
+              child: full
+                  ? const SizedBox.shrink()
+                  : Text(
+                      key: const Key('breadcrumb'),
+                      path.map((n) => n.summary).join('  /  '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.type.captionStyle.copyWith(color: t.muted),
+                    ),
+            ),
+            if (state.editable) ...[
+              if (state.spaces.length > 1)
                 IconAction(
-                  key: const Key('delete-note'),
-                  tooltip: 'Delete',
-                  icon: FLucideIcons.trash2,
-                  onPress: () => confirmDeleteNote(context, state, note),
+                  key: const Key('move-note'),
+                  tooltip: 'Move to another space',
+                  icon: FLucideIcons.folderInput,
+                  onPress: () => showMoveSpaceDialog(context, state, note),
                 ),
-              ],
+              if (draft == null)
+                IconAction(
+                  key: const Key('edit-note'),
+                  tooltip: 'Edit',
+                  icon: FLucideIcons.pencil,
+                  onPress: () => state.startEdit(uid),
+                ),
+              IconAction(
+                key: const Key('delete-note'),
+                tooltip: 'Delete',
+                icon: FLucideIcons.trash2,
+                onPress: () => confirmDeleteNote(context, state, note),
+              ),
             ],
-          ),
+          ],
         ),
         if (draft != null) EditBar(state: state, draft: draft),
         Expanded(

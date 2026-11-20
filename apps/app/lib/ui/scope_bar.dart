@@ -39,7 +39,9 @@ class ScopeBar extends StatelessWidget {
       ),
       decoration: BoxDecoration(
         color: t.card,
-        border: Border(bottom: BorderSide(color: t.divider)),
+        border: Border(
+          bottom: BorderSide(color: t.divider, width: t.borders.hairline),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

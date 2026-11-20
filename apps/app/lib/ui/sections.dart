@@ -38,24 +38,16 @@ class _Panel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(
-            t.space.xl + t.space.xxs,
-            t.space.lg + t.space.xxs,
-            t.space.lg,
-            t.space.md,
-          ),
-          child: SizedBox(
-            height: t.sizes.sectionHeader,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Expanded(child: heading),
-                ?trailing,
-              ],
-            ),
-          ),
+        PaneHeaderRow(
+          key: const Key('side-header'),
+          startPad: t.space.xl + t.space.xxs,
+          endPad: t.space.lg,
+          children: [
+            Expanded(child: heading),
+            ?trailing,
+          ],
         ),
+        SizedBox(height: t.space.md),
         Expanded(
           child: () {
             final body = ListView(
