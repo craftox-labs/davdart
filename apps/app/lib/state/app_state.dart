@@ -15,9 +15,9 @@ import 'task_rules.dart';
 enum ViewMode { board, list }
 
 /// The section the side panel shows, chosen with the icon rail.
-/// `notes` is shown as "Files"; the id stays so saved selections still load.
+/// `notes` is shown as "Notes"; the ids stay so saved selections still load.
 /// Spaces is a popup on the rail, not a section.
-enum Section { notes, views, search, account, settings }
+enum Section { notes, tasks, events, views, search, account, settings }
 
 const boardOrder = ['backlog', 'todo', 'doing', 'blocked', 'done'];
 
@@ -331,6 +331,14 @@ class AppState extends ChangeNotifier {
     section = s;
     prefs?.write(_sectionKey, s.name);
     notifyListeners();
+  }
+
+  /// After a Space switch: the Tasks and Events lists stay (the choice on
+  /// the rail survives), any other section falls back to Notes.
+  void keepListSection() {
+    if (section != Section.tasks && section != Section.events) {
+      setSection(Section.notes);
+    }
   }
 
   NoteSource source;
@@ -1839,11 +1847,8 @@ class AppState extends ChangeNotifier {
         : null;
   }
 
-  /// The main pane shows the Tasks list.
-  bool get tasksTabActive => activeTab?.kind == TabKind.tasks;
-
   /// Something other than Home or a view fills the main pane: a note or task
-  /// page, or the Tasks list.
+  /// page.
   bool get mainIsPage => mainNoteUid != null || mainTaskUid != null;
 
   String get _tabsKey => 'davdart.tabs.v1.${catalog?.current ?? 'default'}';
@@ -1868,7 +1873,6 @@ class AppState extends ChangeNotifier {
     TabKind.note => tree.find(t.id) != null,
     TabKind.view => _viewNotes.containsKey(t.id),
     TabKind.task => _taskById(t.id) != null,
-    TabKind.tasks => true,
   };
 
   void _pruneTabs() {
@@ -1895,11 +1899,8 @@ class AppState extends ChangeNotifier {
     _show(t);
   }
 
-  /// Opens (or focuses) the Tasks list tab.
-  void openTasksTab() {
-    if (_tabs.add(DocTab.tasksList)) _saveTabs();
-    _show(DocTab.tasksList);
-  }
+  /// Shows the Tasks list in the side panel (opens the panel if folded).
+  void openTasksPanel() => setSection(Section.tasks);
 
   /// Opens (or focuses) the main tab of note [uid]. A peek of the same note
   /// closes (one place per note). The "+" button's new note opens this way.
@@ -1931,7 +1932,6 @@ class AppState extends ChangeNotifier {
     TabKind.note => tree.find(t.id)?.note.summary ?? '',
     TabKind.view => _viewByUid(t.id)?.name ?? '',
     TabKind.task => _taskById(t.id)?.summary ?? '',
-    TabKind.tasks => 'Tasks',
   };
 
   bool tabIsFolder(DocTab t) =>
@@ -1967,9 +1967,6 @@ class AppState extends ChangeNotifier {
       if (_taskById(t.id) == null) return;
       _activeViewTab = t;
       if (peekUid == t.id) _setPeek(null);
-      notifyListeners();
-    } else if (t.kind == TabKind.tasks) {
-      _activeViewTab = t;
       notifyListeners();
     } else {
       final v = _viewByUid(t.id);
@@ -2237,7 +2234,7 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Whether the user left the Files tags list open in this Space.
+  /// Whether the user left the Notes tags list open in this Space.
   bool get tagsOpen => _tagsOpen;
   bool _tagsOpen = false;
 

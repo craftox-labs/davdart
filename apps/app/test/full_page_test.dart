@@ -256,7 +256,7 @@ void main() {
     final ys = <Section, double>{};
     final xs = <Section, double>{};
     for (final (sec, label) in [
-      (Section.notes, 'Files'),
+      (Section.notes, 'Notes'),
       (Section.views, 'Views'),
       (Section.search, 'Search'),
     ]) {

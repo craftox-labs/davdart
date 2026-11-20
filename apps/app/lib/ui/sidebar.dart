@@ -4,12 +4,14 @@ import 'package:forui/forui.dart';
 import '../data/space_catalog.dart';
 import '../state/app_state.dart';
 import 'drag_drop.dart';
+import 'events_panel.dart';
 import 'new_space_dialog.dart';
 import 'note_menu.dart';
 import 'parts.dart';
 import 'resize_handle.dart';
 import 'sections.dart';
 import 'shell_frame.dart';
+import 'tasks_panel.dart';
 import 'theme.dart';
 
 /// The side panel: shows the section chosen on the icon rail ([AppState.section]).
@@ -42,6 +44,8 @@ class Sidebar extends StatelessWidget {
     if (section == Section.account && !state.canSignIn) section = Section.notes;
     final body = switch (section) {
       Section.notes => NotesSection(state: state, onPick: close),
+      Section.tasks => TasksPanel(state: state, onPick: close),
+      Section.events => const EventsPanel(),
       Section.views => ViewsSection(state: state, onPick: close),
       Section.search => SearchSection(state: state, onPick: close),
       Section.account => AccountSection(state: state, onPick: close),
@@ -161,7 +165,7 @@ Future<void> _dropOnSpace(
 
 /// The Spaces popup's groups: every Space (the current one first, marked)
 /// with its sync state, then the manage actions (new, rename, delete).
-/// Picking a Space switches to it and shows Files; [onPick] runs only before a
+/// Picking a Space switches to it and keeps Tasks or Events, else shows Notes; [onPick] runs only before a
 /// manage action opens a dialog.
 List<FItemGroup> spaceMenuGroups(
   BuildContext context,
@@ -213,7 +217,7 @@ List<FItemGroup> spaceMenuGroups(
                         FLucideIcons.arrowRightToLine,
                         () {
                           state.switchSpace(sp.id);
-                          state.setSection(Section.notes);
+                          state.keepListSection();
                         },
                         key: Key('menu-space-switch-${sp.id}'),
                       ),
@@ -246,7 +250,7 @@ List<FItemGroup> spaceMenuGroups(
                   : null,
               onPress: () => pick(() {
                 state.switchSpace(sp.id);
-                state.setSection(Section.notes);
+                state.keepListSection();
               }),
             ),
           ),

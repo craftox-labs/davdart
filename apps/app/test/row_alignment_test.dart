@@ -51,7 +51,7 @@ void main() {
         _same(t, _k('side-header'), _k('top-bar'));
         _same(
           t,
-          find.descendant(of: _k('side-header'), matching: find.text('Files')),
+          find.descendant(of: _k('side-header'), matching: find.text('Notes')),
           find
               .descendant(
                 of: _k('top-bar'),

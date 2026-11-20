@@ -143,7 +143,9 @@ class ShellFrame extends StatelessWidget {
 
 /// Icon and name of a section, shared by the rail and the narrow selector.
 (IconData, String) sectionMeta(Section s) => switch (s) {
-  Section.notes => (FLucideIcons.fileText, 'Files'),
+  Section.notes => (FLucideIcons.fileText, 'Notes'),
+  Section.tasks => (FLucideIcons.listChecks, 'Tasks'),
+  Section.events => (FLucideIcons.calendar, 'Events'),
   Section.views => (FLucideIcons.bookmark, 'Views'),
   Section.search => (FLucideIcons.search, 'Search'),
   Section.account => (FLucideIcons.circleUser, 'Account'),
@@ -155,6 +157,8 @@ class ShellFrame extends StatelessWidget {
 /// appears when the app can sign in.
 List<Section> topSections() => const [
   Section.notes,
+  Section.tasks,
+  Section.events,
   Section.views,
   Section.search,
 ];
@@ -428,7 +432,7 @@ class SectionButton extends StatelessWidget {
 /// The Spaces item: a rail button that pops a menu of the Spaces (current one
 /// first) with the manage actions. On the rail the menu opens beside the icon;
 /// in the narrow sheet ([below]) under it. Picking a Space switches to it and
-/// shows Files.
+/// shows Notes.
 class SpacesMenuButton extends StatelessWidget {
   const SpacesMenuButton({
     super.key,
@@ -476,8 +480,8 @@ class SpacesMenuButton extends StatelessWidget {
   );
 }
 
-/// A slim vertical rail: the logo slot, the Spaces popup, then Files, Views
-/// and Search at the top, Account and Settings at the bottom.
+/// A slim vertical rail: the logo slot, the Spaces popup, then Notes, Tasks, Events,
+/// Views and Search at the top, Account and Settings at the bottom.
 class IconRail extends StatelessWidget {
   const IconRail({super.key, required this.state});
   final AppState state;

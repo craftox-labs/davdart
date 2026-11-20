@@ -25,7 +25,6 @@ import 'scope_bar.dart';
 import 'shell_frame.dart';
 import 'sidebar.dart';
 import 'tab_strip.dart';
-import 'tasks_view.dart';
 import 'theme.dart';
 
 /// The real app: Spaces kept in browser storage. `Planning` is filled once
@@ -238,8 +237,6 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
 
     Widget main() => state.noSpace
         ? FirstRunView(state: state)
-        : state.tasksTabActive
-        ? TasksView(state: state)
         : mainNote != null
         ? DetailView(
             key: const Key('main-note'),
@@ -642,36 +639,11 @@ class TopBar extends StatelessWidget {
   /// title where a note fills the main area (narrow layouts).
   Widget _lead(Tokens t) {
     final uid = state.mainNoteUid ?? state.mainTaskUid;
-    if (state.tasksTabActive && showMenu) {
-      // Below wide there is no tab strip: Back returns home.
-      return Row(
-        children: [
-          IconAction(
-            compact: true,
-            key: const Key('tasks-back'),
-            tooltip: 'Back to Home',
-            icon: FLucideIcons.arrowLeft,
-            onPress: () => state.activateTab(null),
-          ),
-          SizedBox(width: t.space.xs),
-          Expanded(
-            child: Text(
-              'Tasks',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: t.type.titleStyle,
-            ),
-          ),
-        ],
-      );
-    }
-    if (uid != null || state.tasksTabActive) {
+    if (uid != null) {
       return Text(
-        state.tasksTabActive
-            ? 'Tasks'
-            : state.tree.find(uid!)?.note.summary ??
-                  state.taskById(uid)?.summary ??
-                  '',
+        state.tree.find(uid)?.note.summary ??
+            state.taskById(uid)?.summary ??
+            '',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: t.type.titleStyle,
@@ -684,7 +656,7 @@ class TopBar extends StatelessWidget {
   }
 
   Widget _bar(BuildContext context, Tokens t, bool narrow) {
-    final home = !state.mainIsPage && !state.tasksTabActive;
+    final home = !state.mainIsPage;
     final board = state.view == ViewMode.board;
     Widget toggle(String label, ViewMode mode) => FButton(
       variant: state.view == mode
@@ -720,7 +692,7 @@ class TopBar extends StatelessWidget {
             ),
           ),
         if (home) ScopeActions(state: state),
-        if (state.activeTab == null || state.tasksTabActive)
+        if (state.activeTab == null)
           const SizedBox.shrink()
         else if (!narrow) ...[
           toggle('Board', ViewMode.board),

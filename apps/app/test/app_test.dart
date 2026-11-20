@@ -1375,7 +1375,7 @@ void main() {
       );
     });
 
-    testWidgets('picking a Space switches and shows Files', (t) async {
+    testWidgets('picking a Space switches and shows Notes', (t) async {
       final state = await multi(t, const Size(1400, 900));
       state.setSection(Section.settings);
       await t.pumpAndSettle();
@@ -1393,48 +1393,56 @@ void main() {
       expect(inbox.dy, lessThan(planning.dy)); // Inbox is now first
     });
 
-    testWidgets('rail order: logo, Spaces, Files, Views, Search', (t) async {
-      await pump(t);
-      expect(find.byKey(const Key('logo-slot')), findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.byKey(const Key('logo-slot')),
-          matching: find.byWidgetPredicate(
-            (w) => w is Semantics && w.properties.label == 'davdart',
+    testWidgets(
+      'rail order: logo, Spaces, Notes, Tasks, Events, Views, Search',
+      (t) async {
+        await pump(t);
+        expect(find.byKey(const Key('logo-slot')), findsOneWidget);
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('logo-slot')),
+            matching: find.byWidgetPredicate(
+              (w) => w is Semantics && w.properties.label == 'davdart',
+            ),
           ),
-        ),
-        findsOneWidget,
-      );
-      // The mark is as wide as the rail icon glyphs, on the same centre line.
-      final tk = tokensOf(t.element(find.byKey(const Key('icon-rail'))));
-      final mark = find.byKey(const Key('logo-mark'));
-      expect(t.getSize(mark).width, tk.icons.rail);
-      final glyph = find.descendant(
-        of: find.byKey(const Key('rail-notes')),
-        matching: find.byType(Icon),
-      );
-      expect(t.getSize(glyph).width, tk.icons.rail);
-      expect((t.getCenter(mark).dx - t.getCenter(glyph).dx).abs(), lessThan(1));
-      final keys = [
-        'logo-slot',
-        'rail-spaces',
-        'rail-notes',
-        'rail-views',
-        'rail-search',
-        'rail-settings',
-      ];
-      final ys = [for (final k in keys) t.getTopLeft(find.byKey(Key(k))).dy];
-      expect(ys, [...ys]..sort());
-      expect(
-        find.byKey(const Key('rail-account')),
-        findsNothing,
-      ); // can't sign in
-      // The logo does nothing when tapped.
-      await t.tap(find.byKey(const Key('logo-slot')));
-      await t.pumpAndSettle();
-      expect(find.byKey(const Key('rail-spaces')), findsOneWidget);
-      expect(find.text('New space…'), findsNothing);
-    });
+          findsOneWidget,
+        );
+        // The mark is as wide as the rail icon glyphs, on the same centre line.
+        final tk = tokensOf(t.element(find.byKey(const Key('icon-rail'))));
+        final mark = find.byKey(const Key('logo-mark'));
+        expect(t.getSize(mark).width, tk.icons.rail);
+        final glyph = find.descendant(
+          of: find.byKey(const Key('rail-notes')),
+          matching: find.byType(Icon),
+        );
+        expect(t.getSize(glyph).width, tk.icons.rail);
+        expect(
+          (t.getCenter(mark).dx - t.getCenter(glyph).dx).abs(),
+          lessThan(1),
+        );
+        final keys = [
+          'logo-slot',
+          'rail-spaces',
+          'rail-notes',
+          'rail-tasks',
+          'rail-events',
+          'rail-views',
+          'rail-search',
+          'rail-settings',
+        ];
+        final ys = [for (final k in keys) t.getTopLeft(find.byKey(Key(k))).dy];
+        expect(ys, [...ys]..sort());
+        expect(
+          find.byKey(const Key('rail-account')),
+          findsNothing,
+        ); // can't sign in
+        // The logo does nothing when tapped.
+        await t.tap(find.byKey(const Key('logo-slot')));
+        await t.pumpAndSettle();
+        expect(find.byKey(const Key('rail-spaces')), findsOneWidget);
+        expect(find.text('New space…'), findsNothing);
+      },
+    );
 
     test('a saved Spaces selection falls back to Files', () {
       final storage = MemoryStorage();

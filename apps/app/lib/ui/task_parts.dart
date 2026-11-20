@@ -190,10 +190,13 @@ class TaskRow extends StatelessWidget {
                 ),
                 for (final tag in tags.take(2)) ...[
                   SizedBox(width: t.space.sm),
-                  Text(
-                    '#$tag',
-                    maxLines: 1,
-                    style: t.type.captionStyle.copyWith(color: t.muted),
+                  Flexible(
+                    child: Text(
+                      '#$tag',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.type.captionStyle.copyWith(color: t.muted),
+                    ),
                   ),
                 ],
                 if (task.due != null) ...[

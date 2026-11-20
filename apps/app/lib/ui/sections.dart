@@ -12,12 +12,13 @@ import 'new_note_dialog.dart';
 import 'note_menu.dart';
 import 'parts.dart';
 import 'save_view_dialog.dart';
+import 'side_panel.dart';
 import 'theme.dart';
 
 /// The panels the side panel shows, one per rail section. Each takes
 /// [onPick], run after an action that should close the narrow sheet.
 
-/// Heading line plus a scrolling body, the frame every section shares.
+/// Heading line plus a scrolling list body, on the shared [SidePanelFrame].
 class _Panel extends StatelessWidget {
   const _Panel({
     required this.heading,
@@ -35,29 +36,14 @@ class _Panel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        PaneHeaderRow(
-          key: const Key('side-header'),
-          startPad: t.space.xl + t.space.xxs,
-          endPad: t.space.lg,
-          children: [
-            Expanded(child: heading),
-            ?trailing,
-          ],
-        ),
-        SizedBox(height: t.space.md),
-        Expanded(
-          child: () {
-            final body = ListView(
-              padding: EdgeInsets.symmetric(horizontal: t.space.lg),
-              children: children,
-            );
-            return wrapBody == null ? body : wrapBody!(body);
-          }(),
-        ),
-      ],
+    final body = ListView(
+      padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+      children: children,
+    );
+    return SidePanelFrame(
+      title: heading,
+      actions: trailing,
+      body: wrapBody == null ? body : wrapBody!(body),
     );
   }
 }
@@ -117,7 +103,7 @@ abstract class _Section extends StatelessWidget {
   final VoidCallback onPick;
 }
 
-/// Files (the notes): the Space name, then the tree with folders and the tags
+/// Notes (the tree): the Space name, then the tree with folders and the tags
 /// at the end. Spaces are switched from the rail's Spaces popup.
 class NotesSection extends _Section {
   const NotesSection({super.key, required super.state, required super.onPick});
@@ -217,7 +203,7 @@ class NotesSection extends _Section {
 
     walk(state.tree.roots, 0);
 
-    final heading = _title('Files');
+    final heading = _title('Notes');
 
     return _Panel(
       heading: heading,
@@ -374,13 +360,6 @@ class ViewsSection extends _Section {
   Widget build(BuildContext context) => _Panel(
     heading: _title('Views'),
     children: [
-      KeyedSubtree(
-        key: const Key('views-tasks'),
-        child: _item(FLucideIcons.listChecks, 'Tasks', () {
-          state.openTasksTab();
-          onPick();
-        }, on: state.tasksTabActive),
-      ),
       if (state.savedViews.isEmpty && !state.hasFilter)
         const _Muted('No saved views yet'),
       for (final v in state.savedViews)

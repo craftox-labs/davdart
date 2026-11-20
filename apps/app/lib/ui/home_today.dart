@@ -116,7 +116,7 @@ class _HomeTodayState extends State<HomeToday> {
                               alignment: Alignment.centerLeft,
                               child: FTappable(
                                 key: const Key('home-tasks-all'),
-                                onPress: state.openTasksTab,
+                                onPress: state.openTasksPanel,
                                 child: Padding(
                                   padding: EdgeInsets.only(top: t.space.sm),
                                   child: Text(

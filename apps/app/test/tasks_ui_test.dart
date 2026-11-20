@@ -15,6 +15,16 @@ import 'tasks_helper.dart';
 
 Finder _k(String k) => find.byKey(Key(k));
 
+/// Text inside the Tasks side panel.
+Finder _panelText(String x) => find.descendant(
+  of: find.byKey(const Key('tasks-view')),
+  matching: find.text(x),
+);
+
+/// A widget inside the Tasks side panel (Home shows tasks too).
+Finder _p(String k) =>
+    find.descendant(of: find.byKey(const Key('tasks-view')), matching: _k(k));
+
 List<Note> _notes() => [
   Note(uid: 'f', summary: 'Plans', categories: ['kind-folder']),
   Note(uid: 'a', summary: 'Alpha', parentUid: 'f', description: 'body'),
@@ -33,44 +43,69 @@ Future<AppState> _tab(
   Size size = const Size(1280, 900),
 }) async {
   final s = await pumpTasksApp(t, notes: _notes(), tasks: _tasks(), size: size);
-  s.openTasksTab();
+  s.openTasksPanel();
   await t.pumpAndSettle();
   return s;
 }
 
 void main() {
   group('Tasks view', () {
-    testWidgets('the Views entry opens the Tasks tab', (t) async {
+    testWidgets('the rail Tasks item lists the tasks in the side panel', (
+      t,
+    ) async {
       final s = await pumpTasksApp(t, notes: _notes(), tasks: _tasks());
-      await t.tap(_k('rail-views'));
+      expect(_k('tasks-view'), findsNothing);
+      await t.tap(_k('rail-tasks'));
       await t.pumpAndSettle();
-      await t.tap(_k('views-tasks'));
-      await t.pumpAndSettle();
-      expect(s.tasksTabActive, isTrue);
-      expect(s.tabs, [DocTab.tasksList]);
-      expect(_k('tab-k:all'), findsOneWidget);
+      expect(s.section, Section.tasks);
+      expect(s.tabs, isEmpty);
       expect(_k('tasks-view'), findsOneWidget);
-      expect(_k('home-today'), findsNothing);
+      expect(
+        find.descendant(of: _k('side-header'), matching: find.text('Tasks')),
+        findsOneWidget,
+      );
+      expect(_k('new-task'), findsOneWidget);
+      expect(_k('home-today'), findsOneWidget);
+    });
+
+    testWidgets('a task row opens per the open setting', (t) async {
+      final s = await _tab(t);
+      await t.tap(_p('task-row-soon'));
+      await t.pumpAndSettle();
+      expect(s.peekUid, 'soon');
+      s.setOpenMode(OpenMode.main);
+      await t.tap(_p('task-row-nodate'));
+      await t.pumpAndSettle();
+      expect(s.mainTaskUid, 'nodate');
+    });
+
+    testWidgets('New task adds a task and opens it', (t) async {
+      final s = await _tab(t);
+      final before = s.tasks.length;
+      await t.tap(_k('new-task'));
+      await t.pumpAndSettle();
+      expect(s.tasks.length, before + 1);
+      expect(s.peekUid, isNotNull);
     });
 
     testWidgets('groups, open filter hides Completed, All shows it', (t) async {
       final s = await _tab(t);
       for (final g in ['overdue', 'today', 'upcoming', 'no-date']) {
-        expect(_k('tasks-$g-toggle'), findsOneWidget, reason: g);
+        expect(_p('tasks-$g-toggle'), findsOneWidget, reason: g);
       }
-      expect(_k('tasks-completed-toggle'), findsNothing);
-      expect(_k('task-row-late'), findsOneWidget);
-      expect(_k('task-row-done'), findsNothing);
-      await t.tap(_k('tasks-filter-all'));
+      expect(_p('tasks-completed-toggle'), findsNothing);
+      expect(_p('task-row-late'), findsOneWidget);
+      expect(_p('task-row-done'), findsNothing);
+      await t.tap(_p('tasks-filter-all'));
       await t.pumpAndSettle();
       expect(s.taskFilter, TaskFilter.all);
-      expect(_k('tasks-completed-toggle'), findsOneWidget);
-      expect(_k('task-row-done'), findsOneWidget);
-      await t.tap(_k('tasks-filter-completed'));
+      expect(_p('tasks-completed-toggle'), findsOneWidget);
+      expect(_p('task-row-done'), findsOneWidget);
+      await t.tap(_p('tasks-filter-completed'));
       await t.pumpAndSettle();
-      expect(_k('task-row-late'), findsNothing);
-      expect(_k('tasks-overdue-toggle'), findsNothing);
-      expect(_k('task-row-done'), findsOneWidget);
+      expect(_p('task-row-late'), findsNothing);
+      expect(_p('tasks-overdue-toggle'), findsNothing);
+      expect(_p('task-row-done'), findsOneWidget);
     });
 
     testWidgets('a group collapses and persists', (t) async {
@@ -81,12 +116,12 @@ void main() {
         tasks: _tasks(),
         prefs: prefs,
       );
-      s.openTasksTab();
+      s.openTasksPanel();
       await t.pumpAndSettle();
-      await t.tap(_k('tasks-overdue-toggle'));
+      await t.tap(_p('tasks-overdue-toggle'));
       await t.pumpAndSettle();
-      expect(_k('task-row-late'), findsNothing);
-      expect(_k('task-row-today'), findsOneWidget);
+      expect(_p('task-row-late'), findsNothing);
+      expect(_p('task-row-today'), findsOneWidget);
       expect(prefs.read('davdart.tasks.overdue.collapsed.v1'), 'true');
     });
 
@@ -95,74 +130,74 @@ void main() {
     ) async {
       final s = await _tab(t);
       expect(
-        find.descendant(of: _k('task-row-late'), matching: find.text('#home')),
+        find.descendant(of: _p('task-row-late'), matching: find.text('#home')),
         findsOneWidget,
       );
-      expect(_k('due-late'), findsOneWidget);
-      expect(_k('due-nodate'), findsNothing);
-      await t.tap(_k('task-check-soon'));
+      expect(_p('due-late'), findsOneWidget);
+      expect(_p('due-nodate'), findsNothing);
+      await t.tap(_p('task-check-soon'));
       await t.pumpAndSettle();
       expect(s.taskById('soon')!.isCompleted, isTrue);
-      expect(_k('task-row-soon'), findsNothing);
+      expect(_p('task-row-soon'), findsNothing);
     });
 
     testWidgets('tag and folder filters narrow the list', (t) async {
       final s = await _tab(t);
       s.setTaskTagFilter('home');
       await t.pumpAndSettle();
-      expect(_k('task-row-late'), findsOneWidget);
-      expect(_k('task-row-today'), findsNothing);
+      expect(_p('task-row-late'), findsOneWidget);
+      expect(_p('task-row-today'), findsNothing);
       s.setTaskTagFilter('home');
       s.setTaskFolderFilter('f');
       await t.pumpAndSettle();
-      expect(_k('task-row-today'), findsOneWidget);
-      expect(_k('task-row-late'), findsNothing);
+      expect(_p('task-row-today'), findsOneWidget);
+      expect(_p('task-row-late'), findsNothing);
       s.setTaskFolderFilter(null);
       await t.pumpAndSettle();
-      expect(_k('task-row-late'), findsOneWidget);
-      expect(_k('tasks-tag-filter'), findsOneWidget);
-      expect(_k('tasks-folder-filter'), findsOneWidget);
+      expect(_p('task-row-late'), findsOneWidget);
+      expect(_p('tasks-tag-filter'), findsOneWidget);
+      expect(_p('tasks-folder-filter'), findsOneWidget);
     });
 
     testWidgets('no match and empty messages', (t) async {
       final s = await _tab(t);
       s.setTaskFolderFilter('a'); // a note with no tasks under it
       await t.pumpAndSettle();
-      expect(_k('tasks-no-match'), findsOneWidget);
+      expect(_p('tasks-no-match'), findsOneWidget);
       final e = await pumpTasksApp(t);
-      e.openTasksTab();
+      e.openTasksPanel();
       await t.pumpAndSettle();
-      expect(_k('tasks-empty'), findsOneWidget);
-      expect(_k('task-quick-add'), findsOneWidget);
+      expect(_p('tasks-empty'), findsOneWidget);
+      expect(_p('task-quick-add'), findsOneWidget);
     });
 
     testWidgets('quick add on top creates a task', (t) async {
       final s = await _tab(t);
-      await t.enterText(_k('task-quick-add'), 'Brand new');
+      await t.enterText(_p('task-quick-add'), 'Brand new');
       await t.testTextInput.receiveAction(TextInputAction.done);
       await t.pumpAndSettle();
       final k = s.tasks.firstWhere((k) => k.summary == 'Brand new');
-      expect(_k('task-row-${k.uid}'), findsOneWidget);
+      expect(_p('task-row-${k.uid}'), findsOneWidget);
     });
 
     testWidgets('click follows the open setting; double click promotes', (
       t,
     ) async {
       final s = await _tab(t);
-      await t.tap(find.text('Soon one'));
+      await t.tap(_panelText('Soon one'));
       await t.pumpAndSettle();
       expect(s.peekUid, 'soon');
       expect(_k('task-detail'), findsOneWidget);
       s.setOpenMode(OpenMode.main);
-      await t.tap(find.text('Whenever'));
+      await t.tap(_panelText('Whenever'));
       await t.pumpAndSettle();
       expect(s.mainTaskUid, 'nodate');
       expect(_k('tab-t:nodate'), findsOneWidget);
-      s.openTasksTab();
+      s.openTasksPanel();
       s.setOpenMode(OpenMode.peek);
       await t.pumpAndSettle();
       final late = find.descendant(
-        of: _k('task-row-late'),
+        of: _p('task-row-late'),
         matching: find.text('Late one'),
       );
       await t.tap(late);
@@ -177,7 +212,7 @@ void main() {
       t,
     ) async {
       final s = await _tab(t);
-      await t.tap(find.text('Soon one'), buttons: kSecondaryButton);
+      await t.tap(_panelText('Soon one'), buttons: kSecondaryButton);
       await t.pumpAndSettle();
       for (final k in [
         'menu-open-peek',
@@ -191,51 +226,51 @@ void main() {
         if (k == 'menu-move-space') continue;
         expect(_k(k), findsOneWidget, reason: k);
       }
-      await t.tap(_k('menu-open-main'));
+      await t.tap(_p('menu-open-main'));
       await t.pumpAndSettle();
       expect(s.mainTaskUid, 'soon');
-      s.openTasksTab();
+      s.openTasksPanel();
       await t.pumpAndSettle();
       // Complete.
-      await t.tap(find.text('Today one'), buttons: kSecondaryButton);
+      await t.tap(_panelText('Today one'), buttons: kSecondaryButton);
       await t.pumpAndSettle();
-      await t.tap(_k('menu-task-toggle'));
+      await t.tap(_p('menu-task-toggle'));
       await t.pumpAndSettle();
       expect(s.taskById('today')!.isCompleted, isTrue);
       // Set due tomorrow through the submenu, then clear it.
-      await t.tap(find.text('Whenever'), buttons: kSecondaryButton);
+      await t.tap(_panelText('Whenever'), buttons: kSecondaryButton);
       await t.pumpAndSettle();
-      await t.tap(_k('menu-task-due'));
+      await t.tap(_p('menu-task-due'));
       await t.pumpAndSettle();
-      await t.tap(_k('menu-task-due-tomorrow'));
+      await t.tap(_p('menu-task-due-tomorrow'));
       await t.pumpAndSettle();
       expect(s.taskById('nodate')!.due, dueIn(1));
       expect(
         find.descendant(
-          of: _k('task-row-nodate'),
+          of: _p('task-row-nodate'),
           matching: find.text('Tomorrow'),
         ),
         findsOneWidget,
       );
-      await t.tap(find.text('Whenever'), buttons: kSecondaryButton);
+      await t.tap(_panelText('Whenever'), buttons: kSecondaryButton);
       await t.pumpAndSettle();
-      await t.tap(_k('menu-task-due'));
+      await t.tap(_p('menu-task-due'));
       await t.pumpAndSettle();
-      await t.tap(_k('menu-task-due-clear'));
+      await t.tap(_p('menu-task-due-clear'));
       await t.pumpAndSettle();
       expect(s.taskById('nodate')!.due, isNull);
       // Delete asks first.
-      await t.tap(find.text('Whenever'), buttons: kSecondaryButton);
+      await t.tap(_panelText('Whenever'), buttons: kSecondaryButton);
       await t.pumpAndSettle();
-      await t.tap(_k('menu-delete'));
+      await t.tap(_p('menu-delete'));
       await t.pumpAndSettle();
       expect(find.text('Delete task?'), findsOneWidget);
       await t.tap(find.text('Cancel'));
       await t.pumpAndSettle();
       expect(s.taskById('nodate'), isNotNull);
-      await t.tap(find.text('Whenever'), buttons: kSecondaryButton);
+      await t.tap(_panelText('Whenever'), buttons: kSecondaryButton);
       await t.pumpAndSettle();
-      await t.tap(_k('menu-delete'));
+      await t.tap(_p('menu-delete'));
       await t.pumpAndSettle();
       await t.tap(_k('delete-confirm'));
       await t.pumpAndSettle();
@@ -244,11 +279,11 @@ void main() {
 
     testWidgets('a pick-a-date dialog sets the due date', (t) async {
       final s = await _tab(t);
-      await t.tap(find.text('Whenever'), buttons: kSecondaryButton);
+      await t.tap(_panelText('Whenever'), buttons: kSecondaryButton);
       await t.pumpAndSettle();
-      await t.tap(_k('menu-task-due'));
+      await t.tap(_p('menu-task-due'));
       await t.pumpAndSettle();
-      await t.tap(_k('menu-task-due-pick'));
+      await t.tap(_p('menu-task-due-pick'));
       await t.pumpAndSettle();
       // The test font is wider than the real one: the calendar header may
       // overflow here, which says nothing about the app.
@@ -267,12 +302,12 @@ void main() {
         t,
         tasks: [mkTask('r', rrule: 'FREQ=DAILY', days: 0)],
       ).then((s) async {
-        s.openTasksTab();
+        s.openTasksPanel();
         await t.pumpAndSettle();
-        expect(t.widget<FCheckbox>(_k('task-check-r')).enabled, isFalse);
-        await t.tap(find.text('r'), buttons: kSecondaryButton);
+        expect(t.widget<FCheckbox>(_p('task-check-r')).enabled, isFalse);
+        await t.tap(_panelText('r'), buttons: kSecondaryButton);
         await t.pumpAndSettle();
-        expect(_k('menu-task-toggle'), findsNothing);
+        expect(_p('menu-task-toggle'), findsNothing);
       });
     });
 
@@ -286,7 +321,7 @@ void main() {
         prefs: prefs,
         into: space,
       );
-      s.openTasksTab();
+      s.openTasksPanel();
       s.openTaskTab('soon');
       await t.pumpAndSettle();
       await pumpTasksApp(
@@ -297,7 +332,6 @@ void main() {
         into: space,
       );
       await t.pumpAndSettle();
-      expect(_k('tab-k:all'), findsOneWidget);
       expect(_k('tab-t:soon'), findsOneWidget);
     });
 
@@ -310,26 +344,26 @@ void main() {
       expect(s.mainTaskUid, 'soon');
       await t.runAsync(() => s.deleteTask('soon'));
       await t.pumpAndSettle();
-      expect(s.tabs, [DocTab.tasksList]);
+      expect(s.tabs, isEmpty);
       expect(s.mainTaskUid, isNull);
     });
 
     for (final w in [320.0, 880.0, 1280.0, 1911.0]) {
       testWidgets('no overflow at $w', (t) async {
         final s = await _tab(t, size: Size(w, 900));
-        await t.tap(_k('tasks-filter-all'), warnIfMissed: false);
+        if (_k('menu').evaluate().isNotEmpty) {
+          // Narrow: the panel is in the sheet.
+          await t.tap(_k('menu'));
+          await t.pumpAndSettle();
+          await t.tap(_k('bar-tasks'));
+          await t.pumpAndSettle();
+        }
+        await t.tap(_k('tasks-filter-all'));
         await t.pumpAndSettle();
-        expect(s.tasksTabActive, isTrue);
+        expect(s.section, Section.tasks);
         expect(t.takeException(), isNull);
       });
     }
-
-    testWidgets('narrow: Back returns home', (t) async {
-      final s = await _tab(t, size: const Size(400, 800));
-      await t.tap(_k('tasks-back'));
-      await t.pumpAndSettle();
-      expect(s.activeTab, isNull);
-    });
   });
 
   group('task detail', () {
@@ -623,7 +657,7 @@ void main() {
           size: Size(w, 900),
         );
         expect(t.takeException(), isNull);
-        s.openTasksTab();
+        s.openTasksPanel();
         await t.pumpAndSettle();
         expect(t.takeException(), isNull);
         await t.tap(
@@ -740,7 +774,7 @@ void main() {
       await t.pumpWidget(DavdartApp(state: s));
       await t.pumpAndSettle();
       await t.runAsync(() => s.addTask('Mover'));
-      s.openTasksTab();
+      s.openTasksPanel();
       await t.pumpAndSettle();
       final uid = s.tasks.single.uid;
       final from = t.getCenter(_k('task-row-$uid'));
@@ -774,9 +808,9 @@ void main() {
       await t.pumpWidget(DavdartApp(state: s));
       await t.pumpAndSettle();
       await t.runAsync(() => s.addTask('Mover'));
-      s.openTasksTab();
+      s.openTasksPanel();
       await t.pumpAndSettle();
-      await t.tap(find.text('Mover'), buttons: kSecondaryButton);
+      await t.tap(_panelText('Mover'), buttons: kSecondaryButton);
       await t.pumpAndSettle();
       await t.tap(_k('menu-move-space'));
       await t.pumpAndSettle();
@@ -801,7 +835,7 @@ void main() {
           );
           switch (variant) {
             case 'tasks-tab':
-              s.openTasksTab();
+              s.openTasksPanel();
             case 'task-peek':
               s.select('soon');
             case 'task-tab':

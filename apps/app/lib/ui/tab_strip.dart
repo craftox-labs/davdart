@@ -212,8 +212,6 @@ class _ReorderableTab extends StatelessWidget {
       width: width,
       icon: tab.kind == TabKind.view
           ? FLucideIcons.bookmark
-          : tab.kind == TabKind.tasks
-          ? FLucideIcons.listChecks
           : tab.kind == TabKind.task
           ? FLucideIcons.listTodo
           : state.tabIsFolder(tab)
@@ -237,34 +235,6 @@ class _ReorderableTab extends StatelessWidget {
         state: state,
         uid: tab.id,
         surface: NoteSurface.mainTab,
-        child: item,
-      );
-    } else if (tab.kind == TabKind.tasks) {
-      item = ActionContextMenu(
-        groups: [
-          [
-            NoteMenuItem(
-              'Close tab',
-              FLucideIcons.x,
-              () => state.closeTab(tab),
-              key: const Key('menu-close'),
-            ),
-            if (state.tabs.length > 1)
-              NoteMenuItem(
-                'Close other tabs',
-                FLucideIcons.x,
-                () => state.closeOtherTabs(tab),
-                key: const Key('menu-close-others'),
-              ),
-            if (state.tabs.last != tab)
-              NoteMenuItem(
-                'Close tabs to the right',
-                FLucideIcons.x,
-                () => state.closeTabsToRight(tab),
-                key: const Key('menu-close-right'),
-              ),
-          ],
-        ],
         child: item,
       );
     } else {
