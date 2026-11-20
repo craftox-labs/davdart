@@ -5,6 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/note_drag.dart';
 import '../theme/tokens.dart';
 import 'logo.dart';
 import 'sidebar.dart';
@@ -432,13 +433,24 @@ class SpacesMenuButton extends StatelessWidget {
         : (mirror ? Alignment.topLeft : Alignment.topRight),
     menuBuilder: (ctx, controller, _) =>
         spaceMenuGroups(ctx, state, controller, onPick: onPick),
-    builder: (ctx, controller, _) => RailButton(
-      icon: spacesIcon,
-      label: spacesLabel,
-      active: false,
-      tipRight: !below,
-      mirror: mirror,
-      onPress: controller.toggle,
+    // A note dragged over the button opens the popup, so it can be dropped
+    // on a Space there.
+    builder: (ctx, controller, _) => DragTarget<NoteDrag>(
+      onWillAcceptWithDetails: (d) =>
+          state.editable &&
+          state.spaces.length > 1 &&
+          state.tree.find(d.data.uid) != null,
+      onMove: (_) {
+        if (!controller.status.isForwardOrCompleted) controller.show();
+      },
+      builder: (_, _, _) => RailButton(
+        icon: spacesIcon,
+        label: spacesLabel,
+        active: false,
+        tipRight: !below,
+        mirror: mirror,
+        onPress: controller.toggle,
+      ),
     ),
   );
 }

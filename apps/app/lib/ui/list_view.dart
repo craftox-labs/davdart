@@ -3,6 +3,8 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/note_drag.dart';
+import 'drag_drop.dart';
 import 'chips.dart';
 import 'note_menu.dart';
 import 'theme.dart';
@@ -41,7 +43,7 @@ class NoteListView extends StatelessWidget {
         child: Text('No notes', style: TextStyle(color: t.muted)),
       );
     }
-    return ListView.separated(
+    final list = ListView.separated(
       itemCount: rows.length,
       separatorBuilder: (_, _) =>
           Container(height: t.borders.hairline, color: t.divider),
@@ -49,60 +51,82 @@ class NoteListView extends StatelessWidget {
         final (n, depth) = rows[i];
         final p = PlanItem.fromNote(n);
         final kids = state.tree.find(n.uid)?.children.isNotEmpty ?? false;
-        return NoteContextMenu(
+        Widget row = NoteContextMenu(
           state: state,
           uid: n.uid,
-          child: FTappable(
-            onPress: () => state.clickNote(n.uid),
-            child: Container(
-              color: state.peekUid == n.uid ? t.selected : null,
-              padding: EdgeInsets.fromLTRB(
-                t.space.lg + depth * t.sizes.listIndent,
-                t.space.lg - t.space.xxs,
-                t.space.lg,
-                t.space.lg - t.space.xxs,
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: t.sizes.listChevronBox,
-                    child: kids && !filtering
-                        ? FTappable(
-                            semanticsLabel: state.collapsed.contains(n.uid)
-                                ? 'Expand'
-                                : 'Collapse',
-                            behavior: HitTestBehavior.opaque,
-                            onPress: () => state.toggle(n.uid),
-                            child: Icon(
-                              state.collapsed.contains(n.uid)
-                                  ? FLucideIcons.chevronRight
-                                  : FLucideIcons.chevronDown,
-                              size: t.icons.lg,
-                              color: t.muted,
-                            ),
-                          )
-                        : null,
-                  ),
-                  StatusDot(p.status),
-                  SizedBox(width: t.space.lg - t.space.xxs),
-                  Expanded(
-                    child: Text(
-                      n.summary,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+          child: NoteDraggable(
+            uid: n.uid,
+            source: NoteDragSource.list,
+            label: n.summary,
+            child: FTappable(
+              onPress: () => state.clickNote(n.uid),
+              child: Container(
+                color: state.peekUid == n.uid ? t.selected : null,
+                padding: EdgeInsets.fromLTRB(
+                  t.space.lg + depth * t.sizes.listIndent,
+                  t.space.lg - t.space.xxs,
+                  t.space.lg,
+                  t.space.lg - t.space.xxs,
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: t.sizes.listChevronBox,
+                      child: kids && !filtering
+                          ? FTappable(
+                              semanticsLabel: state.collapsed.contains(n.uid)
+                                  ? 'Expand'
+                                  : 'Collapse',
+                              behavior: HitTestBehavior.opaque,
+                              onPress: () => state.toggle(n.uid),
+                              child: Icon(
+                                state.collapsed.contains(n.uid)
+                                    ? FLucideIcons.chevronRight
+                                    : FLucideIcons.chevronDown,
+                                size: t.icons.lg,
+                                color: t.muted,
+                              ),
+                            )
+                          : null,
                     ),
-                  ),
-                  if (p.owner != null)
-                    Text(
-                      p.owner!,
-                      style: t.type.captionStyle.copyWith(color: t.muted),
+                    StatusDot(p.status),
+                    SizedBox(width: t.space.lg - t.space.xxs),
+                    Expanded(
+                      child: Text(
+                        n.summary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
-                ],
+                    if (p.owner != null)
+                      Text(
+                        p.owner!,
+                        style: t.type.captionStyle.copyWith(color: t.muted),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
         );
+        if (!filtering && AppState.isFolder(n)) {
+          row = MoveDropTarget(
+            state: state,
+            folderUid: n.uid,
+            rounded: false,
+            child: row,
+          );
+        }
+        return row;
       },
+    );
+    if (filtering) return list;
+    return MoveDropTarget(
+      key: const Key('list-drop-root'),
+      state: state,
+      folderUid: null,
+      rounded: false,
+      child: list,
     );
   }
 }

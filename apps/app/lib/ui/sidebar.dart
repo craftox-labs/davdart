@@ -3,7 +3,9 @@ import 'package:forui/forui.dart';
 
 import '../data/space_catalog.dart';
 import '../state/app_state.dart';
+import 'drag_drop.dart';
 import 'new_space_dialog.dart';
+import 'note_menu.dart';
 import 'resize_handle.dart';
 import 'sections.dart';
 import 'shell_frame.dart';
@@ -75,6 +77,18 @@ class Sidebar extends StatelessWidget {
   }
 }
 
+/// An item row of a menu group wrapped in other widgets (a drop target, a
+/// right-click menu). The group only accepts item widgets, so this stands in
+/// for one.
+class _WrappedItem extends StatelessWidget with FItemMixin {
+  const _WrappedItem({super.key, required this.item, required this.wrap});
+  final FItem item;
+  final Widget Function(Widget item) wrap;
+
+  @override
+  Widget build(BuildContext context) => wrap(item);
+}
+
 /// Sync state line of a Space in the Spaces popup.
 String spaceSyncLabel(AppState state, SpaceInfo sp) =>
     sp.id == state.currentSpaceId && state.syncing
@@ -119,23 +133,62 @@ List<FItemGroup> spaceMenuGroups(
     FItemGroup(
       children: [
         for (final sp in spaces)
-          FItem(
-            key: Key('space-${sp.id}'),
-            selected: sp.id == state.currentSpaceId,
-            prefix: Icon(
-              sp.onServer ? FLucideIcons.cloud : FLucideIcons.hardDrive,
-              size: t.icons.md,
-              color: t.muted,
+          _WrappedItem(
+            key: Key('space-drop-${sp.id}'),
+            wrap: (item) => NoteDropTarget(
+              accepts: (d) =>
+                  sp.id != state.currentSpaceId &&
+                  state.editable &&
+                  state.tree.find(d.uid) != null,
+              onDrop: (d) {
+                controller.hide();
+                state.moveToSpace(d.uid, sp.id);
+              },
+              child: ActionContextMenu(
+                groups: [
+                  [
+                    if (sp.id != state.currentSpaceId)
+                      NoteMenuItem(
+                        'Switch to this space',
+                        FLucideIcons.arrowRightToLine,
+                        () {
+                          state.switchSpace(sp.id);
+                          state.setSection(Section.notes);
+                        },
+                        key: Key('menu-space-switch-${sp.id}'),
+                      ),
+                    NoteMenuItem('Rename…', FLucideIcons.pencil, () async {
+                      if (sp.id != state.currentSpaceId &&
+                          !await state.switchSpace(sp.id)) {
+                        return;
+                      }
+                      if (!context.mounted) return;
+                      onPick?.call();
+                      showRenameSpaceDialog(context, state);
+                    }, key: Key('menu-space-rename-${sp.id}')),
+                  ],
+                ],
+                child: item,
+              ),
             ),
-            title: Text(sp.name, overflow: TextOverflow.ellipsis),
-            subtitle: Text(spaceSyncLabel(state, sp)),
-            suffix: sp.id == state.currentSpaceId
-                ? Icon(FLucideIcons.check, size: t.icons.md, color: t.accent)
-                : null,
-            onPress: () => pick(() {
-              state.switchSpace(sp.id);
-              state.setSection(Section.notes);
-            }),
+            item: FItem(
+              key: Key('space-${sp.id}'),
+              selected: sp.id == state.currentSpaceId,
+              prefix: Icon(
+                sp.onServer ? FLucideIcons.cloud : FLucideIcons.hardDrive,
+                size: t.icons.md,
+                color: t.muted,
+              ),
+              title: Text(sp.name, overflow: TextOverflow.ellipsis),
+              subtitle: Text(spaceSyncLabel(state, sp)),
+              suffix: sp.id == state.currentSpaceId
+                  ? Icon(FLucideIcons.check, size: t.icons.md, color: t.accent)
+                  : null,
+              onPress: () => pick(() {
+                state.switchSpace(sp.id);
+                state.setSection(Section.notes);
+              }),
+            ),
           ),
       ],
     ),

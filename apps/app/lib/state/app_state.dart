@@ -1023,6 +1023,18 @@ class AppState extends ChangeNotifier {
     await _save(p.apply());
   }
 
+  /// Moves note [uid] under [parentUid] (null: the top level). Returns false,
+  /// changing nothing, when the Space is read-only, the note is already
+  /// there, or the move would put it inside itself or one of its descendants.
+  Future<bool> moveNote(String uid, String? parentUid) async {
+    final node = tree.find(uid);
+    if (node == null || !editable) return false;
+    if (node.parent?.note.uid == parentUid) return false;
+    if (!tree.canMove(uid, parentUid)) return false;
+    await updateNote(uid, setParent: true, parentUid: parentUid);
+    return error == null;
+  }
+
   /// Deletes a note; its children move up to its parent so none are lost.
   Future<void> deleteNote(String uid) async {
     final node = tree.find(uid);
@@ -1230,6 +1242,25 @@ class AppState extends ChangeNotifier {
     }
 
     return tabDirty(t) ? guarded(close, uids: [t.id]) : Future.sync(close);
+  }
+
+  /// Closes every document tab except [keep] (which takes focus first).
+  /// Tabs with unsaved edits are asked about one by one.
+  Future<void> closeOtherTabs(DocTab keep) async {
+    if (!_tabs.contains(keep)) return;
+    await activateTab(keep);
+    for (final t in List<DocTab>.of(_tabs.tabs)) {
+      if (t != keep) await closeTab(t);
+    }
+  }
+
+  /// Closes the document tabs to the right of [of] in the strip.
+  Future<void> closeTabsToRight(DocTab of) async {
+    final i = _tabs.tabs.indexOf(of);
+    if (i < 0) return;
+    for (final t in List<DocTab>.of(_tabs.tabs.skip(i + 1))) {
+      await closeTab(t);
+    }
   }
 
   /// Closes the focused document tab (not the home tab).

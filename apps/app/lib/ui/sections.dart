@@ -3,8 +3,10 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/note_drag.dart';
 import 'account_dialog.dart';
 import 'connect_dialog.dart';
+import 'drag_drop.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
@@ -17,10 +19,18 @@ import 'theme.dart';
 
 /// Heading line plus a scrolling body, the frame every section shares.
 class _Panel extends StatelessWidget {
-  const _Panel({required this.heading, required this.children, this.trailing});
+  const _Panel({
+    required this.heading,
+    required this.children,
+    this.trailing,
+    this.wrapBody,
+  });
   final Widget heading;
   final List<Widget> children;
   final Widget? trailing;
+
+  /// Wraps the scrolling body (the drop and right-click area).
+  final Widget Function(Widget body)? wrapBody;
 
   @override
   Widget build(BuildContext context) {
@@ -47,10 +57,13 @@ class _Panel extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: ListView(
-            padding: EdgeInsets.symmetric(horizontal: t.space.lg),
-            children: children,
-          ),
+          child: () {
+            final body = ListView(
+              padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+              children: children,
+            );
+            return wrapBody == null ? body : wrapBody!(body);
+          }(),
         ),
       ],
     );
@@ -126,11 +139,14 @@ class NotesSection extends _Section {
         final kids = n.children.isNotEmpty;
         final open = !state.collapsed.contains(n.note.uid);
         final on = state.peekUid == n.note.uid || state.scopeUid == n.note.uid;
-        tree.add(
-          NoteContextMenu(
-            state: state,
+        Widget entry = NoteContextMenu(
+          state: state,
+          uid: n.note.uid,
+          onOpen: onPick,
+          child: NoteDraggable(
             uid: n.note.uid,
-            onOpen: onPick,
+            source: NoteDragSource.tree,
+            label: n.note.summary,
             child: FTappable(
               onPress: () {
                 if (AppState.isFolder(n.note)) {
@@ -194,6 +210,15 @@ class NotesSection extends _Section {
             ),
           ),
         );
+        if (AppState.isFolder(n.note)) {
+          entry = MoveDropTarget(
+            key: Key('drop-${n.note.uid}'),
+            state: state,
+            folderUid: n.note.uid,
+            child: entry,
+          );
+        }
+        tree.add(entry);
         if (kids && open) walk(n.children, depth + 1);
       }
     }
@@ -204,6 +229,32 @@ class NotesSection extends _Section {
 
     return _Panel(
       heading: heading,
+      wrapBody: (body) => MoveDropTarget(
+        key: const Key('drop-root'),
+        state: state,
+        folderUid: null,
+        rounded: false,
+        child: ActionContextMenu(
+          groups: [
+            if (state.editable)
+              [
+                NoteMenuItem(
+                  'New note…',
+                  FLucideIcons.filePlus,
+                  () => showNewNoteDialog(context, state),
+                  key: const Key('menu-tree-new-note'),
+                ),
+                NoteMenuItem(
+                  'New folder…',
+                  FLucideIcons.folderPlus,
+                  () => showNewFolderDialog(context, state),
+                  key: const Key('menu-tree-new-folder'),
+                ),
+              ],
+          ],
+          child: body,
+        ),
+      ),
       trailing: state.editable
           ? Row(
               mainAxisSize: MainAxisSize.min,
@@ -285,15 +336,35 @@ class _TagWrap extends StatelessWidget {
         runSpacing: t.space.sm,
         children: [
           for (final tag in state.tags)
-            FTappable(
-              key: Key('tag-$tag'),
-              semanticsLabel: 'Tag $tag',
-              onPress: () => state.setTag(tag),
-              child: FBadge(
-                variant: state.tag == tag
-                    ? FBadgeVariant.secondary
-                    : FBadgeVariant.outline,
-                child: Text(tag),
+            ActionContextMenu(
+              groups: [
+                [
+                  if (state.tag != tag)
+                    NoteMenuItem(
+                      'Filter by this tag',
+                      FLucideIcons.tag,
+                      () => state.setTag(tag),
+                      key: const Key('menu-tag-filter'),
+                    ),
+                  if (state.tag != null)
+                    NoteMenuItem(
+                      'Clear the tag filter',
+                      FLucideIcons.x,
+                      () => state.setTag(null),
+                      key: const Key('menu-tag-clear'),
+                    ),
+                ],
+              ],
+              child: FTappable(
+                key: Key('tag-$tag'),
+                semanticsLabel: 'Tag $tag',
+                onPress: () => state.setTag(tag),
+                child: FBadge(
+                  variant: state.tag == tag
+                      ? FBadgeVariant.secondary
+                      : FBadgeVariant.outline,
+                  child: Text(tag),
+                ),
               ),
             ),
         ],
@@ -314,33 +385,63 @@ class ViewsSection extends _Section {
       if (state.savedViews.isEmpty && !state.hasFilter)
         const _Muted('No saved views yet'),
       for (final v in state.savedViews)
-        Row(
-          children: [
-            Expanded(
-              child: _item(FLucideIcons.bookmark, v.name, () {
+        ActionContextMenu(
+          groups: [
+            [
+              NoteMenuItem('Open view', FLucideIcons.bookmark, () {
                 state.applyView(v);
                 onPick();
-              }),
-            ),
-            IconAction(
-              key: Key('view-update-${v.name}'),
-              tooltip: 'Update from current view',
-              icon: FLucideIcons.refreshCw,
-              onPress: () => state.updateView(v),
-            ),
-            IconAction(
-              key: Key('view-rename-${v.name}'),
-              tooltip: 'Rename saved view',
-              icon: FLucideIcons.pencil,
-              onPress: () => showRenameViewDialog(context, state, v),
-            ),
-            IconAction(
-              key: Key('view-delete-${v.name}'),
-              tooltip: 'Remove saved view',
-              icon: FLucideIcons.x,
-              onPress: () => state.deleteView(v.name),
-            ),
+              }, key: Key('menu-view-open-${v.name}')),
+              NoteMenuItem(
+                'Update from current view',
+                FLucideIcons.refreshCw,
+                () => state.updateView(v),
+                key: Key('menu-view-update-${v.name}'),
+              ),
+              NoteMenuItem(
+                'Rename…',
+                FLucideIcons.pencil,
+                () => showRenameViewDialog(context, state, v),
+                key: Key('menu-view-rename-${v.name}'),
+              ),
+            ],
+            [
+              NoteMenuItem(
+                'Remove view',
+                FLucideIcons.trash2,
+                () => state.deleteView(v.name),
+                key: Key('menu-view-delete-${v.name}'),
+              ),
+            ],
           ],
+          child: Row(
+            children: [
+              Expanded(
+                child: _item(FLucideIcons.bookmark, v.name, () {
+                  state.applyView(v);
+                  onPick();
+                }),
+              ),
+              IconAction(
+                key: Key('view-update-${v.name}'),
+                tooltip: 'Update from current view',
+                icon: FLucideIcons.refreshCw,
+                onPress: () => state.updateView(v),
+              ),
+              IconAction(
+                key: Key('view-rename-${v.name}'),
+                tooltip: 'Rename saved view',
+                icon: FLucideIcons.pencil,
+                onPress: () => showRenameViewDialog(context, state, v),
+              ),
+              IconAction(
+                key: Key('view-delete-${v.name}'),
+                tooltip: 'Remove saved view',
+                icon: FLucideIcons.x,
+                onPress: () => state.deleteView(v.name),
+              ),
+            ],
+          ),
         ),
       if (state.query.trim().isNotEmpty)
         Row(

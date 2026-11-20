@@ -1,3 +1,4 @@
+import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -7,8 +8,12 @@ import 'theme.dart';
 
 /// Names a new folder. Its text is optional: notes about the folder, or
 /// instructions for whoever (or whatever agent) works inside it.
-Future<void> showNewFolderDialog(BuildContext context, AppState state) {
-  final inside = state.scope;
+Future<void> showNewFolderDialog(
+  BuildContext context,
+  AppState state, {
+  Note? under,
+}) {
+  final inside = under ?? state.scope;
   final title = TextEditingController();
   final text = TextEditingController();
   var underScope = inside != null;

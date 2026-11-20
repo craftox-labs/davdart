@@ -1,3 +1,4 @@
+import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -10,8 +11,10 @@ Future<void> showNewNoteDialog(
   BuildContext context,
   AppState state, {
   bool inTab = false,
+  Note? under,
+  String status = 'backlog',
 }) {
-  final parent = state.peek ?? state.scope;
+  final parent = under ?? state.peek ?? state.scope;
   final title = TextEditingController();
   var underParent = parent != null;
   void submit(BuildContext ctx) {
@@ -21,7 +24,7 @@ Future<void> showNewNoteDialog(
     state.addNote(
       text,
       parentUid: underParent ? parent?.uid : null,
-      status: 'backlog',
+      status: status,
       inTab: inTab,
     );
   }

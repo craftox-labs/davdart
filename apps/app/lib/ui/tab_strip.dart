@@ -10,6 +10,7 @@ import '../state/note_drag.dart';
 import '../state/tab_state.dart';
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
+import 'save_view_dialog.dart';
 import 'shell_frame.dart';
 import 'theme.dart';
 
@@ -63,19 +64,50 @@ class TabStrip extends StatelessWidget {
                 );
                 return Row(
                   children: [
-                    TabItem(
-                      key: const Key('tab-home'),
-                      flushStart: flushStart,
-                      width: per,
-                      icon: state.view == ViewMode.board
-                          ? FLucideIcons.squareKanban
-                          : FLucideIcons.list,
-                      title:
-                          state.scope?.summary ??
-                          state.currentSpaceName ??
-                          'Notes',
-                      active: active == null,
-                      onPress: () => state.activateTab(null),
+                    ActionContextMenu(
+                      groups: [
+                        [
+                          NoteMenuItem(
+                            state.view == ViewMode.board
+                                ? 'Show as list'
+                                : 'Show as board',
+                            state.view == ViewMode.board
+                                ? FLucideIcons.list
+                                : FLucideIcons.squareKanban,
+                            () => state.setView(
+                              state.view == ViewMode.board
+                                  ? ViewMode.list
+                                  : ViewMode.board,
+                            ),
+                            key: const Key('menu-home-toggle-view'),
+                          ),
+                          if (state.tabs.isNotEmpty)
+                            NoteMenuItem(
+                              'Close all tabs',
+                              FLucideIcons.x,
+                              () async {
+                                for (final x in state.tabs) {
+                                  await state.closeTab(x);
+                                }
+                              },
+                              key: const Key('menu-home-close-all'),
+                            ),
+                        ],
+                      ],
+                      child: TabItem(
+                        key: const Key('tab-home'),
+                        flushStart: flushStart,
+                        width: per,
+                        icon: state.view == ViewMode.board
+                            ? FLucideIcons.squareKanban
+                            : FLucideIcons.list,
+                        title:
+                            state.scope?.summary ??
+                            state.currentSpaceName ??
+                            'Notes',
+                        active: active == null,
+                        onPress: () => state.activateTab(null),
+                      ),
                     ),
                     Expanded(
                       child: SingleChildScrollView(
@@ -173,6 +205,44 @@ class _ReorderableTab extends StatelessWidget {
         state: state,
         uid: tab.id,
         surface: NoteSurface.mainTab,
+        child: item,
+      );
+    } else {
+      final view = state.savedViews.where((v) => v.uid == tab.id).firstOrNull;
+      item = ActionContextMenu(
+        groups: [
+          [
+            if (view != null && state.editable)
+              NoteMenuItem(
+                'Rename view…',
+                FLucideIcons.pencil,
+                () => showRenameViewDialog(context, state, view),
+                key: const Key('menu-tab-rename-view'),
+              ),
+          ],
+          [
+            NoteMenuItem(
+              'Close tab',
+              FLucideIcons.x,
+              () => state.closeTab(tab),
+              key: const Key('menu-close'),
+            ),
+            if (state.tabs.length > 1)
+              NoteMenuItem(
+                'Close other tabs',
+                FLucideIcons.x,
+                () => state.closeOtherTabs(tab),
+                key: const Key('menu-close-others'),
+              ),
+            if (state.tabs.last != tab)
+              NoteMenuItem(
+                'Close tabs to the right',
+                FLucideIcons.x,
+                () => state.closeTabsToRight(tab),
+                key: const Key('menu-close-right'),
+              ),
+          ],
+        ],
         child: item,
       );
     }
@@ -388,7 +458,12 @@ class PromoteTarget extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     return DragTarget<NoteDrag>(
-      onWillAcceptWithDetails: (d) => state.tree.find(d.data.uid) != null,
+      // Board cards and list rows already sit in the main area: only the peek,
+      // the tree and the like promote.
+      onWillAcceptWithDetails: (d) =>
+          d.data.source != NoteDragSource.board &&
+          d.data.source != NoteDragSource.list &&
+          state.tree.find(d.data.uid) != null,
       onAcceptWithDetails: (d) => state.promote(d.data.uid),
       builder: (context, candidates, _) => DecoratedBox(
         position: DecorationPosition.foreground,
