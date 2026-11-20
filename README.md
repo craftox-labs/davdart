@@ -14,12 +14,13 @@ Status: v0, in development. APIs, note formats and the UI will still change.
 
 ## Planned
 
-Real colours, a logo, a command palette, tables, and desktop and phone builds. The planning collection is the source of truth for the roadmap; this list is only a summary.
+Real colours, a command palette, tables, and desktop and phone builds. The planning collection is the source of truth for the roadmap; this list is only a summary.
 
 ## Architecture
 
 - Core package (repo root, plain Dart, no Flutter): `Note` (uid, summary, description, categories, status, timestamps; unmodelled properties such as `ATTACH` are kept so a round trip loses nothing), `PlanItem`, `NoteTree`, `Space`, `SyncEngine`, `CalDavClient` (REPORT, get, put, delete with ETag preconditions; `ConflictException` on 412) and RFC 5545 parsing and serialising for `VJOURNAL`.
 - `apps/app`: the Flutter web app. Theme tokens live in `lib/theme/tokens.dart`.
+- Logo: `assets/logo/davdart.svg` (the app draws it from the same path data in `apps/app/lib/ui/logo.dart`).
 - `apps/web`: a Shelf server for the board, serving the built app at `/app/` and proxying `/dav/` to the CalDAV upstream.
 
 ## Getting started

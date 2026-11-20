@@ -194,6 +194,7 @@ class SizeTokens {
   const SizeTokens({
     this.rail = 52,
     this.railItem = 36,
+    this.logoLarge = 56,
     this.frameInset = 6,
     this.sidebar = 280,
     this.sidebarMin = 200,
@@ -232,6 +233,9 @@ class SizeTokens {
     this.tabMax = 180,
     this.tabClose = 16,
   });
+
+  /// Edge of the logo on the first-run screen (and other large uses).
+  final double logoLarge;
   final double rail, railItem, frameInset, sidebar, detail, topBar;
 
   /// Height of every side-panel section's title row, so titles never move
@@ -289,6 +293,8 @@ class Tokens {
     required this.divider,
     required this.activeItem,
     required this.onActiveItem,
+    required this.logoLower,
+    required this.logoUpper,
     required this.rail,
     required this.card,
     required this.cardBorder,
@@ -337,6 +343,10 @@ class Tokens {
 
   /// Icon colour on [activeItem].
   final Color onActiveItem;
+
+  /// The two shapes of the davdart logo (lower and upper). Both must stay
+  /// visible on [frame], where the rail logo sits.
+  final Color logoLower, logoUpper;
 
   /// Idle rail icon colour.
   final Color rail;
@@ -415,6 +425,8 @@ class Tokens {
     divider: divider,
     activeItem: activeItem,
     onActiveItem: onActiveItem,
+    logoLower: logoLower,
+    logoUpper: logoUpper,
     rail: rail,
     card: card,
     cardBorder: cardBorder,
@@ -452,6 +464,8 @@ class Tokens {
     divider: Color(0xFFE8E8E8),
     activeItem: Color(0xFFFFFFFF),
     onActiveItem: Color(0xFF111111),
+    logoLower: Color(0xFF434343),
+    logoUpper: Color(0xFF9A9A9A),
     rail: Color(0xFF666666),
     card: Color(0xFFF6F6F6),
     cardBorder: Color(0xFFE2E2E2),
@@ -481,6 +495,8 @@ class Tokens {
     divider: Color(0xFF2A2A2A),
     activeItem: Color(0xFF1A1A1A),
     onActiveItem: Color(0xFFF2F2F2),
+    logoLower: Color(0xFF6E6E6E),
+    logoUpper: Color(0xFFE6E6E6),
     rail: Color(0xFF8C8C8C),
     card: Color(0xFF222222),
     cardBorder: Color(0xFF2F2F2F),

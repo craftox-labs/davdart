@@ -3,6 +3,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'account_dialog.dart';
+import 'logo.dart';
 import 'new_space_dialog.dart';
 import 'theme.dart';
 
@@ -27,6 +28,7 @@ class FirstRunView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             spacing: t.space.lg,
             children: [
+              LogoMark(extent: t.sizes.logoLarge),
               Text('Create your first Space', style: t.type.titleStyle),
               Text(
                 signedIn

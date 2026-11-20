@@ -21,7 +21,6 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/semantics.dart';
 import 'package:forui/forui.dart';
-import 'package:davdart_app/ui/logo.dart';
 import 'package:davdart_app/ui/parts.dart';
 import 'package:davdart_app/ui/shell_frame.dart';
 import 'package:davdart_app/ui/sidebar.dart';
@@ -1397,7 +1396,15 @@ void main() {
     testWidgets('rail order: logo, Spaces, Files, Views, Search', (t) async {
       await pump(t);
       expect(find.byKey(const Key('logo-slot')), findsOneWidget);
-      expect(find.text(logoLetter), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('logo-slot')),
+          matching: find.byWidgetPredicate(
+            (w) => w is Semantics && w.properties.label == 'davdart',
+          ),
+        ),
+        findsOneWidget,
+      );
       final keys = [
         'logo-slot',
         'rail-spaces',
