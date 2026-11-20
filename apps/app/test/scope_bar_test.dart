@@ -78,7 +78,11 @@ void main() {
       await t.pumpWidget(DavdartApp(state: s));
       await t.pumpAndSettle();
       final crumb = t.getRect(find.byKey(const Key('crumb-space'))).center.dy;
-      for (final k in ['scope-edit', 'scope-delete', 'scope-close']) {
+      // Narrow bars (below 440) fold the folder actions into one menu button.
+      final keys = w < 440
+          ? ['scope-more']
+          : ['scope-edit', 'scope-delete', 'scope-close'];
+      for (final k in keys) {
         final c = t.getRect(find.byKey(Key(k))).center.dy;
         expect((c - crumb).abs(), lessThanOrEqualTo(1), reason: '$k vs crumb');
       }

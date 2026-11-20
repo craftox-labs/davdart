@@ -126,14 +126,23 @@ class _HomeTodayState extends State<HomeToday> {
                 final gap = t.space.lg;
                 state.nav.homeStacked = c.maxWidth < Tokens.stackBreakpoint;
                 if (c.maxWidth < Tokens.stackBreakpoint) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < cards.length; i++) ...[
-                        if (i > 0) SizedBox(height: gap),
-                        cards[i],
-                      ],
-                    ],
+                  // Stacked cards can outgrow a phone screen: cap them and
+                  // scroll inside, so the board below keeps some room.
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * 0.4,
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          for (var i = 0; i < cards.length; i++) ...[
+                            if (i > 0) SizedBox(height: gap),
+                            cards[i],
+                          ],
+                        ],
+                      ),
+                    ),
                   );
                 }
                 return IntrinsicHeight(

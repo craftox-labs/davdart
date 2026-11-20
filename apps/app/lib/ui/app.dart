@@ -722,7 +722,7 @@ class TopBar extends StatelessWidget {
               child: const FCircularProgress(),
             ),
           ),
-        if (home) ScopeActions(state: state),
+        if (home) ScopeActions(state: state, overflow: narrow),
         if (state.activeTab == null)
           const SizedBox.shrink()
         else if (!narrow) ...[

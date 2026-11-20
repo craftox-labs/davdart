@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import 'edit_note_dialog.dart';
 import 'move_space_dialog.dart';
+import 'note_menu.dart';
 import 'overflow_tip.dart';
 import 'parts.dart';
 import 'theme.dart';
@@ -83,15 +84,19 @@ class ScopeCrumbs extends StatelessWidget {
 }
 
 /// Folder actions (move, edit, delete, close) for the right side of the top
-/// bar; empty when no folder is open.
+/// bar; empty when no folder is open. With [overflow] (narrow bars) they
+/// collapse into one "more" button that opens a menu, so the bar never runs
+/// out of width.
 class ScopeActions extends StatelessWidget {
-  const ScopeActions({super.key, required this.state});
+  const ScopeActions({super.key, required this.state, this.overflow = false});
   final AppState state;
+  final bool overflow;
 
   @override
   Widget build(BuildContext context) {
     final folder = state.scope;
     if (folder == null) return const SizedBox.shrink();
+    if (overflow) return _menu(context, folder);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -129,6 +134,53 @@ class ScopeActions extends StatelessWidget {
       ],
     );
   }
+}
+
+extension on ScopeActions {
+  Widget _menu(BuildContext context, Note folder) => FPopoverMenu(
+    menuAnchor: Alignment.topRight,
+    childAnchor: Alignment.bottomRight,
+    menuBuilder: (ctx, controller, _) => [
+      FItemGroup(
+        children: menuRows(ctx, controller, [
+          if (state.editable) ...[
+            if (state.spaces.length > 1)
+              NoteMenuItem(
+                'Move to another space',
+                FLucideIcons.folderInput,
+                () => showMoveSpaceDialog(context, state, folder),
+                key: const Key('scope-move'),
+              ),
+            NoteMenuItem(
+              'Edit folder',
+              FLucideIcons.pencil,
+              () => showEditNoteDialog(context, state, folder),
+              key: const Key('scope-edit'),
+            ),
+            NoteMenuItem(
+              'Delete folder',
+              FLucideIcons.trash2,
+              () => confirmDeleteNote(context, state, folder),
+              key: const Key('scope-delete'),
+            ),
+          ],
+          NoteMenuItem(
+            'Show the whole space',
+            FLucideIcons.x,
+            () => state.openFolder(null),
+            key: const Key('scope-close'),
+          ),
+        ]),
+      ),
+    ],
+    builder: (ctx, controller, _) => IconAction(
+      key: const Key('scope-more'),
+      compact: true,
+      tooltip: 'Folder actions',
+      icon: FLucideIcons.ellipsis,
+      onPress: controller.toggle,
+    ),
+  );
 }
 
 /// The open folder's description, plain and full width under the header row.
