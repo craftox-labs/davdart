@@ -5,7 +5,6 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../state/note_drag.dart';
-import '../theme/tokens.dart';
 import 'note_menu.dart';
 import 'parts.dart';
 import 'tab_strip.dart';
@@ -13,11 +12,10 @@ import 'theme.dart';
 
 /// The peek pane's header, in the shell's header row above the pane: its one
 /// tab (the peeked note, closable like a strip tab, with its dirty dot; drag
-/// it onto the main area to promote it), with the Collapse control at the
-/// pane's left edge, just before the tab, and Promote ("Open in main area")
+/// it onto the main area to promote it) and Promote ("Open in main area")
 /// after it. With [mirror] (the pane is on the left, its divider on its
-/// right) both controls come first so the tab ends flush at the divider.
-/// Every control is a [Sizes.tabStrip] box, centred on the tab strip's line.
+/// right) Promote comes first so the tab ends flush at the divider. The
+/// Collapse control is not in here: it sits outside the pane ([PeekCollapseButton]).
 class DetailHeader extends StatelessWidget {
   const DetailHeader({
     super.key,
@@ -28,12 +26,6 @@ class DetailHeader extends StatelessWidget {
   final AppState state;
   final double width;
   final bool mirror;
-
-  /// Where the peek tab's content starts, from the pane's left edge: past the
-  /// header controls that come first, plus the tab's own padding. The pane's
-  /// breadcrumb and title use it as their left inset so all three line up.
-  static double inset(Tokens t, bool mirror) =>
-      t.sizes.tabStrip * (mirror ? 2 : 1) + t.space.md;
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +86,8 @@ class DetailHeader extends StatelessWidget {
                     ),
                     child: TabItem(
                       key: const Key('detail-tab'),
-                      // Mirrored, the tab's divider side lines up with the divider.
+                      // The pane's divider side lines up with the divider.
+                      flushStart: !mirror,
                       flushEnd: mirror,
                       width: w,
                       icon: icon,
@@ -121,24 +114,38 @@ class DetailHeader extends StatelessWidget {
         onPress: uid == null ? null : () => state.promote(uid),
       ),
     );
-    final collapse = HeaderControl(
-      child: IconAction(
-        key: const Key('peek-collapse'),
-        tooltip: 'Collapse',
-        icon: FLucideIcons.panelRightClose,
-        onPress: () => state.setPeekCollapsed(true),
-      ),
-    );
     return SizedBox(
       key: const Key('detail-header'),
       width: width,
       height: t.sizes.tabStrip + t.borders.hairline,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: mirror ? [collapse, promote, tab] : [collapse, tab, promote],
+        children: mirror ? [promote, tab] : [tab, promote],
       ),
     );
   }
+}
+
+/// The Collapse control, in the header row just outside the peek pane (left
+/// of it, or right of it when [mirror]ed): a [HeaderControl] square.
+class PeekCollapseButton extends StatelessWidget {
+  const PeekCollapseButton({
+    super.key,
+    required this.state,
+    required this.mirror,
+  });
+  final AppState state;
+  final bool mirror;
+
+  @override
+  Widget build(BuildContext context) => HeaderControl(
+    child: IconAction(
+      key: const Key('peek-collapse'),
+      tooltip: 'Collapse',
+      icon: mirror ? FLucideIcons.panelLeftClose : FLucideIcons.panelRightClose,
+      onPress: () => state.setPeekCollapsed(true),
+    ),
+  );
 }
 
 /// The header cell shown at the outer edge while the peek is collapsed: one

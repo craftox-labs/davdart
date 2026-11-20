@@ -209,19 +209,20 @@ void main() {
       expectContinues(await shot(t), dock.right - _hair, panel.top);
     });
 
-    testWidgets('the peek header starts with Collapse, then the tab', (
-      t,
-    ) async {
+    testWidgets('the peek tab continues the peek border', (t) async {
       final s = await _pump(t);
       s.select('a');
       await t.pumpAndSettle();
       final pane = t.getRect(_k('detail-pane'));
-      final collapse = t.getRect(_k('peek-collapse'));
+      final panel = t.getRect(_k('shell-panel'));
       final tab = t.getRect(_k('detail-tab'));
+      expect(tab.left, pane.left);
       expect(t.getRect(_k('detail-header')).width, pane.width);
-      expect(collapse.left, greaterThanOrEqualTo(pane.left));
-      expect(collapse.left - pane.left, lessThan(collapse.width));
-      expect(tab.left, greaterThanOrEqualTo(collapse.right));
+      s.openNoteTab('b'); // keep the peek tab flush but make home inactive
+      await t.pumpAndSettle();
+      s.select('a');
+      await t.pumpAndSettle();
+      expectContinues(await shot(t), pane.left - _hair, panel.top);
     });
 
     testWidgets('mirrored: peek tab end and home tab start meet the border', (
@@ -234,9 +235,13 @@ void main() {
       final panel = t.getRect(_k('shell-panel'));
       final home = t.getRect(_k('tab-home'));
       expect(t.getRect(_k('detail-header')).width, pane.width);
-      // The border column is the one right of the pane; the home tab starts
-      // after it, its stroke reaching back into it.
-      expect(home.left, pane.right + _hair);
+      // The border column is the one right of the pane; the Collapse control
+      // and then the home tab follow it.
+      expect(
+        t.getRect(_k('peek-collapse')).left,
+        greaterThanOrEqualTo(pane.right + _hair),
+      );
+      expect(home.left, greaterThan(t.getRect(_k('peek-collapse')).right));
       var d = await shot(t);
       expectContinues(d, pane.right, panel.top);
       // Home is active: its stroke is at the same column.
@@ -275,20 +280,18 @@ void main() {
       expect(p.squareEnd, isFalse);
     });
 
-    testWidgets('the peek tab follows the Collapse control, not the divider', (
-      t,
-    ) async {
+    testWidgets('the peek tab lines up with its divider', (t) async {
       final s = await _pump(t);
       s.select('a');
       await t.pumpAndSettle();
       expect(
         t.getRect(_k('detail-tab')).left,
-        greaterThan(t.getRect(_k('detail-pane')).left),
+        t.getRect(_k('detail-pane')).left,
       );
       final p =
           t.widget<CustomPaint>(_in('detail-tab', 'joined-tab')).painter!
               as RailTabPainter;
-      expect(p.squareStart, isFalse);
+      expect(p.squareStart, isTrue);
     });
 
     testWidgets('mirrored, wide but not split: no spacer, home tab free', (
@@ -330,9 +333,7 @@ void main() {
   });
 
   group('detail header', () {
-    testWidgets('sits above the pane: Collapse, closable tab, then Promote', (
-      t,
-    ) async {
+    testWidgets('sits above the pane: closable tab, then Promote', (t) async {
       final s = await _pump(t);
       s.select('a');
       await t.pumpAndSettle();
@@ -349,10 +350,10 @@ void main() {
         t.getRect(_in('detail-tab', 'tab-close')).right,
         lessThanOrEqualTo(t.getRect(_k('peek-promote')).left),
       );
-      expect(t.getRect(_k('peek-collapse')).right, lessThan(header.center.dx));
+      // Collapse is outside the pane, left of it.
       expect(
         t.getRect(_k('peek-collapse')).right,
-        lessThanOrEqualTo(t.getRect(_k('detail-tab')).left),
+        lessThanOrEqualTo(pane.left),
       );
       expect(
         find.descendant(of: _k('detail-tab'), matching: find.text('Alpha')),
@@ -399,16 +400,17 @@ void main() {
       expect(s.peek, isNull);
     });
 
-    testWidgets('Collapse at the pane start, Promote at its end', (t) async {
+    testWidgets('Collapse outside the pane start, Promote at its end', (
+      t,
+    ) async {
       final s = await _pump(t);
       s.select('a');
       await t.pumpAndSettle();
       final header = t.getRect(_k('detail-header'));
       final promote = t.getRect(_k('peek-promote'));
       final collapse = t.getRect(_k('peek-collapse'));
-      expect(collapse.left - header.left, lessThan(collapse.width));
+      expect(collapse.right, lessThanOrEqualTo(header.left));
       expect(promote.right, lessThanOrEqualTo(header.right));
-      expect(promote.left, greaterThan(collapse.right));
       expect(
         t.widget<IconAction>(_k('peek-promote')).tooltip,
         'Open in main area',
@@ -449,27 +451,29 @@ void main() {
       expect(s.draftFor('a')!.titleController.text, 'A2');
     });
 
-    testWidgets('mirrored: the header is on the left, Collapse at its end', (
-      t,
-    ) async {
-      final s = await _pump(t, side: LayoutSide.end);
-      s.select('a');
-      await t.pumpAndSettle();
-      final header = t.getRect(_k('detail-header'));
-      final pane = t.getRect(_k('detail-pane'));
-      final panel = t.getRect(_k('shell-panel'));
-      final strip = t.getRect(_k('tab-strip'));
-      expect(header.left, pane.left);
-      expect(header.right, lessThanOrEqualTo(strip.left));
-      expect(t.getRect(_k('icon-rail')).left, panel.right);
-      expect(t.getRect(_k('peek-collapse')).left, header.left);
-      expect(
-        t.getRect(_k('peek-promote')).left,
-        lessThan(t.getRect(_k('detail-tab')).left),
-      );
-      expect(t.getRect(_in('detail-tab', 'joined-tab')).bottom, panel.top);
-      expect(t.takeException(), isNull);
-    });
+    testWidgets(
+      'mirrored: the header is on the left, Collapse between it and the strip',
+      (t) async {
+        final s = await _pump(t, side: LayoutSide.end);
+        s.select('a');
+        await t.pumpAndSettle();
+        final header = t.getRect(_k('detail-header'));
+        final pane = t.getRect(_k('detail-pane'));
+        final panel = t.getRect(_k('shell-panel'));
+        final strip = t.getRect(_k('tab-strip'));
+        expect(header.left, pane.left);
+        final collapse = t.getRect(_k('peek-collapse'));
+        expect(collapse.left, greaterThanOrEqualTo(header.right));
+        expect(collapse.right, lessThanOrEqualTo(strip.left));
+        expect(t.getRect(_k('icon-rail')).left, panel.right);
+        expect(
+          t.getRect(_k('peek-promote')).left,
+          lessThan(t.getRect(_k('detail-tab')).left),
+        );
+        expect(t.getRect(_in('detail-tab', 'joined-tab')).bottom, panel.top);
+        expect(t.takeException(), isNull);
+      },
+    );
   });
 
   group('between 880 and 1280', () {

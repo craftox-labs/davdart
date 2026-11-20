@@ -20,7 +20,6 @@ class DetailView extends StatelessWidget {
     required this.onClose,
     this.full = false,
     this.inHeader = false,
-    this.startInset,
   });
   final AppState state;
 
@@ -35,10 +34,6 @@ class DetailView extends StatelessWidget {
   /// The shell's header row carries this pane's tab with its controls, so the
   /// pane leaves Back out.
   final bool inHeader;
-
-  /// Left inset of the toolbar's label and the page, so they line up with
-  /// the peek tab's content in the header row; null keeps the default.
-  final double? startInset;
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +50,9 @@ class DetailView extends StatelessWidget {
       children: [
         PaneHeaderRow(
           key: const Key('peek-toolbar'),
-          startPad: startInset ?? t.space.xs,
+          // In the peek pane the label lines up with the title below (the page's
+          // own padding).
+          startPad: inHeader ? t.space.xxl : t.space.xs,
           children: [
             if (!full && !inHeader)
               IconAction(
@@ -102,7 +99,7 @@ class DetailView extends StatelessWidget {
         Expanded(
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
-              startInset ?? t.space.xxl,
+              t.space.xxl,
               t.space.xs,
               t.space.xxl,
               t.space.huge,

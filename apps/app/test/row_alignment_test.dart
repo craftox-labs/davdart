@@ -97,10 +97,14 @@ void main() {
         reason: k,
       );
     }
-    // The control comes before the peek tab, at the pane's left edge.
+    // The control is outside the pane, left of it.
+    expect(
+      t.getRect(_k('peek-collapse')).left,
+      lessThan(t.getRect(_k('detail-pane')).left),
+    );
     expect(
       t.getRect(_k('peek-collapse')).right,
-      lessThanOrEqualTo(t.getRect(_k('detail-tab')).left + 1),
+      lessThanOrEqualTo(t.getRect(_k('detail-pane')).left),
     );
     s.setPeekCollapsed(true);
     await t.pumpAndSettle();
@@ -113,7 +117,9 @@ void main() {
     expect(_k('peek-collapse'), findsOneWidget);
   });
 
-  testWidgets('peek label, title and tab content share a left edge', (t) async {
+  testWidgets('peek label and title share a left edge, content full width', (
+    t,
+  ) async {
     final s = await _pump(t, 1280, LayoutSide.start);
     await s.addFolder('Decisions');
     await s.addNote('Scope note', parentUid: s.scope!.uid);
@@ -126,15 +132,15 @@ void main() {
     final title = t
         .getRect(find.descendant(of: peek, matching: find.text('Scope note')))
         .left;
-    final tabIcon = t
-        .getRect(
-          find
-              .descendant(of: _k('detail-tab'), matching: find.byType(Icon))
-              .first,
-        )
-        .left;
     expect((label - title).abs(), lessThanOrEqualTo(1));
-    expect((label - tabIcon).abs(), lessThanOrEqualTo(1));
+    // The page has the pane's ordinary padding, no tab-driven inset.
+    final tk = tokensOf(t.element(peek));
+    final pane = t.getRect(_k('detail-pane'));
+    expect(title - pane.left, closeTo(tk.space.xxl, 1.5));
+    final scroll = t.getRect(
+      find.descendant(of: peek, matching: find.byType(SingleChildScrollView)),
+    );
+    expect(scroll.width, closeTo(pane.width, 1.5));
   });
 
   testWidgets('collapsed rail: divider through header, square corner', (

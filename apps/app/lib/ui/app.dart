@@ -256,9 +256,6 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
       uid: peekUid!,
       onClose: () => state.guarded(() => state.select(null)),
       inHeader: header,
-      // The peek's own header tab starts past the collapse control; its
-      // label and title share that left edge.
-      startInset: header && split ? DetailHeader.inset(t, mirror) : null,
     );
 
     // A main note tab is a full page: no search or view switch.
@@ -409,9 +406,11 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
             // clearance for the rounded corner.
             // With the rail on the left that is always a divider (the side
             // panel's, or the collapsed rail's, whose panel corner is square).
-            flushStart: mirror ? peekBeside : true,
-            startPad: (mirror ? peekBeside : true) ? 0 : edgePad,
-            endPad: !mirror && detailW != null ? t.radii.tab : t.space.sm,
+            flushStart: !mirror,
+            startPad: !mirror ? 0 : (peekBeside ? t.space.sm : edgePad),
+            endPad: !mirror && detailW != null && !peekBeside
+                ? t.radii.tab
+                : t.space.sm,
           ),
         ),
       );
@@ -430,6 +429,16 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
                 mirror: mirror,
               ),
             );
+      // The Collapse control sits outside the pane, in the header row.
+      final collapse = peekBeside
+          ? _Slide(
+              width: t.sizes.tabStrip * peekF,
+              full: t.sizes.tabStrip,
+              mirror: mirror,
+              outerStart: false,
+              child: PeekCollapseButton(state: state, mirror: mirror),
+            )
+          : null;
       return Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -437,7 +446,10 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
           // Mirrored, the peek's divider column sits between the
           // peek header and the strip, so the home tab starts after it.
           if (mirror && peekBeside) SizedBox(width: t.borders.hairline),
+          // The control is between the strip and the pane, on either side.
+          if (mirror) ?collapse,
           strip,
+          if (!mirror) ?collapse,
           if (mirror) SizedBox(width: dockW) else ?detail,
         ],
       );
