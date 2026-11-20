@@ -57,3 +57,7 @@ Folders and saved views are hidden from boards and lists.
 - `lib/`, `bin/davdart.dart`, `test/`: core package and CLI.
 - `apps/app/`: Flutter web app.
 - `apps/web/`: board server and CalDAV proxy.
+
+## Licence
+
+AGPL-3.0-or-later. See `LICENSE` and `NOTICE`.
