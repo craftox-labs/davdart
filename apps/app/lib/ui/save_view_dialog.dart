@@ -13,23 +13,33 @@ Future<void> showSaveViewDialog(BuildContext context, AppState state) {
             : state.query.trim()) ??
         '',
   );
-  void submit(BuildContext ctx) {
-    if (name.text.trim().isEmpty) return;
-    Navigator.of(ctx).pop();
-    state.saveView(name.text);
+  String? error;
+  void Function(void Function())? setError;
+  Future<void> submit(BuildContext ctx) async {
+    final err = await state.saveView(name.text);
+    if (!ctx.mounted) return;
+    if (err == null) {
+      Navigator.of(ctx).pop();
+    } else {
+      setError?.call(() => error = err);
+    }
   }
 
   return showAppDialog(
     context,
     title: 'Save this view',
-    content: Builder(
-      builder: (ctx) => field(
-        key: const Key('view-name'),
-        controller: name,
-        autofocus: true,
-        hint: 'Name',
-        onSubmit: (_) => submit(ctx),
-      ),
+    content: StatefulBuilder(
+      builder: (ctx, setState) {
+        setError = setState;
+        return field(
+          key: const Key('view-name'),
+          controller: name,
+          autofocus: true,
+          hint: 'Name',
+          error: error,
+          onSubmit: (_) => submit(ctx),
+        );
+      },
     ),
     actions: [
       const CancelButton(),

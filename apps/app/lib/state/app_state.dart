@@ -595,15 +595,26 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
-  /// Saves the current view, search, tag and folder under [name]; a view
-  /// with that name is updated instead.
-  Future<void> saveView(String name) async {
+  /// Whether a view other than [except] already has this name (ignoring
+  /// case and surrounding spaces).
+  bool _viewNameTaken(String name, {String? except}) {
+    final n = name.trim().toLowerCase();
+    return savedViews.any(
+      (v) => v.uid != except && v.name.trim().toLowerCase() == n,
+    );
+  }
+
+  /// Saves the current view, search, tag and folder under a new [name].
+  /// Returns null when done, else why not (an existing view's name is
+  /// refused: use [updateView] to re-save it).
+  Future<String?> saveView(String name) async {
     final n = name.trim();
-    if (n.isEmpty || !_canEditViews()) return;
-    final old = _viewNamed(n);
-    if (old != null) return updateView(old);
+    if (n.isEmpty) return 'Give the view a name';
+    if (_viewNameTaken(n)) return 'A view with that name exists';
+    if (!_canEditViews()) return 'This source is read-only';
     final uid = 'davdart-view-${DateTime.now().toUtc().microsecondsSinceEpoch}';
     await _save(_current(n, uid: uid).toNote());
+    return error;
   }
 
   /// Re-saves the current state into [v] (name unchanged).
@@ -619,7 +630,7 @@ class AppState extends ChangeNotifier {
     final n = name.trim();
     if (n.isEmpty) return 'Give the view a name';
     if (n == v.name) return null;
-    if (_viewNamed(n) != null) return 'A view with that name exists';
+    if (_viewNameTaken(n, except: v.uid)) return 'A view with that name exists';
     if (!_canEditViews()) return 'This source is read-only';
     final note = _viewNotes[v.uid];
     if (note == null) return 'View not found';

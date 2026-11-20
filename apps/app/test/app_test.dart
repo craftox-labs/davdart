@@ -178,8 +178,8 @@ void main() {
       a.setTag('planning');
       a.setQuery(' body ');
       expect(a.hasFilter, isTrue);
-      await a.saveView('Planning bodies');
-      await a.saveView('   ');
+      expect(await a.saveView('Planning bodies'), isNull);
+      expect(await a.saveView('   '), isNotNull);
       expect(a.savedViews, hasLength(1));
       final stored = src.notes.values.singleWhere(isViewNote);
       expect(stored.summary, 'Planning bodies');
@@ -203,11 +203,13 @@ void main() {
       expect(b.searchController.text, 'body');
       expect((b.view, b.tag, b.query), (ViewMode.list, 'planning', 'body'));
       expect(b.scopeUid, isNull); // saved without a folder
-      // saving the same name updates the note instead of adding one
+      // a name that exists is refused (any case), nothing is added
       b.openFolder(folder);
       b.setQuery('x');
-      await b.saveView('Planning bodies');
+      expect(await b.saveView('Planning bodies'), isNotNull);
+      expect(await b.saveView(' planning BODIES '), isNotNull);
       expect(src.notes.values.where(isViewNote), hasLength(1));
+      await b.updateView(b.savedViews.single);
       b.setQuery('');
       b.openFolder(null);
       b.applyView(b.savedViews.single);
@@ -240,6 +242,9 @@ void main() {
       await s.saveView('Two');
       final one = s.savedViews.firstWhere((v) => v.name == 'One');
       expect(await s.renameView(one, 'Two'), isNotNull);
+      expect(await s.renameView(one, ' two '), isNotNull); // any case
+      expect(await s.saveView('TWO'), 'A view with that name exists');
+      expect(s.savedViews, hasLength(2));
       expect(await s.renameView(one, '  '), isNotNull);
       expect(await s.renameView(one, ' Uno '), isNull);
       expect(s.savedViews.map((v) => v.name), ['Two', 'Uno']);
