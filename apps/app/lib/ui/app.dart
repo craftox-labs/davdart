@@ -146,6 +146,9 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
   /// The last peeked note, kept mounted while the pane slides shut.
   String? _heldPeek;
 
+  /// Whether the last build was wide, to tell a resize from a toggle.
+  bool? _wasWide;
+
   bool get _dockOpen => !widget.state.sidebarCollapsed;
 
   @override
@@ -184,7 +187,10 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
           final hasDetail = state.peek != null && !collapsedPeek;
           final animate = !MediaQuery.disableAnimationsOf(context);
           if (state.peekUid != null) _heldPeek = state.peekUid;
-          _drive(_dock, wide && _dockOpen, t, animate && wide);
+          // Crossing the wide breakpoint jumps; only a toggle slides.
+          final crossed = _wasWide != null && _wasWide != wide;
+          _wasWide = wide;
+          _drive(_dock, wide && _dockOpen, t, animate && wide && !crossed);
           _drive(_peek, hasDetail, t, animate && split);
           return AnimatedBuilder(
             animation: Listenable.merge([_dock, _peek]),
@@ -218,6 +224,8 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     // The peek pane stays while it slides shut, with its last note.
     final showDetail = split ? (hasDetail || _peek.value > 0) : hasDetail;
     final showDock = wide && (_dockOpen || _dock.value > 0);
+    // Once the slide-out is over the held note is let go.
+    if (!hasDetail && _peek.value == 0) _heldPeek = null;
     final peekUid = state.peekUid ?? _heldPeek;
     final mainNote = state.mainNoteUid;
 
@@ -275,7 +283,18 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
                     width: full,
                     child: Stack(
                       children: [
-                        peekView(header: true),
+                        // While sliding out the held note is inert: it may
+                        // be live elsewhere (promoted to the main area).
+                        IgnorePointer(
+                          ignoring: !hasDetail,
+                          child: ExcludeFocus(
+                            excluding: !hasDetail,
+                            child: ExcludeSemantics(
+                              excluding: !hasDetail,
+                              child: peekView(header: true),
+                            ),
+                          ),
+                        ),
                         Positioned(
                           top: 0,
                           bottom: 0,
@@ -370,6 +389,8 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
                 : t.sizes.detailTab.clamp(0.0, contentW))
           : null;
       final detailW = detailFull == null ? null : detailFull * peekF;
+      // The peek has a divider (and the strip a neighbour) only when split.
+      final peekBeside = split && detailW != null;
       // Clear of the panel's rounded corner where the strip starts at
       // the panel edge, else just the concave corner.
       final edgePad = t.radii.panel + t.radii.tab;
@@ -381,8 +402,8 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
             // Beside a divider (the side panel or the peek) the home
             // tab lines up with it; at the panel's corner it keeps the
             // clearance for the rounded corner.
-            flushStart: mirror ? detailW != null : dockW > 0,
-            startPad: (mirror ? detailW != null : dockW > 0) ? 0 : edgePad,
+            flushStart: mirror ? peekBeside : dockW > 0,
+            startPad: (mirror ? peekBeside : dockW > 0) ? 0 : edgePad,
             endPad: !mirror && detailW != null ? t.radii.tab : t.space.sm,
           ),
         ),
@@ -408,7 +429,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
           if (mirror) ?detail else SizedBox(width: dockW),
           // Mirrored, the peek's divider column sits between the
           // peek header and the strip, so the home tab starts after it.
-          if (mirror && detailW != null) SizedBox(width: t.borders.hairline),
+          if (mirror && peekBeside) SizedBox(width: t.borders.hairline),
           strip,
           if (mirror) SizedBox(width: dockW) else ?detail,
         ],

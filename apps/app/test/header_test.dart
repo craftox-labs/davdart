@@ -291,6 +291,32 @@ void main() {
       expect(p.squareStart, isTrue);
     });
 
+    testWidgets('mirrored, wide but not split: no spacer, home tab free', (
+      t,
+    ) async {
+      final s = await _pump(
+        t,
+        size: const Size(1000, 900),
+        side: LayoutSide.end,
+      );
+      s.select('a');
+      await t.pumpAndSettle();
+      final p =
+          t.widget<CustomPaint>(_in('tab-home', 'joined-tab')).painter!
+              as RailTabPainter;
+      expect(p.squareStart, isFalse);
+      expect(
+        t.getRect(_k('tab-home')).left,
+        greaterThanOrEqualTo(t.getRect(_k('detail-tab')).right),
+      );
+      expect(
+        t.getRect(_k('tab-home')).left - t.getRect(_k('detail-tab')).right,
+        lessThan(
+          _hair + 0.5 + Tokens.light.radii.panel + Tokens.light.radii.tab,
+        ),
+      );
+    });
+
     testWidgets('mirrored: the peek tab ends at its divider', (t) async {
       final s = await _pump(t, side: LayoutSide.end);
       s.select('a');

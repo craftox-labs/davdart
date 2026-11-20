@@ -4,6 +4,7 @@ import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/app.dart';
+import 'package:davdart_app/ui/sidebar.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -143,6 +144,73 @@ void main() {
       await t.pump();
       expect(t.getSize(_k('dock-pane')).width, _z.sidebar + 30);
       await t.pumpAndSettle();
+    });
+  });
+
+  group('review fixes', () {
+    testWidgets('header peek width matches the pane while the dock slides', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      s.select('a');
+      await t.pumpAndSettle();
+      s.setSidebarCollapsed(true);
+      await t.pump();
+      await t.pump(_half);
+      expect(_k('dock-pane'), findsOneWidget);
+      expect(
+        t.getSize(_k('detail-header')).width,
+        t.getSize(_k('peek-view')).width,
+      );
+      await t.pumpAndSettle();
+      expect(
+        t.getSize(_k('detail-header')).width,
+        t.getSize(_k('peek-view')).width,
+      );
+    });
+
+    testWidgets('a promoted peek is inert while it slides out', (t) async {
+      final s = await _pump(t);
+      s.select('a');
+      await t.pumpAndSettle();
+      s.promote('a');
+      await t.pump();
+      await t.pump(_half);
+      expect(_k('main-note'), findsOneWidget);
+      expect(_k('peek-view'), findsOneWidget);
+      final inert = find.ancestor(
+        of: _k('peek-view'),
+        matching: find.byWidgetPredicate(
+          (w) => w is IgnorePointer && w.ignoring,
+        ),
+      );
+      expect(inert, findsWidgets);
+      expect(
+        find.ancestor(
+          of: _k('main-note'),
+          matching: find.byWidgetPredicate(
+            (w) => w is IgnorePointer && w.ignoring,
+          ),
+        ),
+        findsNothing,
+      );
+      await t.pumpAndSettle();
+      expect(_k('peek-view'), findsNothing);
+      expect(_k('detail-pane'), findsNothing);
+    });
+
+    testWidgets('widening across the breakpoint does not slide the dock', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      expect(s, isNotNull);
+      t.view.physicalSize = const Size(700, 900);
+      await t.pumpAndSettle();
+      expect(_k('dock-pane'), findsNothing);
+      t.view.physicalSize = const Size(1500, 900);
+      await t.pump();
+      final w = t.getSize(_k('dock-pane')).width;
+      expect(w, sidebarWidthOf(t.element(_k('dock-pane')), s));
     });
   });
 }
