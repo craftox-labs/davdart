@@ -1313,7 +1313,9 @@ class AppState extends ChangeNotifier {
     if (!_tabs.contains(keep)) return;
     await activateTab(keep);
     for (final t in List<DocTab>.of(_tabs.tabs)) {
-      if (t != keep) await closeTab(t);
+      if (t == keep) continue;
+      await closeTab(t);
+      if (_tabs.contains(t)) return; // the unsaved-changes prompt cancelled
     }
   }
 
@@ -1332,6 +1334,7 @@ class AppState extends ChangeNotifier {
     if (i < 0) return;
     for (final t in List<DocTab>.of(_tabs.tabs.skip(i + 1))) {
       await closeTab(t);
+      if (_tabs.contains(t)) return; // the unsaved-changes prompt cancelled
     }
   }
 

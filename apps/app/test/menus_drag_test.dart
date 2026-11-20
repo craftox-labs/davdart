@@ -476,5 +476,34 @@ void main() {
       await s.closeAllTabs();
       expect(s.tabs, isEmpty);
     });
+
+    for (final mode in ['others', 'right']) {
+      test('close $mode stops when the prompt cancels', () async {
+        final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+        final s = AppState(SpaceNoteSource(space, seed: _Seed()));
+        await s.load();
+        s.openNoteTab('a');
+        s.openNoteTab('b');
+        s.openNoteTab('c');
+        s.startEdit('b');
+        s.draftFor('b')!.titleController.text = 'Changed';
+        s.leaveGuard = () async => DraftChoice.keep;
+        const a = DocTab.note('a');
+        if (mode == 'others') {
+          await s.closeOtherTabs(a);
+        } else {
+          await s.closeTabsToRight(a);
+        }
+        // 'b' stays (cancelled); 'c' is not closed after the cancel.
+        expect(s.tabs, [a, const DocTab.note('b'), const DocTab.note('c')]);
+        s.leaveGuard = () async => DraftChoice.discard;
+        if (mode == 'others') {
+          await s.closeOtherTabs(a);
+        } else {
+          await s.closeTabsToRight(a);
+        }
+        expect(s.tabs, [a]);
+      });
+    }
   });
 }
