@@ -1,4 +1,5 @@
 import 'package:davdart/davdart.dart';
+import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -80,6 +81,65 @@ List<FItemMixin> menuRows(
   ];
 }
 
+/// An [FContextMenu] (right-click and long-press) that yields to a menu nested
+/// inside it. forui opens on raw pointer-down events, which reach every menu
+/// under the pointer, innermost first. Each menu claims the pointer after its
+/// own handler ran; one that finds the pointer already claimed closes itself
+/// again in the same event, so only the innermost menu is left open.
+class ExclusiveContextMenu extends StatefulWidget {
+  const ExclusiveContextMenu({
+    super.key,
+    required this.menuBuilder,
+    required this.child,
+  });
+  final List<FItemGroupMixin> Function(
+    BuildContext context,
+    FPopoverController controller,
+    List<FItemGroupMixin>? menu,
+  )
+  menuBuilder;
+  final Widget child;
+
+  @override
+  State<ExclusiveContextMenu> createState() => _ExclusiveContextMenuState();
+}
+
+/// Pointers whose secondary press a menu already took (cleared right after
+/// the event has been dispatched).
+final Set<int> _claimed = {};
+
+class _ExclusiveContextMenuState extends State<ExclusiveContextMenu>
+    with SingleTickerProviderStateMixin {
+  late final FPopoverController _controller = FPopoverController(vsync: this);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _down(PointerDownEvent e) {
+    if (e.buttons & kSecondaryButton == 0) return;
+    if (_claimed.add(e.pointer)) {
+      Future.microtask(() => _claimed.remove(e.pointer));
+    } else {
+      _controller.hide(animated: false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: _down,
+    child: FContextMenu(
+      control: FPopoverControl.managed(controller: _controller),
+      longPress: true,
+      secondaryPress: true,
+      menuBuilder: widget.menuBuilder,
+      child: widget.child,
+    ),
+  );
+}
+
 /// Right-click (or long-press) menu for a surface that is not a note: a
 /// folder-less tree area, a saved view, a Space, a tag, a view tab. [groups]
 /// are separated by dividers; empty groups are dropped. With no group left
@@ -100,9 +160,7 @@ class ActionContextMenu extends StatelessWidget {
         if (g.isNotEmpty) g,
     ];
     if (live.isEmpty) return child;
-    return FContextMenu(
-      longPress: true,
-      secondaryPress: true,
+    return ExclusiveContextMenu(
       menuBuilder: (ctx, c, _) => [
         for (final g in live) FItemGroup(children: menuRows(ctx, c, g)),
       ],
@@ -139,9 +197,7 @@ class NoteContextMenu extends StatelessWidget {
   final SpaceHit? hit;
 
   @override
-  Widget build(BuildContext context) => FContextMenu(
-    longPress: true,
-    secondaryPress: true,
+  Widget build(BuildContext context) => ExclusiveContextMenu(
     menuBuilder: (ctx, controller, _) => _groups(context, ctx, controller),
     child: child,
   );

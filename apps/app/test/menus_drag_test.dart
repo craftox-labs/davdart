@@ -128,6 +128,42 @@ void main() {
     });
   });
 
+  group('nested menus', () {
+    testWidgets('a board card opens only its own menu', (t) async {
+      final s = await _pump(t);
+      s.setView(ViewMode.board);
+      await t.pumpAndSettle();
+      final card = find.descendant(
+        of: _k('board-drop-backlog'),
+        matching: find.text('Alpha'),
+      );
+      await t.tap(card, buttons: kSecondaryButton);
+      await t.pumpAndSettle();
+      expect(_k('menu-open-peek'), findsOneWidget);
+      expect(_k('menu-card-new-backlog'), findsOneWidget);
+      expect(_k('menu-board-new-backlog'), findsNothing);
+    });
+
+    testWidgets('a tree row opens only its own menu', (t) async {
+      await _pump(t);
+      await t.tap(_tree('Gamma'), buttons: kSecondaryButton);
+      await t.pumpAndSettle();
+      expect(_k('menu-open-peek'), findsOneWidget);
+      expect(_k('menu-tree-new-note'), findsNothing);
+    });
+
+    testWidgets('a tab opens only its own menu', (t) async {
+      final s = await _pump(t);
+      s.openNoteTab('a');
+      s.openNoteTab('b');
+      await t.pumpAndSettle();
+      await t.tap(_k('tab-n:b'), buttons: kSecondaryButton);
+      await t.pumpAndSettle();
+      expect(_k('menu-close'), findsOneWidget);
+      expect(_k('menu-home-toggle-view'), findsNothing);
+    });
+  });
+
   group('right-click menus', () {
     testWidgets('a folder offers new inside, move and no status', (t) async {
       await _pump(t);

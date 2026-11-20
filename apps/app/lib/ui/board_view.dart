@@ -71,7 +71,8 @@ class BoardView extends StatelessWidget {
                   Expanded(
                     child: ListView(
                       children: [
-                        for (final n in notes) _Card(state: state, note: n),
+                        for (final n in notes)
+                          _Card(state: state, note: n, column: name),
                       ],
                     ),
                   ),
@@ -116,9 +117,12 @@ class BoardView extends StatelessWidget {
 }
 
 class _Card extends StatelessWidget {
-  const _Card({required this.state, required this.note});
+  const _Card({required this.state, required this.note, required this.column});
   final AppState state;
   final Note note;
+
+  /// The column this card sits in ('notes' is the no-status column).
+  final String column;
 
   @override
   Widget build(BuildContext context) {
@@ -130,6 +134,15 @@ class _Card extends StatelessWidget {
       child: NoteContextMenu(
         state: state,
         uid: note.uid,
+        items: [
+          if (state.editable && column != 'notes')
+            NoteMenuItem(
+              'New note in $column…',
+              FLucideIcons.filePlus,
+              () => showNewNoteDialog(context, state, status: column),
+              key: Key('menu-card-new-$column'),
+            ),
+        ],
         child: NoteDraggable(
           uid: note.uid,
           source: NoteDragSource.board,
