@@ -255,7 +255,8 @@ class AppState extends ChangeNotifier {
   Future<bool> openNote(String uid, {OpenMode? mode}) async {
     final isItem = _isTask(uid) || _isEvent(uid);
     if (tree.find(uid) == null && !isItem) return false;
-    if ((mode ?? openMode) == OpenMode.main) {
+    // Narrow (phone): there is no peek, every item opens full screen.
+    if (narrow || (mode ?? openMode) == OpenMode.main) {
       _openTab(uid);
     } else if (_tabs.contains(_tabOf(uid)) || peekUid == uid) {
       select(uid);
@@ -269,6 +270,10 @@ class AppState extends ChangeNotifier {
     }
     return true;
   }
+
+  /// Set by the shell: the narrow layout is showing. It has no peek pane, so
+  /// opening an item always opens it as a main tab.
+  bool narrow = false;
 
   /// Opens task [uid] like [openNote] (peek or main per the setting).
   Future<bool> openTask(String uid, {OpenMode? mode}) =>

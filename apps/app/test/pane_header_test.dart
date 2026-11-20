@@ -139,7 +139,8 @@ void main() {
       await t.tap(_k('edit-note'));
       await t.pumpAndSettle();
       expect(t.takeException(), isNull);
-      final row = t.getRect(_in('peek-view', _k('peek-toolbar')));
+      // Narrow has no peek: the item opens full screen.
+      final row = t.getRect(_in('main-note', _k('peek-toolbar')));
       final field = t.getRect(_k('edit-title'));
       expect(field.top, greaterThanOrEqualTo(row.top));
       expect(field.bottom, lessThanOrEqualTo(row.bottom));

@@ -352,9 +352,13 @@ void main() {
     for (final w in [320.0, 880.0, 1280.0, 1911.0]) {
       testWidgets('no overflow at $w', (t) async {
         final s = await _tab(t, size: Size(w, 900));
-        if (_k('bottom-nav').evaluate().isNotEmpty) {
-          // Narrow: the panel is a bottom tab's page.
-          await t.tap(_k('bnav-tasks'));
+        if (_k('menu').evaluate().isNotEmpty) {
+          // Narrow: the panel is in the side menu.
+          await t.tap(_k('menu'));
+          await t.pumpAndSettle();
+          await t.tap(_k('menu-filter'));
+          await t.pumpAndSettle();
+          await t.tap(_k('filter-tasks'));
           await t.pumpAndSettle();
         }
         await t.tap(_k('tasks-filter-all'));

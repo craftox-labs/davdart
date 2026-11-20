@@ -251,9 +251,7 @@ class SizeTokens {
     this.tabClose = 16,
     this.touchTarget = 44,
     this.spaceChipMax = 140,
-    this.fab = 56,
-    this.sheetGrip = 40,
-    this.sheetGripThickness = 4,
+    this.edgeSwipe = 16,
   });
 
   /// Edge of the logo on the first-run screen (and other large uses).
@@ -316,9 +314,9 @@ class SizeTokens {
   /// Least hit target of an interactive control on the narrow (touch) layout.
   final double touchTarget;
 
-  /// Narrow layout: widest the Space chip in the top bar gets, the quick-add
-  /// button's diameter, and the peek sheet's grip bar (length, thickness).
-  final double spaceChipMax, fab, sheetGrip, sheetGripThickness;
+  /// Narrow layout: widest the Space chip in the top bar gets, and the width
+  /// of the left-edge zone whose swipe opens the side menu.
+  final double spaceChipMax, edgeSwipe;
 }
 
 /// Design tokens shared with the web board (apps/web/lib/web_app.dart). One

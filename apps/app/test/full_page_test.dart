@@ -223,11 +223,11 @@ void main() {
       expect(s.peekUid, 'a');
     });
 
-    testWidgets('narrow layout: Promote is in the sheet, a tab is a page', (
+    testWidgets('narrow layout: no peek or Promote, a tab is a page', (
       t,
     ) async {
       final s = await _pump(t, size: const Size(500, 900));
-      expect(_k('peek-sheet'), findsOneWidget);
+      expect(_k('peek-promote'), findsNothing);
       s.openNoteTab('b');
       await _settle(t);
       expect(_k('main-note'), findsOneWidget);

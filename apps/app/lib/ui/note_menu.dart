@@ -165,7 +165,7 @@ Future<void> showMenuSheet(
     close: () {
       if (!open) return;
       open = false;
-      Navigator.of(context).maybePop();
+      Navigator.of(context).pop();
     },
   );
   try {

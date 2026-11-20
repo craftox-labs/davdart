@@ -1223,11 +1223,11 @@ void main() {
       expect(state.section, Section.notes);
     });
 
-    testWidgets('the narrow tab pages ignore the collapsed state', (t) async {
+    testWidgets('the narrow side menu ignores the collapsed state', (t) async {
       final state = await multi(t, const Size(500, 900));
       state.setSidebarCollapsed(true);
       await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('bnav-notes')));
+      await t.tap(find.byKey(const Key('menu')));
       await t.pumpAndSettle();
       expect(find.byKey(const Key('side-header')), findsOneWidget);
     });
@@ -1480,36 +1480,38 @@ void main() {
       expect(Tokens.dark.frame, isNot(Tokens.dark.panel));
     });
 
-    testWidgets('narrow: no rail, Space chip and bottom nav instead', (
+    testWidgets('narrow: no rail, menu button and bottom bar instead', (
       t,
     ) async {
       await pump(t, size: const Size(420, 800));
       expect(find.byKey(const Key('icon-rail')), findsNothing);
       expect(find.byKey(const Key('shell-panel')), findsNothing);
       expect(find.byKey(const Key('space-chip')), findsOneWidget);
-      expect(find.byKey(const Key('bottom-nav')), findsOneWidget);
+      expect(find.byKey(const Key('menu')), findsOneWidget);
+      expect(find.byKey(const Key('mobile-bar')), findsOneWidget);
     });
   });
 
   group('narrow layout', () {
-    testWidgets('bottom tabs and a single pane', (t) async {
+    testWidgets('side menu, full-screen items, Back', (t) async {
       await pump(t, size: const Size(420, 800));
-      await t.tap(find.byKey(const Key('bnav-notes')));
+      await t.tap(find.byKey(const Key('menu')));
       await t.pumpAndSettle();
-      expect(find.byKey(const Key('bottom-nav')), findsOneWidget);
+      expect(find.byKey(const Key('side-menu')), findsOneWidget);
       await t.tap(find.text('Core slice').last);
       await t.pumpAndSettle();
+      // The menu closed and the note fills the screen.
+      expect(find.byKey(const Key('side-menu')), findsNothing);
       expect(find.text('Body text'), findsOneWidget);
       expect(find.text('BACKLOG'), findsNothing);
       await t.tap(byAction('Close'));
       await t.pumpAndSettle();
       expect(find.text('Body text'), findsNothing);
-      expect(find.text('Core slice'), findsWidgets);
     });
   });
 
   group('narrow sections', () {
-    testWidgets('the tabs reach the other sections', (t) async {
+    testWidgets('the side menu reaches the other sections', (t) async {
       final sem = t.ensureSemantics();
       await pump(t, size: const Size(420, 800));
       await t.tap(find.byKey(const Key('space-chip')));
@@ -1517,10 +1519,16 @@ void main() {
       expect(find.text('One fixed notes source'), findsOneWidget);
       await t.tapAt(const Offset(5, 5));
       await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('bnav-more')));
+      await t.tap(find.byKey(const Key('menu')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('menu-filter')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('filter-views')));
       await t.pumpAndSettle();
       expect(find.text('No saved views yet'), findsOneWidget);
-      await t.tap(find.byKey(const Key('bnav-notes')));
+      await t.tap(find.byKey(const Key('menu-filter')));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('filter-notes')));
       await t.pumpAndSettle();
       expect(find.text('Core slice'), findsWidgets);
       sem.dispose();
@@ -1564,13 +1572,14 @@ void main() {
       t,
     ) async {
       await pump(t, size: const Size(420, 800));
-      await t.tap(find.byKey(const Key('bnav-notes')));
+      await t.tap(find.byKey(const Key('menu')));
       await t.pumpAndSettle();
-      expect(find.byKey(const Key('bottom-nav')), findsOneWidget);
+      expect(find.byKey(const Key('side-menu')), findsOneWidget);
       t.view.physicalSize = const Size(1400, 900);
       await t.pumpAndSettle();
       expect(find.byType(Sidebar), findsOneWidget); // docked only
-      expect(find.byKey(const Key('bottom-nav')), findsNothing);
+      expect(find.byKey(const Key('mobile-bar')), findsNothing);
+      expect(find.byKey(const Key('side-menu')), findsNothing);
     });
   });
 

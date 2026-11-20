@@ -22,7 +22,9 @@ import 'detail_header.dart';
 import 'detail_view.dart';
 import 'first_run_view.dart';
 import 'list_view.dart';
+import '../state/tab_state.dart';
 import 'mobile_nav.dart';
+import 'overflow_tip.dart';
 import 'parts.dart';
 import 'resize_handle.dart';
 import 'scope_bar.dart';
@@ -165,8 +167,28 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
   /// Whether the last build was wide, to tell a resize from a toggle.
   bool? _wasWide;
 
-  /// Narrow layout: a bottom tab's page is open (else Home, or a view's page).
-  bool _sectionOpen = false;
+  /// Narrow layout: the full-screen side menu and the open-items grid.
+  bool _menuOpen = false, _gridOpen = false;
+
+  /// Narrow Back: the grid or the menu first, then an open item or view (to
+  /// Home). False when nothing is left to close (the app may be left).
+  bool _back() {
+    final state = widget.state;
+    if (_gridOpen || _menuOpen) {
+      setState(() => _gridOpen = _menuOpen = false);
+    } else if (state.activeTab != null) {
+      state.activateTab(null);
+    } else {
+      return false;
+    }
+    return true;
+  }
+
+  /// Shows [t] (null: Home) and closes the menu and the grid.
+  void _show(DocTab? t) {
+    setState(() => _gridOpen = _menuOpen = false);
+    widget.state.activateTab(t);
+  }
 
   bool get _dockOpen => !widget.state.sidebarCollapsed;
 
@@ -232,54 +254,6 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     );
   }
 
-  /// The narrow page: Home, a view or an item (the main area), or a bottom
-  /// tab's page, with the quick-add button over it and the peek as a sheet.
-  Widget _narrowBody(
-    BuildContext context,
-    Tokens t,
-    bool hasDetail,
-    bool narrowSection,
-    String? mainNote,
-    Widget Function() main,
-    Widget Function() peek,
-  ) {
-    final state = widget.state;
-    final Widget page = narrowSection
-        ? AreaMark(
-            nav: state.nav,
-            area: NavArea.panel,
-            child: tabOfSection(visibleSection(state)) == NavTab.more
-                ? MorePage(state: state)
-                : sectionBody(state, visibleSection(state), () {}),
-          )
-        : main();
-    final fab =
-        !state.noSpace &&
-        mainNote == null &&
-        !hasDetail &&
-        quickAddFor(state) != null;
-    return LayoutBuilder(
-      builder: (context, bc) => Stack(
-        children: [
-          Positioned.fill(child: page),
-          if (fab)
-            Positioned(
-              right: t.space.lg,
-              bottom: t.space.lg,
-              child: QuickAddButton(state: state),
-            ),
-          if (hasDetail)
-            PeekSheet(
-              key: const Key('detail-pane'),
-              state: state,
-              height: bc.maxHeight,
-              child: peek(),
-            ),
-        ],
-      ),
-    );
-  }
-
   Widget _layout(
     BuildContext context,
     BoxConstraints c, {
@@ -300,18 +274,19 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     if (!hasDetail && _peek.value == 0) _heldPeek = null;
     final peekUid = state.peekUid ?? _heldPeek;
     final mainNote = state.mainItemUid;
-    // Narrow: a bottom tab's page replaces Home while no view or item fills
-    // the main area.
-    final narrowSection =
-        !wide &&
-        _sectionOpen &&
-        !state.noSpace &&
-        mainNote == null &&
-        state.activeTab == null;
+    state.narrow = !wide;
+    // Narrow has no peek: an item peeked before (on a wide window) opens
+    // full screen.
+    if (!wide && state.hasPeek) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.state.narrow) widget.state.promote();
+      });
+    }
+    if (wide) _menuOpen = _gridOpen = false;
     final mirror = state.layoutSide == LayoutSide.end;
     state.nav.setLayout(
       rail: wide,
-      panel: (wide && _dockOpen) || narrowSection,
+      panel: (wide && _dockOpen) || _menuOpen,
       main: split || !hasDetail || !wide,
       peek: hasDetail,
       mirror: mirror,
@@ -468,15 +443,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
         },
       );
     } else if (!wide) {
-      body = _narrowBody(
-        context,
-        t,
-        hasDetail,
-        narrowSection,
-        mainNote,
-        main,
-        peekView,
-      );
+      body = main();
     } else if (hasDetail) {
       // Wide but not split: the peeked note replaces the main area;
       // Promote and Collapse are on the header's peek tab.
@@ -485,7 +452,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
       body = main();
     }
 
-    final narrowNav = !wide && !state.noSpace && mainNote == null;
+    final narrowBar = !wide && !state.noSpace;
     Widget content = FScaffold(
       childPad: false,
       header: split || !showTopBar
@@ -493,26 +460,61 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
           : TopBar(
               state: state,
               showMenu: !wide,
-              onHome: !wide && (narrowSection || state.activeTab != null)
-                  ? () => setState(() {
-                      _sectionOpen = false;
-                      state.activateTab(null);
-                    })
-                  : null,
+              onMenu: () => setState(() => _menuOpen = true),
             ),
-      footer: narrowNav
-          ? MobileBottomNav(
+      footer: narrowBar
+          ? MobileBar(
               state: state,
-              open: narrowSection,
-              onOpen: (s) {
-                state.setSection(s);
-                state.activateTab(null);
-                setState(() => _sectionOpen = true);
+              canBack: _gridOpen || _menuOpen || state.activeTab != null,
+              onBack: _back,
+              onSearch: () {
+                state.setSection(Section.search);
+                setState(() => _menuOpen = true);
               },
+              onGrid: () => setState(() => _gridOpen = true),
+              onHome: () => _show(null),
             )
           : null,
       child: body,
     );
+    if (!wide && !state.noSpace) {
+      final base = content;
+      content = Stack(
+        children: [
+          Positioned.fill(child: base),
+          if (!_menuOpen && !_gridOpen)
+            // The left edge: a swipe from it opens the side menu.
+            Positioned(
+              left: 0,
+              top: 0,
+              bottom: 0,
+              width: t.sizes.edgeSwipe,
+              child: GestureDetector(
+                key: const Key('menu-edge'),
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragUpdate: (d) {
+                  if (d.primaryDelta! > 8) setState(() => _menuOpen = true);
+                },
+              ),
+            ),
+          if (_menuOpen)
+            Positioned.fill(
+              child: SideMenuPage(
+                state: state,
+                onClose: () => setState(() => _menuOpen = false),
+              ),
+            ),
+          if (_gridOpen)
+            Positioned.fill(
+              child: OpenItemsGrid(
+                state: state,
+                onDone: () => setState(() => _gridOpen = false),
+                onOpen: _show,
+              ),
+            ),
+        ],
+      );
+    }
     if (showDock) {
       // Docked beside the content, on the side facing it: left of it
       // normally, right of it when the rail is on the right.
@@ -618,19 +620,11 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     return _LeaveGuard(
       state: state,
       child: PopScope(
-        // Narrow Back: the peek, then an open item or view, then a tab
-        // page, then Home; only from Home does it leave the app.
-        canPop:
-            wide || !(hasDetail || narrowSection || state.activeTab != null),
+        // Narrow Back: the grid or menu, then an open item or view, then
+        // Home; only from Home does it leave the app.
+        canPop: wide || !(_gridOpen || _menuOpen || state.activeTab != null),
         onPopInvokedWithResult: (didPop, _) {
-          if (didPop) return;
-          if (hasDetail) {
-            state.guarded(() => state.select(null));
-          } else if (state.activeTab != null) {
-            state.activateTab(null);
-          } else if (narrowSection) {
-            setState(() => _sectionOpen = false);
-          }
+          if (!didPop) _back();
         },
         child: SafeArea(
           child: wide
@@ -741,15 +735,15 @@ class TopBar extends StatelessWidget {
     super.key,
     required this.state,
     required this.showMenu,
-    this.onHome,
+    this.onMenu,
   });
   final AppState state;
 
-  /// The narrow layout: the Space chip leads the bar.
+  /// The narrow layout: menu button left, the title centred.
   final bool showMenu;
 
-  /// Narrow, away from Home: the button back to it.
-  final VoidCallback? onHome;
+  /// Narrow: opens the side menu.
+  final VoidCallback? onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -759,16 +753,24 @@ class TopBar extends StatelessWidget {
     );
   }
 
+  /// Narrow title, centred: the item's or view's name, a folder's crumbs, or
+  /// on Home the Space chip.
+  Widget _title(Tokens t) {
+    final tab = state.activeTab;
+    if (state.mainItemUid != null && tab != null) {
+      return OverflowTip(state.tabTitle(tab), style: paneTitleStyle(t));
+    }
+    if (state.scope != null || state.activeViewName != null) {
+      return ScopeCrumbs(state: state, label: state.activeViewName);
+    }
+    return SpaceChip(state: state);
+  }
+
   /// Left side of the row: the breadcrumb on Home and view tabs, nothing
   /// where a note fills the main area (it has its own header).
   Widget _lead(Tokens t) {
     // A note filling the main area carries its title in its own header.
     if (state.mainItemUid != null) return const SizedBox.shrink();
-    // Narrow: the Space chip names the Space; the crumbs only add a folder or
-    // a view.
-    if (showMenu && state.scope == null && state.activeViewName == null) {
-      return const SizedBox.shrink();
-    }
     return Align(
       alignment: Alignment.centerLeft,
       child: ScopeCrumbs(state: state, label: state.activeViewName),
@@ -794,17 +796,16 @@ class TopBar extends StatelessWidget {
     return PaneHeaderRow(
       key: const Key('top-bar'),
       children: [
-        if (onHome != null)
+        if (showMenu)
           IconAction(
             compact: true,
-            key: const Key('nav-home'),
-            tooltip: 'Home',
-            icon: FLucideIcons.house,
-            onPress: onHome,
+            key: const Key('menu'),
+            tooltip: 'Menu',
+            icon: FLucideIcons.menu,
+            onPress: onMenu,
           ),
-        if (showMenu) SpaceChip(state: state),
         SizedBox(width: t.space.xs),
-        Expanded(child: _lead(t)),
+        Expanded(child: showMenu ? Center(child: _title(t)) : _lead(t)),
         SizedBox(width: t.space.md),
         if (state.loading)
           Padding(
@@ -816,7 +817,7 @@ class TopBar extends StatelessWidget {
             ),
           ),
         if (home) ScopeActions(state: state, overflow: narrow),
-        if (state.activeTab == null)
+        if (state.activeTab == null || (showMenu && state.mainIsPage))
           const SizedBox.shrink()
         else if (!narrow) ...[
           toggle('Board', ViewMode.board),

@@ -1,159 +1,208 @@
-import 'dart:math' as math;
-
+import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/key_nav.dart';
+import '../state/tab_state.dart';
 import 'event_menu.dart';
+import 'key_nav_ui.dart';
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
+import 'overflow_tip.dart';
 import 'parts.dart';
 import 'shell_frame.dart';
 import 'sidebar.dart';
 import 'task_menu.dart';
 import 'theme.dart';
+import '../theme/tokens.dart';
 
-// The narrow (phone) layout's chrome: bottom navigation, the Space chip and
-// its sheet, the quick-add button and the peek as a bottom sheet. All of it
-// is built only below Tokens.wideBreakpoint.
+// The narrow (phone) layout's chrome, built only below Tokens.wideBreakpoint:
+// the floating bottom bar, the + menu, the side menu page, the open-items
+// grid and the Space chip. Everything reuses the panels and actions of the
+// desktop layout.
 
-/// The bottom navigation items: the list sections the Space supports, then
-/// Search and More.
-enum NavTab { notes, tasks, events, search, more }
+/// One thing the + menu can add.
+class AddEntry {
+  const AddEntry(this.key, this.label, this.icon, this.run, this.section);
+  final String key, label;
+  final IconData icon;
+  final Future<void> Function(BuildContext) run;
+  final Section section;
+}
 
-Section sectionOfTab(NavTab t) => switch (t) {
-  NavTab.notes => Section.notes,
-  NavTab.tasks => Section.tasks,
-  NavTab.events => Section.events,
-  NavTab.search => Section.search,
-  NavTab.more => Section.views,
-};
+/// What + can add in [state]'s Space (a type the Space cannot hold, or a
+/// read-only one, is left out), the type of the side menu's current filter
+/// first.
+List<AddEntry> addEntries(AppState state) {
+  final all = [
+    if (state.editable)
+      AddEntry(
+        'add-note',
+        'New note',
+        FLucideIcons.filePlus,
+        (c) => showNewNoteDialog(c, state),
+        Section.notes,
+      ),
+    if (state.tasksEditable)
+      AddEntry(
+        'add-task',
+        'New task',
+        FLucideIcons.listPlus,
+        (c) => showNewTaskDialog(c, state),
+        Section.tasks,
+      ),
+    if (state.eventsEditable)
+      AddEntry('add-event', 'New event', FLucideIcons.calendarPlus, (c) async {
+        final uid = await showNewEventDialog(c, state);
+        if (uid != null) await state.clickEvent(uid);
+      }, Section.events),
+  ];
+  final first = visibleSection(state);
+  return [
+    ...all.where((e) => e.section == first),
+    ...all.where((e) => e.section != first),
+  ];
+}
 
-NavTab tabOfSection(Section s) => switch (s) {
-  Section.notes => NavTab.notes,
-  Section.tasks => NavTab.tasks,
-  Section.events => NavTab.events,
-  Section.search => NavTab.search,
-  Section.views || Section.account || Section.settings => NavTab.more,
-};
-
-/// The tabs shown for [state]'s Space: a list section the Space cannot hold is
-/// hidden.
-List<NavTab> navTabs(AppState state) => [
-  if (state.supportsNotes) NavTab.notes,
-  if (state.supportsTasks) NavTab.tasks,
-  if (state.supportsEvents) NavTab.events,
-  NavTab.search,
-  NavTab.more,
-];
-
-/// The bottom navigation bar. [open] is false while Home or a view page is
-/// shown (no tab selected). Tapping a tab runs [onOpen] with its section.
-class MobileBottomNav extends StatelessWidget {
-  const MobileBottomNav({
-    super.key,
-    required this.state,
-    required this.open,
-    required this.onOpen,
-  });
-  final AppState state;
-  final bool open;
-  final ValueChanged<Section> onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    final tabs = navTabs(state);
-    final current = tabOfSection(visibleSection(state));
-    final index = open ? tabs.indexOf(current) : -1;
-    return ConstrainedBox(
-      constraints: BoxConstraints(minHeight: t.sizes.touchTarget),
-      child: FBottomNavigationBar(
-        key: const Key('bottom-nav'),
-        index: index,
-        onChange: (i) {
-          final tab = tabs[i];
-          // More keeps the last section of its group.
-          final shown = visibleSection(state);
-          final keep = tab == NavTab.more && tabOfSection(shown) == tab;
-          onOpen(keep ? shown : sectionOfTab(tab));
-        },
+/// Shows the + menu (a sheet of [addEntries]); [before] runs first when a
+/// row is picked, [prefix] namespaces the row keys.
+void showAddMenu(
+  BuildContext context,
+  TickerProvider vsync,
+  AppState state, {
+  String prefix = '',
+  VoidCallback? before,
+}) {
+  final entries = addEntries(state);
+  if (entries.isEmpty) return;
+  final t = tokensOf(context);
+  showMenuSheet(context, vsync, (ctx, c) {
+    return [
+      FItemGroup(
         children: [
-          for (final tab in tabs)
-            FBottomNavigationBarItem(
-              key: Key('bnav-${tab.name}'),
-              icon: Icon(_icon(tab)),
-              label: Text(_label(tab)),
+          for (final e in entries)
+            FItem(
+              key: Key('$prefix${e.key}'),
+              prefix: Icon(e.icon, size: t.icons.md, color: t.muted),
+              title: Text(e.label),
+              onPress: () {
+                c.hide();
+                before?.call();
+                e.run(context);
+              },
             ),
         ],
       ),
-    );
-  }
-
-  static IconData _icon(NavTab t) => switch (t) {
-    NavTab.more => FLucideIcons.ellipsis,
-    _ => sectionMeta(sectionOfTab(t)).$1,
-  };
-
-  static String _label(NavTab t) => switch (t) {
-    NavTab.more => 'More',
-    _ => sectionMeta(sectionOfTab(t)).$2,
-  };
+    ];
+  });
 }
 
-/// The page of the More tab: a row of Views, Account and Settings, then the
-/// chosen one.
-class MorePage extends StatelessWidget {
-  const MorePage({super.key, required this.state});
+/// The floating bottom bar: Back, Search, +, the open-items counter, Home.
+class MobileBar extends StatefulWidget {
+  const MobileBar({
+    super.key,
+    required this.state,
+    required this.canBack,
+    required this.onBack,
+    required this.onSearch,
+    required this.onGrid,
+    required this.onHome,
+  });
   final AppState state;
+  final bool canBack;
+  final VoidCallback onBack, onSearch, onGrid, onHome;
 
+  @override
+  State<MobileBar> createState() => _MobileBarState();
+}
+
+class _MobileBarState extends State<MobileBar> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final sections = [
-      Section.views,
-      if (state.canSignIn) Section.account,
-      Section.settings,
-    ];
-    final current = sections.contains(state.section)
-        ? state.section
-        : Section.views;
-    return Column(
-      key: const Key('more-page'),
-      children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(t.space.lg, t.space.sm, t.space.lg, 0),
-          child: Wrap(
-            spacing: t.space.xs,
-            runSpacing: t.space.xs,
-            children: [
-              for (final s in sections)
-                touchBox(
-                  context,
-                  FButton(
-                    key: Key('more-${s.name}'),
-                    variant: s == current
-                        ? FButtonVariant.secondary
-                        : FButtonVariant.outline,
-                    size: FButtonSizeVariant.xs,
-                    mainAxisSize: MainAxisSize.min,
-                    selected: s == current,
-                    prefix: Icon(sectionMeta(s).$1),
-                    onPress: () => state.setSection(s),
-                    child: Text(sectionMeta(s).$2),
+    final count = widget.state.tabs.length;
+    final canAdd = addEntries(widget.state).isNotEmpty;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        t.space.lg,
+        t.space.xs,
+        t.space.lg,
+        t.space.md,
+      ),
+      child: Container(
+        key: const Key('mobile-bar'),
+        padding: EdgeInsets.symmetric(horizontal: t.space.sm),
+        decoration: BoxDecoration(
+          color: t.panel,
+          borderRadius: BorderRadius.circular(t.radii.panel + t.space.md),
+          border: Border.all(color: t.panelBorder, width: t.borders.hairline),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            IconAction(
+              key: const Key('bar-back'),
+              tooltip: 'Back',
+              icon: FLucideIcons.arrowLeft,
+              onPress: widget.canBack ? widget.onBack : null,
+            ),
+            IconAction(
+              key: const Key('bar-search'),
+              tooltip: 'Search',
+              icon: FLucideIcons.search,
+              onPress: widget.onSearch,
+            ),
+            IconAction(
+              key: const Key('bar-add'),
+              tooltip: 'New',
+              icon: FLucideIcons.plus,
+              onPress: canAdd
+                  ? () => showAddMenu(context, this, widget.state)
+                  : null,
+            ),
+            FTappable(
+              key: const Key('bar-count'),
+              semanticsLabel: 'Open items: $count',
+              behavior: HitTestBehavior.opaque,
+              onPress: widget.onGrid,
+              child: SizedBox(
+                width: t.sizes.touchTarget,
+                height: t.sizes.touchTarget,
+                child: Center(
+                  child: Container(
+                    constraints: BoxConstraints(
+                      minWidth: t.icons.lg + t.space.sm,
+                      minHeight: t.icons.lg + t.space.sm,
+                    ),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(t.radii.control),
+                      border: Border.all(
+                        color: t.fg,
+                        width: t.borders.hairline * 2,
+                      ),
+                    ),
+                    child: Text('$count', style: t.type.captionStyle),
                   ),
                 ),
-            ],
-          ),
+              ),
+            ),
+            IconAction(
+              key: const Key('bar-home'),
+              tooltip: 'Home',
+              icon: FLucideIcons.house,
+              onPress: widget.onHome,
+            ),
+          ],
         ),
-        Expanded(child: sectionBody(state, current, () {})),
-      ],
+      ),
     );
   }
 }
 
-/// The Space chip in the narrow top bar: the current Space's name, opening a
-/// bottom sheet with the Space popup's actions.
+/// The Space chip: the current Space's name, opening a bottom sheet with the
+/// Space popup's actions.
 class SpaceChip extends StatefulWidget {
   const SpaceChip({super.key, required this.state});
   final AppState state;
@@ -194,166 +243,361 @@ class _SpaceChipState extends State<SpaceChip> with TickerProviderStateMixin {
   }
 }
 
-/// What the quick-add button adds in [state]'s current section, or null when
-/// it has nothing to add (Search, More, a read-only or unsupported section).
-({String label, IconData icon, Future<void> Function(BuildContext) run})?
-quickAddFor(AppState state) {
-  switch (visibleSection(state)) {
-    case Section.notes:
-      if (!state.editable) return null;
-      return (
-        label: 'New note',
-        icon: FLucideIcons.filePlus,
-        run: (c) => showNewNoteDialog(c, state),
-      );
-    case Section.tasks:
-      if (!state.tasksEditable) return null;
-      return (
-        label: 'New task',
-        icon: FLucideIcons.listPlus,
-        run: (c) => showNewTaskDialog(c, state),
-      );
-    case Section.events:
-      if (!state.eventsEditable) return null;
-      return (
-        label: 'New event',
-        icon: FLucideIcons.calendarPlus,
-        run: (c) async {
-          final uid = await showNewEventDialog(c, state);
-          if (uid != null) await state.clickEvent(uid);
-        },
-      );
-    default:
-      return null;
+/// How many notes (not folders) the current Space holds.
+int _noteCount(AppState state) {
+  var n = 0;
+  void walk(List<NoteNode> nodes) {
+    for (final x in nodes) {
+      if (!AppState.isFolder(x.note)) n++;
+      walk(x.children);
+    }
   }
+
+  walk(state.tree.roots);
+  return n;
 }
 
-/// The context-sensitive quick-add button, round and [Tokens] touch sized.
-class QuickAddButton extends StatelessWidget {
-  const QuickAddButton({super.key, required this.state});
+/// The sections the side menu's filter offers for [state]'s Space.
+List<Section> filterSections(AppState state) => topSections(state);
+
+/// The full-screen side menu: the Space chip, a filter pill choosing the
+/// panel (bound to [AppState.section]), that panel (with its toolbar and tags
+/// drawer), and Account and Settings in the footer. [onClose] closes it;
+/// picking an item runs it too.
+class SideMenuPage extends StatefulWidget {
+  const SideMenuPage({super.key, required this.state, required this.onClose});
   final AppState state;
+  final VoidCallback onClose;
+
+  @override
+  State<SideMenuPage> createState() => _SideMenuPageState();
+}
+
+class _SideMenuPageState extends State<SideMenuPage>
+    with TickerProviderStateMixin {
+  String _label(Section s) {
+    final state = widget.state;
+    final name = sectionMeta(s).$2;
+    return switch (s) {
+      Section.notes => '$name · ${_noteCount(state)}',
+      Section.tasks => '$name · ${state.tasks.length}',
+      Section.events => '$name · ${state.events.length}',
+      _ => name,
+    };
+  }
+
+  void _pickFilter() {
+    final state = widget.state;
+    final t = tokensOf(context);
+    showMenuSheet(context, this, (ctx, c) {
+      return [
+        FItemGroup(
+          children: [
+            for (final s in filterSections(state))
+              FItem(
+                key: Key('filter-${s.name}'),
+                prefix: Icon(
+                  sectionMeta(s).$1,
+                  size: t.icons.md,
+                  color: t.muted,
+                ),
+                title: Text(_label(s)),
+                suffix: visibleSection(state) == s
+                    ? Icon(
+                        FLucideIcons.check,
+                        size: t.icons.md,
+                        color: t.accent,
+                      )
+                    : null,
+                onPress: () {
+                  c.hide();
+                  state.setSection(s);
+                },
+              ),
+          ],
+        ),
+      ];
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final add = quickAddFor(state);
-    if (add == null) return const SizedBox.shrink();
     final t = tokensOf(context);
-    return SizedBox(
-      width: t.sizes.fab,
-      height: t.sizes.fab,
-      child: FButton.icon(
-        key: const Key('fab-add'),
-        semanticsLabel: add.label,
-        onPress: () => add.run(context),
-        child: Icon(add.icon),
+    final state = widget.state;
+    final section = visibleSection(state);
+    final inFilter = filterSections(state).contains(section);
+    Widget footer(Section s, String key) => IconAction(
+      key: Key(key),
+      tooltip: sectionMeta(s).$2,
+      icon: sectionMeta(s).$1,
+      onPress: () => state.setSection(s),
+    );
+    return GestureDetector(
+      key: const Key('side-menu'),
+      behavior: HitTestBehavior.translucent,
+      // Swiping left closes it (rows swipe only to the right).
+      onHorizontalDragEnd: (d) {
+        if ((d.primaryVelocity ?? 0) < -400) widget.onClose();
+      },
+      child: FScaffold(
+        childPad: false,
+        child: Column(
+          children: [
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                t.space.lg,
+                t.space.sm,
+                t.space.sm,
+                t.space.xs,
+              ),
+              child: Row(
+                children: [
+                  SpaceChip(state: state),
+                  const Spacer(),
+                  IconAction(
+                    key: const Key('menu-close'),
+                    tooltip: 'Close menu',
+                    icon: FLucideIcons.x,
+                    onPress: widget.onClose,
+                  ),
+                ],
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: touchBox(
+                  context,
+                  FButton(
+                    key: const Key('menu-filter'),
+                    variant: FButtonVariant.secondary,
+                    size: FButtonSizeVariant.xs,
+                    mainAxisSize: MainAxisSize.min,
+                    prefix: Icon(sectionMeta(section).$1),
+                    suffix: const Icon(FLucideIcons.chevronDown),
+                    onPress: _pickFilter,
+                    child: Text(
+                      inFilter ? _label(section) : sectionMeta(section).$2,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: AreaMark(
+                nav: state.nav,
+                area: NavArea.panel,
+                child: sectionBody(state, section, widget.onClose),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: t.space.sm),
+              child: Row(
+                children: [
+                  if (state.canSignIn) footer(Section.account, 'menu-account'),
+                  const Spacer(),
+                  footer(Section.settings, 'menu-settings'),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-/// The peek as a draggable bottom sheet over the page. Its handle row drags
-/// it between the half and the full height (below the dismiss line it
-/// closes); the row also carries "Open in main", which moves the item to a
-/// full-screen page. [child] is the peeked item.
-class PeekSheet extends StatefulWidget {
-  const PeekSheet({
-    super.key,
-    required this.state,
-    required this.height,
-    required this.child,
-  });
-  final AppState state;
+/// The first line of text worth showing on a card of [tab].
+String tabPreview(AppState state, DocTab tab) {
+  String first(String s) {
+    for (final l in s.split('\n')) {
+      final x = l.trim();
+      if (x.isNotEmpty) return x;
+    }
+    return '';
+  }
 
-  /// The room the sheet may fill (the page area's height).
-  final double height;
-  final Widget child;
-
-  @override
-  State<PeekSheet> createState() => _PeekSheetState();
+  switch (tab.kind) {
+    case TabKind.note:
+      return first(state.tree.find(tab.id)?.note.description ?? '');
+    case TabKind.task:
+      return first(state.taskById(tab.id)?.description ?? '');
+    case TabKind.event:
+      final e = state.eventById(tab.id);
+      if (e == null) return '';
+      final d = first(e.description);
+      return d.isNotEmpty ? d : e.location;
+    case TabKind.view:
+      return 'Saved view';
+  }
 }
 
-class _PeekSheetState extends State<PeekSheet> {
-  static const _half = 0.55, _full = 1.0, _dismiss = 0.3;
-  double _fraction = _half;
+IconData tabIcon(AppState state, DocTab tab) => switch (tab.kind) {
+  TabKind.note =>
+    state.tabIsFolder(tab) ? FLucideIcons.folder : FLucideIcons.fileText,
+  TabKind.task => FLucideIcons.listChecks,
+  TabKind.event => FLucideIcons.calendar,
+  TabKind.view => FLucideIcons.bookmark,
+};
 
-  void _drag(DragUpdateDetails d) => setState(
-    () =>
-        _fraction = (_fraction - d.delta.dy / widget.height).clamp(0.2, _full),
-  );
+/// The open items as a full page of two-column cards. A card opens its item,
+/// its X closes it (the last one leaves for Home), + adds, Done goes back.
+class OpenItemsGrid extends StatefulWidget {
+  const OpenItemsGrid({
+    super.key,
+    required this.state,
+    required this.onDone,
+    required this.onOpen,
+  });
+  final AppState state;
+  final VoidCallback onDone;
 
-  void _end([DragEndDetails? d]) {
-    final v = d?.primaryVelocity ?? 0;
-    if (_fraction < _dismiss || v > 900 && _fraction < _half) {
-      widget.state.guarded(() => widget.state.select(null));
-      setState(() => _fraction = _half);
-      return;
-    }
-    setState(
-      () => _fraction = v < -600 || _fraction > (_half + _full) / 2
-          ? _full
-          : _half,
-    );
+  /// Shows tab [t] (null: Home) and closes the grid.
+  final void Function(DocTab? t) onOpen;
+
+  @override
+  State<OpenItemsGrid> createState() => _OpenItemsGridState();
+}
+
+class _OpenItemsGridState extends State<OpenItemsGrid>
+    with TickerProviderStateMixin {
+  Future<void> _close(DocTab tab) async {
+    final state = widget.state;
+    await state.closeTab(tab);
+    if (state.tabs.isEmpty) widget.onOpen(null);
   }
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final h = math.max(t.sizes.touchTarget * 2, widget.height * _fraction);
-    final r = Radius.circular(t.radii.panel);
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      height: math.min(h, widget.height),
-      child: DecoratedBox(
-        key: const Key('peek-sheet'),
+    final state = widget.state;
+    final tabs = state.tabs;
+    return FScaffold(
+      key: const Key('open-grid'),
+      childPad: false,
+      child: Column(
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              t.space.lg,
+              t.space.sm,
+              t.space.sm,
+              t.space.xs,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Open items (${tabs.length})',
+                    style: t.type.labelStyle,
+                  ),
+                ),
+                IconAction(
+                  key: const Key('grid-add'),
+                  tooltip: 'New',
+                  icon: FLucideIcons.plus,
+                  onPress: addEntries(state).isEmpty
+                      ? null
+                      : () => showAddMenu(
+                          context,
+                          this,
+                          state,
+                          prefix: 'grid-',
+                          before: widget.onDone,
+                        ),
+                ),
+                touchBox(
+                  context,
+                  FButton(
+                    key: const Key('grid-done'),
+                    variant: FButtonVariant.outline,
+                    size: FButtonSizeVariant.xs,
+                    mainAxisSize: MainAxisSize.min,
+                    onPress: widget.onDone,
+                    child: const Text('Done'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: tabs.isEmpty
+                ? Center(
+                    child: Text(
+                      'No open items',
+                      style: t.type.captionStyle.copyWith(color: t.muted),
+                    ),
+                  )
+                : GridView.count(
+                    crossAxisCount: 2,
+                    padding: EdgeInsets.all(t.space.lg),
+                    mainAxisSpacing: t.space.md,
+                    crossAxisSpacing: t.space.md,
+                    childAspectRatio: 1.25,
+                    children: [for (final tab in tabs) _card(t, tab)],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _card(Tokens t, DocTab tab) {
+    final state = widget.state;
+    final active = state.activeTab == tab;
+    final title = state.tabTitle(tab);
+    final preview = tabPreview(state, tab);
+    return FTappable(
+      key: Key('grid-card-${tab.code}'),
+      semanticsLabel: title,
+      onPress: () => widget.onOpen(tab),
+      child: Container(
+        padding: EdgeInsets.all(t.space.md),
         decoration: BoxDecoration(
           color: t.panel,
-          borderRadius: BorderRadius.vertical(top: r),
-          border: Border(
-            top: BorderSide(color: t.panelBorder, width: t.borders.hairline),
+          borderRadius: BorderRadius.circular(t.radii.card),
+          border: Border.all(
+            color: active ? t.accent : t.panelBorder,
+            width: active ? t.borders.hairline * 2 : t.borders.hairline,
           ),
         ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.vertical(top: r),
-          child: Column(
-            children: [
-              SizedBox(
-                height: t.sizes.touchTarget,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        key: const Key('peek-sheet-handle'),
-                        behavior: HitTestBehavior.opaque,
-                        onVerticalDragUpdate: _drag,
-                        onVerticalDragEnd: _end,
-                        child: Center(
-                          child: Container(
-                            width: t.sizes.sheetGrip,
-                            height: t.sizes.sheetGripThickness,
-                            decoration: BoxDecoration(
-                              color: t.divider,
-                              borderRadius: BorderRadius.circular(
-                                t.sizes.sheetGripThickness,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(tabIcon(state, tab), size: t.icons.md, color: t.muted),
+                const Spacer(),
+                SizedBox(
+                  width: t.sizes.touchTarget,
+                  height: t.sizes.touchTarget,
+                  child: FTappable(
+                    key: Key('grid-close-${tab.code}'),
+                    semanticsLabel: 'Close $title',
+                    behavior: HitTestBehavior.opaque,
+                    onPress: () => _close(tab),
+                    child: Center(
+                      child: Icon(FLucideIcons.x, size: t.icons.md),
                     ),
-                    IconAction(
-                      key: const Key('peek-promote'),
-                      tooltip: 'Open in main area',
-                      icon: FLucideIcons.squareArrowOutUpRight,
-                      onPress: () => widget.state.promote(),
-                    ),
-                  ],
+                  ),
+                ),
+              ],
+            ),
+            OverflowTip(
+              title.isEmpty ? '(untitled)' : title,
+              style: t.type.labelStyle,
+            ),
+            if (preview.isNotEmpty)
+              Expanded(
+                child: Text(
+                  preview,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.type.captionStyle.copyWith(color: t.muted),
                 ),
               ),
-              Expanded(child: widget.child),
-            ],
-          ),
+          ],
         ),
       ),
     );

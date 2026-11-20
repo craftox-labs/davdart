@@ -99,14 +99,20 @@ void main() {
           size: Size(w, 900),
         );
         for (final sec in ['tasks', 'events']) {
-          if (_k('bottom-nav').evaluate().isNotEmpty) {
-            await t.tap(_k('bnav-$sec'));
+          if (_k('menu').evaluate().isNotEmpty) {
+            await t.tap(_k('menu'));
+            await t.pumpAndSettle();
+            await t.tap(_k('menu-filter'));
+            await t.pumpAndSettle();
+            await t.tap(_k('filter-$sec'));
           } else {
             await t.tap(_k('rail-$sec'));
           }
           await t.pumpAndSettle();
           expect(t.takeException(), isNull, reason: '$sec at $w');
-          if (_k('bottom-nav').evaluate().isEmpty) continue;
+          if (_k('menu').evaluate().isEmpty) continue;
+          await t.tap(_k('menu-close'));
+          await t.pumpAndSettle();
           s.setSection(Section.notes);
         }
         await _end(t);
