@@ -47,6 +47,12 @@ class KeyNav extends ChangeNotifier {
   /// Home Today cards are stacked (narrow), set by the cards each build.
   bool homeStacked = false;
 
+  /// The Home board is a status accordion (narrow); set by the board each
+  /// build. [boardOpen] holds the sections the user opened or closed, by
+  /// status; a status not in it follows the default (see boardDefaultOpen).
+  bool boardAccordion = false;
+  final Map<String, bool> boardOpen = {};
+
   /// Layout, set by the shell each build: which areas are on screen.
   final Set<NavArea> _visible = {NavArea.main};
   bool _mirror = false;

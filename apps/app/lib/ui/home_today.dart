@@ -128,21 +128,23 @@ class _HomeTodayState extends State<HomeToday> {
                 if (c.maxWidth < Tokens.stackBreakpoint) {
                   // Stacked cards can outgrow a phone screen: cap them and
                   // scroll inside, so the board below keeps some room.
+                  final stack = Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < cards.length; i++) ...[
+                        if (i > 0) SizedBox(height: gap),
+                        cards[i],
+                      ],
+                    ],
+                  );
+                  // Only on the narrow layout: a wide window whose main pane
+                  // is narrow keeps the uncapped desktop behaviour.
+                  if (!narrowLayout(context)) return stack;
                   return ConstrainedBox(
                     constraints: BoxConstraints(
                       maxHeight: MediaQuery.sizeOf(context).height * 0.4,
                     ),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (var i = 0; i < cards.length; i++) ...[
-                            if (i > 0) SizedBox(height: gap),
-                            cards[i],
-                          ],
-                        ],
-                      ),
-                    ),
+                    child: SingleChildScrollView(child: stack),
                   );
                 }
                 return IntrinsicHeight(

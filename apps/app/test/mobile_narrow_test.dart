@@ -125,16 +125,13 @@ void main() {
       }
       final row = t.getRect(find.byKey(const Key('home-today-tasks-a')));
       expect(row.height, greaterThanOrEqualTo(44));
-      final box = find.ancestor(
+      final hit = find.ancestor(
         of: find.byKey(const Key('task-check-a')),
-        matching: find.byType(SizedBox),
+        matching: find.byType(GestureDetector),
       );
-      final hit = box.evaluate().map((e) => t.getRect(find.byWidget(e.widget)));
-      expect(
-        hit.any((r) => r.width >= 44 && r.height >= 44),
-        isTrue,
-        reason: 'checkbox hit area',
-      );
+      final r = t.getRect(hit.first);
+      expect(r.width, greaterThanOrEqualTo(44), reason: 'checkbox hit area');
+      expect(r.height, greaterThanOrEqualTo(44), reason: 'checkbox hit area');
       expect(t.takeException(), isNull);
     });
   }
@@ -150,5 +147,88 @@ void main() {
     expect(find.byKey(const Key('board-accordion')), findsNothing);
     final r = t.getRect(find.byKey(const Key('home-today-tasks-add')));
     expect(r.height, lessThan(44));
+  });
+
+  testWidgets('scope-more menu items act', (t) async {
+    t.view.physicalSize = const Size(320, 568);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final storage = MemoryStorage();
+    final s = AppState(
+      SpaceNoteSource(
+        Space(SpaceConfig(id: 's', name: 'S'), PersistentNoteStore(storage)),
+        flags: storage,
+      ),
+    );
+    await s.load();
+    await s.addFolder('Folder', text: 'Text');
+    s.openFolder(s.scope!.uid);
+    await t.pumpWidget(DavdartApp(state: s));
+    await t.pumpAndSettle();
+    expect(s.scope, isNotNull);
+    await t.tap(find.byKey(const Key('scope-more')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('scope-close')));
+    await t.pumpAndSettle();
+    expect(s.scope, isNull);
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets('accordion state survives crossing the 600px breakpoint', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [
+        Note(uid: 'a', summary: 'Alpha', description: 'status: todo\n\nx'),
+        Note(uid: 'b', summary: 'Bravo', description: 'status: doing\n\nx'),
+      ],
+      size: const Size(400, 800),
+    );
+    await t.tap(find.byKey(const Key('board-acc-todo-toggle')));
+    await t.tap(find.byKey(const Key('board-acc-doing-toggle')));
+    await t.pumpAndSettle();
+    expect(find.text('Alpha'), findsOneWidget);
+    expect(find.text('Bravo'), findsNothing);
+    t.view.physicalSize = const Size(700, 800);
+    await t.pumpAndSettle();
+    expect(find.byKey(const Key('board-accordion')), findsNothing);
+    t.view.physicalSize = const Size(400, 800);
+    await t.pumpAndSettle();
+    expect(find.text('Alpha'), findsOneWidget);
+    expect(find.text('Bravo'), findsNothing);
+    // Keyboard nav skips cards of the closed section.
+    expect(s.nav.boardAccordion, isTrue);
+    expect(s.nav.boardOpen, {'todo': true, 'doing': false});
+  });
+
+  testWidgets('wide window with a narrow main pane keeps Today uncapped', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(
+      t,
+      tasks: [
+        for (var i = 0; i < 6; i++)
+          mkTask('late$i', summary: 'Task $i', days: -2),
+      ],
+      events: [
+        for (var i = 0; i < 6; i++)
+          mkEvent('e$i', summary: 'Event $i', rrule: 'FREQ=DAILY'),
+      ],
+      size: const Size(900, 560),
+    );
+    // The main pane is stacked only if narrower than 600; either way the
+    // wide layout must not cap Today at 40% of the height.
+    final h = t.getRect(find.byKey(const Key('home-today'))).height;
+    if (s.nav.homeStacked) expect(h, greaterThan(560 * 0.4));
+    expect(
+      find.descendant(
+        of: find.byKey(const Key('home-today')),
+        matching: find.byType(SingleChildScrollView),
+      ),
+      findsNothing,
+    );
+    // Desktop behaviour is unchanged, so a short window may overflow.
+    t.takeException();
   });
 }

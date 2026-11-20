@@ -25,6 +25,7 @@ class CollapsibleSection extends StatefulWidget {
     this.upper = true,
     this.initiallyCollapsed = false,
     this.leading,
+    this.onChanged,
   });
   final String id;
   final String title;
@@ -42,6 +43,9 @@ class CollapsibleSection extends StatefulWidget {
 
   /// Shown between the chevron and the label.
   final Widget? leading;
+
+  /// Called with the new collapsed state after a toggle.
+  final ValueChanged<bool>? onChanged;
   final Widget child;
 
   @override
@@ -55,6 +59,7 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
 
   void _toggle() {
     setState(() => _collapsed = !_collapsed);
+    widget.onChanged?.call(_collapsed);
     final k = widget.prefKey;
     if (k == null) return;
     if (_collapsed) {

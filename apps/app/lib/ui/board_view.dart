@@ -18,7 +18,16 @@ import 'overflow_tip.dart';
 
 /// Publishes the Home board's cards (column by column) as the keyboard rows
 /// of the Home grid; a collapsed Board is skipped at move time.
+/// The status whose accordion section starts open: doing, else the first
+/// status with notes.
+String boardDefaultOpen(List<(String, List<Note>)> cols) =>
+    cols.any((c) => c.$1 == 'doing' && c.$2.isNotEmpty)
+    ? 'doing'
+    : cols.firstWhere((c) => c.$2.isNotEmpty, orElse: () => cols.first).$1;
+
 void publishBoardNav(AppState state) {
+  final cols = state.columns(includeNoStatus: false);
+  final open = cols.isEmpty ? '' : boardDefaultOpen(cols);
   state.nav.publishHome('board', [
     for (final (name, notes) in state.columns(includeNoStatus: false))
       for (final n in notes)
@@ -30,7 +39,9 @@ void publishBoardNav(AppState state) {
             await state.openNote(n.uid, mode: mode);
           },
           hidden: () =>
-              state.prefs?.read('davdart.home.board.collapsed.v1') == 'true',
+              state.prefs?.read('davdart.home.board.collapsed.v1') == 'true' ||
+              (state.nav.boardAccordion &&
+                  !(state.nav.boardOpen[name] ?? name == open)),
         ),
   ]);
 }
@@ -122,12 +133,10 @@ class BoardView extends StatelessWidget {
     // Phone widths: one column, a collapsible section per status, cards
     // with the title only. Doing (else the first status with notes) starts
     // open. Cards of a collapsed section are not built.
+    if (keyboard) state.nav.boardAccordion = false;
     if (MediaQuery.sizeOf(context).width < Tokens.stackBreakpoint) {
-      final open = cols.any((c) => c.$1 == 'doing' && c.$2.isNotEmpty)
-          ? 'doing'
-          : cols
-                .firstWhere((c) => c.$2.isNotEmpty, orElse: () => cols.first)
-                .$1;
+      final open = boardDefaultOpen(cols);
+      if (keyboard) state.nav.boardAccordion = true;
       return ListView(
         key: const Key('board-accordion'),
         padding: EdgeInsets.all(gap),
@@ -141,7 +150,10 @@ class BoardView extends StatelessWidget {
                 id: 'board-acc-$name',
                 title: name,
                 count: notes.length,
-                initiallyCollapsed: name != open,
+                initiallyCollapsed:
+                    !(state.nav.boardOpen[name] ?? name == open),
+                onChanged: (collapsed) =>
+                    state.nav.boardOpen[name] = !collapsed,
                 leading: StatusDot(name == 'notes' ? null : name),
                 headerPadding: EdgeInsets.only(bottom: t.space.sm),
                 child: Column(

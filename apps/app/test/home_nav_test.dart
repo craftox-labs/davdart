@@ -194,8 +194,10 @@ void main() {
       expect(_cur(s), 'task-b');
       await _press(t, _j); // end of Tasks: into Events
       expect(_cur(s), 'event-row-e1');
-      await _press(t, _j); // end of Events: into the first board column
-      expect(_cur(s), 'card-n1');
+      // End of Events: into the board. On the accordion only the open
+      // (doing) section has reachable cards; todo is closed.
+      await _press(t, _j);
+      expect(_cur(s), 'card-n3');
       await _press(t, _k_);
       expect(_cur(s), 'event-row-e1');
       await _press(t, _k_);

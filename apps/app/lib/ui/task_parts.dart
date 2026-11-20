@@ -125,6 +125,7 @@ class TaskCheckbox extends StatelessWidget {
       final m = tokensOf(context).sizes.touchTarget;
       target = GestureDetector(
         behavior: HitTestBehavior.opaque,
+        excludeFromSemantics: true,
         onTap: state.tasksEditable && blocker == null
             ? () => state.toggleTask(task.uid)
             : null,
