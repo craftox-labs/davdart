@@ -93,11 +93,12 @@ class Event {
   bool get isRecurring =>
       (rrule != null && rrule!.isNotEmpty) || rdates.isNotEmpty;
 
-  /// Start as wall-clock fields (UTC-flagged; zones are not applied, see
-  /// [ICalDate.wall]), or null.
-  DateTime? get startWall => dtstart?.wall;
+  /// Start as wall-clock fields in the local zone (UTC-flagged [DateTime];
+  /// a `...Z` value is converted to local time, floating and TZID values are
+  /// taken as written, see [ICalDate.localWall]), or null.
+  DateTime? get startWall => dtstart?.localWall;
 
-  /// Length of one occurrence: [dtend] minus [dtstart] on wall clocks, else
+  /// Length of one occurrence: [dtend] minus [dtstart] (as written), else
   /// [duration], else one day for an all-day event and zero otherwise.
   Duration get length {
     final s = dtstart?.wall, e = dtend?.wall;
@@ -107,7 +108,7 @@ class Event {
     return allDay ? const Duration(days: 1) : Duration.zero;
   }
 
-  /// End as wall-clock fields: [startWall] plus [length]; null without start.
+  /// End as local wall-clock fields: [startWall] plus [length]; null without start.
   DateTime? get endWall => startWall?.add(length);
 
   Event copyWith({
@@ -127,6 +128,7 @@ class Event {
     bool clearRrule = false,
     List<String>? exdates,
     List<String>? rdates,
+    List<String>? siblingLines,
     String? parentUid,
     bool clearParent = false,
     DateTime? lastModified,
@@ -150,7 +152,7 @@ class Event {
         dtstamp: dtstamp,
         extraLines: List.of(extraLines),
         calendarLines: List.of(calendarLines),
-        siblingLines: List.of(siblingLines),
+        siblingLines: siblingLines ?? List.of(this.siblingLines),
         propertyParams: Map.of(propertyParams),
         href: href,
         etag: etag,

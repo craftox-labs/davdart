@@ -45,6 +45,45 @@ class ICalDate {
     return DateTime.utc(p[0], p[1], p[2], p[3], p[4], p[5]);
   }
 
+  /// The wall-clock fields in the user's local zone (UTC-flagged
+  /// [DateTime]). A UTC timed value (`...Z`) is an instant, so it is
+  /// converted with `toLocal()`; floating, TZID and all-day values are
+  /// returned as [wall] (no time zone database, so zones stay unapplied).
+  /// Events use this for expansion, grouping and display.
+  DateTime? get localWall {
+    final w = wall;
+    if (w == null || !isUtc || allDay) return w;
+    final l = w.toLocal();
+    return DateTime.utc(l.year, l.month, l.day, l.hour, l.minute, l.second);
+  }
+
+  /// The value for local wall-clock [w] in the flavour of [like]: a UTC
+  /// timed [like] converts back with `toUtc()` and keeps its `Z`; anything
+  /// else is written as the same wall fields. Inverse of [localWall].
+  static ICalDate fromLocalWall(DateTime w, ICalDate like) {
+    String t(int n, [int l = 2]) => n.toString().padLeft(l, '0');
+    if (like.allDay) {
+      return ICalDate('${t(w.year, 4)}${t(w.month)}${t(w.day)}', like.params);
+    }
+    var x = w;
+    if (like.isUtc) {
+      x = DateTime(w.year, w.month, w.day, w.hour, w.minute, w.second).toUtc();
+    }
+    return ICalDate(
+        '${t(x.year, 4)}${t(x.month)}${t(x.day)}T${t(x.hour)}${t(x.minute)}'
+        '${t(x.second)}${like.isUtc ? 'Z' : ''}',
+        like.params);
+  }
+
+  /// This value moved by [d] on the local wall clock (an all-day date moves
+  /// by whole days). Unchanged when it does not parse.
+  ICalDate shifted(Duration d) {
+    final w = localWall;
+    if (w == null) return this;
+    final n = allDay ? w.add(Duration(days: d.inDays)) : w.add(d);
+    return fromLocalWall(n, this);
+  }
+
   @override
   bool operator ==(Object other) =>
       other is ICalDate && other.value == value && other.params == params;

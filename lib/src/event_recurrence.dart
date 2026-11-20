@@ -3,8 +3,9 @@ import 'ical.dart';
 import 'task.dart' show ICalDate;
 
 /// One occurrence of an [Event] (the event itself, or one instance of its
-/// recurrence). Times are wall-clock fields as UTC-flagged [DateTime]s; zones
-/// are not applied (see [ICalDate.wall]). [end] is exclusive.
+/// recurrence). Times are local wall-clock fields as UTC-flagged [DateTime]s:
+/// a `...Z` value is converted to the local zone, floating and TZID values are
+/// taken as written (see [ICalDate.localWall]). [end] is exclusive.
 class EventOccurrence {
   EventOccurrence({
     required this.event,
@@ -69,8 +70,9 @@ const _maxOccurrences = 100000;
 ///
 /// [from] and [to] are compared with wall-clock fields (UTC-flagged
 /// [DateTime]s): pass a local day boundary as `DateTime.utc(y, m, d)` for
-/// all-day and floating events; UTC events are exact instants. All-day events
-/// match by local date.
+/// all-day and floating events. UTC (`Z`) values (DTSTART, EXDATE, RDATE,
+/// RECURRENCE-ID, UNTIL) are converted to the local zone first, so the window
+/// is the local day. All-day events match by local date.
 ///
 /// Supported: FREQ DAILY, WEEKLY, MONTHLY, YEARLY with INTERVAL, COUNT, UNTIL,
 /// WKST, BYDAY (weekly and daily plain weekdays; monthly also with an ordinal
@@ -81,7 +83,9 @@ const _maxOccurrences = 100000;
 /// the one instance only). Anything else (BYSETPOS, BYWEEKNO, BYYEARDAY,
 /// BYHOUR, ..., SECONDLY..HOURLY, RDATE periods) returns just the base
 /// occurrence with [EventOccurrence.unsupported] set. Time zones are not
-/// applied: floating, UTC and TZID values all expand on their wall time.
+/// applied: floating and TZID values expand on their wall time; UTC values on
+/// their local wall time (a daily UTC series therefore keeps its local time
+/// across a daylight saving change).
 List<EventOccurrence> occurrencesBetween(
     Event event, DateTime from, DateTime to) {
   final startWall = event.startWall;
@@ -160,6 +164,17 @@ List<EventOccurrence> occurrencesBetween(
     final startDate =
         DateTime.utc(startWall.year, startWall.month, startWall.day);
     final tod = startWall.difference(startDate);
+    // RFC 5545 3.8.5.3: DTSTART is always the first instance, even when it
+    // does not match BYDAY or BYMONTHDAY (weekly and monthly rules).
+    if (rule.startsOffPattern(startDate)) {
+      count++;
+      if (rule.count == null || count <= rule.count!) {
+        final s = startDate.add(tod);
+        if (until == null || !_afterUntil(s, until, allDay)) {
+          if (s.isBefore(to)) emit(s);
+        }
+      }
+    }
     outer:
     for (var i = 0; i < 1000000; i++) {
       final period = rule.period(startDate, i);
@@ -199,7 +214,7 @@ void _addOverrides(
   for (final o in overrides) {
     final id = _recurrenceId(o);
     if (id == null) continue;
-    final s = o.startWall ?? id.wall;
+    final s = o.startWall ?? id.localWall;
     if (s == null) continue;
     final e = o.dtstart == null && o.dtend == null && o.duration == null
         ? s.add(event.length)
@@ -230,13 +245,11 @@ ICalDate _idFor(ICalDate first, DateTime s) {
   String t(int n, [int w = 2]) => n.toString().padLeft(w, '0');
   final d = '${t(s.year, 4)}${t(s.month)}${t(s.day)}';
   if (first.allDay) return ICalDate(d, first.params);
-  return ICalDate(
-      '${d}T${t(s.hour)}${t(s.minute)}${t(s.second)}${first.isUtc ? 'Z' : ''}',
-      first.params);
+  return ICalDate.fromLocalWall(s, first);
 }
 
 bool _afterUntil(DateTime s, ICalDate until, bool allDay) {
-  final u = until.wall;
+  final u = until.localWall;
   if (u == null) return false;
   if (until.allDay || allDay) {
     return DateTime.utc(s.year, s.month, s.day)
@@ -258,7 +271,7 @@ class _Key {
   int get hashCode => Object.hash(at, dateOnly);
 }
 
-_Key _key(ICalDate d) => _Key(d.wall ?? DateTime.utc(0), d.allDay);
+_Key _key(ICalDate d) => _Key(d.localWall ?? DateTime.utc(0), d.allDay);
 
 ICalDate? _recurrenceId(Event o) {
   for (final l in o.extraLines) {
@@ -271,7 +284,7 @@ ICalDate? _recurrenceId(Event o) {
         final semi = head.indexOf(';');
         final d = ICalDate(
             l.substring(i + 1).trim(), semi < 0 ? '' : head.substring(semi));
-        return d.wall == null ? null : d;
+        return d.localWall == null ? null : d;
       }
     }
   }
@@ -294,7 +307,7 @@ List<Event> _overrides(Event e) {
 Set<_Key> _excluded(Event e) {
   final out = <_Key>{};
   for (final v in _dateLines(e.exdates)) {
-    final w = v.wall;
+    final w = v.localWall;
     if (w != null) out.add(_Key(w, v.allDay));
   }
   return out;
@@ -348,7 +361,7 @@ _Plan _plan(Event e) {
   final rdates = <DateTime>[];
   for (final l in e.rdates) {
     for (final d in _dateLines([l])) {
-      final w = d.wall;
+      final w = d.localWall;
       if (w == null || d.params.toUpperCase().contains('PERIOD')) {
         bad = true;
       } else {
@@ -462,6 +475,14 @@ class _Rule {
         if (byday.isNotEmpty) return null;
     }
     return _Rule(freq, interval, count, until, byday, bmd, bm, wk);
+  }
+
+  /// True for a weekly or monthly rule with BYDAY or BYMONTHDAY whose first
+  /// period does not include [start] (so DTSTART is an extra first instance).
+  bool startsOffPattern(DateTime start) {
+    if (freq != 'WEEKLY' && freq != 'MONTHLY') return false;
+    if (byday.isEmpty && bymonthday.isEmpty) return false;
+    return !period(start, 0).days.contains(start);
   }
 
   _Period period(DateTime start, int i) {

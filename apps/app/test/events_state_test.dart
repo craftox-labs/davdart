@@ -6,6 +6,7 @@ import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/event_rules.dart';
 import 'package:davdart_app/state/note_draft.dart';
 import 'package:davdart_app/state/tab_state.dart';
+import 'package:davdart_app/ui/events_panel.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -248,7 +249,7 @@ void main() {
       expect(e.dtend, isNull);
     });
 
-    test('editing a series keeps overrides and exceptions', () async {
+    test('editing a series keeps overrides and exceptions (shifted with the start)', () async {
       final s = await _open(MemoryStorage(), seed: _Seed());
       final src = s.source as SpaceNoteSource;
       await src.saveEvent(parseEvent(_recurringWithOverride));
@@ -266,7 +267,10 @@ void main() {
       expect(e.exdates, hasLength(1));
       expect(e.siblingLines, isNotEmpty);
       final ics = serializeEvent(e);
-      expect(ics, contains('RECURRENCE-ID:20261122T090000'));
+      expect(
+        ics,
+        contains('RECURRENCE-ID:20261122T080000'),
+      ); // shifted with the start
       expect(ics, contains('SUMMARY:Standup moved'));
     });
 
@@ -740,6 +744,119 @@ void main() {
       expect(await s.moveToSpace('r1', other), isNull);
       expect(s.error, contains('cannot be moved'));
       expect(s.eventById('r1'), isNotNull);
+    });
+  });
+
+  group('UTC events and series edits', () {
+    DateTime local(DateTime u) {
+      final l = u.toLocal();
+      return DateTime.utc(l.year, l.month, l.day, l.hour, l.minute);
+    }
+
+    test('a UTC event is grouped, shown and edited in local time', () async {
+      final s = await _open(MemoryStorage(), seed: _Seed());
+      final src = s.source as SpaceNoteSource;
+      await src.saveEvent(
+        _e('u', start: '20261120T090000Z', end: '20261120T100000Z'),
+      );
+      await s.load();
+      final e = s.eventById('u')!;
+      expect(e.startWall, local(DateTime.utc(2026, 11, 20, 9)));
+      expect(eventWhen(e), contains(timeLabel(e.startWall!)));
+      // 'now' at the event's local midnight: it is Today.
+      final day = DateTime(
+        e.startWall!.year,
+        e.startWall!.month,
+        e.startWall!.day,
+      );
+      final g = s.upcomingOccurrences(day, 7);
+      expect(g.first.id, 'today');
+      // Editing writes back UTC: the draft holds local wall time.
+      s.startEventEdit('u');
+      expect(s.eventDraftFor('u')!.start, e.startWall);
+      final ns = e.startWall!.add(const Duration(hours: 1));
+      expect(
+        await s.updateEvent(
+          'u',
+          setWhen: true,
+          start: ns,
+          end: ns.add(const Duration(hours: 2)),
+        ),
+        isTrue,
+      );
+      final w = s.eventById('u')!;
+      expect(w.dtstart!.isUtc, isTrue);
+      expect(w.dtend!.isUtc, isTrue);
+      expect(w.dtstart!.value, '20261120T100000Z');
+      expect(w.dtend!.value, '20261120T120000Z');
+    });
+
+    test('changing the start shifts EXDATE, RDATE and overrides', () async {
+      final s = await _open(MemoryStorage(), seed: _Seed());
+      final src = s.source as SpaceNoteSource;
+      await src.saveEvent(parseEvent(_recurringWithOverride));
+      await s.load();
+      expect(
+        await s.updateEvent(
+          'r1',
+          setWhen: true,
+          start: DateTime.utc(2026, 11, 20, 10),
+          end: DateTime.utc(2026, 11, 20, 11),
+        ),
+        isTrue,
+      );
+      final e = s.eventById('r1')!;
+      expect(e.dtstart!.value, '20261120T100000');
+      expect(e.exdates.single, 'EXDATE:20261121T100000');
+      expect(e.siblingLines, contains('RECURRENCE-ID:20261122T100000'));
+      expect(e.siblingLines, contains('DTSTART:20261122T120000'));
+      expect(e.siblingLines, contains('DTEND:20261122T130000'));
+      final o = e.occurrences(
+        DateTime.utc(2026, 11, 20),
+        DateTime.utc(2026, 11, 24),
+      );
+      expect(
+        [for (final x in o) '${x.start.day} ${x.start.hour} ${x.isOverride}'],
+        ['20 10 false', '22 12 true'],
+      );
+      // The moved instance keeps its length.
+      expect(o.last.end, DateTime.utc(2026, 11, 22, 13));
+    });
+
+    test('all day to timed is refused for a series with exdates', () async {
+      final s = await _open(MemoryStorage(), seed: _Seed());
+      final src = s.source as SpaceNoteSource;
+      await src.saveEvent(parseEvent(_recurringWithOverride));
+      await s.load();
+      expect(
+        await s.updateEvent(
+          'r1',
+          setWhen: true,
+          allDay: true,
+          start: DateTime.utc(2026, 11, 20),
+        ),
+        isFalse,
+      );
+      expect(s.error, contains('all day'));
+      expect(s.eventById('r1')!.dtstart!.value, '20261120T090000');
+    });
+
+    test('row keys stay unique when an override lands on another day', () {
+      final v = parseEvent(
+        'BEGIN:VCALENDAR\r\nVERSION:2.0\r\n'
+        'BEGIN:VEVENT\r\nUID:k\r\nDTSTAMP:20261119T000000Z\r\n'
+        'DTSTART:20261120T090000\r\nRRULE:FREQ=DAILY;COUNT=3\r\nSUMMARY:K\r\nEND:VEVENT\r\n'
+        'BEGIN:VEVENT\r\nUID:k\r\nRECURRENCE-ID:20261121T090000\r\n'
+        'DTSTAMP:20261119T000000Z\r\nDTSTART:20261122T140000\r\nSUMMARY:K2\r\nEND:VEVENT\r\n'
+        'END:VCALENDAR\r\n',
+      );
+      final o = v.occurrences(
+        DateTime.utc(2026, 11, 20),
+        DateTime.utc(2026, 11, 24),
+      );
+      expect(o, hasLength(3));
+      final keys = {for (final x in o) eventRowKey(x)};
+      expect(keys, hasLength(3));
     });
   });
 }

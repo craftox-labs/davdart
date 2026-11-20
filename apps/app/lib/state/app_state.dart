@@ -2098,10 +2098,12 @@ class AppState extends ChangeNotifier {
   }
 
   /// Changes an event (a recurring one: the whole series; overrides, EXDATEs
-  /// and other lines stay as they are). Only what is passed changes;
+  /// and other lines follow a changed start). Only what is passed changes;
   /// [setStatus] says that a null [status] means "clear"; [setWhen] applies
   /// [allDay], [start] and [end] (all-day end inclusive, see [addEvent]) and
-  /// keeps the zone flavour of the old value. Returns false when nothing was
+  /// keeps the zone flavour of the old value (a UTC event is written back as UTC;
+  /// [start] and [end] are local). A new start moves EXDATE, RDATE and the
+  /// overrides by the same amount. Returns false when nothing was
   /// saved.
   Future<bool> updateEvent(
     String uid, {
@@ -2132,6 +2134,30 @@ class AppState extends ChangeNotifier {
       var last = end ?? first;
       if (last.isBefore(first)) last = first;
       final from = eventDate(first, allDay: allDay, like: e.dtstart);
+      final old = e.startWall;
+      final hasExtras =
+          e.exdates.isNotEmpty ||
+          e.rdates.isNotEmpty ||
+          e.siblingLines.isNotEmpty;
+      if (hasExtras && old != null) {
+        if (allDay != e.allDay) {
+          error =
+              'A repeating event with excluded or changed occurrences '
+              'cannot switch between all day and timed.';
+          notifyListeners();
+          return false;
+        }
+        // Keep EXDATE, RDATE and the overrides on the same instances: move
+        // them by the same amount as the start (their lengths stay).
+        final delta = first.difference(old);
+        if (delta != Duration.zero) {
+          copy = copy.copyWith(
+            exdates: [for (final l in e.exdates) shiftDateLine(l, delta)],
+            rdates: [for (final l in e.rdates) shiftDateLine(l, delta)],
+            siblingLines: shiftSiblingLines(e.siblingLines, delta),
+          );
+        }
+      }
       if (allDay) {
         copy = copy.copyWith(
           dtstart: from,

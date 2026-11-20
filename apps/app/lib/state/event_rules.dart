@@ -1,8 +1,12 @@
 import 'package:davdart/davdart.dart';
 
-/// The current moment as wall-clock fields (UTC-flagged). Event times carry no
-/// zone in the app (the core has no time zone database), so "now" is the
-/// user's local clock read the same way.
+/// The current moment as local wall-clock fields (UTC-flagged).
+///
+/// Time policy for events: everything is compared as local wall time. A UTC
+/// value (`...Z`) is converted to the local zone (`ICalDate.localWall`, so
+/// 09:00Z is 16:00 at UTC+7 and groups into that local day); floating and TZID
+/// values are taken as written (the core has no time zone database). Editing
+/// a UTC event converts the local input back with `toUtc` and keeps the Z.
 DateTime wallNow(DateTime now) {
   final l = now.toLocal();
   return DateTime.utc(l.year, l.month, l.day, l.hour, l.minute, l.second);
@@ -134,16 +138,53 @@ String eventWhen(Event e, [DateTime? now]) {
       '${dayLabel(end, now)} ${timeLabel(end)}';
 }
 
-/// The date-time value for [wall]. With a timed [like] its flavour carries
-/// over (a Z for UTC, the TZID parameter for a zoned time); otherwise it is a
-/// floating time. With [allDay] the result is a date.
+/// The date-time value for local [wall]. With a timed [like] its flavour
+/// carries over (a UTC [like] converts [wall] back to UTC and keeps the Z, the
+/// TZID parameter of a zoned time is kept); otherwise it is a floating time.
+/// With [allDay] the result is a date.
 ICalDate eventDate(DateTime wall, {bool allDay = false, ICalDate? like}) {
   String t(int n, [int w = 2]) => n.toString().padLeft(w, '0');
   final date = '${t(wall.year, 4)}${t(wall.month)}${t(wall.day)}';
   if (allDay) return ICalDate(date, ';VALUE=DATE');
   final stamp = '${date}T${t(wall.hour)}${t(wall.minute)}00';
   if (like != null && !like.allDay) {
-    return ICalDate(like.isUtc ? '${stamp}Z' : stamp, like.params);
+    return ICalDate.fromLocalWall(
+      DateTime.utc(wall.year, wall.month, wall.day, wall.hour, wall.minute),
+      like,
+    );
   }
   return ICalDate(stamp);
+}
+
+/// [line] (an EXDATE or RDATE property line) with every value moved by
+/// [delta] on the local wall clock; the name, parameters and each value's
+/// flavour (Z, TZID, date) are kept. PERIOD values and lines that do not
+/// parse are returned as they are.
+String shiftDateLine(String line, Duration delta) {
+  var inQuote = false;
+  for (var i = 0; i < line.length; i++) {
+    if (line[i] == '"') inQuote = !inQuote;
+    if (line[i] != ':' || inQuote) continue;
+    final head = line.substring(0, i);
+    final semi = head.indexOf(';');
+    final params = semi < 0 ? '' : head.substring(semi);
+    if (params.toUpperCase().contains('PERIOD')) return line;
+    final vals = [
+      for (final v in line.substring(i + 1).split(','))
+        ICalDate(v.trim(), params).shifted(delta).value,
+    ];
+    return '$head:${vals.join(',')}';
+  }
+  return line;
+}
+
+/// The raw lines of a series' other VEVENTs (RECURRENCE-ID overrides) with
+/// RECURRENCE-ID, DTSTART and DTEND moved by [delta], so each override keeps
+/// naming the shifted instance and keeps its length.
+List<String> shiftSiblingLines(List<String> lines, Duration delta) {
+  final re = RegExp(
+    r'^(RECURRENCE-ID|DTSTART|DTEND)[;:]',
+    caseSensitive: false,
+  );
+  return [for (final l in lines) re.hasMatch(l) ? shiftDateLine(l, delta) : l];
 }

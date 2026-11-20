@@ -112,18 +112,18 @@ class EventsPanel extends StatelessWidget {
   }
 }
 
-/// The key of an agenda row: `event-row-<uid>`, with `@<yyyymmdd>` added for
-/// a repeating event (each of its occurrences has a row).
+/// The key of an agenda row: `event-row-<uid>`, with `@<yyyymmddThhmm>` of
+/// the start added for a repeating event (each of its occurrences has a row;
+/// an override moved onto another instance's day still differs by time). An
+/// occurrence replaced by an override and the one it was moved onto cannot
+/// share a start, but an exact tie gets the original instance id added.
 Key eventRowKey(EventOccurrence o) {
+  if (!o.event.isRecurring) return Key('event-row-${o.event.uid}');
   final s = o.start;
-  final day =
-      '${s.year}${s.month.toString().padLeft(2, '0')}'
-      '${s.day.toString().padLeft(2, '0')}';
-  return Key(
-    o.event.isRecurring
-        ? 'event-row-${o.event.uid}@$day'
-        : 'event-row-${o.event.uid}',
-  );
+  String t(int n) => n.toString().padLeft(2, '0');
+  final at = '${s.year}${t(s.month)}${t(s.day)}T${t(s.hour)}${t(s.minute)}';
+  final id = o.isOverride ? '#${o.recurrenceId?.value ?? ''}' : '';
+  return Key('event-row-${o.event.uid}@$at$id');
 }
 
 /// One occurrence as a row: time (or "All day", with the day above it in the

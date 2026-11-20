@@ -156,7 +156,11 @@ void main() {
       }
 
       for (var d = 0; d < 3; d++) {
-        expect(_p('event-row-daily@${stamp(d)}'), findsOneWidget, reason: '$d');
+        expect(
+          _p('event-row-daily@${stamp(d)}T1800'),
+          findsOneWidget,
+          reason: '$d',
+        );
       }
       expect(_k('event-repeat-daily'), findsNWidgets(3));
       expect(_k('event-repeat-standup'), findsNothing);
