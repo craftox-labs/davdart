@@ -425,7 +425,25 @@ class AppState extends ChangeNotifier {
   /// Which section the side panel shows.
   Section section = Section.notes;
 
+  /// Whether the current Space's collection can hold what [s] lists.
+  bool supportsSection(Section s) => switch (s) {
+    Section.notes => supportsNotes,
+    Section.tasks => supportsTasks,
+    Section.events => supportsEvents,
+    _ => true,
+  };
+
+  /// [s], or the first list section the Space supports (Views when none).
+  Section _supportedSection(Section s) {
+    if (supportsSection(s)) return s;
+    for (final o in const [Section.notes, Section.tasks, Section.events]) {
+      if (supportsSection(o)) return o;
+    }
+    return Section.views;
+  }
+
   void setSection(Section s) {
+    s = _supportedSection(s);
     setSidebarCollapsed(false);
     if (section == s) return;
     section = s;
@@ -854,6 +872,7 @@ class AppState extends ChangeNotifier {
 
   final Map<String, Note> _viewNotes = {};
 
+  // Saved views are notes, so they are off in a Space with no VJOURNAL.
   bool _canEditViews() {
     if (editable) return true;
     error = 'Save failed: this source is read-only';
@@ -1238,14 +1257,16 @@ class AppState extends ChangeNotifier {
           syncMessage = 'Could not reach the server: $e';
         }
       }
-      var loaded = await src.load();
+      // A section the collection cannot hold is never loaded or synced.
+      section = _supportedSection(section);
+      var loaded = supportsNotes ? await src.load() : <Note>[];
       if (src != source) return; // another Space was opened meanwhile
       _setNotes(loaded);
       await _loadTasks(src);
       if (src != source) return;
       await _loadEvents(src);
       if (src != source) return;
-      if (src is EditableNoteSource) {
+      if (src is EditableNoteSource && supportsNotes) {
         try {
           await _migrateViews(src);
           if (src != source) return;
@@ -1273,6 +1294,8 @@ class AppState extends ChangeNotifier {
     if (error == null && connected) sync();
   }
 
+  /// Note actions (and saved views, which are notes) are off in a Space
+  /// whose collection takes no VJOURNAL.
   bool get editable => source is EditableNoteSource && supportsNotes;
 
   /// Which sections the current Space's collection supports (VJOURNAL,
@@ -1356,16 +1379,18 @@ class AppState extends ChangeNotifier {
     // others: a failing task or event sync leaves the notes (and their
     // message) alone and the other way round.
     try {
-      final r = await s.sync();
+      final r = supportsNotes ? await s.sync() : null;
       if (s != _space) return;
-      message = r == null
+      message = !supportsNotes
+          ? 'Synced ${_clock()}'
+          : r == null
           ? null
           : r.errors.isNotEmpty
           ? 'Sync problem: ${r.errors.first}'
           : r.conflicts.isNotEmpty
           ? 'Synced; ${r.conflicts.length} overlapping edit(s) resolved, older text kept in history'
           : 'Synced ${_clock()}';
-      final loaded = await s.load();
+      final loaded = supportsNotes ? await s.load() : <Note>[];
       if (s != _space) return;
       _setNotes(loaded);
     } catch (e) {
@@ -1374,7 +1399,7 @@ class AppState extends ChangeNotifier {
     }
     String? taskProblem;
     try {
-      final tr = await s.syncTasks();
+      final tr = supportsTasks ? await s.syncTasks() : null;
       if (s != _space) return;
       if (tr != null && tr.errors.isNotEmpty) {
         taskProblem = 'Tasks: sync problem: ${tr.errors.first}';
@@ -1384,14 +1409,14 @@ class AppState extends ChangeNotifier {
       taskProblem = 'Tasks: sync failed: $e';
     }
     try {
-      _setTasks(await s.loadTasks());
+      _setTasks(supportsTasks ? await s.loadTasks() : <Task>[]);
     } catch (e) {
       taskProblem ??= 'Tasks could not be read: $e';
     }
     if (s != _space) return;
     String? eventProblem;
     try {
-      final er = await s.syncEvents();
+      final er = supportsEvents ? await s.syncEvents() : null;
       if (s != _space) return;
       if (er != null && er.errors.isNotEmpty) {
         eventProblem = 'Events: sync problem: ${er.errors.first}';
@@ -1401,7 +1426,7 @@ class AppState extends ChangeNotifier {
       eventProblem = 'Events: sync failed: $e';
     }
     try {
-      _setEvents(await s.loadEvents());
+      _setEvents(supportsEvents ? await s.loadEvents() : <Event>[]);
     } catch (e) {
       eventProblem ??= 'Events could not be read: $e';
     }
@@ -1629,7 +1654,7 @@ class AppState extends ChangeNotifier {
   bool get tasksEditable => source is SpaceNoteSource && supportsTasks;
 
   Future<void> _loadTasks(NoteSource src) async {
-    if (src is! SpaceNoteSource) {
+    if (src is! SpaceNoteSource || !supportsTasks) {
       tasks = [];
       return;
     }
@@ -2058,7 +2083,7 @@ class AppState extends ChangeNotifier {
   bool get eventsEditable => source is SpaceNoteSource && supportsEvents;
 
   Future<void> _loadEvents(NoteSource src) async {
-    if (src is! SpaceNoteSource) {
+    if (src is! SpaceNoteSource || !supportsEvents) {
       events = [];
       return;
     }

@@ -535,6 +535,8 @@ class SpaceCatalog {
       ),
       account: info.onServer ? account : null,
       pendingPath: info.collection,
+      holdsNotes: info.notes,
+      holdsTasks: info.tasks,
       flags: scoped,
       davBase: davBase,
       httpClient: httpClient,

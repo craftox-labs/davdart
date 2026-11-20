@@ -9,8 +9,14 @@ import 'package:http/testing.dart';
 
 // A server with a notes calendar and a bot calendar that takes only VEVENT
 // and VTODO (no VJOURNAL).
-http.Client _server(List<String> seen) => MockClient((r) async {
+http.Client _server(
+  List<String> seen, {
+  List<String> botComps = const ['VEVENT', 'VTODO'],
+}) => MockClient((r) async {
   seen.add('${r.method} ${r.url.path}');
+  if (r.method == 'REPORT' && r.body.contains('name="VJOURNAL"')) {
+    seen.add('VJOURNAL-QUERY ${r.url.path}');
+  }
   if (r.method == 'PROPFIND' && r.url.path == '/dav/tm/') {
     String coll(String path, String name, List<String> comps) =>
         '<response><href>$path</href><propstat><prop>'
@@ -24,7 +30,7 @@ http.Client _server(List<String> seen) => MockClient((r) async {
       '<response><href>/dav/tm/</href><propstat><prop>'
       '<resourcetype><collection/></resourcetype></prop></propstat></response>'
       '${coll('/dav/notes/', 'Notes', ['VJOURNAL', 'VTODO', 'VEVENT'])}'
-      '${coll('/dav/bot/', 'Bot', ['VEVENT', 'VTODO'])}'
+      '${coll('/dav/bot/', 'Bot', botComps)}'
       '</multistatus>',
       207,
     );
@@ -88,5 +94,71 @@ void main() {
     expect(find.byKey(const Key('rail-tasks')), findsOneWidget);
     expect(find.byKey(const Key('rail-events')), findsOneWidget);
     expect(t.takeException(), isNull);
+  });
+
+  Future<(AppState, List<String>)> open(List<String> comps, String name) async {
+    final seen = <String>[];
+    final m = MemoryStorage();
+    final c = SpaceCatalog(
+      m,
+      davBase: Uri.parse('https://fake.test/dav/'),
+      httpClient: _server(seen, botComps: comps),
+    );
+    await c.signIn('tm', 'pw');
+    c.current = c.spaces.firstWhere((s) => s.name == name).id;
+    final s = _app(c, m);
+    await s.load();
+    // Let the sync that load() starts finish.
+    for (var i = 0; i < 20 && s.syncing; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    seen.removeWhere(
+      (r) => !r.endsWith(' /dav/bot/') || r.startsWith('PROPFIND'),
+    );
+    return (s, seen);
+  }
+
+  test('no sync request for an unsupported component', () async {
+    final (all, allSeen) = await open(['VJOURNAL', 'VTODO', 'VEVENT'], 'Bot');
+    expect(all.syncMessage, isNot(contains('problem')));
+    // Login check plus three syncs.
+    expect(allSeen, hasLength(5), reason: '$allSeen');
+    final (bot, botSeen) = await open(['VEVENT', 'VTODO'], 'Bot');
+    expect(botSeen, hasLength(3), reason: '$botSeen');
+    expect(botSeen.where((r) => r.startsWith('VJOURNAL')), isEmpty);
+    expect(bot.syncMessage, startsWith('Synced'));
+    final (noTasks, s1) = await open(['VJOURNAL', 'VEVENT'], 'Bot');
+    expect(s1, hasLength(4));
+    expect(noTasks.tasksEditable, isFalse);
+    expect(noTasks.editable && noTasks.eventsEditable, isTrue);
+    final (noEvents, s2) = await open(['VJOURNAL', 'VTODO'], 'Bot');
+    expect(s2, hasLength(4));
+    expect(noEvents.eventsEditable, isFalse);
+    expect(noEvents.tasksEditable, isTrue);
+  });
+
+  test('sections redirect to a supported one in the state itself', () async {
+    final (bot, _) = await open(['VEVENT', 'VTODO'], 'Bot');
+    bot.setSection(Section.notes);
+    expect(bot.section, Section.tasks);
+    bot.openEventsPanel();
+    expect(bot.section, Section.events);
+    final (noTasks, _) = await open(['VJOURNAL', 'VEVENT'], 'Bot');
+    noTasks.openTasksPanel();
+    expect(noTasks.section, Section.notes);
+  });
+
+  test('persisted Space JSON without component fields supports all', () {
+    final m = MemoryStorage();
+    m.write(
+      'davdart.spaces.v1',
+      '[{"id":"a","name":"A"},{"id":"b","name":"B","collection":"x/"},'
+          '{"id":"c","name":"C","notes":false}]',
+    );
+    final c = SpaceCatalog(m);
+    final a = c.spaces[0], b = c.spaces[1], cc = c.spaces[2];
+    expect((a.notes, a.tasks, a.events), (true, true, true));
+    expect((b.notes, b.tasks, b.events), (true, true, true));
+    expect((cc.notes, cc.tasks, cc.events), (false, true, true));
   });
 }

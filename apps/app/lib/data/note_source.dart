@@ -112,6 +112,8 @@ class SpaceNoteSource implements EditableNoteSource {
     this.httpClient,
     this.account,
     this.pendingPath,
+    this.holdsNotes = true,
+    this.holdsTasks = true,
     TaskStore? taskStore,
     EventStore? eventStore,
   }) : davBase = davBase ?? Uri.base.resolve('/dav/'),
@@ -263,6 +265,10 @@ class SpaceNoteSource implements EditableNoteSource {
 
   /// The collection an account Space syncs with, before its first connect.
   final String? pendingPath;
+
+  /// Which components the collection takes; the login check asks for one it
+  /// holds (a VJOURNAL REPORT can fail on a VEVENT,VTODO collection).
+  final bool holdsNotes, holdsTasks;
   final NoteSource? seed;
   final KeyValueStorage? flags;
 
@@ -333,7 +339,13 @@ class SpaceNoteSource implements EditableNoteSource {
     bool viaAccount = false,
   }) async {
     final client = _clientFor(path, user, password);
-    await client.listNotes();
+    if (holdsNotes) {
+      await client.listNotes();
+    } else if (holdsTasks) {
+      await client.listTasks();
+    } else {
+      await client.listEvents();
+    }
     if (replaceLocal) {
       for (final n in await space.store.all()) {
         await space.store.remove(n.local.uid);

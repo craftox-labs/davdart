@@ -204,6 +204,20 @@ void main() {
       expect(_cur(s), 'task-b');
     });
 
+    testWidgets('opening the todo section makes its cards reachable', (
+      t,
+    ) async {
+      final s = await _home(t, size: const Size(500, 900));
+      await t.tap(find.byKey(const Key('board-acc-todo-toggle')));
+      await t.pumpAndSettle();
+      await _press(t, _j);
+      await _press(t, _j);
+      await _press(t, _j);
+      expect(_cur(s), 'card-n1');
+      await _press(t, _j);
+      expect(_cur(s), 'card-n2');
+    });
+
     testWidgets('l does not hop between stacked cards', (t) async {
       final s = await _home(t, size: const Size(500, 900));
       await _press(t, _l);
