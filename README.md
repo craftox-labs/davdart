@@ -1,24 +1,43 @@
 # davdart
 
-Notes and planning over CalDAV, local-first with sync. Notes are stored as iCalendar `VJOURNAL` resources, so any CalDAV server (for example Radicale) holds them and any client can read them.
+Notes, tasks and events over CalDAV, local-first with sync. Notes are stored as iCalendar `VJOURNAL` resources, tasks as `VTODO` and events as `VEVENT`, so any CalDAV server (for example Radicale) holds them and any client can read them. The app is Flutter with forui; the core is a UI-free Dart library.
 
 Status: v0, in development. APIs, note formats and the UI will still change.
 
 ## What works today
 
-- A UI-free Dart core: notes, plan items, folders, saved views, a CalDAV client and a sync engine.
-- A Flutter web app (built on forui 0.28.0): icon rail with Files, Views, Search, Spaces, Account and Settings; a tab strip; a full-page note view with in-place editing; board and list views; an optional mirrored layout; a token-driven theme.
-- Spaces: each Space is a CalDAV collection or a local-only store. Folders and saved views sync as ordinary notes.
+- A UI-free Dart core: notes, tasks, events, plan items, folders, saved views, a CalDAV client and sync engines for each type.
+- A Flutter web app (built on forui 0.28.0): icon rail with Notes, Tasks, Events, Views, Search, Spaces, Account and Settings; a tab strip; a full-page item view with in-place editing; board and list views; a Home page with Today cards for tasks and events; an optional mirrored layout; a token-driven theme.
 - A small board server that serves the app and proxies CalDAV to the upstream server.
 - A CLI for listing, creating, moving and exporting notes.
 
+## Spaces
+
+A Space is a CalDAV collection or a local-only store. Folders and saved views sync as ordinary notes.
+
+Spaces are component-aware. A collection is listed when it holds `VJOURNAL`, `VTODO` or `VEVENT`. One that advertises `VJOURNAL` is a project Space: notes, tasks and events are all available. A collection that does not, such as a calendar made by Fossify Calendar or another `VEVENT`/`VTODO`-only client, shows only the types it advertises or already holds, with no note actions; sync skips the types a collection does not support. The app never creates server collections; new Spaces are local. Removing a Space never deletes server data.
+
+Spaces are discovered at sign-in or with Account > Refresh spaces; collections added on the server later do not appear until you refresh. A fresh install has no Space and starts with a create-a-Space screen.
+
+## Layout
+
+- Desktop (880 px and wider): icon rail, a left panel listing notes, tasks or events for the rail section, and tabs in the main area. Items open in a peek pane or a main tab, depending on the open setting. Right-click menus and drag to move work in the tree, boards and Spaces.
+- Narrow and mobile: a top bar, a side menu with the Space chip and a Notes/Tasks/Events/Views filter, a bottom bar, and a grid of open items. Items always open full screen. Swipe right completes a task, with undo; long press opens actions.
+- Between 440 and 880 px the board turns into status accordions below 600 px, and Home stacks its Today cards.
+
+## Keyboard
+
+- Ctrl/Cmd+K opens a command palette that runs any action and searches the open Space.
+- Vim-style navigation across the rail, panels and main pane, a help overlay (`?`) and global chords. Settings > Keyboard turns Vim keys off.
+- An optional modal Vim editor (Normal, Insert, Visual) in the note, task and event body fields. It is off on touch devices.
+
 ## Planned
 
-Real colours, a command palette, tables, and desktop and phone builds. The planning collection is the source of truth for the roadmap; this list is only a summary.
+Real colours, tables, and desktop and phone builds. The planning collection is the source of truth for the roadmap; this list is only a summary.
 
 ## Architecture
 
-- Core package (repo root, plain Dart, no Flutter): `Note` (uid, summary, description, categories, status, timestamps; unmodelled properties such as `ATTACH` are kept so a round trip loses nothing), `PlanItem`, `NoteTree`, `Space`, `SyncEngine`, `CalDavClient` (REPORT, get, put, delete with ETag preconditions; `ConflictException` on 412) and RFC 5545 parsing and serialising for `VJOURNAL`.
+- Core package (repo root, plain Dart, no Flutter): `Note`, `Task` and `Event` (notes: uid, summary, description, categories, status, timestamps; unmodelled properties such as `ATTACH` are kept so a round trip loses nothing), `PlanItem`, `NoteTree`, `Space`, `SyncEngine` and `TaskSyncEngine`, `CalDavClient` (REPORT, get, put, delete with ETag preconditions; `ConflictException` on 412) and RFC 5545 parsing and serialising for `VJOURNAL`, `VTODO` and `VEVENT`.
 - `apps/app`: the Flutter web app. Theme tokens live in `lib/theme/tokens.dart`.
 - Logo: `assets/logo/davdart.svg` (the app draws it from the same path data in `apps/app/lib/ui/logo.dart`).
 - `apps/web`: a Shelf server for the board, serving the built app at `/app/` and proxying `/dav/` to the CalDAV upstream.
