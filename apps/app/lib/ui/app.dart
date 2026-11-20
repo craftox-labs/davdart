@@ -13,6 +13,7 @@ import '../state/app_state.dart';
 import '../state/note_draft.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
+import 'home_today.dart';
 import 'detail_header.dart';
 import 'detail_view.dart';
 import 'first_run_view.dart';
@@ -248,6 +249,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
         : Column(
             children: [
               ScopeText(state: state),
+              if (state.activeTab == null) HomeToday(state: state),
               Expanded(
                 child: state.activeTab == null || state.view == ViewMode.board
                     ? BoardView(
