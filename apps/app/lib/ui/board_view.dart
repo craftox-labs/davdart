@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../state/note_drag.dart';
 import 'drag_drop.dart';
 import 'chips.dart';
+import 'content_grid.dart';
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
 import 'theme.dart';
@@ -45,59 +46,86 @@ class BoardView extends StatelessWidget {
         ),
       );
     }
-    return ListView(
-      scrollDirection: Axis.horizontal,
-      padding: EdgeInsets.all(t.space.lg),
-      children: [
-        for (final (name, notes) in cols)
-          _drop(
-            name,
-            context,
-            Container(
-              width: t.sizes.boardColumn,
-              margin: EdgeInsets.only(right: t.space.lg),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      t.space.xs,
-                      t.space.xs,
-                      t.space.xs,
-                      t.space.md,
-                    ),
-                    child: Row(
-                      children: [
-                        StatusDot(name == 'notes' ? null : name),
-                        SizedBox(width: t.space.md),
-                        Text(
-                          name.toUpperCase(),
-                          style: t.type.labelStyle.copyWith(
-                            fontSize: t.type.caption,
-                            color: t.muted,
-                          ),
-                        ),
-                        SizedBox(width: t.space.sm),
-                        Text(
-                          '${notes.length}',
-                          style: t.type.captionStyle.copyWith(color: t.muted),
-                        ),
-                      ],
-                    ),
+    final gap = t.space.lg;
+    Widget column(String name, List<Note> notes) => _drop(
+      name,
+      context,
+      Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              t.space.xs,
+              t.space.xs,
+              t.space.xs,
+              t.space.md,
+            ),
+            child: Row(
+              children: [
+                StatusDot(name == 'notes' ? null : name),
+                SizedBox(width: t.space.md),
+                Text(
+                  name.toUpperCase(),
+                  style: t.type.labelStyle.copyWith(
+                    fontSize: t.type.caption,
+                    color: t.muted,
                   ),
-                  Expanded(
-                    child: ListView(
-                      children: [
-                        for (final n in notes)
-                          _Card(state: state, note: n, column: name),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                SizedBox(width: t.space.sm),
+                Text(
+                  '${notes.length}',
+                  style: t.type.captionStyle.copyWith(color: t.muted),
+                ),
+              ],
             ),
           ),
-      ],
+          Expanded(
+            child: ListView(
+              children: [
+                for (final n in notes)
+                  _Card(state: state, note: n, column: name),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+    return ContentCap(
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final avail = c.maxWidth - 2 * gap;
+          final each = (avail - (cols.length - 1) * gap) / cols.length;
+          final fits = each >= t.sizes.boardColumn;
+          if (fits) {
+            // Equal columns share the full width; gutters sit between them.
+            return Padding(
+              padding: EdgeInsets.all(gap),
+              child: Row(
+                children: [
+                  for (var i = 0; i < cols.length; i++) ...[
+                    if (i > 0) SizedBox(width: gap),
+                    Expanded(child: column(cols[i].$1, cols[i].$2)),
+                  ],
+                ],
+              ),
+            );
+          }
+          // Too narrow for the minimum: fixed-width columns that scroll.
+          return ListView(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.all(gap),
+            children: [
+              for (var i = 0; i < cols.length; i++) ...[
+                if (i > 0) SizedBox(width: gap),
+                SizedBox(
+                  width: t.sizes.boardColumn,
+                  child: column(cols[i].$1, cols[i].$2),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
     );
   }
 

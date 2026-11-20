@@ -1,0 +1,113 @@
+import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
+
+import '../data/key_value_storage.dart';
+import 'theme.dart';
+
+/// A section with a small heading row (chevron, muted label, optional count)
+/// that toggles its body. The collapsed state is kept in [prefs] under
+/// [prefKey] when given. The toggle is keyed `'$id-toggle'`.
+///
+/// With [fill] the expanded body takes the height the section is given: put
+/// the section in a `Flexible`, so a collapsed one shrinks to its heading.
+class CollapsibleSection extends StatefulWidget {
+  const CollapsibleSection({
+    super.key,
+    required this.id,
+    required this.title,
+    required this.child,
+    this.count,
+    this.prefs,
+    this.prefKey,
+    this.fill = false,
+    this.headerPadding = EdgeInsets.zero,
+    this.upper = true,
+  });
+  final String id;
+  final String title;
+  final int? count;
+  final KeyValueStorage? prefs;
+  final String? prefKey;
+  final bool fill;
+  final EdgeInsetsGeometry headerPadding;
+
+  /// Upper-case the label.
+  final bool upper;
+  final Widget child;
+
+  @override
+  State<CollapsibleSection> createState() => _CollapsibleSectionState();
+}
+
+class _CollapsibleSectionState extends State<CollapsibleSection> {
+  late bool _collapsed =
+      widget.prefKey != null && widget.prefs?.read(widget.prefKey!) == 'true';
+
+  void _toggle() {
+    setState(() => _collapsed = !_collapsed);
+    final k = widget.prefKey;
+    if (k == null) return;
+    if (_collapsed) {
+      widget.prefs?.write(k, 'true');
+    } else {
+      widget.prefs?.remove(k);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final title = widget.upper ? widget.title.toUpperCase() : widget.title;
+    final fill = widget.fill && !_collapsed;
+    return Column(
+      mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: widget.headerPadding,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FTappable(
+              key: Key('${widget.id}-toggle'),
+              semanticsLabel:
+                  '${_collapsed ? 'Expand' : 'Collapse'} ${widget.title}',
+              onPress: _toggle,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _collapsed
+                        ? FLucideIcons.chevronRight
+                        : FLucideIcons.chevronDown,
+                    size: t.icons.lg,
+                    color: t.muted,
+                  ),
+                  SizedBox(width: t.space.sm),
+                  Flexible(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.type.labelStyle.copyWith(
+                        fontSize: t.type.caption,
+                        color: t.muted,
+                      ),
+                    ),
+                  ),
+                  if (widget.count != null) ...[
+                    SizedBox(width: t.space.sm),
+                    Text(
+                      '${widget.count}',
+                      style: t.type.captionStyle.copyWith(color: t.muted),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (!_collapsed) fill ? Expanded(child: widget.child) : widget.child,
+      ],
+    );
+  }
+}

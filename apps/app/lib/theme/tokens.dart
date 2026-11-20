@@ -208,6 +208,7 @@ class SizeTokens {
     this.sectionHeader = 32,
     this.detailTab = 280,
     this.boardColumn = 264,
+    this.contentMax = 1800,
     this.statusDot = 8,
     this.spinner = 14,
     this.statusField = 160,
@@ -252,7 +253,14 @@ class SizeTokens {
   /// the double-click reset), and the least width the list keeps beside it.
   final double detailMin, detailMax, listMin;
 
-  final double boardColumn, statusDot, spinner, statusField, metaLabel;
+  /// [boardColumn] is the least width of a board column; [contentMax] caps
+  /// the Home grid (board and Today strip), left-aligned beyond it.
+  final double boardColumn,
+      contentMax,
+      statusDot,
+      spinner,
+      statusField,
+      metaLabel;
   final double chevronBox, listChevronBox, listMarker;
   final double treeIndent, listIndent;
   final double dialogSm, dialog, dialogMd, dialogLg, dialogXl;

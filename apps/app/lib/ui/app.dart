@@ -13,6 +13,7 @@ import '../state/app_state.dart';
 import '../state/note_draft.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
+import 'collapsible_section.dart';
 import 'home_today.dart';
 import 'detail_header.dart';
 import 'detail_view.dart';
@@ -250,14 +251,36 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
             children: [
               ScopeText(state: state),
               if (state.activeTab == null) HomeToday(state: state),
-              Expanded(
-                child: state.activeTab == null || state.view == ViewMode.board
-                    ? BoardView(
-                        state: state,
-                        includeNoStatus: state.activeTab != null,
-                      )
-                    : NoteListView(state: state),
-              ),
+              if (state.activeTab == null)
+                Flexible(
+                  child: ListenableBuilder(
+                    listenable: state,
+                    builder: (context, _) => CollapsibleSection(
+                      id: 'home-board',
+                      title: 'Board',
+                      count: [
+                        for (final c in state.columns(includeNoStatus: false))
+                          ...c.$2,
+                      ].length,
+                      prefs: state.prefs,
+                      prefKey: 'davdart.home.board.collapsed.v1',
+                      fill: true,
+                      headerPadding: EdgeInsets.fromLTRB(
+                        t.space.lg,
+                        t.space.md,
+                        t.space.lg,
+                        0,
+                      ),
+                      child: BoardView(state: state, includeNoStatus: false),
+                    ),
+                  ),
+                )
+              else
+                Expanded(
+                  child: state.view == ViewMode.board
+                      ? BoardView(state: state)
+                      : NoteListView(state: state),
+                ),
             ],
           );
 

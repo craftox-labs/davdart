@@ -6,6 +6,8 @@ import '../state/app_state.dart';
 import '../state/note_drag.dart';
 import '../theme/tokens.dart';
 import 'chips.dart';
+import 'collapsible_section.dart';
+import 'content_grid.dart';
 import 'drag_drop.dart';
 import 'note_menu.dart';
 import 'theme.dart';
@@ -41,18 +43,6 @@ class HomeToday extends StatefulWidget {
 }
 
 class _HomeTodayState extends State<HomeToday> {
-  late bool _collapsed = widget.state.prefs?.read(_prefKey) == 'true';
-
-  void _toggle() {
-    setState(() => _collapsed = !_collapsed);
-    final p = widget.state.prefs;
-    if (_collapsed) {
-      p?.write(_prefKey, 'true');
-    } else {
-      p?.remove(_prefKey);
-    }
-  }
-
   static int _newest(Note a, Note b) {
     final x = a.lastModified, y = b.lastModified;
     if (x == null && y == null) return 0;
@@ -84,43 +74,21 @@ class _HomeTodayState extends State<HomeToday> {
           if (recent.isNotEmpty)
             _Panel('Recently changed', recent, state, now, true),
         ];
-        return Padding(
-          key: const Key('home-today'),
-          padding: EdgeInsets.fromLTRB(t.space.lg, t.space.md, t.space.lg, 0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              FTappable(
-                key: const Key('home-today-toggle'),
-                semanticsLabel: _collapsed ? 'Expand Today' : 'Collapse Today',
-                onPress: _toggle,
-                child: Row(
-                  children: [
-                    Icon(
-                      _collapsed
-                          ? FLucideIcons.chevronRight
-                          : FLucideIcons.chevronDown,
-                      size: t.icons.lg,
-                      color: t.muted,
-                    ),
-                    SizedBox(width: t.space.sm),
-                    Text(
-                      'TODAY',
-                      style: t.type.labelStyle.copyWith(
-                        fontSize: t.type.caption,
-                        color: t.muted,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (!_collapsed) ...[
-                SizedBox(height: t.space.sm),
-                LayoutBuilder(
+        return ContentCap(
+          child: Padding(
+            key: const Key('home-today'),
+            padding: EdgeInsets.fromLTRB(t.space.lg, t.space.md, t.space.lg, 0),
+            child: CollapsibleSection(
+              id: 'home-today',
+              title: 'Today',
+              prefs: state.prefs,
+              prefKey: _prefKey,
+              child: Padding(
+                padding: EdgeInsets.only(top: t.space.sm),
+                child: LayoutBuilder(
                   builder: (context, c) {
-                    final stack = c.maxWidth < Tokens.stackBreakpoint;
                     final gap = t.space.lg;
-                    if (stack) {
+                    if (c.maxWidth < Tokens.stackBreakpoint) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
@@ -131,19 +99,25 @@ class _HomeTodayState extends State<HomeToday> {
                         ],
                       );
                     }
+                    // Always two half-width slots, so a lone panel keeps its
+                    // place and lines up with the board columns below.
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        for (var i = 0; i < panels.length; i++) ...[
+                        for (var i = 0; i < 2; i++) ...[
                           if (i > 0) SizedBox(width: gap),
-                          Expanded(child: panels[i]),
+                          Expanded(
+                            child: i < panels.length
+                                ? panels[i]
+                                : const SizedBox.shrink(),
+                          ),
                         ],
                       ],
                     );
                   },
                 ),
-              ],
-            ],
+              ),
+            ),
           ),
         );
       },
@@ -175,32 +149,27 @@ class _Panel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: EdgeInsets.all(t.space.xs),
-              child: Row(
+            CollapsibleSection(
+              id: 'home-today-$slug',
+              title: title,
+              upper: false,
+              count: rows.length,
+              prefs: state.prefs,
+              prefKey: 'davdart.home.today.$slug.collapsed.v1',
+              headerPadding: EdgeInsets.all(t.space.xs),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Text(
-                    title,
-                    style: t.type.labelStyle.copyWith(
-                      fontSize: t.type.caption,
-                      color: t.muted,
+                  for (final n in rows)
+                    _Row(
+                      key: Key('home-today-$slug-${n.uid}'),
+                      state: state,
+                      note: n,
+                      age: showAge ? shortAge(n.lastModified, now) : null,
                     ),
-                  ),
-                  SizedBox(width: t.space.sm),
-                  Text(
-                    '${rows.length}',
-                    style: t.type.captionStyle.copyWith(color: t.muted),
-                  ),
                 ],
               ),
             ),
-            for (final n in rows)
-              _Row(
-                key: Key('home-today-$slug-${n.uid}'),
-                state: state,
-                note: n,
-                age: showAge ? shortAge(n.lastModified, now) : null,
-              ),
           ],
         ),
       ),
