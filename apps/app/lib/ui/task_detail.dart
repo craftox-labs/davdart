@@ -183,7 +183,7 @@ class TaskEditor extends StatelessWidget {
                     draft.setDue(null);
                   } else if (day == null ||
                       DateTime.utc(d.year, d.month, d.day) != day) {
-                    draft.setDue(dueOfDay(d));
+                    draft.setDue(dueOfDay(d, draft.due));
                   }
                 },
               ),

@@ -47,8 +47,18 @@ String dueLabel(Task t, DateTime now) {
 /// A task's due day as a date for the pickers (UTC midnight), or null.
 DateTime? dueDate(Task t) => t.due == null ? null : taskDueDay(t);
 
-/// An all-day due value for a picked day.
-ICalDate dueOfDay(DateTime d) => ICalDate.date(d.year, d.month, d.day);
+/// The due value for a picked day. With a timed [existing] value only the
+/// date part changes: time of day, Z and TZID/params stay. Otherwise all-day.
+ICalDate dueOfDay(DateTime d, [ICalDate? existing]) {
+  final day = ICalDate.date(d.year, d.month, d.day);
+  if (existing == null || existing.allDay) return day;
+  final t = existing.value.indexOf('T');
+  if (t != 8) return day;
+  return ICalDate(
+    '${day.value}${existing.value.substring(t)}',
+    existing.params,
+  );
+}
 
 /// The local calendar day [days] from today, as a UTC-flagged date.
 DateTime dayFromToday(int days, [DateTime? now]) {

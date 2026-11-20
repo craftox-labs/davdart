@@ -65,7 +65,7 @@ class TaskContextMenu extends StatelessWidget {
     void due(DateTime? day) => state.updateTask(
       uid,
       setDue: true,
-      due: day == null ? null : dueOfDay(day),
+      due: day == null ? null : dueOfDay(day, task.due),
     );
     final manage = <NoteMenuItem>[
       if (edit && !blocked)

@@ -54,6 +54,25 @@ void main() {
     expect(dueLabel(Task(uid: 'x'), now), '');
   });
 
+  test('dueOfDay keeps time and zone, all-day stays a date', () {
+    final day = DateTime.utc(2026, 12, 5);
+    final tz = dueOfDay(
+      day,
+      const ICalDate('20261120T093000', ';TZID=Europe/Berlin'),
+    );
+    expect(tz.value, '20261205T093000');
+    expect(tz.params, ';TZID=Europe/Berlin');
+    expect(
+      dueOfDay(day, const ICalDate('20261120T093000Z')).value,
+      '20261205T093000Z',
+    );
+    expect(
+      dueOfDay(day, ICalDate.date(2026, 11, 20)),
+      ICalDate.date(2026, 12, 5),
+    );
+    expect(dueOfDay(day), ICalDate.date(2026, 12, 5));
+  });
+
   testWidgets('shows Doing rows and the Tasks panel, no Recently changed', (
     t,
   ) async {
