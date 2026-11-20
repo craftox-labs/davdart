@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:xml/xml.dart';
 
+import 'event.dart';
 import 'ical.dart';
 import 'note.dart';
 import 'task.dart';
@@ -52,10 +53,24 @@ class TaskSyncResult {
   final String? syncToken;
 }
 
+/// Result of [CalDavClient.syncEvents].
+class EventSyncResult {
+  EventSyncResult(this.changed, this.deletedHrefs, this.syncToken,
+      [this.unparsableHrefs = const []]);
+  final List<Event> changed;
+  final List<String> deletedHrefs;
+
+  /// Resources on the server that could not be parsed; see [SyncResult].
+  final List<String> unparsableHrefs;
+  final String? syncToken;
+}
+
 /// A calendar collection found under a user's home.
 class CollectionInfo {
   const CollectionInfo(this.href, this.name,
-      {this.holdsNotes = true, this.holdsTasks = true});
+      {this.holdsNotes = true,
+      this.holdsTasks = true,
+      this.holdsEvents = true});
 
   /// Absolute URL of the collection.
   final Uri href;
@@ -68,6 +83,9 @@ class CollectionInfo {
 
   /// False when the server says the collection takes no VTODO.
   final bool holdsTasks;
+
+  /// False when the server says the collection takes no VEVENT.
+  final bool holdsEvents;
 }
 
 /// CalDAV client for one collection that holds VJOURNAL resources.
@@ -147,6 +165,7 @@ class CalDavClient {
         dn.isEmpty ? (segs.isEmpty ? url.path : segs.last) : dn,
         holdsNotes: comps.isEmpty || comps.contains('VJOURNAL'),
         holdsTasks: comps.isEmpty || comps.contains('VTODO'),
+        holdsEvents: comps.isEmpty || comps.contains('VEVENT'),
       ));
     }
     return out;
@@ -162,7 +181,7 @@ class CalDavClient {
     required String password,
     http.Client? client,
     String? id,
-    List<String> components = const ['VJOURNAL', 'VTODO'],
+    List<String> components = const ['VJOURNAL', 'VTODO', 'VEVENT'],
   }) async {
     final h = _withSlash(home);
     final c = CalDavClient(
@@ -298,6 +317,18 @@ class CalDavClient {
           ..href = href
           ..etag = etag);
     return TaskSyncResult(r.$1, r.$2, r.$3, r.$4);
+  }
+
+  /// Like [sync], for the VEVENT resources of the collection.
+  Future<EventSyncResult> syncEvents({String? syncToken}) async {
+    final r = await _syncGeneric<Event>(syncToken,
+        parse: parseEvent,
+        missing: 'no VEVENT found',
+        get: getEvent,
+        setMeta: (e, href, etag) => e
+          ..href = href
+          ..etag = etag);
+    return EventSyncResult(r.$1, r.$2, r.$3, r.$4);
   }
 
   Future<(List<T>, List<String>, String?, List<String>)> _syncGeneric<T>(
@@ -522,6 +553,78 @@ class CalDavClient {
     }
   }
 
+  // ---- Events (VEVENT) ----
+
+  /// Lists every event in the collection, with href and etag set.
+  Future<List<Event>> listEvents() async {
+    final r = await _send('REPORT', collection,
+        headers: {
+          'Depth': '1',
+          'Content-Type': 'application/xml; charset=utf-8',
+        },
+        body: _reportBody('VEVENT'));
+    if (r.statusCode != 207) {
+      throw CalDavException(r.statusCode, 'REPORT failed');
+    }
+    return parseEventMultistatus(utf8.decode(r.bodyBytes),
+        onError: onResourceError);
+  }
+
+  /// Fetches one event by href (absolute or relative to the collection).
+  Future<Event> getEvent(String href) async {
+    final r = await _send('GET', _resolve(href));
+    if (r.statusCode != 200) throw CalDavException(r.statusCode, 'GET failed');
+    final e = parseEvent(utf8.decode(r.bodyBytes));
+    e.href = href;
+    e.etag = r.headers['etag'];
+    return e;
+  }
+
+  /// Creates or updates [event], like [putNote]: conditional on the etag, or
+  /// create-only without one. Returns the stored event with fresh href, etag.
+  Future<Event> putEvent(Event event, {bool touch = true}) async {
+    if (touch) {
+      final now = DateTime.now().toUtc();
+      event
+        ..lastModified = now
+        ..dtstamp = now;
+    }
+    final href = event.href ?? '${Uri.encodeComponent(event.uid)}.ics';
+    final r = await _send('PUT', _resolve(href),
+        headers: {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          if (event.etag != null)
+            'If-Match': event.etag!
+          else
+            'If-None-Match': '*',
+        },
+        body: serializeEvent(event));
+    if (r.statusCode == 412) {
+      throw ConflictException('${event.uid} changed on the server');
+    }
+    if (r.statusCode != 200 && r.statusCode != 201 && r.statusCode != 204) {
+      throw CalDavException(r.statusCode, 'PUT failed');
+    }
+    final stored = event.copyWith();
+    stored.href = href;
+    stored.etag = r.headers['etag'] ?? (await getEvent(href)).etag;
+    return stored;
+  }
+
+  /// Deletes [event]; with an etag the delete is conditional.
+  Future<void> deleteEvent(Event event) async {
+    final href = event.href;
+    if (href == null) throw ArgumentError('event has no href');
+    final r = await _send('DELETE', _resolve(href),
+        headers: {if (event.etag != null) 'If-Match': event.etag!});
+    if (r.statusCode == 412) {
+      throw ConflictException('${event.uid} changed on the server');
+    }
+    if (r.statusCode != 200 && r.statusCode != 204 && r.statusCode != 404) {
+      throw CalDavException(r.statusCode, 'DELETE failed');
+    }
+  }
+
   void close() => _http.close();
 }
 
@@ -578,4 +681,30 @@ List<Task> parseTaskMultistatus(String body,
     }
   }
   return tasks;
+}
+
+/// Parses a WebDAV 207 multistatus body into events with href and etag.
+/// Resources without a VEVENT are skipped; unparsable ones go to [onError].
+List<Event> parseEventMultistatus(String body,
+    {void Function(String? href, Object error)? onError}) {
+  final doc = XmlDocument.parse(body);
+  final events = <Event>[];
+  for (final resp
+      in doc.descendantElements.where((e) => e.localName == 'response')) {
+    String? text(String name) => resp.descendantElements
+        .where((e) => e.localName == name)
+        .map((e) => e.innerText)
+        .firstOrNull;
+    final data = text('calendar-data');
+    if (data == null || data.trim().isEmpty) continue;
+    final href = text('href');
+    try {
+      events.add(parseEvent(data)
+        ..href = href
+        ..etag = text('getetag'));
+    } on ICalException catch (e) {
+      if (e.message != 'no VEVENT found') onError?.call(href, e);
+    }
+  }
+  return events;
 }

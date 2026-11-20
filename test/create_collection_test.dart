@@ -25,6 +25,7 @@ void main() {
     expect(seen.body, contains('Work &amp; &lt;play>'));
     expect(seen.body, contains('VJOURNAL'));
     expect(seen.body, contains('VTODO'));
+    expect(seen.body, contains('VEVENT'));
   });
 
   test('createCollection reports a refusal', () async {

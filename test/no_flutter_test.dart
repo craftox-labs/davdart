@@ -28,7 +28,8 @@ void ioGuard() {
       'config.dart',
       'file_store.dart',
       'space_book.dart',
-      'task_file_store.dart'
+      'task_file_store.dart',
+      'event_file_store.dart'
     };
     final offenders = [
       for (final f in Directory('lib/src')

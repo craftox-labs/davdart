@@ -1,3 +1,4 @@
+import 'event.dart';
 import 'note.dart';
 import 'plan_item.dart';
 import 'task.dart';
@@ -361,4 +362,109 @@ TaskMerge mergeTasks(Task base, Task local, Task remote) {
       .whereType<DateTime>()
       .fold<DateTime?>(null, (a, d) => a == null || d.isAfter(a) ? d : a);
   return TaskMerge(merged, conflicts);
+}
+
+/// Merged event plus what had to be decided.
+class EventMerge {
+  EventMerge(this.event, this.conflicts);
+  final Event event;
+  final List<MergeConflict> conflicts;
+  bool get hadConflict => conflicts.isNotEmpty;
+}
+
+/// Three-way merge of two edited copies of one event against [base], the copy
+/// last synced. Same policy as [mergeTasks]: each field (title, location,
+/// status, start, end, duration, recurrence rule, parent) merges on its own,
+/// tags as sets, the description per line; on a true conflict the later
+/// lastModified wins that field (ties go to [remote]) and the loser is
+/// reported. Exception dates, extra dates, recurrence overrides and unknown
+/// lines are taken whole from the side that changed them (the later side if
+/// both did). The result keeps [remote]'s href and etag, ready to PUT.
+EventMerge mergeEvents(Event base, Event local, Event remote) {
+  final conflicts = <MergeConflict>[];
+  final lm = local.lastModified, rm = remote.lastModified;
+  final preferLocal = lm != null && (rm == null || lm.isAfter(rm));
+
+  T? pick<T>(String what, T? b, T? l, T? r) {
+    if (l == r) return l;
+    if (l == b) return r;
+    if (r == b) return l;
+    final win = preferLocal ? l : r;
+    conflicts.add(MergeConflict(
+        what, l?.toString() ?? '', r?.toString() ?? '', win?.toString() ?? ''));
+    return win;
+  }
+
+  bool sameList(List<String> a, List<String> b) =>
+      a.length == b.length &&
+      [for (var i = 0; i < a.length; i++) a[i] == b[i]].every((x) => x);
+
+  // Whole-list choice: the changed side wins; both changed: the later one.
+  List<String> chooseList(List<String> b, List<String> l, List<String> r) {
+    if (sameList(l, r)) return List.of(r);
+    return List.of(sameList(l, b)
+        ? r
+        : sameList(r, b) || preferLocal
+            ? l
+            : r);
+  }
+
+  final merged = remote.copyWith();
+  merged.summary = pick('title', base.summary, local.summary, remote.summary)!;
+  merged.location =
+      pick('location', base.location, local.location, remote.location)!;
+  merged.status = pick('status', base.status, local.status, remote.status);
+  merged.dtstart = pick('start', base.dtstart, local.dtstart, remote.dtstart);
+  merged.dtend = pick('end', base.dtend, local.dtend, remote.dtend);
+  merged.duration =
+      pick('duration', base.duration, local.duration, remote.duration);
+  merged.rrule = pick('repeat', base.rrule, local.rrule, remote.rrule);
+  merged.parentUid =
+      pick('parent', base.parentUid, local.parentUid, remote.parentUid);
+
+  merged.exdates = chooseList(base.exdates, local.exdates, remote.exdates);
+  merged.rdates = chooseList(base.rdates, local.rdates, remote.rdates);
+  final extra =
+      chooseList(base.extraLines, local.extraLines, remote.extraLines);
+  merged.extraLines
+    ..clear()
+    ..addAll(extra);
+  final sib =
+      chooseList(base.siblingLines, local.siblingLines, remote.siblingLines);
+  merged.siblingLines
+    ..clear()
+    ..addAll(sib);
+  if (!_sameMap(local.propertyParams, remote.propertyParams)) {
+    final src = _sameMap(local.propertyParams, base.propertyParams)
+        ? remote.propertyParams
+        : _sameMap(remote.propertyParams, base.propertyParams) || preferLocal
+            ? local.propertyParams
+            : remote.propertyParams;
+    final copy = Map.of(src);
+    merged.propertyParams
+      ..clear()
+      ..addAll(copy);
+  }
+
+  final cats = <String>{...remote.categories};
+  for (final c in local.categories) {
+    if (!base.categories.contains(c)) cats.add(c);
+  }
+  for (final c in base.categories) {
+    if (!local.categories.contains(c)) cats.remove(c);
+  }
+  merged.categories = [
+    for (final c in [...remote.categories, ...local.categories])
+      if (cats.remove(c)) c
+  ];
+
+  final text = mergeText(
+      base.description, local.description, remote.description,
+      preferLocal: preferLocal);
+  conflicts.addAll(text.conflicts);
+  merged.description = text.text;
+  merged.lastModified = [lm, rm]
+      .whereType<DateTime>()
+      .fold<DateTime?>(null, (a, d) => a == null || d.isAfter(a) ? d : a);
+  return EventMerge(merged, conflicts);
 }

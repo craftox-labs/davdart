@@ -1,3 +1,4 @@
+import 'event.dart';
 import 'note.dart';
 import 'task.dart';
 
@@ -575,3 +576,224 @@ String serializeTasks(Iterable<Task> tasks) {
 }
 
 String serializeTask(Task t) => serializeTasks([t]);
+
+// ---- Events (VEVENT) ----
+
+/// Builds an Event from the lines of one VEVENT component (BEGIN..END).
+Event _eventFromLines(List<String> lines) {
+  String? uid, summary, description, location, status, parent, rrule, duration;
+  ICalDate? end, start;
+  DateTime? created, modified, stamp;
+  final cats = <String>[];
+  final extra = <String>[];
+  final exdates = <String>[];
+  final rdates = <String>[];
+  final params = <String, String>{};
+  var depth = 0;
+  for (final line in lines.sublist(1, lines.length - 1)) {
+    final p = _parseLine(line);
+    if (p == null) continue;
+    if (p.name == 'BEGIN') depth++;
+    if (depth > 0) {
+      extra.add(line); // VALARM and other nested components
+      if (p.name == 'END') depth--;
+      continue;
+    }
+    switch (p.name) {
+      case 'UID':
+        uid = p.value.trim();
+      case 'SUMMARY':
+        if (summary == null) {
+          summary = unescapeText(p.value);
+          if (p.params.isNotEmpty) params['SUMMARY'] = p.params;
+        } else {
+          extra.add(line);
+        }
+      case 'DESCRIPTION':
+        if (description == null) {
+          description = unescapeText(p.value);
+          if (p.params.isNotEmpty) params['DESCRIPTION'] = p.params;
+        } else {
+          extra.add(line);
+        }
+      case 'LOCATION':
+        if (location == null) {
+          location = unescapeText(p.value);
+          if (p.params.isNotEmpty) params['LOCATION'] = p.params;
+        } else {
+          extra.add(line);
+        }
+      case 'CATEGORIES':
+        if (p.params.isNotEmpty) {
+          extra.add(line);
+        } else {
+          for (final c in _splitCommas(p.value)) {
+            final t = unescapeText(c).trim();
+            if (t.isNotEmpty) cats.add(t);
+          }
+        }
+      case 'STATUS':
+        status = p.value.trim().toUpperCase();
+      case 'DTSTART' || 'DTEND':
+        final d = ICalDate(p.value.trim(), p.params);
+        final isEnd = p.name == 'DTEND';
+        if (d.wall != null && (isEnd ? end : start) == null) {
+          if (isEnd) {
+            end = d;
+          } else {
+            start = d;
+          }
+        } else {
+          extra.add(line);
+        }
+      case 'DURATION':
+        if (duration == null &&
+            p.params.isEmpty &&
+            parseIcalDuration(p.value) != null) {
+          duration = p.value.trim();
+        } else {
+          extra.add(line);
+        }
+      case 'RRULE':
+        if (rrule == null && p.params.isEmpty && p.value.trim().isNotEmpty) {
+          rrule = p.value.trim();
+        } else {
+          extra.add(line);
+        }
+      case 'EXDATE':
+        exdates.add(line);
+      case 'RDATE':
+        rdates.add(line);
+      case 'RELATED-TO':
+        final type = _relType.firstMatch(p.params)?.group(1)?.toUpperCase();
+        if (parent == null &&
+            p.value.trim().isNotEmpty &&
+            p.params.replaceAll(_relType, '').replaceAll(';', '').isEmpty &&
+            (type == null || type == 'PARENT')) {
+          parent = p.value.trim();
+        } else {
+          extra.add(line);
+        }
+      case 'CREATED' || 'LAST-MODIFIED':
+        if (p.params.isEmpty && _utcStamp.hasMatch(p.value.trim())) {
+          final d = _parseDateTime(p.value);
+          if (p.name == 'CREATED') {
+            created = d;
+          } else {
+            modified = d;
+          }
+        } else {
+          extra.add(line);
+        }
+      case 'DTSTAMP':
+        try {
+          stamp = _parseDateTime(p.value);
+        } on ICalException {
+          // Malformed: a fresh stamp is written on save.
+        }
+      default:
+        extra.add(line);
+    }
+  }
+  if (uid == null || uid.isEmpty) throw ICalException('VEVENT without UID');
+  return Event(
+    uid: uid,
+    summary: summary ?? '',
+    description: description ?? '',
+    location: location ?? '',
+    categories: cats,
+    status: status,
+    dtstart: start,
+    dtend: end,
+    duration: duration,
+    rrule: rrule,
+    exdates: exdates,
+    rdates: rdates,
+    parentUid: parent,
+    created: created,
+    lastModified: modified,
+    dtstamp: stamp,
+    extraLines: extra,
+    propertyParams: params,
+  );
+}
+
+/// Parses every VEVENT in an iCalendar document as its own Event.
+List<Event> parseEvents(String text) => [
+      for (final b in _splitCalendar(text).blocks)
+        if (b.type == 'VEVENT') _eventFromLines(b.lines),
+    ];
+
+/// Parses one CalDAV resource into a single Event, keeping other VEVENTs of
+/// the resource (recurrence overrides) in [Event.siblingLines] and VTIMEZONE
+/// and other calendar-level content in [Event.calendarLines]. Throws
+/// [ICalException] ("no VEVENT found") if the resource holds no VEVENT.
+Event parseEvent(String text) {
+  final cal = _splitCalendar(text);
+  final events = [
+    for (final b in cal.blocks)
+      if (b.type == 'VEVENT') b
+  ];
+  if (events.isEmpty) throw ICalException('no VEVENT found');
+  bool isOverride(_Block b) =>
+      b.lines.any((l) => l.toUpperCase().startsWith('RECURRENCE-ID'));
+  final master =
+      events.firstWhere((b) => !isOverride(b), orElse: () => events.first);
+  final event = _eventFromLines(master.lines);
+  for (final b in cal.blocks) {
+    if (identical(b, master)) continue;
+    (b.type == 'VEVENT' ? event.siblingLines : event.calendarLines)
+        .addAll(b.lines);
+  }
+  event.calendarLines.addAll(cal.looseLines);
+  return event;
+}
+
+/// Serializes [events] as one VCALENDAR with CRLF line endings.
+String serializeEvents(Iterable<Event> events) {
+  final out = StringBuffer();
+  void w(String l) => out.write('${fold(l)}\r\n');
+  w('BEGIN:VCALENDAR');
+  w('VERSION:2.0');
+  w('PRODID:$_prodId');
+  for (final e in events) {
+    e.calendarLines.forEach(w);
+    w('BEGIN:VEVENT');
+    w('UID:${e.uid}');
+    w('DTSTAMP:${_formatDateTime(e.dtstamp)}');
+    if (e.created != null) w('CREATED:${_formatDateTime(e.created!)}');
+    if (e.lastModified != null) {
+      w('LAST-MODIFIED:${_formatDateTime(e.lastModified!)}');
+    }
+    String params(String name) => e.propertyParams[name] ?? '';
+    if (e.summary.isNotEmpty) {
+      w('SUMMARY${params('SUMMARY')}:${escapeText(e.summary)}');
+    }
+    if (e.description.isNotEmpty) {
+      w('DESCRIPTION${params('DESCRIPTION')}:${escapeText(e.description)}');
+    }
+    if (e.location.isNotEmpty) {
+      w('LOCATION${params('LOCATION')}:${escapeText(e.location)}');
+    }
+    if (e.categories.isNotEmpty) {
+      w('CATEGORIES:${e.categories.map(escapeText).join(',')}');
+    }
+    if (e.status != null && e.status!.isNotEmpty) w('STATUS:${e.status}');
+    if (e.dtstart != null) w('DTSTART${e.dtstart!.params}:${e.dtstart!.value}');
+    if (e.dtend != null) w('DTEND${e.dtend!.params}:${e.dtend!.value}');
+    if (e.duration != null) w('DURATION:${e.duration}');
+    if (e.rrule != null && e.rrule!.isNotEmpty) w('RRULE:${e.rrule}');
+    e.exdates.forEach(w);
+    e.rdates.forEach(w);
+    if (e.parentUid != null && e.parentUid!.isNotEmpty) {
+      w('RELATED-TO;RELTYPE=PARENT:${e.parentUid}');
+    }
+    e.extraLines.forEach(w);
+    w('END:VEVENT');
+    e.siblingLines.forEach(w);
+  }
+  w('END:VCALENDAR');
+  return out.toString();
+}
+
+String serializeEvent(Event e) => serializeEvents([e]);
