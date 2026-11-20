@@ -237,8 +237,9 @@ class SizeTokens {
     this.dialogMd = 380,
     this.dialogLg = 480,
     this.dialogXl = 560,
-    this.dialogHelp = 960,
+    this.dialogHelp = 1100,
     this.helpKeys = 124,
+    this.helpColumn = 320,
     this.helpRow = 28,
     this.narrowBar = 440,
     this.pageMax = 860,
@@ -292,7 +293,7 @@ class SizeTokens {
 
   /// The keyboard help dialog's widest size, the width of its key column
   /// and the least height of one binding row.
-  final double dialogHelp, helpKeys, helpRow;
+  final double dialogHelp, helpKeys, helpColumn, helpRow;
 
   /// Width below which the top bar swaps its view toggle for one icon.
   final double narrowBar;

@@ -8,7 +8,7 @@ import '../state/key_bindings.dart';
 import '../state/key_nav.dart';
 import 'app_actions.dart';
 import 'command_palette.dart';
-import 'note_editor.dart';
+import 'popover_track.dart';
 import 'theme.dart';
 
 /// Rows are all built (a big cache extent) so a cursor can scroll to any row.
@@ -196,6 +196,7 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
     if (token == 'Esc') {
       final f = FocusManager.instance.primaryFocus;
       final off = f != null && f != nav.node && f is! FocusScopeNode;
+      if (PopoverTracker.instance.dismiss()) return KeyEventResult.handled;
       if (pending.isNotEmpty || nav.count > 0) {
         nav.clearPending();
         if (nav.shown) nav.hide();
@@ -334,35 +335,55 @@ class AreaMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    return Listener(
-      behavior: HitTestBehavior.translucent,
-      onPointerDown: (_) => nav.pointerIn(area),
-      child: Stack(
-        fit: StackFit.passthrough,
-        children: [
-          child,
-          if (bar)
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: t.borders.focus,
-              child: IgnorePointer(
-                child: ListenableBuilder(
-                  listenable: nav,
-                  builder: (context, _) => nav.shown && nav.area == area
-                      ? ColoredBox(
-                          key: Key('area-mark-${area.name}'),
-                          color: t.accent,
-                        )
-                      : const SizedBox.shrink(),
+    return _AreaScope(
+      area: area,
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (_) => nav.pointerIn(area),
+        child: Stack(
+          fit: StackFit.passthrough,
+          children: [
+            child,
+            if (bar)
+              Positioned(
+                left: 0,
+                top: 0,
+                bottom: 0,
+                width: t.borders.focus,
+                child: IgnorePointer(
+                  child: ListenableBuilder(
+                    listenable: nav,
+                    builder: (context, _) => nav.shown && nav.area == area
+                        ? ColoredBox(
+                            key: Key('area-mark-${area.name}'),
+                            color: t.accent,
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
+}
+
+/// Says which area a subtree belongs to, so the area that holds the primary
+/// focus can be found from the focused node.
+class _AreaScope extends InheritedWidget {
+  const _AreaScope({required this.area, required super.child});
+  final NavArea area;
+
+  @override
+  bool updateShouldNotify(_AreaScope old) => area != old.area;
+}
+
+/// The area whose subtree holds the primary focus; null when the focus is
+/// elsewhere (the key catcher, a dialog).
+NavArea? focusedAreaOf() {
+  final c = FocusManager.instance.primaryFocus?.context;
+  return c?.getInheritedWidgetOfExactType<_AreaScope>()?.area;
 }
 
 /// A row of a keyboard list: draws the cursor (an accent outline and tint,

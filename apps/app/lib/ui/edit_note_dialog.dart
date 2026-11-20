@@ -1,3 +1,5 @@
+import 'popover_track.dart';
+
 import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -77,29 +79,32 @@ Future<void> showEditNoteDialog(
             controller: tags,
             label: 'Tags (comma separated)',
           ),
-          FSelect<String>.rich(
-            key: const Key('edit-parent'),
-            label: const Text('Inside'),
-            format: (v) => labels[v]?.$2.trim() ?? v,
-            control: FSelectControl.lifted(
-              value: parent ?? '',
-              onChange: (v) => setLocal(() {
-                parent = (v == null || v.isEmpty) ? null : v;
-              }),
+          TrackPopover(
+            builder: (_, pc) => FSelect<String>.rich(
+              popoverControl: pc,
+              key: const Key('edit-parent'),
+              label: const Text('Inside'),
+              format: (v) => labels[v]?.$2.trim() ?? v,
+              control: FSelectControl.lifted(
+                value: parent ?? '',
+                onChange: (v) => setLocal(() {
+                  parent = (v == null || v.isEmpty) ? null : v;
+                }),
+              ),
+              children: [
+                for (final e in targets)
+                  FSelectItem<String>(
+                    title: Text(
+                      e.$3 ? '${e.$2.trim()}  (folder)' : e.$2.trim(),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    prefix: SizedBox(
+                      width: _indent(e.$2) * tokensOf(ctx).space.lg,
+                    ),
+                    value: e.$1 ?? '',
+                  ),
+              ],
             ),
-            children: [
-              for (final e in targets)
-                FSelectItem<String>(
-                  title: Text(
-                    e.$3 ? '${e.$2.trim()}  (folder)' : e.$2.trim(),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  prefix: SizedBox(
-                    width: _indent(e.$2) * tokensOf(ctx).space.lg,
-                  ),
-                  value: e.$1 ?? '',
-                ),
-            ],
           ),
           field(
             key: const Key('edit-body'),

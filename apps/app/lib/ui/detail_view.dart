@@ -1,3 +1,5 @@
+import 'popover_track.dart';
+
 import 'package:davdart/davdart.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -135,25 +137,30 @@ class DetailView extends StatelessWidget {
                             SizedBox(width: t.space.lg),
                             SizedBox(
                               width: t.sizes.statusField,
-                              child: FSelect<String>.rich(
-                                key: const Key('status-menu'),
-                                format: (v) => v,
-                                hint: 'none',
-                                control: FSelectControl.lifted(
-                                  value: boardOrder.contains(p.status)
-                                      ? p.status
-                                      : null,
-                                  onChange: (v) {
-                                    if (v != null) state.setStatus(note.uid, v);
-                                  },
+                              child: TrackPopover(
+                                builder: (_, pc) => FSelect<String>.rich(
+                                  popoverControl: pc,
+                                  key: const Key('status-menu'),
+                                  format: (v) => v,
+                                  hint: 'none',
+                                  control: FSelectControl.lifted(
+                                    value: boardOrder.contains(p.status)
+                                        ? p.status
+                                        : null,
+                                    onChange: (v) {
+                                      if (v != null) {
+                                        state.setStatus(note.uid, v);
+                                      }
+                                    },
+                                  ),
+                                  children: [
+                                    for (final s in boardOrder)
+                                      FSelectItem<String>(
+                                        title: Text(s),
+                                        value: s,
+                                      ),
+                                  ],
                                 ),
-                                children: [
-                                  for (final s in boardOrder)
-                                    FSelectItem<String>(
-                                      title: Text(s),
-                                      value: s,
-                                    ),
-                                ],
                               ),
                             ),
                           ],

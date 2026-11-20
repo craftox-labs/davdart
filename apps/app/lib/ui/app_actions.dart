@@ -1,3 +1,5 @@
+import 'key_nav_ui.dart';
+
 import 'dart:async';
 
 import 'package:davdart/davdart.dart';
@@ -15,7 +17,6 @@ import 'move_space_dialog.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
 import 'new_space_dialog.dart';
-import 'note_editor.dart';
 import 'parts.dart';
 import 'task_menu.dart';
 import 'theme.dart';
@@ -58,19 +59,16 @@ Object? targetItem(AppState s) {
   return u == null ? null : s.findItem(u);
 }
 
-/// The item in edit mode that Esc or Ctrl+Enter act on: the focused area's
-/// (peek or main page), else any open one; null when none is editing.
+/// The item in edit mode that Esc or Ctrl+Enter act on: the editor of the
+/// area holding the primary focus, else the focused area (peek or main page). Null when that area has no editor
+/// open, even if another area has one: Esc then keeps its area-level meaning.
 String? editingUid(AppState s) {
-  final byArea = switch (s.nav.area) {
+  final u = switch (focusedAreaOf() ?? s.nav.area) {
     NavArea.peek => s.hasPeek ? s.peekUid : null,
     NavArea.main => s.mainItemUid,
     _ => null,
   };
-  if (byArea != null && s.isEditing(byArea)) return byArea;
-  for (final u in [s.mainItemUid, if (s.hasPeek) s.peekUid]) {
-    if (u != null && s.isEditing(u)) return u;
-  }
-  return null;
+  return u != null && s.isEditing(u) ? u : null;
 }
 
 /// Gives the side panel the keyboard focus, on its list's cursor.
@@ -612,7 +610,7 @@ List<AppAction> buildActions(AppState state) {
         // Nothing shows and the focus is on the key catcher: Esc leaves an
         // open edit before it moves the area focus.
         final u = editingUid(s);
-        if (u != null && !popoverOpen()) {
+        if (u != null) {
           s.nav.hide();
           s.leaveEdit(u);
           return;
@@ -695,22 +693,28 @@ Future<void> showKeyboardHelp(BuildContext context, AppState state) {
   );
 }
 
-/// Help groups laid out masonry-style: 1 column under 520px of width, 2
-/// under 800, else 3. Each group goes to the shortest column so the columns
+/// Help groups laid out masonry-style in as many columns as fit at least
+/// [Sizes.helpColumn] each (one under two of them, three from about 1010px).
+/// Each group goes to the shortest column so the columns
 /// stay balanced by row count.
 class HelpColumns extends StatelessWidget {
   const HelpColumns({super.key, required this.groups});
   final List<(String, List<(String, String)>)> groups;
 
-  static int columnsFor(double width) =>
-      width < 520 ? 1 : (width < 800 ? 2 : 3);
+  /// Columns that fit [width], each at least [min] wide with [gap] between.
+  static int columnsFor(double width, {double min = 320, double gap = 24}) =>
+      ((width + gap) / (min + gap)).floor().clamp(1, 3);
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     return LayoutBuilder(
       builder: (context, box) {
-        final n = columnsFor(box.maxWidth);
+        final n = columnsFor(
+          box.maxWidth,
+          min: t.sizes.helpColumn,
+          gap: t.space.xxxl,
+        );
         final cols = [for (var i = 0; i < n; i++) <int>[]];
         final heights = List<int>.filled(n, 0);
         for (var i = 0; i < groups.length; i++) {
@@ -810,7 +814,11 @@ class _KeyCap extends StatelessWidget {
           horizontal: t.space.sm,
           vertical: t.space.xxs,
         ),
-        child: Text(label, style: t.type.monoStyle.copyWith(color: t.fg)),
+        child: Text(
+          label,
+          softWrap: false,
+          style: t.type.monoStyle.copyWith(color: t.fg),
+        ),
       ),
     );
   }

@@ -1,5 +1,6 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
+import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/state/app_action.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/key_bindings.dart';
@@ -756,7 +757,7 @@ void main() {
       await open(t, const Size(1400, 1000));
       expect(_k('help-columns-3'), findsOneWidget);
       expect(t.takeException(), isNull);
-      expect(t.getSize(_k('help-columns-3')).width, greaterThan(800));
+      expect(t.getSize(_k('help-columns-3')).width, greaterThan(1000));
       final scroll = t.state<ScrollableState>(
         find.descendant(
           of: find.byType(FDialog),
@@ -767,10 +768,31 @@ void main() {
       await _press(t, LogicalKeyboardKey.escape);
     });
 
-    testWidgets('medium: two columns', (t) async {
-      await open(t, const Size(800, 900));
-      expect(_k('help-columns-2'), findsOneWidget);
-      expect(t.takeException(), isNull);
+    testWidgets('medium: two columns from 800px, three only when wide', (
+      t,
+    ) async {
+      for (final w in [800.0, 960.0, 1040.0]) {
+        await open(t, Size(w, 900));
+        expect(_k('help-columns-2'), findsOneWidget, reason: '$w');
+        expect(t.takeException(), isNull);
+        await _press(t, LogicalKeyboardKey.escape);
+        await t.pumpAndSettle();
+      }
+    });
+
+    testWidgets('no column is narrower than the minimum; chips stay whole', (
+      t,
+    ) async {
+      await open(t, const Size(1400, 1000));
+      final tokens = Tokens.light;
+      final inner = t.getSize(_k('help-columns-3')).width;
+      expect(
+        (inner - 2 * tokens.space.xxxl) / 3,
+        greaterThanOrEqualTo(tokens.sizes.helpColumn),
+      );
+      final chip = find.text('Ctrl+Enter');
+      expect(chip, findsWidgets);
+      expect(t.getSize(chip.first).height, lessThan(30));
       await _press(t, LogicalKeyboardKey.escape);
     });
 

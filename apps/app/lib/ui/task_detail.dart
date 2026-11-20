@@ -1,3 +1,5 @@
+import 'popover_track.dart';
+
 import 'package:davdart/davdart.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -170,66 +172,75 @@ class TaskEditor extends StatelessWidget {
                 'A title is required',
                 style: t.type.captionStyle.copyWith(color: t.error),
               ),
-            FDateField.calendar(
-              key: const Key('edit-due'),
-              label: const Text('Due'),
-              clearable: true,
-              hint: 'No due date',
-              selectionControl: FDateSelectionControl.liftedSingle(
-                value: day,
-                onChange: (d) {
-                  if (d == null) {
-                    draft.setDue(null);
-                  } else if (day == null ||
-                      DateTime.utc(d.year, d.month, d.day) != day) {
-                    draft.setDue(dueOfDay(d, draft.due));
-                  }
-                },
+            TrackPopover(
+              builder: (_, pc) => FDateField.calendar(
+                popoverControl: pc,
+                key: const Key('edit-due'),
+                label: const Text('Due'),
+                clearable: true,
+                hint: 'No due date',
+                selectionControl: FDateSelectionControl.liftedSingle(
+                  value: day,
+                  onChange: (d) {
+                    if (d == null) {
+                      draft.setDue(null);
+                    } else if (day == null ||
+                        DateTime.utc(d.year, d.month, d.day) != day) {
+                      draft.setDue(dueOfDay(d, draft.due));
+                    }
+                  },
+                ),
               ),
             ),
-            FSelect<String>.rich(
-              key: const Key('edit-priority'),
-              label: const Text('Priority'),
-              format: (v) => v,
-              control: FSelectControl.lifted(
-                value: priorityBucket(draft.priority),
-                onChange: (v) {
-                  final b = priorityBucket(draft.priority);
-                  if (v != null && v != b) {
-                    draft.setPriority(priorityOfBucket(v));
-                  }
-                },
+            TrackPopover(
+              builder: (_, pc) => FSelect<String>.rich(
+                popoverControl: pc,
+                key: const Key('edit-priority'),
+                label: const Text('Priority'),
+                format: (v) => v,
+                control: FSelectControl.lifted(
+                  value: priorityBucket(draft.priority),
+                  onChange: (v) {
+                    final b = priorityBucket(draft.priority);
+                    if (v != null && v != b) {
+                      draft.setPriority(priorityOfBucket(v));
+                    }
+                  },
+                ),
+                children: [
+                  for (final p in const ['none', 'low', 'medium', 'high'])
+                    FSelectItem<String>(title: Text(p), value: p),
+                ],
               ),
-              children: [
-                for (final p in const ['none', 'low', 'medium', 'high'])
-                  FSelectItem<String>(title: Text(p), value: p),
-              ],
             ),
             field(
               key: const Key('edit-tags'),
               controller: draft.tagsController,
               label: 'Tags (comma separated)',
             ),
-            FSelect<String>.rich(
-              key: const Key('edit-parent'),
-              label: const Text('Inside'),
-              format: (v) => labels[v] ?? v,
-              control: FSelectControl.lifted(
-                value: parent ?? '',
-                onChange: (v) =>
-                    draft.setParent((v == null || v.isEmpty) ? null : v),
-              ),
-              children: [
-                for (final e in targets)
-                  FSelectItem<String>(
-                    title: Text(
-                      '${e.$2}${e.$3}',
-                      overflow: TextOverflow.ellipsis,
+            TrackPopover(
+              builder: (_, pc) => FSelect<String>.rich(
+                popoverControl: pc,
+                key: const Key('edit-parent'),
+                label: const Text('Inside'),
+                format: (v) => labels[v] ?? v,
+                control: FSelectControl.lifted(
+                  value: parent ?? '',
+                  onChange: (v) =>
+                      draft.setParent((v == null || v.isEmpty) ? null : v),
+                ),
+                children: [
+                  for (final e in targets)
+                    FSelectItem<String>(
+                      title: Text(
+                        '${e.$2}${e.$3}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      prefix: SizedBox(width: e.$4 * t.space.lg),
+                      value: e.$1 ?? '',
                     ),
-                    prefix: SizedBox(width: e.$4 * t.space.lg),
-                    value: e.$1 ?? '',
-                  ),
-              ],
+                ],
+              ),
             ),
             field(
               key: const Key('edit-body'),
@@ -413,33 +424,36 @@ class TaskDetail extends StatelessWidget {
                         if (edit)
                           SizedBox(
                             width: t.sizes.statusField,
-                            child: FSelect<String>.rich(
-                              key: const Key('task-status-menu'),
-                              format: (v) => _statusWords
-                                  .firstWhere(
-                                    (e) => e.$1 == v,
-                                    orElse: () => (v, v),
-                                  )
-                                  .$2,
-                              hint: status,
-                              control: FSelectControl.lifted(
-                                value: _statusWords.any((e) => e.$1 == status)
-                                    ? status
-                                    : null,
-                                onChange: (v) {
-                                  if (v != null && v != status) {
-                                    state.setTaskStatus(uid, v);
-                                  }
-                                },
+                            child: TrackPopover(
+                              builder: (_, pc) => FSelect<String>.rich(
+                                popoverControl: pc,
+                                key: const Key('task-status-menu'),
+                                format: (v) => _statusWords
+                                    .firstWhere(
+                                      (e) => e.$1 == v,
+                                      orElse: () => (v, v),
+                                    )
+                                    .$2,
+                                hint: status,
+                                control: FSelectControl.lifted(
+                                  value: _statusWords.any((e) => e.$1 == status)
+                                      ? status
+                                      : null,
+                                  onChange: (v) {
+                                    if (v != null && v != status) {
+                                      state.setTaskStatus(uid, v);
+                                    }
+                                  },
+                                ),
+                                children: [
+                                  for (final e in _statusWords)
+                                    FSelectItem<String>(
+                                      title: Text(e.$2),
+                                      value: e.$1,
+                                      enabled: !(e.$1 == 'done' && blocked),
+                                    ),
+                                ],
                               ),
-                              children: [
-                                for (final e in _statusWords)
-                                  FSelectItem<String>(
-                                    title: Text(e.$2),
-                                    value: e.$1,
-                                    enabled: !(e.$1 == 'done' && blocked),
-                                  ),
-                              ],
                             ),
                           )
                         else

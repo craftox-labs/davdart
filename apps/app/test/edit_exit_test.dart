@@ -1,5 +1,6 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/state/key_nav.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -152,9 +153,39 @@ void main() {
     });
   }
 
-  testWidgets('Esc with a dropdown open does not leave edit mode', (t) async {
-    final s = await open(t, kinds[0]);
-    // A click on the select focuses its field, then opens the menu.
+  testWidgets('Esc and Ctrl+Enter act on the focused area, not the other', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [Note(uid: 'n1', summary: 'Note one', description: 'body')],
+      tasks: [mkTask('k1', days: 0)],
+    );
+    await s.openNote('k1', mode: OpenMode.main);
+    s.select('n1');
+    await t.pumpAndSettle();
+    s.startTaskEdit('k1');
+    await t.pumpAndSettle();
+    expect(s.isEditing('k1'), isTrue);
+    expect(s.nav.area, NavArea.main);
+    // The peek (no editor) has the focus: the main edit is left alone.
+    s.nav.focusArea(NavArea.peek);
+    await t.pump();
+    await _esc(t);
+    expect(s.isEditing('k1'), isTrue);
+    s.nav.focusArea(NavArea.peek);
+    await t.pump();
+    await _ctrlEnter(t);
+    expect(s.isEditing('k1'), isTrue);
+    // With the main page focused, Esc leaves its edit.
+    s.nav.focusArea(NavArea.main);
+    s.nav.hide();
+    await t.pump();
+    await _esc(t);
+    expect(s.isEditing('k1'), isFalse);
+  });
+
+  Future<void> openSelect(WidgetTester t) async {
     final focus = find
         .descendant(of: _k('edit-status'), matching: find.byType(Focus))
         .evaluate()
@@ -164,14 +195,63 @@ void main() {
     await t.pump();
     await t.tap(_k('edit-status'));
     await t.pumpAndSettle();
+  }
+
+  testWidgets('Esc closes a real FSelect first; the second Esc leaves', (
+    t,
+  ) async {
+    final s = await open(t, kinds[0]);
+    await openSelect(t);
     expect(find.text('backlog'), findsWidgets);
-    // Esc does not leave edit mode while the dropdown is showing.
     await _esc(t);
-    expect(s.isEditing('n1'), isTrue);
-    // Closing it (a click outside) and pressing Esc again leaves.
-    await t.tapAt(const Offset(2, 2));
-    await t.pumpAndSettle();
     expect(find.text('backlog'), findsNothing);
+    expect(s.isEditing('n1'), isTrue);
+    await _esc(t);
+    expect(s.isEditing('n1'), isFalse);
+  });
+
+  testWidgets('Esc closes a real FDateField popover first; second leaves', (
+    t,
+  ) async {
+    final s = await open(t, kinds[1]);
+    await t.tap(_k('edit-due'));
+    await t.pumpAndSettle();
+    t.takeException(); // the test font overflows the calendar header
+    expect(find.byType(FCalendar), findsWidgets);
+    await _esc(t);
+    expect(find.byType(FCalendar), findsNothing);
+    expect(s.isEditing('k1'), isTrue);
+    await _esc(t);
+    expect(s.isEditing('k1'), isFalse);
+  });
+
+  testWidgets('a calendar outside any popover does not disable Esc', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [Note(uid: 'n1', summary: 'Note one', description: 'body')],
+    );
+    s.select('n1');
+    await t.pumpAndSettle();
+    s.startEdit('n1');
+    await t.pumpAndSettle();
+    // A permanent calendar added to the overlay, never in a popover.
+    final overlay = t.state<OverlayState>(find.byType(Overlay).first);
+    overlay.insert(
+      OverlayEntry(
+        builder: (_) => Align(
+          alignment: Alignment.bottomRight,
+          child: SizedBox(
+            width: 300,
+            child: FCalendar.grid(
+              selectionControl: FDateSelectionControl.managedSingle(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await t.pumpAndSettle();
+    t.takeException(); // the test font overflows the calendar header
+    expect(find.byType(FCalendar), findsOneWidget);
     await _esc(t);
     expect(s.isEditing('n1'), isFalse);
   });

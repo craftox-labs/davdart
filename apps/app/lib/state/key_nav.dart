@@ -55,6 +55,16 @@ class KeyNav extends ChangeNotifier {
   final Map<String, String?> _cursor = {};
   final Map<String, int> _lastIndex = {};
 
+  // Home: the block and row-in-block of the cursor's last known row.
+  String? _homeBlock;
+  int _homeRow = 0;
+
+  void _noteHome(List<NavEntry> rows, int i) {
+    if (i < 0 || i >= rows.length) return;
+    _homeBlock = rows[i].block;
+    _homeRow = rows.sublist(0, i).where((e) => e.block == rows[i].block).length;
+  }
+
   /// Direction of the last cursor move (+1 down, -1 up, 0 jump), for
   /// scrolling the row into view.
   int lastDir = 0;
@@ -194,6 +204,17 @@ class KeyNav extends ChangeNotifier {
     final c = _cursor[list];
     if (c == null || rows.isEmpty) return null;
     if (rows.any((e) => e.id == c)) return c;
+    if (list == homeList && _homeBlock != null) {
+      // Home: its row went (completed, deleted, moved): the previous row of
+      // the same card or column, else the next block's first row.
+      final same = [
+        for (final e in rows)
+          if (e.block == _homeBlock) e,
+      ];
+      if (same.isNotEmpty) {
+        return same[(_homeRow - 1).clamp(0, same.length - 1)].id;
+      }
+    }
     final i = (_lastIndex[list] ?? 0).clamp(0, rows.length - 1);
     return rows[i].id;
   }
@@ -216,6 +237,7 @@ class KeyNav extends ChangeNotifier {
     if (cursorId(list) == null) {
       _cursor[list] = rows.first.id;
       _lastIndex[list] = 0;
+      if (list == homeList) _noteHome(rows, 0);
     } else {
       _cursor[list] = cursorId(list);
     }
@@ -228,6 +250,7 @@ class KeyNav extends ChangeNotifier {
     if (i < 0) return;
     _cursor[list] = id;
     _lastIndex[list] = i;
+    if (list == homeList) _noteHome(rows, i);
     lastDir = dir;
     if (!silent) notifyListeners();
   }

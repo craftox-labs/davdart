@@ -1929,6 +1929,11 @@ class AppState extends ChangeNotifier {
   bool dirtyTaskFor(String uid) => _taskDrafts[uid]?.dirty ?? false;
 
   /// Starts editing task [uid] (no-op if read-only, unknown or already open).
+  /// Edit keys (Esc, Ctrl+Enter) act on the focused area's editor: the
+  /// area that shows [uid] takes the focus when its edit starts.
+  void _focusEditor(String uid) =>
+      nav.focusArea(uid == mainItemUid ? NavArea.main : NavArea.peek);
+
   void startTaskEdit(String uid) {
     final t = _taskById(uid);
     if (t == null || !tasksEditable || _taskDrafts.containsKey(uid)) return;
@@ -1943,6 +1948,7 @@ class AppState extends ChangeNotifier {
       originalDue: t.due,
       originalPriority: t.priority,
     );
+    _focusEditor(uid);
     notifyListeners();
   }
 
@@ -2302,6 +2308,7 @@ class AppState extends ChangeNotifier {
       end: end,
       status: e.status,
     );
+    _focusEditor(uid);
     notifyListeners();
   }
 
@@ -2659,6 +2666,7 @@ class AppState extends ChangeNotifier {
       originalParent: tree.find(n.uid)?.parent?.note.uid,
       originalStatus: boardOrder.contains(p.status) ? p.status : null,
     );
+    _focusEditor(uid);
     notifyListeners();
   }
 

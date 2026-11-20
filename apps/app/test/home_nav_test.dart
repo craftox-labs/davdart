@@ -131,6 +131,41 @@ void main() {
       expect(s.taskById('a')!.isClosed, isTrue);
     });
 
+    testWidgets('completing the cursor task lands on the previous row', (
+      t,
+    ) async {
+      final s = await _home(
+        t,
+        tasks: [mkTask('a', days: 0), mkTask('b', days: 0)],
+      );
+      await _press(t, _j);
+      expect(_cur(s), 'task-b');
+      await _press(t, LogicalKeyboardKey.keyX);
+      await t.pumpAndSettle();
+      expect(s.taskById('b')!.isClosed, isTrue);
+      expect(_cur(s), 'task-a');
+      await _press(t, _l); // h and l still work
+      expect(_cur(s), 'event-row-e1');
+      await _press(t, _h);
+      expect(_cur(s), 'task-a');
+    });
+
+    testWidgets('completing the last task row moves on, keys keep working', (
+      t,
+    ) async {
+      final s = await _home(t, tasks: [mkTask('a', days: 0)]);
+      await _press(t, LogicalKeyboardKey.keyX);
+      await t.pumpAndSettle();
+      expect(s.taskById('a')!.isClosed, isTrue);
+      expect(_cur(s), 'event-row-e1'); // the next block
+      await _press(t, _j);
+      expect(_cur(s), 'event-row-e1');
+      await _shift(t, LogicalKeyboardKey.bracketRight);
+      expect(_cur(s), 'card-n1');
+      await _press(t, _l); // h and l work on the board
+      expect(_cur(s), 'card-n3');
+    });
+
     testWidgets('an empty card is skipped by } and h l', (t) async {
       final s = await _home(t, events: const []);
       await _shift(t, LogicalKeyboardKey.bracketRight);

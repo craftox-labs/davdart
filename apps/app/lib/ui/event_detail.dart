@@ -1,3 +1,5 @@
+import 'popover_track.dart';
+
 import 'package:davdart/davdart.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -150,22 +152,25 @@ class EventEditor extends StatelessWidget {
             controller: draft.locationController,
             label: 'Location',
           ),
-          FSelect<String>.rich(
-            key: const Key('edit-status'),
-            label: const Text('Status'),
-            format: (v) => _statusName(v),
-            control: FSelectControl.lifted(
-              value: draft.status ?? '',
-              onChange: (v) {
-                if (v == null) return;
-                final next = v.isEmpty ? null : v;
-                if (next != draft.status) draft.setStatus(next);
-              },
+          TrackPopover(
+            builder: (_, pc) => FSelect<String>.rich(
+              popoverControl: pc,
+              key: const Key('edit-status'),
+              label: const Text('Status'),
+              format: (v) => _statusName(v),
+              control: FSelectControl.lifted(
+                value: draft.status ?? '',
+                onChange: (v) {
+                  if (v == null) return;
+                  final next = v.isEmpty ? null : v;
+                  if (next != draft.status) draft.setStatus(next);
+                },
+              ),
+              children: [
+                for (final e in _statusWords)
+                  FSelectItem<String>(title: Text(e.$2), value: e.$1),
+              ],
             ),
-            children: [
-              for (final e in _statusWords)
-                FSelectItem<String>(title: Text(e.$2), value: e.$1),
-            ],
           ),
           field(
             key: const Key('edit-tags'),

@@ -1,3 +1,5 @@
+import 'popover_track.dart';
+
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -40,16 +42,19 @@ class EventWhenFields extends StatelessWidget {
       ValueChanged<DateTime> set,
     ) {
       final day = DateTime.utc(v.year, v.month, v.day);
-      return FDateField.calendar(
-        key: Key('$keys-$id-date'),
-        label: Text(label),
-        selectionControl: FDateSelectionControl.liftedSingle(
-          value: day,
-          onChange: (d) {
-            if (d == null) return;
-            final picked = DateTime.utc(d.year, d.month, d.day);
-            if (picked != day) set(picked);
-          },
+      return TrackPopover(
+        builder: (_, pc) => FDateField.calendar(
+          popoverControl: pc,
+          key: Key('$keys-$id-date'),
+          label: Text(label),
+          selectionControl: FDateSelectionControl.liftedSingle(
+            value: day,
+            onChange: (d) {
+              if (d == null) return;
+              final picked = DateTime.utc(d.year, d.month, d.day);
+              if (picked != day) set(picked);
+            },
+          ),
         ),
       );
     }

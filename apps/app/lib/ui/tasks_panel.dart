@@ -1,3 +1,5 @@
+import 'popover_track.dart';
+
 import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -261,28 +263,34 @@ class _Filters extends StatelessWidget {
         if (folders.isNotEmpty)
           SizedBox(
             width: t.sizes.statusField,
-            child: FSelect<String>.rich(
-              key: const Key('tasks-folder-filter'),
-              format: (v) => v.isEmpty
-                  ? 'Everywhere'
-                  : folders.where((e) => e.$1 == v).firstOrNull?.$2 ?? v,
-              control: FSelectControl.lifted(
-                value: folder != null && folders.any((e) => e.$1 == folder)
-                    ? folder
-                    : '',
-                onChange: (v) => state.setTaskFolderFilter(
-                  v == null || v.isEmpty ? null : v,
-                ),
-              ),
-              children: [
-                FSelectItem<String>(title: const Text('Everywhere'), value: ''),
-                for (final e in folders)
-                  FSelectItem<String>(
-                    title: Text(e.$2, overflow: TextOverflow.ellipsis),
-                    prefix: SizedBox(width: e.$3 * t.space.lg),
-                    value: e.$1,
+            child: TrackPopover(
+              builder: (_, pc) => FSelect<String>.rich(
+                popoverControl: pc,
+                key: const Key('tasks-folder-filter'),
+                format: (v) => v.isEmpty
+                    ? 'Everywhere'
+                    : folders.where((e) => e.$1 == v).firstOrNull?.$2 ?? v,
+                control: FSelectControl.lifted(
+                  value: folder != null && folders.any((e) => e.$1 == folder)
+                      ? folder
+                      : '',
+                  onChange: (v) => state.setTaskFolderFilter(
+                    v == null || v.isEmpty ? null : v,
                   ),
-              ],
+                ),
+                children: [
+                  FSelectItem<String>(
+                    title: const Text('Everywhere'),
+                    value: '',
+                  ),
+                  for (final e in folders)
+                    FSelectItem<String>(
+                      title: Text(e.$2, overflow: TextOverflow.ellipsis),
+                      prefix: SizedBox(width: e.$3 * t.space.lg),
+                      value: e.$1,
+                    ),
+                ],
+              ),
             ),
           ),
       ],

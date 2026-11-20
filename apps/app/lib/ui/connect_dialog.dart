@@ -1,3 +1,5 @@
+import 'popover_track.dart';
+
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -92,32 +94,35 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
             if (found != null)
               found!.isEmpty
                   ? const Text('No note collections for this user.')
-                  : FSelect<String>.rich(
-                      key: const Key('connect-pick'),
-                      label: const Text('Collection'),
-                      format: (v) =>
-                          [
-                            for (final c in found!)
-                              if (c.path == v) c.name,
-                          ].firstOrNull ??
-                          v,
-                      control: FSelectControl.lifted(
-                        value: picked,
-                        onChange: (v) => setLocal(() {
-                          picked = v;
-                          path.text = v ?? '';
-                        }),
-                      ),
-                      children: [
-                        for (final c in found!)
-                          FSelectItem<String>(
-                            title: Text(
-                              c.name,
-                              overflow: TextOverflow.ellipsis,
+                  : TrackPopover(
+                      builder: (_, pc) => FSelect<String>.rich(
+                        popoverControl: pc,
+                        key: const Key('connect-pick'),
+                        label: const Text('Collection'),
+                        format: (v) =>
+                            [
+                              for (final c in found!)
+                                if (c.path == v) c.name,
+                            ].firstOrNull ??
+                            v,
+                        control: FSelectControl.lifted(
+                          value: picked,
+                          onChange: (v) => setLocal(() {
+                            picked = v;
+                            path.text = v ?? '';
+                          }),
+                        ),
+                        children: [
+                          for (final c in found!)
+                            FSelectItem<String>(
+                              title: Text(
+                                c.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              value: c.path,
                             ),
-                            value: c.path,
-                          ),
-                      ],
+                        ],
+                      ),
                     ),
             field(
               key: const Key('connect-path'),

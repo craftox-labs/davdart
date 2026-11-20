@@ -6,6 +6,7 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/note_draft.dart';
 import 'parts.dart';
+import 'popover_track.dart';
 import 'theme.dart';
 
 /// The unsaved-edits bar: an indicator while anything differs, plus Discard
@@ -134,45 +135,51 @@ class NoteEditor extends StatelessWidget {
               style: t.type.captionStyle.copyWith(color: t.error),
             ),
           if (!AppState.isFolder(note))
-            FSelect<String>.rich(
-              key: const Key('edit-status'),
-              label: const Text('Status'),
-              format: (v) => v,
-              hint: 'none',
-              control: FSelectControl.lifted(
-                value: draft.status,
-                onChange: (v) => draft.setStatus(v),
+            TrackPopover(
+              builder: (_, pc) => FSelect<String>.rich(
+                popoverControl: pc,
+                key: const Key('edit-status'),
+                label: const Text('Status'),
+                format: (v) => v,
+                hint: 'none',
+                control: FSelectControl.lifted(
+                  value: draft.status,
+                  onChange: (v) => draft.setStatus(v),
+                ),
+                children: [
+                  for (final s in boardOrder)
+                    FSelectItem<String>(title: Text(s), value: s),
+                ],
               ),
-              children: [
-                for (final s in boardOrder)
-                  FSelectItem<String>(title: Text(s), value: s),
-              ],
             ),
           field(
             key: const Key('edit-tags'),
             controller: draft.tagsController,
             label: 'Tags (comma separated)',
           ),
-          FSelect<String>.rich(
-            key: const Key('edit-parent'),
-            label: const Text('Inside'),
-            format: (v) => labels[v] ?? v,
-            control: FSelectControl.lifted(
-              value: parent ?? '',
-              onChange: (v) =>
-                  draft.setParent((v == null || v.isEmpty) ? null : v),
-            ),
-            children: [
-              for (final e in targets)
-                FSelectItem<String>(
-                  title: Text(
-                    e.$3 ? '${e.$2}  (folder)' : e.$2,
-                    overflow: TextOverflow.ellipsis,
+          TrackPopover(
+            builder: (_, pc) => FSelect<String>.rich(
+              popoverControl: pc,
+              key: const Key('edit-parent'),
+              label: const Text('Inside'),
+              format: (v) => labels[v] ?? v,
+              control: FSelectControl.lifted(
+                value: parent ?? '',
+                onChange: (v) =>
+                    draft.setParent((v == null || v.isEmpty) ? null : v),
+              ),
+              children: [
+                for (final e in targets)
+                  FSelectItem<String>(
+                    title: Text(
+                      e.$3 ? '${e.$2}  (folder)' : e.$2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    prefix: SizedBox(width: e.$4 * t.space.lg),
+                    value: e.$1 ?? '',
                   ),
-                  prefix: SizedBox(width: e.$4 * t.space.lg),
-                  value: e.$1 ?? '',
-                ),
-            ],
+              ],
+            ),
           ),
           field(
             key: const Key('edit-body'),
@@ -192,25 +199,6 @@ bool imeComposing() {
   final c = FocusManager.instance.primaryFocus?.context;
   final ed = c?.findAncestorStateOfType<EditableTextState>();
   return ed != null && ed.textEditingValue.composing.isValid;
-}
-
-/// Whether a dropdown, picker or calendar popover is showing (or still
-/// animating closed): Esc belongs to it first. Found by the content widget
-/// forui builds only while its popover is open.
-bool popoverOpen() {
-  var open = false;
-  final re = RegExp(r'^(Content<|FCalendar|FTimePicker|FPicker|FAutocomplete)');
-  void visit(Element e) {
-    if (open) return;
-    if (re.hasMatch(e.widget.runtimeType.toString())) {
-      open = true;
-      return;
-    }
-    e.visitChildren(visit);
-  }
-
-  WidgetsBinding.instance.rootElement?.visitChildren(visit);
-  return open;
 }
 
 /// Keys of an open edit, while the focus is inside the editor: Esc leaves
@@ -239,7 +227,8 @@ class EditKeys extends StatelessWidget {
           !kb.isControlPressed &&
           !kb.isMetaPressed &&
           !kb.isAltPressed) {
-        if (imeComposing() || popoverOpen()) return KeyEventResult.ignored;
+        if (imeComposing()) return KeyEventResult.ignored;
+        if (PopoverTracker.instance.dismiss()) return KeyEventResult.handled;
         state.leaveEdit(uid);
         return KeyEventResult.handled;
       }
