@@ -8,6 +8,7 @@ import '../state/note_draft.dart';
 import 'parts.dart';
 import 'popover_track.dart';
 import 'theme.dart';
+import 'vim_field.dart';
 
 /// The unsaved-edits bar: an indicator while anything differs, plus Discard
 /// and Save.
@@ -181,11 +182,12 @@ class NoteEditor extends StatelessWidget {
               ],
             ),
           ),
-          field(
-            key: const Key('edit-body'),
+          VimField(
+            state: state,
+            uid: draft.uid,
             controller: draft.bodyController,
+            fieldKey: const Key('edit-body'),
             minLines: full ? t.sizes.editorLinesFull : t.sizes.editorLines,
-            maxLines: null,
             label: 'Text',
           ),
         ],

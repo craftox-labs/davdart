@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/widgets.dart';
 
 import 'app_state.dart';
+import 'vim_editor/vim_keys.dart';
 
 /// What an action runs with: the app state, plus a [context] below the
 /// Navigator for the actions that open a dialog. [openPalette] reopens the
@@ -102,7 +103,10 @@ const knownShortcuts = <(String, String)>[
 /// Keys of an open edit that live in the editors, for the Edit group of the
 /// help dialog (Ctrl/Cmd+Enter is a registry action).
 const editShortcuts = <(String, String)>[
-  ('Esc', 'Leave edit mode (asks first if unsaved)'),
+  (
+    'Esc',
+    'Leave edit mode (asks first if unsaved); in the Vim editor: leave Insert',
+  ),
 ];
 
 /// The help dialog's groups, in order. An action sits in the group named by
@@ -116,6 +120,7 @@ const helpGroups = [
   'Panes',
   'App',
   chordGroup,
+  vimHelpGroup,
 ];
 
 String helpGroupOf(String group) => switch (group) {
@@ -140,6 +145,7 @@ List<(String, List<(String, String)>)> helpRows(List<AppAction> actions) {
   }
   by['Edit']!.addAll(editShortcuts);
   by['App']!.addAll(knownShortcuts);
+  by[vimHelpGroup]!.addAll(vimHelpRows);
   return [
     for (final g in helpGroups)
       if (by[g]!.isNotEmpty) (g, by[g]!),

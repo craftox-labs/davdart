@@ -171,9 +171,11 @@ class AppState extends ChangeNotifier {
         ? OpenMode.main
         : OpenMode.peek;
     vimKeys = prefs?.read(_vimKeysKey) != 'false';
+    vimEditor = prefs?.read(_vimEditorKey) != 'false';
   }
 
   static const _vimKeysKey = 'davdart.vim.keys.v1';
+  static const _vimEditorKey = 'davdart.vim.editor.v1';
 
   ChordKeymap? _chords;
   String? _chordsSig;
@@ -204,6 +206,23 @@ class AppState extends ChangeNotifier {
       prefs?.write(_vimKeysKey, 'false');
     }
     nav.clearPending();
+    notifyListeners();
+  }
+
+  /// The setting "Vim editing" (default on): modal editing (Normal, Insert,
+  /// Visual) in the long text fields of the note, task and event editors.
+  /// Keyboard only: the touch layout never uses it. Off keeps the plain
+  /// field and Esc leaving edit mode.
+  bool vimEditor = true;
+
+  void setVimEditor(bool v) {
+    if (vimEditor == v) return;
+    vimEditor = v;
+    if (v) {
+      prefs?.remove(_vimEditorKey);
+    } else {
+      prefs?.write(_vimEditorKey, 'false');
+    }
     notifyListeners();
   }
 
@@ -1976,7 +1995,7 @@ class AppState extends ChangeNotifier {
 
   /// Saves the edit of task [uid]. Text typed while the save runs stays as
   /// the draft, still dirty. False if nothing was saved.
-  Future<bool> saveTaskDraft(String uid) async {
+  Future<bool> saveTaskDraft(String uid, {bool stay = false}) async {
     final d = _taskDrafts[uid];
     if (d == null || d.titleEmpty) return false;
     final title = d.titleController.text;
@@ -2007,7 +2026,7 @@ class AppState extends ChangeNotifier {
         due: due,
         priority: priority,
       );
-      if (!d.dirty) _taskDrafts.remove(uid);
+      if (!d.dirty && !stay) _taskDrafts.remove(uid);
     }
     notifyListeners();
     return true;
@@ -2336,7 +2355,7 @@ class AppState extends ChangeNotifier {
 
   /// Saves the edit of event [uid]. Text typed while the save runs stays as
   /// the draft, still dirty. False if nothing was saved.
-  Future<bool> saveEventDraft(String uid) async {
+  Future<bool> saveEventDraft(String uid, {bool stay = false}) async {
     final d = _eventDrafts[uid];
     if (d == null || d.titleEmpty || d.endBeforeStart) return false;
     final title = d.titleController.text;
@@ -2372,7 +2391,7 @@ class AppState extends ChangeNotifier {
         end: end,
         status: status,
       );
-      if (!d.dirty) _eventDrafts.remove(uid);
+      if (!d.dirty && !stay) _eventDrafts.remove(uid);
     }
     notifyListeners();
     return true;
@@ -2697,7 +2716,7 @@ class AppState extends ChangeNotifier {
   /// Saves the edit of note [uid] (the peek note by default) through
   /// [updateNote] (and [setStatus] when the status changed). False if
   /// nothing was saved (empty title, failure).
-  Future<bool> saveDraft([String? uid]) async {
+  Future<bool> saveDraft([String? uid, bool stay = false]) async {
     final key = uid ?? peekUid;
     final d = key == null ? null : _drafts[key];
     if (d == null || d.titleEmpty) return false;
@@ -2729,7 +2748,7 @@ class AppState extends ChangeNotifier {
       );
       // Nothing typed meanwhile: the edit is done. Otherwise the newer text
       // stays as the draft, still dirty.
-      if (!d.dirty) _drafts.remove(key);
+      if (!d.dirty && !stay) _drafts.remove(key);
     }
     notifyListeners();
     return true;
@@ -2756,6 +2775,25 @@ class AppState extends ChangeNotifier {
     if (!await _settleDrafts([uid])) return false;
     if (isEditing(uid)) _dropDraft(uid);
     return true;
+  }
+
+  /// Saves the edit of [uid] and stays in edit mode (`:w` in the Vim
+  /// editor). A clean edit does nothing. False when nothing was saved.
+  Future<bool> saveEdit(String uid) async {
+    if (!isEditing(uid)) return true;
+    if (_taskDrafts.containsKey(uid)) {
+      return dirtyTaskFor(uid) ? saveTaskDraft(uid, stay: true) : true;
+    }
+    if (_eventDrafts.containsKey(uid)) {
+      return dirtyEventFor(uid) ? saveEventDraft(uid, stay: true) : true;
+    }
+    return dirtyFor(uid) ? saveDraft(uid, true) : true;
+  }
+
+  /// Leaves edit mode for [uid] and drops the unsaved changes without asking
+  /// (`:q!` in the Vim editor).
+  void discardEdit(String uid) {
+    if (isEditing(uid)) _dropDraft(uid);
   }
 
   /// Saves the edit of [uid] and leaves edit mode (Ctrl/Cmd+Enter, the Save

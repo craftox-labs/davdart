@@ -12,6 +12,15 @@ import 'note_editor.dart' show imeComposing;
 import 'popover_track.dart';
 import 'theme.dart';
 
+/// Actions that move the keyboard's area or view: a text field gives up the
+/// focus for them (chords, the Vim editor's Space leader).
+bool navigatingAction(String id) =>
+    id.startsWith('focus.') ||
+    id.startsWith('go.') ||
+    id.startsWith('tab.') ||
+    id == 'panel.toggle' ||
+    id == 'peek.toggle';
+
 /// Rows are all built (a big cache extent) so a cursor can scroll to any row.
 final navCacheExtent = ScrollCacheExtent.pixels(100000);
 
@@ -148,15 +157,6 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
     super.dispose();
   }
 
-  /// Actions whose chord moves the keyboard's area or view: a text field
-  /// gives up the focus for them.
-  static bool _navigating(String id) =>
-      id.startsWith('focus.') ||
-      id.startsWith('go.') ||
-      id.startsWith('tab.') ||
-      id == 'panel.toggle' ||
-      id == 'peek.toggle';
-
   /// The global chord layer: runs the action bound to [e], also while a text
   /// field has focus. A chord is always handled (also repeats, and when the
   /// action is not enabled) so it never reaches the field or the browser;
@@ -169,7 +169,7 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
     if (e is! KeyDownEvent) return KeyEventResult.handled;
     final a = buildActions(state).where((a) => a.id == id).firstOrNull;
     if (a == null || !a.enabled(state)) return KeyEventResult.handled;
-    if (_navigating(id)) {
+    if (navigatingAction(id)) {
       if (_typing) nav.node.requestFocus();
       nav.markShown();
     }

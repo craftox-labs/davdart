@@ -753,6 +753,26 @@ class SettingsSection extends _Section {
           onChange: state.setVimKeys,
         ),
       ),
+      Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: tokensOf(context).space.md,
+          vertical: tokensOf(context).space.xs,
+        ),
+        child: FCheckbox(
+          key: const Key('vim-editor'),
+          label: const Text('Vim editing'),
+          description: Text(
+            isTouchPlatform
+                ? 'Needs a keyboard: off on phones and tablets.'
+                : 'Modal editing (Normal, Insert, Visual) in text bodies; '
+                      'press ? for the keys.',
+          ),
+          semanticsLabel: 'Vim editing',
+          enabled: !isTouchPlatform,
+          value: state.vimEditor && !isTouchPlatform,
+          onChange: state.setVimEditor,
+        ),
+      ),
       _label(context, 'ABOUT'),
       const _Muted('davdart: notes and plans, kept in Spaces.'),
     ],

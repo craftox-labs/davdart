@@ -754,7 +754,7 @@ void main() {
     }
 
     testWidgets('wide: three columns, nothing scrolls, no overflow', (t) async {
-      await open(t, const Size(1400, 1100));
+      await open(t, const Size(1400, 1400));
       expect(_k('help-columns-3'), findsOneWidget);
       expect(t.takeException(), isNull);
       expect(t.getSize(_k('help-columns-3')).width, greaterThan(1000));

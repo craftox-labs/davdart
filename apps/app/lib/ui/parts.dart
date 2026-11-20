@@ -265,6 +265,8 @@ FTextField field({
   int? maxLines = 1,
   ValueChanged<String>? onChange,
   ValueChanged<String>? onSubmit,
+  bool readOnly = false,
+  bool? showCursor,
 }) {
   var last = controller.text;
   return FTextField(
@@ -291,6 +293,8 @@ FTextField field({
     minLines: minLines,
     maxLines: maxLines,
     onSubmit: onSubmit,
+    readOnly: readOnly,
+    showCursor: showCursor,
   );
 }
 

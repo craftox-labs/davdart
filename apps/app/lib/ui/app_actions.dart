@@ -535,6 +535,14 @@ List<AppAction> buildActions(AppState state) {
       enabled: yes,
       run: (c) => c.state.setVimKeys(!c.state.vimKeys),
     ),
+    AppAction(
+      id: 'setting.vim-editor',
+      title: state.vimEditor ? 'Turn Vim editing off' : 'Turn Vim editing on',
+      group: 'Settings',
+      keywords: const ['setting', 'keyboard', 'vim', 'editor', 'modal', 'text'],
+      enabled: yes,
+      run: (c) => c.state.setVimEditor(!c.state.vimEditor),
+    ),
     key('nav.down', 'Move down', 'Navigation', const ['j', 'Down'], (c) {
       motion(c, 1);
     }),
@@ -707,6 +715,15 @@ Future<void> showKeyboardHelp(BuildContext context, AppState state) {
             child: Text(
               'Vim keys are off: only the arrow keys, Enter, Esc and the '
               'Ctrl/Cmd chords work.',
+              style: t.type.captionStyle.copyWith(color: t.muted),
+            ),
+          ),
+        if (!state.vimEditor)
+          Padding(
+            padding: EdgeInsets.only(bottom: t.space.md),
+            child: Text(
+              'Vim editing is off (Settings, Keyboard): the editors use plain '
+              'text fields.',
               style: t.type.captionStyle.copyWith(color: t.muted),
             ),
           ),

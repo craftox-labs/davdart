@@ -15,6 +15,7 @@ import 'task_menu.dart';
 import 'task_parts.dart';
 import 'note_editor.dart';
 import 'theme.dart';
+import 'vim_field.dart';
 
 const _statusWords = [
   ('todo', 'needs-action'),
@@ -242,11 +243,12 @@ class TaskEditor extends StatelessWidget {
                 ],
               ),
             ),
-            field(
-              key: const Key('edit-body'),
+            VimField(
+              state: state,
+              uid: draft.uid,
               controller: draft.bodyController,
+              fieldKey: const Key('edit-body'),
               minLines: full ? t.sizes.editorLinesFull : t.sizes.editorLines,
-              maxLines: null,
               label: 'Description',
             ),
           ],

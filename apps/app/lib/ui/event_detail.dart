@@ -15,6 +15,7 @@ import 'markdown_lite.dart';
 import 'parts.dart';
 import 'note_editor.dart';
 import 'theme.dart';
+import 'vim_field.dart';
 
 const _statusWords = [
   ('', 'none'),
@@ -177,11 +178,12 @@ class EventEditor extends StatelessWidget {
             controller: draft.tagsController,
             label: 'Tags (comma separated)',
           ),
-          field(
-            key: const Key('edit-body'),
+          VimField(
+            state: state,
+            uid: draft.uid,
             controller: draft.bodyController,
+            fieldKey: const Key('edit-body'),
             minLines: full ? t.sizes.editorLinesFull : t.sizes.editorLines,
-            maxLines: null,
             label: 'Description',
           ),
         ],
