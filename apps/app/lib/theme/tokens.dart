@@ -1,5 +1,6 @@
 import 'dart:ui' show Color, FontWeight;
 
+import 'package:flutter/animation.dart' show Curve, Curves;
 import 'package:flutter/painting.dart' show TextStyle;
 
 // HOW TO RETHEME
@@ -151,6 +152,18 @@ class RadiusTokens {
   final double tab;
 }
 
+/// Motion: how the side panes slide open and shut.
+class MotionTokens {
+  const MotionTokens({
+    this.slide = const Duration(milliseconds: 200),
+    this.curve = Curves.easeOutCubic,
+  });
+
+  /// Time for a pane to slide between closed and open.
+  final Duration slide;
+  final Curve curve;
+}
+
 /// Border widths.
 class BorderTokens {
   const BorderTokens({this.hairline = 1, this.focus = 2});
@@ -290,6 +303,7 @@ class Tokens {
     this.borders = const BorderTokens(),
     this.icons = const IconTokens(),
     this.sizes = const SizeTokens(),
+    this.motion = const MotionTokens(),
   });
 
   /// Window background: behind the rail and around the panel.
@@ -368,6 +382,7 @@ class Tokens {
   final BorderTokens borders;
   final IconTokens icons;
   final SizeTokens sizes;
+  final MotionTokens motion;
 
   /// A copy with some colours or groups replaced (used by tests and previews).
   Tokens copyWith({
@@ -414,6 +429,7 @@ class Tokens {
     borders: borders ?? this.borders,
     icons: icons ?? this.icons,
     sizes: sizes ?? this.sizes,
+    motion: motion,
   );
 
   // Neutral placeholders; real colours come later.

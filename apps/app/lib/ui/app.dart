@@ -86,13 +86,90 @@ class DavdartApp extends StatelessWidget {
 
 /// Sidebar, main view and detail, arranged by width: three panes on a wide
 /// screen, sidebar plus one pane in the middle, a drawer and one pane on a
-/// phone.
-class Shell extends StatelessWidget {
+/// phone. The docked sidebar and (split layout) the peek slide open and shut.
+class Shell extends StatefulWidget {
   const Shell({super.key, required this.state});
   final AppState state;
 
   @override
+  State<Shell> createState() => _ShellState();
+}
+
+/// Fits [child], laid out at [full] width, into a box [width] wide anchored
+/// on the pane's outer edge, so the pane slides in and out without its
+/// content reflowing.
+class _Slide extends StatelessWidget {
+  const _Slide({
+    super.key,
+    required this.width,
+    required this.full,
+    required this.mirror,
+    required this.outerStart,
+    required this.child,
+  });
+  final double width, full;
+  final bool mirror;
+
+  /// The pane's outer edge is the start (left) edge when not mirrored.
+  final bool outerStart;
+  final Widget child;
+
+  @override
   Widget build(BuildContext context) {
+    // Fully open: no clip, so a tab's edge stroke may reach into the divider.
+    if (width >= full) return SizedBox(width: full, child: child);
+    final left = mirror != outerStart;
+    return SizedBox(
+      width: width,
+      child: ClipRect(
+        child: OverflowBox(
+          alignment: left ? Alignment.topLeft : Alignment.topRight,
+          minWidth: full,
+          maxWidth: full,
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _ShellState extends State<Shell> with TickerProviderStateMixin {
+  late final AnimationController _dock = AnimationController(
+    vsync: this,
+    value: _dockOpen ? 1 : 0,
+  );
+  late final AnimationController _peek = AnimationController(
+    vsync: this,
+    value: widget.state.peek != null && !widget.state.peekCollapsed ? 1 : 0,
+  );
+
+  /// The last peeked note, kept mounted while the pane slides shut.
+  String? _heldPeek;
+
+  bool get _dockOpen => !widget.state.sidebarCollapsed;
+
+  @override
+  void dispose() {
+    _dock.dispose();
+    _peek.dispose();
+    super.dispose();
+  }
+
+  /// Drives [c] to open or shut: animated, or at once when [animate] is off.
+  void _drive(AnimationController c, bool open, Tokens t, bool animate) {
+    c.duration = animate ? t.motion.slide : Duration.zero;
+    if (!animate) {
+      c.value = open ? 1 : 0;
+    } else if (open && !c.isForwardOrCompleted) {
+      c.forward();
+    } else if (!open && c.status != AnimationStatus.reverse && c.value > 0) {
+      c.reverse();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
     return ListenableBuilder(
       listenable: state,
       builder: (context, _) => LayoutBuilder(
@@ -100,211 +177,267 @@ class Shell extends StatelessWidget {
           final t = tokensOf(context);
           final wide = c.maxWidth >= Tokens.wideBreakpoint;
           final split = c.maxWidth >= Tokens.splitBreakpoint;
-          // The peek (single side slot) and the main pane are independent.
-          // Collapsed, the peek keeps its note but takes no room.
-          final peekUid = state.peekUid;
           // Only the wide header row has the expand button, so below it a
           // collapsed peek shows again.
           final collapsedPeek =
               wide && state.peek != null && state.peekCollapsed;
           final hasDetail = state.peek != null && !collapsedPeek;
-          final mainNote = state.mainNoteUid;
-
-          Widget main() => mainNote != null
-              ? DetailView(
-                  key: const Key('main-note'),
-                  state: state,
-                  uid: mainNote,
-                  // Below wide there is no strip: Back returns home.
-                  onClose: () => state.activateTab(null),
-                  full: wide,
-                )
-              : Column(
-                  children: [
-                    ScopeBar(state: state),
-                    Expanded(
-                      child: state.view == ViewMode.board
-                          ? BoardView(state: state)
-                          : NoteListView(state: state),
-                    ),
-                  ],
-                );
-
-          Widget peekView({bool header = false}) => DetailView(
-            key: const Key('peek-view'),
-            state: state,
-            uid: peekUid!,
-            onClose: () => state.guarded(() => state.select(null)),
-            inHeader: header,
-          );
-
-          final mirror = state.layoutSide == LayoutSide.end;
-          final Widget body;
-          if (split) {
-            body = LayoutBuilder(
-              builder: (context, bc) {
-                final z = t.sizes;
-                final hi = detailMaxFor(t, bc.maxWidth);
-                final width = detailWidthFor(t, state, bc.maxWidth);
-                final divider = Container(
-                  width: t.borders.hairline,
-                  color: t.panelBorder,
-                );
-                final detail = !hasDetail
-                    ? const SizedBox.shrink()
-                    : SizedBox(
-                        key: const Key('detail-pane'),
-                        width: width,
-                        child: Stack(
-                          children: [
-                            peekView(header: true),
-                            Positioned(
-                              top: 0,
-                              bottom: 0,
-                              left: mirror ? null : 0,
-                              right: mirror ? 0 : null,
-                              child: PaneResizeHandle(
-                                key: const Key('detail-handle'),
-                                width: width,
-                                min: z.detailMin,
-                                max: hi,
-                                grow: mirror ? 1 : -1,
-                                onResize: (w) =>
-                                    state.setDetailWidth(w, save: false),
-                                onEnd: () =>
-                                    state.setDetailWidth(state.detailWidth),
-                                onReset: () => state.setDetailWidth(null),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                return Row(
-                  children: [
-                    if (mirror && hasDetail) ...[detail, divider],
-                    Expanded(
-                      child: PromoteTarget(state: state, child: main()),
-                    ),
-                    if (!mirror && hasDetail) ...[divider, detail],
-                  ],
-                );
-              },
-            );
-          } else if (hasDetail) {
-            // Wide but not split: the peeked note replaces the main area;
-            // Promote and Collapse are on the header's peek tab.
-            body = peekView(header: wide);
-          } else {
-            body = main();
-          }
-
-          Widget content = FScaffold(
-            childPad: false,
-            // A main note tab is a full page: no search or view switch.
-            header: mainNote != null && wide
-                ? null
-                : TopBar(state: state, showMenu: !wide),
-            child: body,
-          );
-          if (wide && !state.sidebarCollapsed) {
-            // Docked beside the content, on the side facing it: left of it
-            // normally, right of it when the rail is on the right.
-            final dock = IconTheme(
-              data: context.theme.style.iconStyle,
-              child: DockedSidebar(state: state),
-            );
-            content = Row(
-              children: [
-                if (!mirror) dock,
-                Expanded(child: content),
-                if (mirror) dock,
-              ],
-            );
-          }
-
-          // The header row, over the panel: the tab strip above the main
-          // content, the peek's tab above the peek pane, the side panel's
-          // width left empty.
-          Widget header(BuildContext context, double panelWidth) {
-            final dockW = state.sidebarCollapsed
-                ? 0.0
-                : sidebarWidthOf(context, state);
-            final contentW = panelWidth - dockW;
-            // Beside the list the tab spans the pane; where the note replaces
-            // the list (not split) it is a compact tab at the end of the row.
-            final detailW = hasDetail
-                ? (split
-                      ? detailWidthFor(t, state, contentW)
-                      : t.sizes.detailTab.clamp(0.0, contentW))
-                : null;
-            // Clear of the panel's rounded corner where the strip starts at
-            // the panel edge, else just the concave corner.
-            final edgePad = t.radii.panel + t.radii.tab;
-            final strip = Expanded(
-              child: PromoteTarget(
-                state: state,
-                child: TabStrip(
-                  state: state,
-                  // Beside a divider (the side panel or the peek) the home
-                  // tab lines up with it; at the panel's corner it keeps the
-                  // clearance for the rounded corner.
-                  flushStart: mirror ? detailW != null : dockW > 0,
-                  startPad: (mirror ? detailW != null : dockW > 0)
-                      ? 0
-                      : edgePad,
-                  endPad: !mirror && detailW != null ? t.radii.tab : t.space.sm,
-                ),
-              ),
-            );
-            final detail = detailW == null
-                ? (collapsedPeek
-                      ? PeekExpandButton(state: state, mirror: mirror)
-                      : null)
-                : DetailHeader(state: state, width: detailW, mirror: mirror);
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (mirror) ?detail else SizedBox(width: dockW),
-                // Mirrored, the peek's divider column sits between the
-                // peek header and the strip, so the home tab starts after it.
-                if (mirror && detailW != null)
-                  SizedBox(width: t.borders.hairline),
-                strip,
-                if (mirror) SizedBox(width: dockW) else ?detail,
-              ],
-            );
-          }
-
-          return _LeaveGuard(
-            state: state,
-            child: SafeArea(
-              child: wide
-                  ? CallbackShortcuts(
-                      bindings: {
-                        const SingleActivator(
-                          LogicalKeyboardKey.keyW,
-                          control: true,
-                        ): state.closeActiveTab,
-                        const SingleActivator(
-                          LogicalKeyboardKey.keyW,
-                          meta: true,
-                        ): state.closeActiveTab,
-                      },
-                      // Focus so the shortcuts work before anything is clicked.
-                      child: Focus(
-                        autofocus: true,
-                        child: ShellFrame(
-                          state: state,
-                          showRail: true,
-                          header: header,
-                          child: content,
-                        ),
-                      ),
-                    )
-                  : ShellFrame(state: state, showRail: false, child: content),
+          final animate = !MediaQuery.disableAnimationsOf(context);
+          if (state.peekUid != null) _heldPeek = state.peekUid;
+          _drive(_dock, wide && _dockOpen, t, animate && wide);
+          _drive(_peek, hasDetail, t, animate && split);
+          return AnimatedBuilder(
+            animation: Listenable.merge([_dock, _peek]),
+            builder: (context, _) => _layout(
+              context,
+              c,
+              wide: wide,
+              split: split,
+              collapsedPeek: collapsedPeek,
+              hasDetail: hasDetail,
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _layout(
+    BuildContext context,
+    BoxConstraints c, {
+    required bool wide,
+    required bool split,
+    required bool collapsedPeek,
+    required bool hasDetail,
+  }) {
+    final state = widget.state;
+    final t = tokensOf(context);
+    final curve = t.motion.curve;
+    final dockF = curve.transform(_dock.value);
+    final peekF = split ? curve.transform(_peek.value) : 1.0;
+    // The peek pane stays while it slides shut, with its last note.
+    final showDetail = split ? (hasDetail || _peek.value > 0) : hasDetail;
+    final showDock = wide && (_dockOpen || _dock.value > 0);
+    final peekUid = state.peekUid ?? _heldPeek;
+    final mainNote = state.mainNoteUid;
+
+    Widget main() => mainNote != null
+        ? DetailView(
+            key: const Key('main-note'),
+            state: state,
+            uid: mainNote,
+            // Below wide there is no strip: Back returns home.
+            onClose: () => state.activateTab(null),
+            full: wide,
+          )
+        : Column(
+            children: [
+              ScopeBar(state: state),
+              Expanded(
+                child: state.view == ViewMode.board
+                    ? BoardView(state: state)
+                    : NoteListView(state: state),
+              ),
+            ],
+          );
+
+    Widget peekView({bool header = false}) => DetailView(
+      key: const Key('peek-view'),
+      state: state,
+      uid: peekUid!,
+      onClose: () => state.guarded(() => state.select(null)),
+      inHeader: header,
+    );
+
+    // A main note tab is a full page: no search or view switch.
+    final showTopBar = !(mainNote != null && wide);
+    final mirror = state.layoutSide == LayoutSide.end;
+    final Widget body;
+    if (split) {
+      body = LayoutBuilder(
+        builder: (context, bc) {
+          final z = t.sizes;
+          final hi = detailMaxFor(t, bc.maxWidth);
+          final full = detailWidthFor(t, state, bc.maxWidth);
+          final divider = Container(
+            width: t.borders.hairline,
+            color: t.panelBorder,
+          );
+          final detail = !showDetail
+              ? const SizedBox.shrink()
+              : _Slide(
+                  key: const Key('detail-pane'),
+                  width: full * peekF,
+                  full: full,
+                  mirror: mirror,
+                  outerStart: false,
+                  child: SizedBox(
+                    width: full,
+                    child: Stack(
+                      children: [
+                        peekView(header: true),
+                        Positioned(
+                          top: 0,
+                          bottom: 0,
+                          left: mirror ? null : 0,
+                          right: mirror ? 0 : null,
+                          child: PaneResizeHandle(
+                            key: const Key('detail-handle'),
+                            width: full,
+                            min: z.detailMin,
+                            max: hi,
+                            grow: mirror ? 1 : -1,
+                            onResize: (w) =>
+                                state.setDetailWidth(w, save: false),
+                            onEnd: () =>
+                                state.setDetailWidth(state.detailWidth),
+                            onReset: () => state.setDetailWidth(null),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+          // The top bar belongs to the main section: the peek is its own
+          // pane, full height beside it.
+          final mainColumn = Column(
+            children: [
+              if (showTopBar) TopBar(state: state, showMenu: !wide),
+              Expanded(
+                child: PromoteTarget(state: state, child: main()),
+              ),
+            ],
+          );
+          return Row(
+            children: [
+              if (mirror && showDetail) ...[detail, divider],
+              Expanded(child: mainColumn),
+              if (!mirror && showDetail) ...[divider, detail],
+            ],
+          );
+        },
+      );
+    } else if (hasDetail) {
+      // Wide but not split: the peeked note replaces the main area;
+      // Promote and Collapse are on the header's peek tab.
+      body = peekView(header: wide);
+    } else {
+      body = main();
+    }
+
+    Widget content = FScaffold(
+      childPad: false,
+      header: split || !showTopBar
+          ? null
+          : TopBar(state: state, showMenu: !wide),
+      child: body,
+    );
+    if (showDock) {
+      // Docked beside the content, on the side facing it: left of it
+      // normally, right of it when the rail is on the right.
+      final full = sidebarWidthOf(context, state);
+      final dock = _Slide(
+        key: const Key('dock-pane'),
+        width: full * dockF,
+        full: full,
+        mirror: mirror,
+        outerStart: true,
+        child: IconTheme(
+          data: context.theme.style.iconStyle,
+          child: DockedSidebar(state: state),
+        ),
+      );
+      content = Row(
+        children: [
+          if (!mirror) dock,
+          Expanded(child: content),
+          if (mirror) dock,
+        ],
+      );
+    }
+
+    // The header row, over the panel: the tab strip above the main
+    // content, the peek's tab above the peek pane, the side panel's
+    // width left empty.
+    Widget header(BuildContext context, double panelWidth) {
+      final dockW = showDock ? sidebarWidthOf(context, state) * dockF : 0.0;
+      final contentW = panelWidth - dockW;
+      // Beside the list the tab spans the pane; where the note replaces
+      // the list (not split) it is a compact tab at the end of the row.
+      final detailFull = showDetail
+          ? (split
+                ? detailWidthFor(t, state, contentW)
+                : t.sizes.detailTab.clamp(0.0, contentW))
+          : null;
+      final detailW = detailFull == null ? null : detailFull * peekF;
+      // Clear of the panel's rounded corner where the strip starts at
+      // the panel edge, else just the concave corner.
+      final edgePad = t.radii.panel + t.radii.tab;
+      final strip = Expanded(
+        child: PromoteTarget(
+          state: state,
+          child: TabStrip(
+            state: state,
+            // Beside a divider (the side panel or the peek) the home
+            // tab lines up with it; at the panel's corner it keeps the
+            // clearance for the rounded corner.
+            flushStart: mirror ? detailW != null : dockW > 0,
+            startPad: (mirror ? detailW != null : dockW > 0) ? 0 : edgePad,
+            endPad: !mirror && detailW != null ? t.radii.tab : t.space.sm,
+          ),
+        ),
+      );
+      final detail = detailW == null
+          ? (collapsedPeek
+                ? PeekExpandButton(state: state, mirror: mirror)
+                : null)
+          : _Slide(
+              width: detailW,
+              full: detailFull!,
+              mirror: mirror,
+              outerStart: false,
+              child: DetailHeader(
+                state: state,
+                width: detailFull,
+                mirror: mirror,
+              ),
+            );
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (mirror) ?detail else SizedBox(width: dockW),
+          // Mirrored, the peek's divider column sits between the
+          // peek header and the strip, so the home tab starts after it.
+          if (mirror && detailW != null) SizedBox(width: t.borders.hairline),
+          strip,
+          if (mirror) SizedBox(width: dockW) else ?detail,
+        ],
+      );
+    }
+
+    return _LeaveGuard(
+      state: state,
+      child: SafeArea(
+        child: wide
+            ? CallbackShortcuts(
+                bindings: {
+                  const SingleActivator(LogicalKeyboardKey.keyW, control: true):
+                      state.closeActiveTab,
+                  const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+                      state.closeActiveTab,
+                },
+                // Focus so the shortcuts work before anything is clicked.
+                child: Focus(
+                  autofocus: true,
+                  child: ShellFrame(
+                    state: state,
+                    showRail: true,
+                    header: header,
+                    child: content,
+                  ),
+                ),
+              )
+            : ShellFrame(state: state, showRail: false, child: content),
       ),
     );
   }
@@ -424,7 +557,12 @@ class TopBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final narrow = MediaQuery.sizeOf(context).width < t.sizes.narrowBar;
+    return LayoutBuilder(
+      builder: (context, c) => _bar(context, t, c.maxWidth < t.sizes.narrowBar),
+    );
+  }
+
+  Widget _bar(BuildContext context, Tokens t, bool narrow) {
     final board = state.view == ViewMode.board;
     Widget toggle(String label, ViewMode mode) => FButton(
       variant: state.view == mode
