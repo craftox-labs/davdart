@@ -153,7 +153,7 @@ List<FItemGroup> spaceMenuGroups(
   VoidCallback? onPick,
 }) {
   final t = tokensOf(context);
-  if (state.spaces.isEmpty) {
+  if (state.catalog == null) {
     return [
       FItemGroup(
         children: [FItem(title: const Text('One fixed notes source'))],
@@ -242,17 +242,18 @@ List<FItemGroup> spaceMenuGroups(
           title: const Text('New space…'),
           onPress: () => manage(() => showNewSpaceDialog(context, state)),
         ),
-        FItem(
-          prefix: Icon(FLucideIcons.pencil, size: t.icons.md, color: t.muted),
-          title: const Text('Rename this space…'),
-          onPress: () => manage(() => showRenameSpaceDialog(context, state)),
-        ),
-        if (state.currentSpaceId != SpaceCatalog.planningId)
+        if (state.currentSpaceId != null) ...[
+          FItem(
+            prefix: Icon(FLucideIcons.pencil, size: t.icons.md, color: t.muted),
+            title: const Text('Rename this space…'),
+            onPress: () => manage(() => showRenameSpaceDialog(context, state)),
+          ),
           FItem(
             prefix: Icon(FLucideIcons.trash2, size: t.icons.md, color: t.muted),
             title: const Text('Delete this space…'),
             onPress: () => manage(() => showDeleteSpaceDialog(context, state)),
           ),
+        ],
       ],
     ),
   ];

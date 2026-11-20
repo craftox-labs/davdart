@@ -300,8 +300,12 @@ class AppState extends ChangeNotifier {
   final SpaceCatalog? catalog;
 
   List<SpaceInfo> get spaces => catalog?.spaces ?? const [];
-  String? get currentSpaceName => catalog?.currentInfo.name;
+  String? get currentSpaceName => catalog?.currentInfo?.name;
   String? get currentSpaceId => catalog?.current;
+
+  /// True when there is a catalog but no Space in it (a new install, or
+  /// every Space deleted): the app shows the first-run screen.
+  bool get noSpace => catalog != null && catalog!.current == null;
 
   /// Opens another Space: fresh selection and filters, its own notes.
   /// Returns false when it stayed put (same Space, or the user chose to keep
@@ -309,10 +313,20 @@ class AppState extends ChangeNotifier {
   Future<bool> switchSpace(String id) async {
     final c = catalog;
     if (c == null || id == c.current) return false;
+    if (!c.spaces.any((s) => s.id == id)) return false;
     if (!await _settleDrafts(_drafts.keys.toList())) return false;
     _drafts.clear();
     c.select(id);
-    source = c.sourceFor(id);
+    await _openCurrent();
+    return true;
+  }
+
+  /// Resets the view state and loads the catalog's current Space (or the
+  /// empty source when there is none).
+  Future<void> _openCurrent() async {
+    final c = catalog!;
+    final id = c.current;
+    source = id == null ? const EmptyNoteSource() : c.sourceFor(id);
     notes = [];
     tree = NoteTree.build(const []);
     peekUid = null;
@@ -328,7 +342,6 @@ class AppState extends ChangeNotifier {
     savedViews.clear();
     _resetTabs();
     await load();
-    return true;
   }
 
   /// Creates a Space and opens it. With [onServer] (and an account) the
@@ -368,10 +381,12 @@ class AppState extends ChangeNotifier {
           : 'Signed in; added $n space${n == 1 ? '' : 's'}';
       // The open Space may just have been linked to the server.
       final src = source;
-      if (src is SpaceNoteSource &&
-          c.currentInfo.onServer &&
+      if (src is EmptyNoteSource && c.current != null) {
+        await _openCurrent(); // the first Space came with the account
+      } else if (src is SpaceNoteSource &&
+          c.currentInfo?.onServer == true &&
           src.account == null) {
-        source = c.sourceFor(c.current);
+        source = c.sourceFor(c.current!);
         notifyListeners();
         await load();
       }
@@ -399,7 +414,8 @@ class AppState extends ChangeNotifier {
     final c = catalog;
     if (c == null || c.account == null) return;
     c.signOut();
-    source = c.sourceFor(c.current);
+    final cur = c.current;
+    source = cur == null ? const EmptyNoteSource() : c.sourceFor(cur);
     syncMessage = null;
     syncing = false;
     _syncAgain = false;
@@ -407,29 +423,50 @@ class AppState extends ChangeNotifier {
   }
 
   /// Whether the open Space belongs to the account (its notes sync).
-  bool get currentOnServer => catalog?.currentInfo.onServer ?? false;
+  bool get currentOnServer => catalog?.currentInfo?.onServer ?? false;
 
   /// Renames the open Space (on the server too for an account Space).
   /// Returns null when done, else why not.
   Future<String?> renameSpace(String name) async {
     final c = catalog;
-    if (c == null) return 'No spaces here';
-    final err = await c.renameSpace(c.current, name);
+    final id = c?.current;
+    if (c == null || id == null) return 'No spaces here';
+    final err = await c.renameSpace(id, name);
     if (err == null) notifyListeners();
     return err;
   }
 
-  /// Deletes the open Space (never Planning) and opens Planning.
+  /// What deleting the open Space would lose beyond this device's copy:
+  /// notes with unsaved edits plus notes not yet synced to the server.
+  Future<int> unsyncedInCurrent() async {
+    final src = source;
+    final synced = src is SpaceNoteSource ? await src.unsyncedCount() : 0;
+    return _drafts.keys.where(dirtyFor).length + synced;
+  }
+
+  /// Deletes the open Space from this device only (server notes are never
+  /// touched). The nearest remaining Space opens, or the first-run screen
+  /// shows when none is left.
   Future<void> deleteSpace() async {
     final c = catalog;
-    if (c == null || c.current == SpaceCatalog.planningId) return;
-    final id = c.current;
+    final id = c?.current;
+    if (c == null || id == null) return;
     final viewsKey = _viewsKeyNow;
-    // Open Planning first so nothing writes to the doomed Space afterwards.
-    await switchSpace(SpaceCatalog.planningId);
+    // Open the neighbour first so nothing writes to the doomed Space after.
+    final next = c.neighbourOf(id);
+    if (next != null) {
+      if (!await switchSpace(next)) return;
+    } else {
+      if (!await _settleDrafts(_drafts.keys.toList())) return;
+      _drafts.clear();
+    }
     prefs?.remove(viewsKey);
     prefs?.remove('$viewsKey.migrated');
+    prefs?.remove('davdart.tabs.v1.$id');
+    prefs?.remove('davdart.folders.collapsed.v1.$id');
+    prefs?.remove('davdart.tags.open.v1.$id');
     c.remove(id);
+    if (next == null) await _openCurrent();
     notifyListeners();
   }
 

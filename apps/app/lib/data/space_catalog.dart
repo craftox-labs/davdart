@@ -44,9 +44,11 @@ class PrefixedStorage implements KeyValueStorage {
   ];
 }
 
-/// The Spaces on this device and which one is open. The first, `planning`,
-/// keeps its original storage keys (and is seeded from the board feed once);
-/// every other Space is local, empty to start, and has its own keys.
+/// The Spaces on this device and which one is open. The legacy `planning`
+/// Space, if this device has one, keeps its original unprefixed storage keys
+/// (and is seeded from the board feed once); every other Space is local,
+/// empty to start, and has its own keys. A new install has no Space at all
+/// ([current] is null) until the user creates one or signs in.
 class SpaceCatalog {
   SpaceCatalog(
     this.storage, {
@@ -87,7 +89,7 @@ class SpaceCatalog {
 
   final List<SpaceInfo> spaces = [];
   final Set<String> _deleted = {};
-  String current = planningId;
+  String? current;
 
   void _load() {
     try {
@@ -111,14 +113,39 @@ class SpaceCatalog {
       // Keep the unreadable value for recovery instead of overwriting it.
       final raw = storage.read(_listKey);
       if (raw != null) storage.write('$_listKey.unreadable', raw);
+      _unreadable = true;
       spaces.clear();
     }
-    if (!spaces.any((s) => s.id == planningId)) {
+    final stored = storage.read(_listKey);
+    final hadList = stored != null && stored.isNotEmpty && !_unreadable;
+    // No stored list: an install from before the catalog has its Planning
+    // Space in the unprefixed keys; a new install has nothing and no Space.
+    if (!hadList && hasLegacyData && !spaces.any((s) => s.id == planningId)) {
       spaces.insert(0, const SpaceInfo(planningId, 'Planning'));
     }
     final c = storage.read(_currentKey);
-    if (c != null && spaces.any((s) => s.id == c)) current = c;
+    if (c != null && spaces.any((s) => s.id == c)) {
+      current = c;
+    } else if (spaces.isNotEmpty) {
+      current = spaces.first.id;
+    }
   }
+
+  bool _unreadable = false;
+
+  /// The unprefixed keys the legacy Planning Space stores its own data in.
+  static const legacyKeys = [
+    'davdart.space.v1',
+    'davdart.seeded.v1',
+    'davdart.server.v1',
+    'davdart.lastserver.v1',
+  ];
+
+  /// Whether this device holds data of the legacy Planning Space.
+  bool get hasLegacyData => legacyKeys.any((k) {
+    final v = storage.read(k);
+    return v != null && v.isNotEmpty;
+  });
 
   void _save() {
     storage.write(
@@ -132,10 +159,15 @@ class SpaceCatalog {
           },
       ]),
     );
-    storage.write(_currentKey, current);
+    storage.write(_currentKey, current ?? '');
   }
 
-  SpaceInfo get currentInfo => spaces.firstWhere((s) => s.id == current);
+  SpaceInfo? get currentInfo {
+    for (final s in spaces) {
+      if (s.id == current) return s;
+    }
+    return null;
+  }
 
   String _unique(String name) {
     var n = name.trim();
@@ -258,6 +290,7 @@ class SpaceCatalog {
       spaces.add(SpaceInfo(id, _unique(f.name), collection: f.path));
       added++;
     }
+    if (current == null && spaces.isNotEmpty) current = spaces.first.id;
     _save();
     return added;
   }
@@ -355,19 +388,46 @@ class SpaceCatalog {
     _save();
   }
 
-  /// Deletes a local Space and everything stored for it. The Planning Space
-  /// cannot be deleted. If it was open, Planning opens instead.
+  /// Deletes a Space from this device and everything stored for it (never
+  /// anything on a server). If it was open, the nearest remaining Space
+  /// opens (the next one, else the previous); [current] is null when none
+  /// remain. The legacy Planning Space has unprefixed keys: exactly
+  /// [legacyKeys] go, never another Space's keys.
   bool remove(String id) {
-    if (id == planningId || !spaces.any((s) => s.id == id)) return false;
+    final at = spaces.indexWhere((s) => s.id == id);
+    if (at < 0) return false;
     _deleted.add(id);
-    final scoped = PrefixedStorage(storage, 'sp.$id.'); // never Planning
-    for (final k in scoped.keys.toList()) {
-      scoped.remove(k);
+    if (id == planningId) {
+      for (final k in legacyKeys) {
+        storage.remove(k);
+      }
+    } else {
+      final scoped = PrefixedStorage(storage, 'sp.$id.');
+      // 'sp.a.b.' keys belong to Space 'a.b', not to 'a'.
+      final longer = [
+        for (final s in spaces)
+          if (s.id != id && s.id.startsWith('$id.')) 'sp.${s.id}.',
+      ];
+      for (final k in scoped.keys.toList()) {
+        if (longer.any((p) => 'sp.$id.$k'.startsWith(p))) continue;
+        scoped.remove(k);
+      }
     }
-    spaces.removeWhere((s) => s.id == id);
-    if (current == id) current = planningId;
+    spaces.removeAt(at);
+    if (current == id) {
+      current = spaces.isEmpty
+          ? null
+          : spaces[at < spaces.length ? at : spaces.length - 1].id;
+    }
     _save();
     return true;
+  }
+
+  /// The Space [remove] would open after [id] goes, or null.
+  String? neighbourOf(String id) {
+    final at = spaces.indexWhere((s) => s.id == id);
+    if (at < 0 || spaces.length < 2) return null;
+    return spaces[at + 1 < spaces.length ? at + 1 : at - 1].id;
   }
 
   void select(String id) {
@@ -379,13 +439,11 @@ class SpaceCatalog {
   /// The note source for Space [id].
   SpaceNoteSource sourceFor(String id) {
     final info = spaces.firstWhere((s) => s.id == id);
-    final scoped = id == planningId
-        ? storage
-        : PrefixedStorage(
-            storage,
-            'sp.$id.',
-            dead: () => _deleted.contains(id),
-          );
+    final scoped = PrefixedStorage(
+      storage,
+      id == planningId ? '' : 'sp.$id.',
+      dead: () => _deleted.contains(id),
+    );
     return SpaceNoteSource(
       Space(SpaceConfig(id: id, name: info.name), PersistentNoteStore(scoped)),
       seed: id == planningId ? planningSeed : null,

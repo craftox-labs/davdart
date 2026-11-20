@@ -1,7 +1,9 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
-import 'package:davdart_app/data/space_catalog.dart';
+
+import 'catalog_helper.dart';
+
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/note_draft.dart';
 import 'package:davdart_app/state/note_drag.dart';
@@ -395,9 +397,9 @@ void main() {
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
       final storage = MemoryStorage();
-      final c = SpaceCatalog(storage, planningSeed: _Seed());
+      final c = catalogWithPlanning(storage, planningSeed: _Seed());
       c.add('Inbox');
-      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
       await t.pumpWidget(DavdartApp(state: s));
       await t.pumpAndSettle();
       await t.tap(_k('rail-search'));
@@ -515,8 +517,8 @@ void main() {
 
     test('moving a note to another Space does not drop its draft', () async {
       final storage = MemoryStorage();
-      final c = SpaceCatalog(storage);
-      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      final c = catalogWithPlanning(storage);
+      final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
       await s.load();
       await s.addNote('Ship');
       final uid = s.notes.firstWhere((n) => n.summary == 'Ship').uid;

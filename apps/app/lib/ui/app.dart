@@ -15,6 +15,7 @@ import '../theme/tokens.dart';
 import 'board_view.dart';
 import 'detail_header.dart';
 import 'detail_view.dart';
+import 'first_run_view.dart';
 import 'list_view.dart';
 import 'parts.dart';
 import 'resize_handle.dart';
@@ -30,8 +31,11 @@ import 'theme.dart';
 SpaceCatalog defaultCatalog() =>
     SpaceCatalog(defaultStorage(), planningSeed: ApiNoteSource());
 
-AppState _fromCatalog(SpaceCatalog c) =>
-    AppState(c.sourceFor(c.current), prefs: c.storage, catalog: c);
+AppState _fromCatalog(SpaceCatalog c) => AppState(
+  c.current == null ? const EmptyNoteSource() : c.sourceFor(c.current!),
+  prefs: c.storage,
+  catalog: c,
+);
 
 class DavdartApp extends StatelessWidget {
   DavdartApp({
@@ -230,7 +234,9 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     final mainNote = state.mainNoteUid;
     final mirror = state.layoutSide == LayoutSide.end;
 
-    Widget main() => mainNote != null
+    Widget main() => state.noSpace
+        ? FirstRunView(state: state)
+        : mainNote != null
         ? DetailView(
             key: const Key('main-note'),
             state: state,

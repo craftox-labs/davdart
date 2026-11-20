@@ -1,7 +1,9 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
-import 'package:davdart_app/data/space_catalog.dart';
+
+import 'catalog_helper.dart';
+
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/tab_state.dart';
 import 'package:davdart_app/ui/app.dart';
@@ -278,9 +280,9 @@ void main() {
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
       final storage = MemoryStorage();
-      final c = SpaceCatalog(storage, planningSeed: _Seed());
+      final c = catalogWithPlanning(storage, planningSeed: _Seed());
       final other = c.add('Other');
-      final startId = c.current;
+      final startId = c.current!;
       final s = AppState(c.sourceFor(startId), prefs: storage, catalog: c);
       await t.pumpWidget(DavdartApp(state: s));
       await t.pumpAndSettle();

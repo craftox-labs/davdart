@@ -56,6 +56,13 @@ List<Note> parseNotesJson(String body) {
   return out;
 }
 
+/// The source of an app with no Space open: no notes, read-only.
+class EmptyNoteSource implements NoteSource {
+  const EmptyNoteSource();
+  @override
+  Future<List<Note>> load() async => const [];
+}
+
 /// A source the app can also write to.
 abstract class EditableNoteSource implements NoteSource {
   Future<Note> save(Note note);
@@ -250,6 +257,17 @@ class SpaceNoteSource implements EditableNoteSource {
 
   @override
   Future<void> delete(String uid) => space.delete(uid);
+
+  /// How many notes have local changes the server has not received yet
+  /// (0 when not connected: a local Space has no server copy to lag behind).
+  Future<int> unsyncedCount() async {
+    if (!connected) return 0;
+    var n = 0;
+    for (final e in await space.store.all()) {
+      if (e.dirty || e.deleted) n++;
+    }
+    return n;
+  }
 
   /// Earlier versions kept when a sync merge had to pick a winner.
   Future<List<Revision>> revisions(String uid) => space.store.revisions(uid);

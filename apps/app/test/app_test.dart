@@ -8,6 +8,9 @@ import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/data/persistent_store.dart';
 import 'package:davdart_app/data/space_catalog.dart';
+
+import 'catalog_helper.dart';
+
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:davdart_app/ui/list_view.dart';
@@ -296,8 +299,11 @@ void main() {
       () async {
         final storage = MemoryStorage();
         AppState open() {
-          final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
-          return AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+          final c = catalogWithPlanning(
+            storage,
+            planningSeed: FakeSource(sample),
+          );
+          return AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
         }
 
         final s = open();
@@ -321,46 +327,53 @@ void main() {
       },
     );
 
-    test('rename a space; delete removes its data, never Planning', () async {
-      final storage = MemoryStorage();
-      final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
-      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
-      await s.load();
-      await s.createSpace('Inbox');
-      await s.addNote('doomed');
-      s.setQuery('x');
-      await s.saveView('v');
-      final id = s.currentSpaceId!;
-      expect(await s.renameSpace('  '), isNotNull);
-      expect(await s.renameSpace('Planning'), isNotNull);
-      expect(await s.renameSpace('Scratch'), isNull);
-      expect(s.currentSpaceName, 'Scratch');
-      expect(s.savedViews.map((v) => v.name), ['v']);
-      final doomed = c.sourceFor(id);
-      expect(SpaceCatalog(storage).spaces.last.name, 'Scratch');
-      expect(storage.keys.any((k) => k.startsWith('sp.$id.')), isTrue);
-      await s.deleteSpace();
-      expect(s.currentSpaceId, 'planning');
-      expect(s.notes, hasLength(3));
-      expect(s.spaces.map((e) => e.id), ['planning']);
-      expect(storage.keys.where((k) => k.contains(id)), isEmpty);
-      await doomed.save(
-        Note(uid: 'late', summary: 'late', description: ''),
-      ); // a save still running after delete must not leave data behind
-      expect(storage.keys.where((k) => k.contains(id)), isEmpty);
-      await s.deleteSpace(); // Planning: ignored
-      expect(s.spaces, hasLength(1));
-      expect(await s.renameSpace('Work'), isNull);
-      expect(s.currentSpaceName, 'Work');
-    });
+    test(
+      'rename a space; delete removes its data and opens the neighbour',
+      () async {
+        final storage = MemoryStorage();
+        final c = catalogWithPlanning(
+          storage,
+          planningSeed: FakeSource(sample),
+        );
+        final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
+        await s.load();
+        await s.createSpace('Inbox');
+        await s.addNote('doomed');
+        s.setQuery('x');
+        await s.saveView('v');
+        final id = s.currentSpaceId!;
+        expect(await s.renameSpace('  '), isNotNull);
+        expect(await s.renameSpace('Planning'), isNotNull);
+        expect(await s.renameSpace('Scratch'), isNull);
+        expect(s.currentSpaceName, 'Scratch');
+        expect(s.savedViews.map((v) => v.name), ['v']);
+        final doomed = c.sourceFor(id);
+        expect(SpaceCatalog(storage).spaces.last.name, 'Scratch');
+        expect(storage.keys.any((k) => k.startsWith('sp.$id.')), isTrue);
+        await s.deleteSpace();
+        expect(s.currentSpaceId, 'planning');
+        expect(s.notes, hasLength(3));
+        expect(s.spaces.map((e) => e.id), ['planning']);
+        expect(storage.keys.where((k) => k.contains(id)), isEmpty);
+        await doomed.save(
+          Note(uid: 'late', summary: 'late', description: ''),
+        ); // a save still running after delete must not leave data behind
+        expect(storage.keys.where((k) => k.contains(id)), isEmpty);
+        expect(await s.renameSpace('Work'), isNull);
+        expect(s.currentSpaceName, 'Work');
+      },
+    );
 
     test(
       'a slow load from a space left behind does not overwrite the new one',
       () async {
         final storage = MemoryStorage();
         final gate = Completer<List<Note>>();
-        final c = SpaceCatalog(storage, planningSeed: SlowSource(gate.future));
-        final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+        final c = catalogWithPlanning(
+          storage,
+          planningSeed: SlowSource(gate.future),
+        );
+        final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
         final first = s.load(); // planning seed is still loading
         await s.createSpace('Inbox');
         await s.addNote('mine');
@@ -375,8 +388,11 @@ void main() {
       'duplicate space names get a number; saved views are per space',
       () async {
         final storage = MemoryStorage();
-        final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
-        final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+        final c = catalogWithPlanning(
+          storage,
+          planningSeed: FakeSource(sample),
+        );
+        final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
         await s.load();
         s.setQuery('x');
         await s.saveView('mine');
@@ -391,7 +407,7 @@ void main() {
         await s.switchSpace('planning');
         expect(s.savedViews.map((v) => v.name), ['mine']);
         storage.write('davdart.spaces.v1', '{broken');
-        final c2 = SpaceCatalog(storage);
+        final c2 = catalogWithPlanning(storage);
         expect(c2.spaces.map((e) => e.id), ['planning']);
         expect(storage.read('davdart.spaces.v1.unreadable'), '{broken');
       },
@@ -674,12 +690,12 @@ void main() {
         return server.respond(r);
       });
       final storage = MemoryStorage();
-      final c = SpaceCatalog(
+      final c = catalogWithPlanning(
         storage,
         davBase: Uri.parse('https://fake.test/dav/'),
         httpClient: client,
       );
-      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
       await s.load();
       await s.signIn(' tm ', 'pw');
       expect(s.accountUser, 'tm');
@@ -719,7 +735,7 @@ void main() {
       expect(s.currentOnServer, isTrue);
       expect(await s.renameSpace('Work'), isNull);
       // Restart: still signed in, the space reconnects without asking again.
-      final c2 = SpaceCatalog(
+      final c2 = catalogWithPlanning(
         storage,
         davBase: Uri.parse('https://fake.test/dav/'),
         httpClient: client,
@@ -753,13 +769,13 @@ void main() {
         return server.respond(r);
       });
       final storage = MemoryStorage();
-      final c = SpaceCatalog(
+      final c = catalogWithPlanning(
         storage,
         planningSeed: FakeSource(sample),
         davBase: Uri.parse('https://fake.test/dav/'),
         httpClient: client,
       );
-      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
       await s.load();
       // The Planning space was connected to the collection by hand.
       await s.connect('c/', 'tm', 'pw');
@@ -850,8 +866,8 @@ void main() {
 
     test('move a folder and its notes to another space', () async {
       final storage = MemoryStorage();
-      final c = SpaceCatalog(storage);
-      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      final c = catalogWithPlanning(storage);
+      final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
       await s.load();
       await s.addFolder('Deploy', text: 'agents: be careful');
       final folder = s.scope!;
@@ -997,9 +1013,9 @@ void main() {
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
       final storage = MemoryStorage();
-      final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
+      final c = catalogWithPlanning(storage, planningSeed: FakeSource(sample));
       final state = AppState(
-        c.sourceFor(c.current),
+        c.sourceFor(c.current!),
         prefs: storage,
         catalog: c,
       );
@@ -1022,9 +1038,9 @@ void main() {
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
       final storage = MemoryStorage();
-      final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
+      final c = catalogWithPlanning(storage, planningSeed: FakeSource(sample));
       final state = AppState(
-        c.sourceFor(c.current),
+        c.sourceFor(c.current!),
         prefs: storage,
         catalog: c,
       );
@@ -1032,7 +1048,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('rail-spaces')));
       await t.pumpAndSettle();
-      expect(find.text('Delete this space…'), findsNothing);
+      expect(find.text('Delete this space…'), findsOneWidget);
       await t.tap(find.text('New space…'));
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('space-name')), 'Inbox');
@@ -1058,8 +1074,8 @@ void main() {
 
     test('search across spaces finds notes and opens the hit', () async {
       final storage = MemoryStorage();
-      final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
-      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      final c = catalogWithPlanning(storage, planningSeed: FakeSource(sample));
+      final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
       await s.load();
       await s.createSpace('Inbox');
       await s.addNote('Loose idea about decisions');
@@ -1096,10 +1112,10 @@ void main() {
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
       final storage = MemoryStorage();
-      final c = SpaceCatalog(storage, planningSeed: FakeSource(sample));
+      final c = catalogWithPlanning(storage, planningSeed: FakeSource(sample));
       c.add('Inbox');
       final state = AppState(
-        c.sourceFor(c.current),
+        c.sourceFor(c.current!),
         prefs: storage,
         catalog: c,
       );

@@ -36,7 +36,10 @@ class ScopeCrumbs extends StatelessWidget {
   }
 
   Widget _crumbs(BuildContext context, Tokens t, List<Note> path, bool scoped) {
-    final space = (!scoped ? label : null) ?? state.currentSpaceName ?? 'Notes';
+    final space =
+        (!scoped ? label : null) ??
+        state.currentSpaceName ??
+        (state.noSpace ? 'No space' : 'Notes');
     final style = t.type.bodyStrong;
     final sep = Padding(
       padding: EdgeInsets.symmetric(horizontal: t.space.sm),

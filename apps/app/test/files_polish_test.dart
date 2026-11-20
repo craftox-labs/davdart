@@ -1,7 +1,9 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
-import 'package:davdart_app/data/space_catalog.dart';
+
+import 'catalog_helper.dart';
+
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/widgets.dart';
@@ -79,8 +81,8 @@ void main() {
     test('is kept per Space', () async {
       final prefs = MemoryStorage();
       AppState open() {
-        final c = SpaceCatalog(prefs, planningSeed: _Seed());
-        return AppState(c.sourceFor(c.current), prefs: prefs, catalog: c);
+        final c = catalogWithPlanning(prefs, planningSeed: _Seed());
+        return AppState(c.sourceFor(c.current!), prefs: prefs, catalog: c);
       }
 
       final s = open();

@@ -85,20 +85,31 @@ Future<void> showRenameSpaceDialog(BuildContext context, AppState state) {
   );
 }
 
-/// Confirms deleting the open (non-Planning) Space.
-Future<void> showDeleteSpaceDialog(BuildContext context, AppState state) {
+/// Confirms deleting the open Space from this device. Says plainly that
+/// server notes are never deleted, and warns about changes not synced yet.
+Future<void> showDeleteSpaceDialog(BuildContext context, AppState state) async {
   final name = state.currentSpaceName ?? 'this space';
+  final unsynced = await state.unsyncedInCurrent();
+  if (!context.mounted) return;
+  final base = state.currentOnServer
+      ? 'This removes only this device\'s copy of the space. Notes on the '
+            'server are never deleted, and Refresh spaces brings the space '
+            'back.'
+      : 'This removes only this device\'s copy: its notes and saved views '
+            'are deleted from this device. Notes on a server, if it was '
+            'connected to one, are never deleted.';
+  final warn = unsynced == 0
+      ? ''
+      : state.currentOnServer
+      ? ' Warning: $unsynced note${unsynced == 1 ? ' has' : 's have'} changes '
+            'that are not saved or not synced to the server yet; they will '
+            'be lost.'
+      : ' Warning: $unsynced note${unsynced == 1 ? ' has' : 's have'} '
+            'unsaved edits that will be lost.';
   return showAppDialog(
     context,
     title: 'Delete $name?',
-    content: Text(
-      state.currentOnServer
-          ? 'This removes the space from this device only. The collection '
-                'and its notes stay on the server, and Refresh spaces '
-                'brings it back.'
-          : 'Its notes and saved views are removed from this device. A '
-                'server collection it was connected to is not touched.',
-    ),
+    content: Text('$base$warn', key: const Key('space-delete-text')),
     actions: [
       const CancelButton(),
       ActionButton(

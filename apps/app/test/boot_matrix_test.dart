@@ -1,6 +1,7 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
+import 'package:davdart_app/data/space_catalog.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/widgets.dart';
@@ -23,6 +24,30 @@ AppState _make(MemoryStorage m) => AppState(
 );
 
 void main() {
+  // A new install: an empty catalog boots to the first-run screen.
+  for (final size in const [
+    Size(320, 700),
+    Size(880, 900),
+    Size(1280, 900),
+    Size(2560, 1300),
+  ]) {
+    testWidgets('boots with an empty catalog: $size', (t) async {
+      t.view.physicalSize = size;
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final m = MemoryStorage();
+      final c = SpaceCatalog(m);
+      await t.pumpWidget(
+        DavdartApp(
+          state: AppState(const EmptyNoteSource(), prefs: m, catalog: c),
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(t.takeException(), isNull);
+      expect(find.text('Create your first Space'), findsOneWidget);
+    });
+  }
+
   for (final side in LayoutSide.values) {
     for (final size in const [
       Size(880, 900),
