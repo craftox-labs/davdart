@@ -9,9 +9,9 @@ import 'theme.dart';
 import 'edit_note_dialog.dart';
 import 'move_space_dialog.dart';
 
-/// The Home breadcrumb above Board and List: "Home › Space" or, inside a
-/// folder, "Home › Space › folder". The Space name is a link back to the whole
-/// Space. A folder adds its text and actions.
+/// The breadcrumb above Board and List: "[house] Space" or, inside a folder,
+/// "[house] Space › folder". The Space is the root crumb, with the house icon,
+/// and a link back to the whole Space. A folder adds its text and actions.
 class ScopeBar extends StatelessWidget {
   const ScopeBar({super.key, required this.state});
   final AppState state;
@@ -49,12 +49,6 @@ class ScopeBar extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Icon(
-                folder == null ? FLucideIcons.house : FLucideIcons.folderOpen,
-                size: t.icons.lg,
-                color: t.accent,
-              ),
-              SizedBox(width: t.space.md),
               Expanded(child: _crumbs(context, t, path, folder != null)),
               if (folder != null && state.editable) ...[
                 if (state.spaces.length > 1)
@@ -112,39 +106,29 @@ class ScopeBar extends StatelessWidget {
     final folders = path.map((n) => n.summary).where((e) => e.isNotEmpty);
     return Row(
       children: [
+        Icon(FLucideIcons.house, size: t.icons.lg, color: t.accent),
+        SizedBox(width: t.space.md),
         Flexible(
-          child: Text(
-            'Home',
-            key: const Key('crumb-home'),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: style,
-          ),
-        ),
-        if (space.isNotEmpty) ...[
-          sep,
-          Flexible(
-            child: scoped
-                ? FTappable(
-                    key: const Key('crumb-space'),
-                    semanticsLabel: 'Show the whole space',
-                    onPress: () => state.openFolder(null),
-                    builder: (_, _, _) => Text(
-                      space,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: style.copyWith(color: t.muted),
-                    ),
-                  )
-                : Text(
+          child: scoped
+              ? FTappable(
+                  key: const Key('crumb-space'),
+                  semanticsLabel: 'Show the whole space',
+                  onPress: () => state.openFolder(null),
+                  builder: (_, _, _) => Text(
                     space,
-                    key: const Key('crumb-space'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: style,
+                    style: style.copyWith(color: t.muted),
                   ),
-          ),
-        ],
+                )
+              : Text(
+                  space,
+                  key: const Key('crumb-space'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: style,
+                ),
+        ),
         if (folders.isNotEmpty) ...[
           sep,
           Flexible(

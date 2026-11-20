@@ -893,9 +893,9 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const Key('scope-bar')), findsOneWidget);
       expect(find.byKey(const Key('scope-text')), findsOneWidget);
-      // Breadcrumb: Home > Space > folder; the Space name clears the scope.
-      expect(find.text('Home'), findsWidgets);
+      // Breadcrumb: [house] Space > folder; the Space name clears the scope.
       expect(find.byKey(const Key('crumb-space')), findsOneWidget);
+      expect(find.byIcon(FLucideIcons.house), findsWidgets);
       expect(textOfKey(t, 'crumb-folder'), 'Planning');
       await t.tap(find.byKey(const Key('crumb-space')));
       await t.pumpAndSettle();
@@ -906,7 +906,7 @@ void main() {
         state.notes.firstWhere((n) => n.summary == 'Planning').uid,
       );
       await t.pumpAndSettle();
-      expect(find.byIcon(FLucideIcons.folderOpen), findsWidgets);
+      expect(find.byKey(const Key('crumb-folder')), findsOneWidget);
       // A note made now lands inside the open folder.
       await t.tap(byAction('New note'));
       await t.pumpAndSettle();

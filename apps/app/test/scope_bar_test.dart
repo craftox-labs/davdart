@@ -5,6 +5,7 @@ import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -45,6 +46,15 @@ void main() {
       expect(text.width, greaterThan(bar.width / 2));
       expect(text.right, lessThanOrEqualTo(bar.right));
       expect(find.byKey(const Key('crumb-space')), findsOneWidget);
+      final bar2 = find.byKey(const Key('scope-bar'));
+      expect(
+        find.descendant(of: bar2, matching: find.text('Home')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: bar2, matching: find.byIcon(FLucideIcons.house)),
+        findsOneWidget,
+      );
     });
   }
 
@@ -68,7 +78,7 @@ void main() {
       s.openFolder(s.scope!.uid);
       await t.pumpWidget(DavdartApp(state: s));
       await t.pumpAndSettle();
-      final crumb = t.getRect(find.byKey(const Key('crumb-home'))).center.dy;
+      final crumb = t.getRect(find.byKey(const Key('crumb-space'))).center.dy;
       for (final k in ['scope-edit', 'scope-delete', 'scope-close']) {
         final c = t.getRect(find.byKey(Key(k))).center.dy;
         expect((c - crumb).abs(), lessThanOrEqualTo(1), reason: '$k vs crumb');
