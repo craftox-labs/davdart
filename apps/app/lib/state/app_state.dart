@@ -423,6 +423,7 @@ class AppState extends ChangeNotifier {
     selectedTaskUid = null;
     taskFilter = TaskFilter.open;
     taskTagFilter = null;
+    eventTagFilter = null;
     taskFolderFilter = null;
     tree = NoteTree.build(const []);
     peekUid = null;
@@ -434,6 +435,8 @@ class AppState extends ChangeNotifier {
     _syncAgain = false;
     collapsed.clear();
     _tagsOpen = false;
+    _taskTagsOpen = false;
+    _eventTagsOpen = false;
     scopeUid = null;
     savedViews.clear();
     _resetTabs();
@@ -1195,6 +1198,8 @@ class AppState extends ChangeNotifier {
       }
       _restoreCollapsed();
       _tagsOpen = prefs?.read(_tagsOpenKey) == 'true';
+      _taskTagsOpen = prefs?.read(_taskTagsOpenKey) == 'true';
+      _eventTagsOpen = prefs?.read(_eventTagsOpenKey) == 'true';
       _restoreTabs();
     } catch (e) {
       if (src != source) return;
@@ -1996,6 +2001,9 @@ class AppState extends ChangeNotifier {
 
   void _setEvents(List<Event> loaded) {
     events = List.unmodifiable(loaded);
+    if (eventTagFilter != null && !eventTags.contains(eventTagFilter)) {
+      eventTagFilter = null;
+    }
     _eventDrafts.removeWhere((u, _) => !events.any((e) => e.uid == u));
     if (peekUid != null && findItem(peekUid!) == null) _setPeek(null);
     if (_tabsLoaded) _pruneTabs();
@@ -2016,16 +2024,30 @@ class AppState extends ChangeNotifier {
 
   List<String> eventTagsOf(Event e) => _plainTags(e.categories);
 
+  /// Events panel tag filter (not saved); null shows every event.
+  String? eventTagFilter;
+
+  void setEventTagFilter(String? tag) {
+    eventTagFilter = eventTagFilter == tag ? null : tag;
+    notifyListeners();
+  }
+
+  /// Events after the tag filter, for the agenda (past included).
+  List<Event> get filteredEvents => [
+    for (final e in events)
+      if (eventTagFilter == null || e.categories.contains(eventTagFilter)) e,
+  ];
+
   /// Agenda groups from the day of [from] for [days] days: Today, Tomorrow,
   /// This week, Later (empty groups left out). Recurring events are expanded;
   /// see [upcomingGroups].
   List<AgendaGroup> upcomingOccurrences(DateTime from, int days) =>
-      upcomingGroups(events, from, days);
+      upcomingGroups(filteredEvents, from, days);
 
   /// Occurrences that ended before the day of [from], within the last [days]
   /// days, latest first.
   List<EventOccurrence> pastOccurrences(DateTime from, [int days = 30]) =>
-      pastAgenda(events, from, days);
+      pastAgenda(filteredEvents, from, days);
 
   /// Saves, reloads the events and syncs. False (with [error] set when the
   /// cause is the Space) if nothing was saved.
@@ -2792,6 +2814,36 @@ class AppState extends ChangeNotifier {
   /// The tags list shows open while a tag filter is active, so the active
   /// tag stays visible.
   bool get tagsExpanded => tagsOpen || tag != null;
+
+  bool _taskTagsOpen = false;
+  bool _eventTagsOpen = false;
+
+  /// Tags drawer open flags of the Tasks and Events panels (per Space,
+  /// saved); each shows open while its tag filter is active.
+  bool get taskTagsExpanded => _taskTagsOpen || taskTagFilter != null;
+  bool get eventTagsExpanded => _eventTagsOpen || eventTagFilter != null;
+  String get _taskTagsOpenKey => 'davdart.tasktags.open.v1.$_spaceKey';
+  String get _eventTagsOpenKey => 'davdart.eventtags.open.v1.$_spaceKey';
+
+  void setTaskTagsOpen(bool v) {
+    _taskTagsOpen = v;
+    _flag(_taskTagsOpenKey, v);
+    notifyListeners();
+  }
+
+  void setEventTagsOpen(bool v) {
+    _eventTagsOpen = v;
+    _flag(_eventTagsOpenKey, v);
+    notifyListeners();
+  }
+
+  void _flag(String key, bool v) {
+    if (v) {
+      prefs?.write(key, 'true');
+    } else {
+      prefs?.remove(key);
+    }
+  }
 
   void setTagsOpen(bool v) {
     _tagsOpen = v;

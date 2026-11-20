@@ -155,7 +155,8 @@ void main() {
       s.setTaskFolderFilter(null);
       await t.pumpAndSettle();
       expect(_p('task-row-late'), findsOneWidget);
-      expect(_p('tasks-tag-filter'), findsOneWidget);
+      expect(_k('tasks-tags-drawer'), findsOneWidget);
+      expect(_k('tasks-tag-filter'), findsNothing);
       expect(_p('tasks-folder-filter'), findsOneWidget);
     });
 

@@ -15,6 +15,7 @@ import 'save_view_dialog.dart';
 import 'side_panel.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
+import 'panel_tags_drawer.dart';
 
 /// The panels the side panel shows, one per rail section. Each takes
 /// [onPick], run after an action that should close the narrow sheet.
@@ -26,6 +27,7 @@ class _Panel extends StatelessWidget {
     required this.children,
     this.trailing,
     this.wrapBody,
+    this.drawer,
   });
   final Widget heading;
   final List<Widget> children;
@@ -33,6 +35,9 @@ class _Panel extends StatelessWidget {
 
   /// Wraps the scrolling body (the drop and right-click area).
   final Widget Function(Widget body)? wrapBody;
+
+  /// Wraps the body with the bottom tags drawer.
+  final Widget Function(Widget body)? drawer;
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +49,9 @@ class _Panel extends StatelessWidget {
     return SidePanelFrame(
       title: heading,
       actions: trailing,
-      body: wrapBody == null ? body : wrapBody!(body),
+      body: drawer == null
+          ? (wrapBody == null ? body : wrapBody!(body))
+          : drawer!(wrapBody == null ? body : wrapBody!(body)),
     );
   }
 }
@@ -205,6 +212,35 @@ class NotesSection extends _Section {
 
     return _Panel(
       heading: heading,
+      drawer: (body) => PanelTagsDrawer(
+        body: body,
+        tags: state.tags,
+        selected: state.tag,
+        onSelect: state.setTag,
+        expanded: state.tagsExpanded,
+        onExpandedChange: state.setTagsOpen,
+        menuBuilder: (tag, chip) => ActionContextMenu(
+          groups: [
+            [
+              if (state.tag != tag)
+                NoteMenuItem(
+                  'Filter by this tag',
+                  FLucideIcons.tag,
+                  () => state.setTag(tag),
+                  key: const Key('menu-tag-filter'),
+                ),
+              if (state.tag != null)
+                NoteMenuItem(
+                  'Clear the tag filter',
+                  FLucideIcons.x,
+                  () => state.setTag(null),
+                  key: const Key('menu-tag-clear'),
+                ),
+            ],
+          ],
+          child: chip,
+        ),
+      ),
       wrapBody: (body) => MoveDropTarget(
         key: const Key('drop-root'),
         state: state,
@@ -269,28 +305,6 @@ class NotesSection extends _Section {
             ),
           ),
         ...tree,
-        if (state.tags.isNotEmpty) ...[
-          Padding(
-            padding: EdgeInsets.only(top: t.space.lg),
-            child: FAccordion(
-              key: const Key('tags-accordion'),
-              control: FAccordionControl.lifted(
-                expanded: (_) => state.tagsExpanded,
-                onChange: (_, open) => state.setTagsOpen(open),
-              ),
-              children: [
-                FAccordionItem(
-                  title: Text(
-                    'Tags (${state.tags.length})',
-                    style: t.type.labelStyle.copyWith(color: t.muted),
-                  ),
-                  child: _TagWrap(state: state),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: t.space.lg),
-        ],
       ],
     );
   }

@@ -8,6 +8,7 @@ import '../state/note_drag.dart';
 import 'collapsible_section.dart';
 import 'drag_drop.dart';
 import 'event_menu.dart';
+import 'panel_tags_drawer.dart';
 import 'parts.dart';
 import 'side_panel.dart';
 import 'theme.dart';
@@ -65,47 +66,55 @@ class EventsPanel extends StatelessWidget {
                   },
                 )
               : null,
-          body: ListView(
-            key: const Key('events-view'),
-            padding: EdgeInsets.fromLTRB(
-              t.space.lg,
-              t.space.md,
-              t.space.lg,
-              t.space.huge,
-            ),
-            children: [
-              if (state.events.isEmpty)
-                _Note('No events yet', key: const Key('events-empty'))
-              else if (!shown)
-                _Note('Nothing in sight', key: const Key('events-none')),
-              for (final s in sections)
-                if (s.$3.isNotEmpty)
-                  Padding(
-                    padding: EdgeInsets.only(top: t.space.md),
-                    child: CollapsibleSection(
-                      id: 'events-${s.$1}',
-                      title: s.$2,
-                      upper: false,
-                      count: s.$3.length,
-                      prefs: state.prefs,
-                      prefKey: 'davdart.events.${s.$1}.collapsed.v1',
-                      headerPadding: EdgeInsets.all(t.space.xs),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          for (final o in s.$3)
-                            EventRow(
-                              key: eventRowKey(o),
-                              state: state,
-                              occurrence: o,
-                              showDay: s.$1 == 'upcoming' || s.$1 == 'past',
-                              onOpen: onPick,
-                            ),
-                        ],
+          body: PanelTagsDrawer(
+            keyPrefix: 'events-tags',
+            tags: state.eventTags,
+            selected: state.eventTagFilter,
+            onSelect: state.setEventTagFilter,
+            expanded: state.eventTagsExpanded,
+            onExpandedChange: state.setEventTagsOpen,
+            body: ListView(
+              key: const Key('events-view'),
+              padding: EdgeInsets.fromLTRB(
+                t.space.lg,
+                t.space.md,
+                t.space.lg,
+                t.space.huge,
+              ),
+              children: [
+                if (state.events.isEmpty)
+                  _Note('No events yet', key: const Key('events-empty'))
+                else if (!shown)
+                  _Note('Nothing in sight', key: const Key('events-none')),
+                for (final s in sections)
+                  if (s.$3.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.only(top: t.space.md),
+                      child: CollapsibleSection(
+                        id: 'events-${s.$1}',
+                        title: s.$2,
+                        upper: false,
+                        count: s.$3.length,
+                        prefs: state.prefs,
+                        prefKey: 'davdart.events.${s.$1}.collapsed.v1',
+                        headerPadding: EdgeInsets.all(t.space.xs),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            for (final o in s.$3)
+                              EventRow(
+                                key: eventRowKey(o),
+                                state: state,
+                                occurrence: o,
+                                showDay: s.$1 == 'upcoming' || s.$1 == 'past',
+                                onOpen: onPick,
+                              ),
+                          ],
+                        ),
                       ),
                     ),
-                  ),
-            ],
+              ],
+            ),
           ),
         );
       },

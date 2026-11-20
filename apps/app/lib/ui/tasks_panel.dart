@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../state/note_drag.dart';
 import '../state/task_rules.dart';
 import 'collapsible_section.dart';
+import 'panel_tags_drawer.dart';
 import 'parts.dart';
 import 'side_panel.dart';
 import 'task_parts.dart';
@@ -96,72 +97,83 @@ class TasksPanel extends StatelessWidget {
                   },
                 )
               : null,
-          body: Column(
-            key: const Key('tasks-view'),
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Padding(
-                padding: EdgeInsets.fromLTRB(
-                  t.space.lg,
-                  t.space.md,
-                  t.space.lg,
-                  t.space.sm,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  spacing: t.space.md,
-                  children: [
-                    TaskQuickAdd(state: state),
-                    _Filters(state: state),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: ListView(
+          body: PanelTagsDrawer(
+            keyPrefix: 'tasks-tags',
+            tags: state.taskTags,
+            selected: state.taskTagFilter,
+            onSelect: state.setTaskTagFilter,
+            expanded: state.taskTagsExpanded,
+            onExpandedChange: state.setTaskTagsOpen,
+            body: Column(
+              key: const Key('tasks-view'),
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
                   padding: EdgeInsets.fromLTRB(
                     t.space.lg,
-                    0,
+                    t.space.md,
                     t.space.lg,
-                    t.space.huge,
+                    t.space.sm,
                   ),
-                  children: [
-                    if (state.tasks.isEmpty)
-                      _Note('No tasks yet', key: const Key('tasks-empty'))
-                    else if (shown.isEmpty)
-                      _Note('No tasks match', key: const Key('tasks-no-match')),
-                    for (final g in groups)
-                      if (g.$3.isNotEmpty)
-                        Padding(
-                          padding: EdgeInsets.only(top: t.space.md),
-                          child: CollapsibleSection(
-                            id: 'tasks-${g.$1}',
-                            title: g.$2,
-                            upper: false,
-                            count: g.$3.length,
-                            prefs: state.prefs,
-                            prefKey: 'davdart.tasks.${g.$1}.collapsed.v1',
-                            headerPadding: EdgeInsets.all(t.space.xs),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                for (final k in g.$3)
-                                  TaskRow(
-                                    key: Key('task-row-${k.uid}'),
-                                    state: state,
-                                    task: k,
-                                    now: clock,
-                                    showTags: true,
-                                    source: NoteDragSource.list,
-                                    onOpen: onPick,
-                                  ),
-                              ],
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: t.space.md,
+                    children: [
+                      TaskQuickAdd(state: state),
+                      _Filters(state: state),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.fromLTRB(
+                      t.space.lg,
+                      0,
+                      t.space.lg,
+                      t.space.huge,
+                    ),
+                    children: [
+                      if (state.tasks.isEmpty)
+                        _Note('No tasks yet', key: const Key('tasks-empty'))
+                      else if (shown.isEmpty)
+                        _Note(
+                          'No tasks match',
+                          key: const Key('tasks-no-match'),
+                        ),
+                      for (final g in groups)
+                        if (g.$3.isNotEmpty)
+                          Padding(
+                            padding: EdgeInsets.only(top: t.space.md),
+                            child: CollapsibleSection(
+                              id: 'tasks-${g.$1}',
+                              title: g.$2,
+                              upper: false,
+                              count: g.$3.length,
+                              prefs: state.prefs,
+                              prefKey: 'davdart.tasks.${g.$1}.collapsed.v1',
+                              headerPadding: EdgeInsets.all(t.space.xs),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  for (final k in g.$3)
+                                    TaskRow(
+                                      key: Key('task-row-${k.uid}'),
+                                      state: state,
+                                      task: k,
+                                      now: clock,
+                                      showTags: true,
+                                      source: NoteDragSource.list,
+                                      onOpen: onPick,
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -213,7 +225,6 @@ class _Filters extends StatelessWidget {
     }
 
     walk(state.tree.roots, 0);
-    final tags = state.taskTags;
     final folder = state.taskFolderFilter;
     return Wrap(
       spacing: t.space.md,
@@ -223,24 +234,6 @@ class _Filters extends StatelessWidget {
         toggle('Open', TaskFilter.open),
         toggle('All', TaskFilter.all),
         toggle('Completed', TaskFilter.completed),
-        if (tags.isNotEmpty)
-          SizedBox(
-            width: t.sizes.statusField,
-            child: FSelect<String>.rich(
-              key: const Key('tasks-tag-filter'),
-              format: (v) => v.isEmpty ? 'All tags' : '#$v',
-              control: FSelectControl.lifted(
-                value: state.taskTagFilter ?? '',
-                onChange: (v) =>
-                    state.setTaskTagFilter(v == null || v.isEmpty ? null : v),
-              ),
-              children: [
-                FSelectItem<String>(title: const Text('All tags'), value: ''),
-                for (final tag in tags)
-                  FSelectItem<String>(title: Text('#$tag'), value: tag),
-              ],
-            ),
-          ),
         if (folders.isNotEmpty)
           SizedBox(
             width: t.sizes.statusField,
