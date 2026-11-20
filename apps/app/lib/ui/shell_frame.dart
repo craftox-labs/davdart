@@ -61,7 +61,9 @@ class ShellFrame extends StatelessWidget {
                 mirror ? 0 : t.sizes.frameInset,
                 t.sizes.frameInset,
               ),
-              child: DecoratedBox(
+              // A Container insets its child by the border width, so the
+              // hairline shows all round.
+              child: Container(
                 key: const Key('shell-panel'),
                 decoration: BoxDecoration(
                   color: t.panel,
@@ -89,10 +91,11 @@ class ShellFrame extends StatelessWidget {
               // reaches over the border.
               height: top + t.borders.hairline,
               child: Padding(
+                // Spans exactly the panel's inner width (inside its border).
                 padding: EdgeInsets.fromLTRB(
-                  mirror ? t.sizes.frameInset : 0,
+                  (mirror ? t.sizes.frameInset : 0) + t.borders.hairline,
                   t.sizes.frameInset,
-                  mirror ? 0 : t.sizes.frameInset,
+                  (mirror ? 0 : t.sizes.frameInset) + t.borders.hairline,
                   0,
                 ),
                 child: LayoutBuilder(
@@ -204,9 +207,13 @@ class RailTabPainter extends CustomPainter {
     final edge = size.width + margin; // x of the panel's outer left edge
     final r = radius;
     final fillPaint = Paint()..color = fill;
+    // A tab at a divider reaches one border width further out on that side,
+    // so its edge stroke lands in the divider's own pixel column.
+    final y0 = vertical && squareStart ? -borderWidth : 0.0;
+    final y1 = size.height + (vertical && squareEnd ? borderWidth : 0.0);
     canvas.drawRRect(
       RRect.fromRectAndCorners(
-        Rect.fromLTWH(0, 0, size.width + reach, size.height),
+        Rect.fromLTRB(0, y0, size.width + reach, y1),
         topLeft: Radius.circular(r),
         bottomLeft: Radius.circular(r),
       ),
@@ -225,16 +232,12 @@ class RailTabPainter extends CustomPainter {
       final to = edge + borderWidth; // past the panel's outer top edge
       canvas.drawPath(
         Path()
-          ..moveTo(squareStart ? to : edge - r, o)
-          ..lineTo(r, o)
-          ..arcToPoint(Offset(o, r), radius: inner, clockwise: false)
-          ..lineTo(o, size.height - r)
-          ..arcToPoint(
-            Offset(r, size.height - o),
-            radius: inner,
-            clockwise: false,
-          )
-          ..lineTo(squareEnd ? to : edge - r, size.height - o),
+          ..moveTo(squareStart ? to : edge - r, y0 + o)
+          ..lineTo(r, y0 + o)
+          ..arcToPoint(Offset(o, y0 + r), radius: inner, clockwise: false)
+          ..lineTo(o, y1 - r)
+          ..arcToPoint(Offset(r, y1 - o), radius: inner, clockwise: false)
+          ..lineTo(squareEnd ? to : edge - r, y1 - o),
         arc,
       );
     }

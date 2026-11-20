@@ -148,7 +148,7 @@ class Shell extends StatelessWidget {
                 final width = detailWidthFor(t, state, bc.maxWidth);
                 final divider = Container(
                   width: t.borders.hairline,
-                  color: t.divider,
+                  color: t.panelBorder,
                 );
                 final detail = !hasDetail
                     ? const SizedBox.shrink()
@@ -265,6 +265,10 @@ class Shell extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (mirror) ?detail else SizedBox(width: dockW),
+                // Mirrored, the peek's divider column sits between the
+                // peek header and the strip, so the home tab starts after it.
+                if (mirror && detailW != null)
+                  SizedBox(width: t.borders.hairline),
                 strip,
                 if (mirror) SizedBox(width: dockW) else ?detail,
               ],

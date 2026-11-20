@@ -11,6 +11,7 @@ import 'package:davdart_app/ui/app.dart';
 import 'package:davdart_app/ui/parts.dart';
 import 'package:davdart_app/ui/shell_frame.dart';
 import 'package:davdart_app/ui/sidebar.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -153,8 +154,101 @@ void main() {
       // Left of the box: the flare paints there only when not flush.
       expect(px(free, 17, 54), isNot(0));
       expect(px(flush, 17, 54), 0);
-      expect(px(flush, 20, 20), isNot(0xAA0000FF));
-      expect(px(flush, 20, 40), 0xAA0000FF);
+      expect(px(flush, 19, 20), isNot(0xAA0000FF));
+      // The edge stroke reaches one border width out, to column 19.
+      expect(px(flush, 19, 40), 0xAA0000FF);
+      expect(px(flush, 20, 40), 0x112233FF);
+      // The fill reaches out as well; the free tab's column 19 is empty.
+      expect(px(free, 19, 40), 0);
+    });
+  });
+
+  group('tab edge meets the vertical line', () {
+    Future<ByteData> shot(WidgetTester t) async {
+      final boundary = t.renderObject(
+        find.byType(RepaintBoundary).first,
+      ) as RenderRepaintBoundary;
+      final img = await t.runAsync(() => boundary.toImage());
+      return (await t.runAsync(img!.toByteData))!;
+    }
+
+    int at(ByteData d, int x, int y) => d.getUint32((y * 1500 + x) * 4);
+
+    // The sampled column holds the same colour in the tab (above the panel's
+    // top edge) and in the line below it, and that colour is the border's.
+    void expectContinues(ByteData d, double col, double panelTop) {
+      final x = col.round();
+      final tab = at(d, x, panelTop.round() - 12);
+      final line = at(d, x, panelTop.round() + 200);
+      expect(tab, line);
+      expect(tab, isNot(at(d, x + 2, panelTop.round() - 12)));
+      expect(tab, isNot(at(d, x - 2, panelTop.round() - 12)));
+    }
+
+    testWidgets('the panel border shows all round, inside the margin', (
+      t,
+    ) async {
+      await _pump(t);
+      final panel = t.getRect(_k('shell-panel'));
+      final d = await shot(t);
+      final b = Tokens.light.panelBorder.toARGB32();
+      int rgba(int c) => ((c & 0xFFFFFF) << 8) | (c >>> 24);
+      final cy = (panel.top + panel.height / 2).round();
+      expect(at(d, panel.right.round() - 1, cy), rgba(b));
+      expect(at(d, panel.left.round(), cy), rgba(b));
+      expect(at(d, panel.center.dx.round(), panel.bottom.round() - 1), rgba(b));
+    });
+
+    testWidgets('home tab continues the dock border', (t) async {
+      await _pump(t);
+      final dock = t.getRect(find.byType(DockedSidebar));
+      final tab = t.getRect(_k('tab-home'));
+      final panel = t.getRect(_k('shell-panel'));
+      // Rect arithmetic: the stroke is one hairline left of the box edge.
+      expect(tab.left - _hair, dock.right - _hair);
+      expectContinues(await shot(t), dock.right - _hair, panel.top);
+    });
+
+    testWidgets('peek tab continues the peek border', (t) async {
+      final s = await _pump(t);
+      s.select('a');
+      await t.pumpAndSettle();
+      final pane = t.getRect(_k('detail-pane'));
+      final panel = t.getRect(_k('shell-panel'));
+      final tab = t.getRect(_k('detail-tab'));
+      expect(tab.left, pane.left);
+      expect(t.getRect(_k('detail-header')).width, pane.width);
+      // The border column is the one left of the pane.
+      s.openNoteTab('b'); // keep the peek tab flush but make home inactive
+      await t.pumpAndSettle();
+      s.select('a');
+      await t.pumpAndSettle();
+      expectContinues(await shot(t), pane.left - _hair, panel.top);
+    });
+
+    testWidgets('mirrored: peek tab end and home tab start meet the border', (
+      t,
+    ) async {
+      final s = await _pump(t, side: LayoutSide.end);
+      s.select('a');
+      await t.pumpAndSettle();
+      final pane = t.getRect(_k('detail-pane'));
+      final panel = t.getRect(_k('shell-panel'));
+      final home = t.getRect(_k('tab-home'));
+      expect(t.getRect(_k('detail-header')).width, pane.width);
+      // The border column is the one right of the pane; the home tab starts
+      // after it, its stroke reaching back into it.
+      expect(home.left, pane.right + _hair);
+      var d = await shot(t);
+      expectContinues(d, pane.right, panel.top);
+      // Home is active: its stroke is at the same column.
+      expect(_in('tab-home', 'joined-tab'), findsOneWidget);
+      s.openNoteTab('b');
+      await t.pumpAndSettle();
+      s.select('a');
+      await t.pumpAndSettle();
+      d = await shot(t);
+      expectContinues(d, pane.right, panel.top);
     });
   });
 

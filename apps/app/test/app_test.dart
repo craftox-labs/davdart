@@ -1134,7 +1134,8 @@ void main() {
       // The content takes the freed width.
       expect(
         t.getSize(find.byType(TopBar)).width,
-        t.getSize(find.byKey(const Key('shell-panel'))).width,
+        t.getSize(find.byKey(const Key('shell-panel'))).width -
+            2 * Tokens.light.borders.hairline,
       );
       // Another icon while collapsed reopens that section.
       await t.tap(find.byKey(const Key('rail-views')));
@@ -1400,9 +1401,7 @@ void main() {
 
     testWidgets('the panel and rail take their colours from tokens', (t) async {
       await pump(t);
-      final panel = t.widget<DecoratedBox>(
-        find.byKey(const Key('shell-panel')),
-      );
+      final panel = t.widget<Container>(find.byKey(const Key('shell-panel')));
       expect((panel.decoration as BoxDecoration).color, Tokens.light.panel);
       expect(Tokens.light.frame, isNot(Tokens.light.panel));
       expect(Tokens.dark.frame, isNot(Tokens.dark.panel));

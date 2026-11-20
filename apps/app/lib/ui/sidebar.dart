@@ -54,13 +54,20 @@ class Sidebar extends StatelessWidget {
                   color: t.panel,
                   border: Border(
                     left: BorderSide(
-                      color: t.divider,
+                      color: t.panelBorder,
                       width: t.borders.hairline,
                     ),
                   ),
                 ),
               )
-            : null,
+            : DecorationDelta.boxDelta(
+                border: Border(
+                  right: BorderSide(
+                    color: t.panelBorder,
+                    width: t.borders.hairline,
+                  ),
+                ),
+              ),
       ),
       header: inDrawer ? SectionBar(state: state, onPick: close) : null,
       child: body,
