@@ -228,6 +228,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     if (!hasDetail && _peek.value == 0) _heldPeek = null;
     final peekUid = state.peekUid ?? _heldPeek;
     final mainNote = state.mainNoteUid;
+    final mirror = state.layoutSide == LayoutSide.end;
 
     Widget main() => mainNote != null
         ? DetailView(
@@ -255,13 +256,15 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
       uid: peekUid!,
       onClose: () => state.guarded(() => state.select(null)),
       inHeader: header,
+      // The peek's own header tab starts past the collapse control; its
+      // label and title share that left edge.
+      startInset: header && split ? DetailHeader.inset(t, mirror) : null,
     );
 
     // A main note tab is a full page: no search or view switch.
     // Where the peeked note replaces the main area it brings its own
     // toolbar row, level with the side panel's header.
     final showTopBar = !(wide && (mainNote != null || (hasDetail && !split)));
-    final mirror = state.layoutSide == LayoutSide.end;
     final Widget body;
     if (split) {
       body = LayoutBuilder(
@@ -404,8 +407,10 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
             // Beside a divider (the side panel or the peek) the home
             // tab lines up with it; at the panel's corner it keeps the
             // clearance for the rounded corner.
-            flushStart: mirror ? peekBeside : dockW > 0,
-            startPad: (mirror ? peekBeside : dockW > 0) ? 0 : edgePad,
+            // With the rail on the left that is always a divider (the side
+            // panel's, or the collapsed rail's, whose panel corner is square).
+            flushStart: mirror ? peekBeside : true,
+            startPad: (mirror ? peekBeside : true) ? 0 : edgePad,
             endPad: !mirror && detailW != null ? t.radii.tab : t.space.sm,
           ),
         ),

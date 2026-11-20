@@ -46,6 +46,18 @@ class ShellFrame extends StatelessWidget {
     if (!showRail) {
       return ColoredBox(color: t.frame, child: child);
     }
+    // Rail only (side panel collapsed): the panel's corner at the rail is
+    // square, flush with the divider, rather than rounded.
+    final square = state.sidebarCollapsed;
+    final r = Radius.circular(t.radii.panel);
+    final ri = Radius.circular(t.radii.panel - t.borders.hairline);
+    final none = Radius.zero;
+    BorderRadius corners(Radius r) => BorderRadius.only(
+      topLeft: square && !mirror ? none : r,
+      topRight: square && mirror ? none : r,
+      bottomLeft: r,
+      bottomRight: r,
+    );
     return ColoredBox(
       color: t.frame,
       child: Stack(
@@ -72,14 +84,9 @@ class ShellFrame extends StatelessWidget {
                     color: t.panelBorder,
                     width: t.borders.hairline,
                   ),
-                  borderRadius: BorderRadius.circular(t.radii.panel),
+                  borderRadius: corners(r),
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(
-                    t.radii.panel - t.borders.hairline,
-                  ),
-                  child: child,
-                ),
+                child: ClipRRect(borderRadius: corners(ri), child: child),
               ),
             ),
           ),
@@ -102,6 +109,20 @@ class ShellFrame extends StatelessWidget {
                 child: LayoutBuilder(
                   builder: (context, c) => header!(context, c.maxWidth),
                 ),
+              ),
+            ),
+          // The divider between the rail and the panel runs on up through
+          // the header row, so the first tab sits flush at it.
+          if (header != null && square)
+            Positioned(
+              left: mirror ? null : t.sizes.rail,
+              right: mirror ? t.sizes.rail : null,
+              top: 0,
+              height: top + t.borders.hairline,
+              width: t.borders.hairline,
+              child: ColoredBox(
+                key: const Key('rail-divider'),
+                color: t.panelBorder,
               ),
             ),
           // The rail sits above the panel so the active tab can paint over
@@ -479,11 +500,20 @@ class IconRail extends StatelessWidget {
       key: const Key('icon-rail'),
       width: t.sizes.rail,
       child: Padding(
-        padding: EdgeInsets.symmetric(vertical: t.space.lg),
+        padding: EdgeInsets.only(bottom: t.space.lg),
         child: Column(
           spacing: t.space.xs,
           children: [
-            const LogoSlot(),
+            // The logo slot's centre is on the header row's centreline.
+            SizedBox(
+              height:
+                  math.max(0.0, t.sizes.frameInset + t.sizes.tabStrip / 2) +
+                  t.sizes.railItem / 2,
+              child: const Align(
+                alignment: Alignment.bottomCenter,
+                child: LogoSlot(),
+              ),
+            ),
             SizedBox(height: t.space.xs),
             SpacesMenuButton(
               key: const Key('rail-spaces'),

@@ -209,21 +209,19 @@ void main() {
       expectContinues(await shot(t), dock.right - _hair, panel.top);
     });
 
-    testWidgets('peek tab continues the peek border', (t) async {
+    testWidgets('the peek header starts with Collapse, then the tab', (
+      t,
+    ) async {
       final s = await _pump(t);
       s.select('a');
       await t.pumpAndSettle();
       final pane = t.getRect(_k('detail-pane'));
-      final panel = t.getRect(_k('shell-panel'));
+      final collapse = t.getRect(_k('peek-collapse'));
       final tab = t.getRect(_k('detail-tab'));
-      expect(tab.left, pane.left);
       expect(t.getRect(_k('detail-header')).width, pane.width);
-      // The border column is the one left of the pane.
-      s.openNoteTab('b'); // keep the peek tab flush but make home inactive
-      await t.pumpAndSettle();
-      s.select('a');
-      await t.pumpAndSettle();
-      expectContinues(await shot(t), pane.left - _hair, panel.top);
+      expect(collapse.left, greaterThanOrEqualTo(pane.left));
+      expect(collapse.left - pane.left, lessThan(collapse.width));
+      expect(tab.left, greaterThanOrEqualTo(collapse.right));
     });
 
     testWidgets('mirrored: peek tab end and home tab start meet the border', (
@@ -277,18 +275,20 @@ void main() {
       expect(p.squareEnd, isFalse);
     });
 
-    testWidgets('the peek tab lines up with its divider', (t) async {
+    testWidgets('the peek tab follows the Collapse control, not the divider', (
+      t,
+    ) async {
       final s = await _pump(t);
       s.select('a');
       await t.pumpAndSettle();
       expect(
         t.getRect(_k('detail-tab')).left,
-        t.getRect(_k('detail-pane')).left,
+        greaterThan(t.getRect(_k('detail-pane')).left),
       );
       final p =
           t.widget<CustomPaint>(_in('detail-tab', 'joined-tab')).painter!
               as RailTabPainter;
-      expect(p.squareStart, isTrue);
+      expect(p.squareStart, isFalse);
     });
 
     testWidgets('mirrored, wide but not split: no spacer, home tab free', (
@@ -330,36 +330,39 @@ void main() {
   });
 
   group('detail header', () {
-    testWidgets(
-      'sits above the pane: closable tab, then Promote and Collapse',
-      (t) async {
-        final s = await _pump(t);
-        s.select('a');
-        await t.pumpAndSettle();
-        final header = t.getRect(_k('detail-header'));
-        final pane = t.getRect(_k('detail-pane'));
-        final panel = t.getRect(_k('shell-panel'));
-        expect(header.left, pane.left);
-        expect(header.width, pane.width);
-        expect(t.getRect(_in('detail-tab', 'joined-tab')).bottom, panel.top);
-        // Close lives in the tab itself, like a strip tab's.
-        expect(_in('detail-tab', 'tab-close'), findsOneWidget);
-        expect(_k('detail-close'), findsNothing);
-        expect(
-          t.getRect(_in('detail-tab', 'tab-close')).right,
-          lessThanOrEqualTo(t.getRect(_k('peek-promote')).left),
-        );
-        expect(t.getRect(_k('peek-collapse')).right, header.right);
-        expect(
-          find.descendant(of: _k('detail-tab'), matching: find.text('Alpha')),
-          findsOneWidget,
-        );
-        await t.tap(_in('detail-tab', 'tab-close'));
-        await t.pumpAndSettle();
-        expect(s.peek, isNull);
-        expect(_k('detail-header'), findsNothing);
-      },
-    );
+    testWidgets('sits above the pane: Collapse, closable tab, then Promote', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      s.select('a');
+      await t.pumpAndSettle();
+      final header = t.getRect(_k('detail-header'));
+      final pane = t.getRect(_k('detail-pane'));
+      final panel = t.getRect(_k('shell-panel'));
+      expect(header.left, pane.left);
+      expect(header.width, pane.width);
+      expect(t.getRect(_in('detail-tab', 'joined-tab')).bottom, panel.top);
+      // Close lives in the tab itself, like a strip tab's.
+      expect(_in('detail-tab', 'tab-close'), findsOneWidget);
+      expect(_k('detail-close'), findsNothing);
+      expect(
+        t.getRect(_in('detail-tab', 'tab-close')).right,
+        lessThanOrEqualTo(t.getRect(_k('peek-promote')).left),
+      );
+      expect(t.getRect(_k('peek-collapse')).right, lessThan(header.center.dx));
+      expect(
+        t.getRect(_k('peek-collapse')).right,
+        lessThanOrEqualTo(t.getRect(_k('detail-tab')).left),
+      );
+      expect(
+        find.descendant(of: _k('detail-tab'), matching: find.text('Alpha')),
+        findsOneWidget,
+      );
+      await t.tap(_in('detail-tab', 'tab-close'));
+      await t.pumpAndSettle();
+      expect(s.peek, isNull);
+      expect(_k('detail-header'), findsNothing);
+    });
 
     testWidgets('the tab close matches a strip tab close in size', (t) async {
       final s = await _pump(t);
@@ -396,15 +399,16 @@ void main() {
       expect(s.peek, isNull);
     });
 
-    testWidgets('Promote and Collapse sit at the pane edge', (t) async {
+    testWidgets('Collapse at the pane start, Promote at its end', (t) async {
       final s = await _pump(t);
       s.select('a');
       await t.pumpAndSettle();
       final header = t.getRect(_k('detail-header'));
       final promote = t.getRect(_k('peek-promote'));
       final collapse = t.getRect(_k('peek-collapse'));
-      expect(collapse.right, header.right);
-      expect(promote.right, lessThanOrEqualTo(collapse.left));
+      expect(collapse.left - header.left, lessThan(collapse.width));
+      expect(promote.right, lessThanOrEqualTo(header.right));
+      expect(promote.left, greaterThan(collapse.right));
       expect(
         t.widget<IconAction>(_k('peek-promote')).tooltip,
         'Open in main area',

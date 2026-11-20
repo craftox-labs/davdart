@@ -4,6 +4,7 @@ import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/widgets.dart';
+import 'package:davdart_app/ui/theme.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Seed implements NoteSource {
@@ -82,4 +83,86 @@ void main() {
       });
     }
   }
+
+  testWidgets('header controls share one centreline at 1280', (t) async {
+    final s = await _pump(t, 1280, LayoutSide.start);
+    s.select('a');
+    await t.pumpAndSettle();
+    final plus = _k('tab-new');
+    final line = t.getRect(plus).center.dy;
+    for (final k in ['peek-collapse', 'detail-tab', 'tab-home', 'logo-slot']) {
+      expect(
+        (t.getRect(_k(k)).center.dy - line).abs(),
+        lessThanOrEqualTo(1),
+        reason: k,
+      );
+    }
+    // The control comes before the peek tab, at the pane's left edge.
+    expect(
+      t.getRect(_k('peek-collapse')).right,
+      lessThanOrEqualTo(t.getRect(_k('detail-tab')).left + 1),
+    );
+    s.setPeekCollapsed(true);
+    await t.pumpAndSettle();
+    expect(
+      (t.getRect(_k('peek-expand')).center.dy - line).abs(),
+      lessThanOrEqualTo(1),
+    );
+    s.setPeekCollapsed(false);
+    await t.pumpAndSettle();
+    expect(_k('peek-collapse'), findsOneWidget);
+  });
+
+  testWidgets('peek label, title and tab content share a left edge', (t) async {
+    final s = await _pump(t, 1280, LayoutSide.start);
+    await s.addFolder('Decisions');
+    await s.addNote('Scope note', parentUid: s.scope!.uid);
+    final uid = s.notes.firstWhere((n) => n.summary == 'Scope note').uid;
+    s.openFolder(null);
+    s.select(uid);
+    await t.pumpAndSettle();
+    final peek = _k('peek-view');
+    final label = t.getRect(_k('breadcrumb')).left;
+    final title = t
+        .getRect(find.descendant(of: peek, matching: find.text('Scope note')))
+        .left;
+    final tabIcon = t
+        .getRect(
+          find
+              .descendant(of: _k('detail-tab'), matching: find.byType(Icon))
+              .first,
+        )
+        .left;
+    expect((label - title).abs(), lessThanOrEqualTo(1));
+    expect((label - tabIcon).abs(), lessThanOrEqualTo(1));
+  });
+
+  testWidgets('collapsed rail: divider through header, square corner', (
+    t,
+  ) async {
+    final s = await _pump(t, 1280, LayoutSide.start);
+    s.setSidebarCollapsed(true);
+    await t.pumpAndSettle();
+    final tk = tokensOf(t.element(_k('shell-panel')));
+    final panel = t.getRect(_k('shell-panel'));
+    final divider = t.getRect(_k('rail-divider'));
+    expect(divider.left, panel.left);
+    expect(divider.top, 0);
+    expect(divider.bottom, greaterThanOrEqualTo(panel.top));
+    // Flush at the divider's inner edge, as beside an open side panel.
+    expect(t.getRect(_k('tab-home')).left, panel.left + tk.borders.hairline);
+    final box =
+        t.widget<Container>(_k('shell-panel')).decoration! as BoxDecoration;
+    final r = box.borderRadius! as BorderRadius;
+    expect(r.topLeft, Radius.zero);
+    expect(r.topRight, isNot(Radius.zero));
+    expect(r.bottomLeft, isNot(Radius.zero));
+    // Open again: the rounded corner and the divider-less header return.
+    s.setSidebarCollapsed(false);
+    await t.pumpAndSettle();
+    expect(_k('rail-divider'), findsNothing);
+    final open =
+        t.widget<Container>(_k('shell-panel')).decoration! as BoxDecoration;
+    expect((open.borderRadius! as BorderRadius).topLeft, isNot(Radius.zero));
+  });
 }

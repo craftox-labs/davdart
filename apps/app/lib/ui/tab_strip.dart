@@ -75,6 +75,9 @@ class TabStrip extends StatelessWidget {
                 final per = (((c.maxWidth - plus - homeW - 2 * flare) / n))
                     .clamp(t.sizes.tabMin, t.sizes.tabMax);
                 return Row(
+                  // Top-aligned, so the "+" shares the centreline of every
+                  // other header control (tabStrip / 2 below the top).
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     ActionContextMenu(
                       groups: [
