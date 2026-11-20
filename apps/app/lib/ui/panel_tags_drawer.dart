@@ -42,7 +42,6 @@ class PanelTagsDrawer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (tags.isEmpty) return body;
     final t = tokensOf(context);
     return LayoutBuilder(
       builder: (context, c) {
@@ -51,71 +50,77 @@ class PanelTagsDrawer extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(child: body),
-            Container(
-              key: Key('$keyPrefix-drawer'),
-              decoration: BoxDecoration(
-                border: Border(
-                  top: BorderSide(color: t.divider, width: t.borders.hairline),
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  FTappable(
-                    key: Key('$keyPrefix-toggle'),
-                    semanticsLabel: 'Tags (${tags.length})',
-                    behavior: HitTestBehavior.opaque,
-                    onPress: () => onExpandedChange(!expanded),
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: t.space.lg,
-                        vertical: t.space.md,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'Tags (${tags.length})',
-                              style: t.type.labelStyle.copyWith(color: t.muted),
-                            ),
-                          ),
-                          Icon(
-                            expanded
-                                ? FLucideIcons.chevronDown
-                                : FLucideIcons.chevronUp,
-                            size: t.icons.md,
-                            color: t.muted,
-                          ),
-                        ],
-                      ),
+            if (tags.isNotEmpty)
+              Container(
+                key: Key('$keyPrefix-drawer'),
+                decoration: BoxDecoration(
+                  border: Border(
+                    top: BorderSide(
+                      color: t.divider,
+                      width: t.borders.hairline,
                     ),
                   ),
-                  if (expanded)
-                    ConstrainedBox(
-                      constraints: BoxConstraints(maxHeight: cap),
-                      child: LayoutBuilder(
-                        builder: (context, box) => SingleChildScrollView(
-                          key: Key('$keyPrefix-chips'),
-                          padding: EdgeInsets.fromLTRB(
-                            t.space.lg,
-                            0,
-                            t.space.lg,
-                            t.space.md,
-                          ),
-                          child: Wrap(
-                            spacing: t.space.sm,
-                            runSpacing: t.space.sm,
-                            children: [
-                              for (final tag in tags) _chip(tag, box, t),
-                            ],
-                          ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    FTappable(
+                      key: Key('$keyPrefix-toggle'),
+                      semanticsLabel: 'Tags (${tags.length})',
+                      behavior: HitTestBehavior.opaque,
+                      onPress: () => onExpandedChange(!expanded),
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: t.space.lg,
+                          vertical: t.space.md,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Tags (${tags.length})',
+                                style: t.type.labelStyle.copyWith(
+                                  color: t.muted,
+                                ),
+                              ),
+                            ),
+                            Icon(
+                              expanded
+                                  ? FLucideIcons.chevronDown
+                                  : FLucideIcons.chevronUp,
+                              size: t.icons.md,
+                              color: t.muted,
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                ],
+                    if (expanded)
+                      ConstrainedBox(
+                        constraints: BoxConstraints(maxHeight: cap),
+                        child: LayoutBuilder(
+                          builder: (context, box) => SingleChildScrollView(
+                            key: Key('$keyPrefix-chips'),
+                            padding: EdgeInsets.fromLTRB(
+                              t.space.lg,
+                              0,
+                              t.space.lg,
+                              t.space.md,
+                            ),
+                            child: Wrap(
+                              spacing: t.space.sm,
+                              runSpacing: t.space.sm,
+                              children: [
+                                for (final tag in tags) _chip(tag, box, t),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
-            ),
           ],
         );
       },
