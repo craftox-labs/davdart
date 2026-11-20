@@ -47,4 +47,32 @@ void main() {
       expect(find.byKey(const Key('crumb-space')), findsOneWidget);
     });
   }
+
+  for (final w in [320.0, 880.0]) {
+    testWidgets('scope bar row is vertically centred at $w', (t) async {
+      t.view.physicalSize = Size(w, 800);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final storage = MemoryStorage();
+      final s = AppState(
+        SpaceNoteSource(
+          Space(
+            SpaceConfig(id: 's', name: 'Space'),
+            PersistentNoteStore(storage),
+          ),
+          flags: storage,
+        ),
+      );
+      await s.load();
+      await s.addFolder('Folder', text: 'Some description');
+      s.openFolder(s.scope!.uid);
+      await t.pumpWidget(DavdartApp(state: s));
+      await t.pumpAndSettle();
+      final crumb = t.getRect(find.byKey(const Key('crumb-home'))).center.dy;
+      for (final k in ['scope-edit', 'scope-delete', 'scope-close']) {
+        final c = t.getRect(find.byKey(Key(k))).center.dy;
+        expect((c - crumb).abs(), lessThanOrEqualTo(1), reason: '$k vs crumb');
+      }
+    });
+  }
 }
