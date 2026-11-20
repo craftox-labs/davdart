@@ -6,6 +6,7 @@ import 'package:xml/xml.dart';
 
 import 'ical.dart';
 import 'note.dart';
+import 'task.dart';
 
 class CalDavException implements Exception {
   CalDavException(this.statusCode, this.message);
@@ -34,9 +35,18 @@ class SyncResult {
   final String? syncToken;
 }
 
+/// Result of [CalDavClient.syncTasks].
+class TaskSyncResult {
+  TaskSyncResult(this.changed, this.deletedHrefs, this.syncToken);
+  final List<Task> changed;
+  final List<String> deletedHrefs;
+  final String? syncToken;
+}
+
 /// A calendar collection found under a user's home.
 class CollectionInfo {
-  const CollectionInfo(this.href, this.name, {this.holdsNotes = true});
+  const CollectionInfo(this.href, this.name,
+      {this.holdsNotes = true, this.holdsTasks = true});
 
   /// Absolute URL of the collection.
   final Uri href;
@@ -46,6 +56,9 @@ class CollectionInfo {
 
   /// False when the server says the collection takes only events or tasks.
   final bool holdsNotes;
+
+  /// False when the server says the collection takes no VTODO.
+  final bool holdsTasks;
 }
 
 /// CalDAV client for one collection that holds VJOURNAL resources.
@@ -124,6 +137,7 @@ class CalDavClient {
         _withSlash(url),
         dn.isEmpty ? (segs.isEmpty ? url.path : segs.last) : dn,
         holdsNotes: comps.isEmpty || comps.contains('VJOURNAL'),
+        holdsTasks: comps.isEmpty || comps.contains('VTODO'),
       ));
     }
     return out;
@@ -139,6 +153,7 @@ class CalDavClient {
     required String password,
     http.Client? client,
     String? id,
+    List<String> components = const ['VJOURNAL', 'VTODO'],
   }) async {
     final h = _withSlash(home);
     final c = CalDavClient(
@@ -157,7 +172,9 @@ class CalDavClient {
         b.element('d:prop', nest: () {
           b.element('d:displayname', nest: name);
           b.element('c:supported-calendar-component-set', nest: () {
-            b.element('c:comp', attributes: {'name': 'VJOURNAL'});
+            for (final c in components) {
+              b.element('c:comp', attributes: {'name': c});
+            }
           });
         });
       });
@@ -223,11 +240,12 @@ class CalDavClient {
     return http.Response.fromStream(await _http.send(req));
   }
 
-  static const _reportBody = '''<?xml version="1.0" encoding="utf-8"?>
+  static String _reportBody(String comp) =>
+      '''<?xml version="1.0" encoding="utf-8"?>
 <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
   <d:prop><d:getetag/><c:calendar-data/></d:prop>
   <c:filter><c:comp-filter name="VCALENDAR">
-    <c:comp-filter name="VJOURNAL"/>
+    <c:comp-filter name="$comp"/>
   </c:comp-filter></c:filter>
 </c:calendar-query>''';
 
@@ -238,7 +256,7 @@ class CalDavClient {
           'Depth': '1',
           'Content-Type': 'application/xml; charset=utf-8',
         },
-        body: _reportBody);
+        body: _reportBody('VJOURNAL'));
     if (r.statusCode != 207) {
       throw CalDavException(r.statusCode, 'REPORT failed');
     }
@@ -249,6 +267,37 @@ class CalDavClient {
   /// is an initial sync. Throws [SyncTokenInvalid] if the server rejects the
   /// token; fall back to `sync()` without a token then.
   Future<SyncResult> sync({String? syncToken}) async {
+    final r = await _syncGeneric<Note>(syncToken,
+        parse: parseNote,
+        missing: 'no VJOURNAL found',
+        get: getNote,
+        setMeta: (n, href, etag) => n
+          ..href = href
+          ..etag = etag);
+    return SyncResult(r.$1, r.$2, r.$3);
+  }
+
+  /// Like [sync], for the VTODO resources of the collection. The server
+  /// answers sync-collection for every component, so notes, tasks and events
+  /// arrive together; each caller keeps its own type and skips the rest.
+  Future<TaskSyncResult> syncTasks({String? syncToken}) async {
+    final r = await _syncGeneric<Task>(syncToken,
+        parse: parseTask,
+        missing: 'no VTODO found',
+        get: getTask,
+        setMeta: (t, href, etag) => t
+          ..href = href
+          ..etag = etag);
+    return TaskSyncResult(r.$1, r.$2, r.$3);
+  }
+
+  Future<(List<T>, List<String>, String?)> _syncGeneric<T>(
+    String? syncToken, {
+    required T Function(String) parse,
+    required String missing,
+    required Future<T> Function(String href) get,
+    required T Function(T, String href, String? etag) setMeta,
+  }) async {
     final token =
         const HtmlEscape(HtmlEscapeMode.element).convert(syncToken ?? '');
     final body = '''<?xml version="1.0" encoding="utf-8"?>
@@ -272,7 +321,7 @@ class CalDavClient {
       throw CalDavException(r.statusCode, 'sync REPORT failed');
     }
     final doc = XmlDocument.parse(text);
-    final changed = <Note>[];
+    final changed = <T>[];
     final deleted = <String>[];
     String? newToken;
     for (final e in doc.descendantElements) {
@@ -311,22 +360,20 @@ class CalDavClient {
       final etag = first('getetag');
       var data = first('calendar-data');
       try {
-        Note n;
+        T n;
         if (data == null || data.trim().isEmpty) {
-          n = await getNote(href);
+          n = await get(href);
         } else {
-          n = parseNote(data)
-            ..href = href
-            ..etag = etag;
+          n = setMeta(parse(data), href, etag);
         }
         changed.add(n);
       } on ICalException catch (e) {
-        if (e.message != 'no VJOURNAL found') onResourceError?.call(href, e);
+        if (e.message != missing) onResourceError?.call(href, e);
       }
       // A failed fetch (CalDavException, network error) is not caught: the
       // whole sync fails, so the caller keeps its old token and retries.
     }
-    return SyncResult(changed, deleted, newToken);
+    return (changed, deleted, newToken);
   }
 
   /// Fetches one note by href (absolute or relative to the collection).
@@ -390,6 +437,78 @@ class CalDavClient {
     }
   }
 
+  // ---- Tasks (VTODO) ----
+
+  /// Lists every task in the collection, with href and etag set.
+  Future<List<Task>> listTasks() async {
+    final r = await _send('REPORT', collection,
+        headers: {
+          'Depth': '1',
+          'Content-Type': 'application/xml; charset=utf-8',
+        },
+        body: _reportBody('VTODO'));
+    if (r.statusCode != 207) {
+      throw CalDavException(r.statusCode, 'REPORT failed');
+    }
+    return parseTaskMultistatus(utf8.decode(r.bodyBytes),
+        onError: onResourceError);
+  }
+
+  /// Fetches one task by href (absolute or relative to the collection).
+  Future<Task> getTask(String href) async {
+    final r = await _send('GET', _resolve(href));
+    if (r.statusCode != 200) throw CalDavException(r.statusCode, 'GET failed');
+    final t = parseTask(utf8.decode(r.bodyBytes));
+    t.href = href;
+    t.etag = r.headers['etag'];
+    return t;
+  }
+
+  /// Creates or updates [task], like [putNote]: conditional on the etag, or
+  /// create-only without one. Returns the stored task with fresh href, etag.
+  Future<Task> putTask(Task task, {bool touch = true}) async {
+    if (touch) {
+      final now = DateTime.now().toUtc();
+      task
+        ..lastModified = now
+        ..dtstamp = now;
+    }
+    final href = task.href ?? '${Uri.encodeComponent(task.uid)}.ics';
+    final r = await _send('PUT', _resolve(href),
+        headers: {
+          'Content-Type': 'text/calendar; charset=utf-8',
+          if (task.etag != null)
+            'If-Match': task.etag!
+          else
+            'If-None-Match': '*',
+        },
+        body: serializeTask(task));
+    if (r.statusCode == 412) {
+      throw ConflictException('${task.uid} changed on the server');
+    }
+    if (r.statusCode != 200 && r.statusCode != 201 && r.statusCode != 204) {
+      throw CalDavException(r.statusCode, 'PUT failed');
+    }
+    final stored = task.copyWith();
+    stored.href = href;
+    stored.etag = r.headers['etag'] ?? (await getTask(href)).etag;
+    return stored;
+  }
+
+  /// Deletes [task]; with an etag the delete is conditional.
+  Future<void> deleteTask(Task task) async {
+    final href = task.href;
+    if (href == null) throw ArgumentError('task has no href');
+    final r = await _send('DELETE', _resolve(href),
+        headers: {if (task.etag != null) 'If-Match': task.etag!});
+    if (r.statusCode == 412) {
+      throw ConflictException('${task.uid} changed on the server');
+    }
+    if (r.statusCode != 200 && r.statusCode != 204 && r.statusCode != 404) {
+      throw CalDavException(r.statusCode, 'DELETE failed');
+    }
+  }
+
   void close() => _http.close();
 }
 
@@ -420,4 +539,30 @@ List<Note> parseMultistatus(String body,
     }
   }
   return notes;
+}
+
+/// Parses a WebDAV 207 multistatus body into tasks with href and etag.
+/// Resources without a VTODO are skipped; unparsable ones go to [onError].
+List<Task> parseTaskMultistatus(String body,
+    {void Function(String? href, Object error)? onError}) {
+  final doc = XmlDocument.parse(body);
+  final tasks = <Task>[];
+  for (final resp
+      in doc.descendantElements.where((e) => e.localName == 'response')) {
+    String? text(String name) => resp.descendantElements
+        .where((e) => e.localName == name)
+        .map((e) => e.innerText)
+        .firstOrNull;
+    final data = text('calendar-data');
+    if (data == null || data.trim().isEmpty) continue;
+    final href = text('href');
+    try {
+      tasks.add(parseTask(data)
+        ..href = href
+        ..etag = text('getetag'));
+    } on ICalException catch (e) {
+      if (e.message != 'no VTODO found') onError?.call(href, e);
+    }
+  }
+  return tasks;
 }

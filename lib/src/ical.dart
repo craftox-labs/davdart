@@ -1,4 +1,5 @@
 import 'note.dart';
+import 'task.dart';
 
 class ICalException implements Exception {
   ICalException(this.message);
@@ -358,3 +359,219 @@ String serializeNotes(Iterable<Note> notes) {
 }
 
 String serializeNote(Note n) => serializeNotes([n]);
+
+// ---- Tasks (VTODO) ----
+
+final _relType = RegExp(r'RELTYPE="?([A-Za-z-]+)"?', caseSensitive: false);
+
+/// Builds a Task from the lines of one VTODO component (BEGIN..END).
+Task _todoFromLines(List<String> lines) {
+  String? uid, summary, description, status, parent, rrule;
+  int? percent, priority;
+  ICalDate? due, start;
+  DateTime? created, modified, stamp, completed;
+  final cats = <String>[];
+  final extra = <String>[];
+  final params = <String, String>{};
+  var depth = 0;
+  for (final line in lines.sublist(1, lines.length - 1)) {
+    final p = _parseLine(line);
+    if (p == null) continue;
+    if (p.name == 'BEGIN') depth++;
+    if (depth > 0) {
+      extra.add(line); // VALARM and other nested components
+      if (p.name == 'END') depth--;
+      continue;
+    }
+    switch (p.name) {
+      case 'UID':
+        uid = p.value.trim();
+      case 'SUMMARY':
+        if (summary == null) {
+          summary = unescapeText(p.value);
+          if (p.params.isNotEmpty) params['SUMMARY'] = p.params;
+        } else {
+          extra.add(line);
+        }
+      case 'DESCRIPTION':
+        if (description == null) {
+          description = unescapeText(p.value);
+          if (p.params.isNotEmpty) params['DESCRIPTION'] = p.params;
+        } else {
+          extra.add(line);
+        }
+      case 'CATEGORIES':
+        if (p.params.isNotEmpty) {
+          extra.add(line);
+        } else {
+          for (final c in _splitCommas(p.value)) {
+            final t = unescapeText(c).trim();
+            if (t.isNotEmpty) cats.add(t);
+          }
+        }
+      case 'STATUS':
+        status = p.value.trim().toUpperCase();
+      case 'PERCENT-COMPLETE':
+        final v = int.tryParse(p.value.trim());
+        if (percent == null && v != null && v >= 0 && v <= 100) {
+          percent = v;
+        } else {
+          extra.add(line);
+        }
+      case 'PRIORITY':
+        final v = int.tryParse(p.value.trim());
+        if (priority == null && v != null && v >= 0 && v <= 9) {
+          priority = v;
+        } else {
+          extra.add(line);
+        }
+      case 'DUE' || 'DTSTART':
+        final d = ICalDate(p.value.trim(), p.params);
+        final isDue = p.name == 'DUE';
+        if (d.wall != null && (isDue ? due : start) == null) {
+          if (isDue) {
+            due = d;
+          } else {
+            start = d;
+          }
+        } else {
+          extra.add(line);
+        }
+      case 'RRULE':
+        if (rrule == null && p.params.isEmpty && p.value.trim().isNotEmpty) {
+          rrule = p.value.trim();
+        } else {
+          extra.add(line);
+        }
+      case 'RELATED-TO':
+        final type = _relType.firstMatch(p.params)?.group(1)?.toUpperCase();
+        if (parent == null &&
+            p.value.trim().isNotEmpty &&
+            p.params.replaceAll(_relType, '').replaceAll(';', '').isEmpty &&
+            (type == null || type == 'PARENT')) {
+          parent = p.value.trim();
+        } else {
+          extra.add(line);
+        }
+      case 'CREATED' || 'LAST-MODIFIED' || 'COMPLETED':
+        // Only plain UTC values are modelled; anything else stays verbatim.
+        if (p.params.isEmpty && _utcStamp.hasMatch(p.value.trim())) {
+          final d = _parseDateTime(p.value);
+          if (p.name == 'CREATED') {
+            created = d;
+          } else if (p.name == 'COMPLETED') {
+            completed = d;
+          } else {
+            modified = d;
+          }
+        } else {
+          extra.add(line);
+        }
+      case 'DTSTAMP':
+        try {
+          stamp = _parseDateTime(p.value);
+        } on ICalException {
+          // Malformed: a fresh stamp is written on save.
+        }
+      default:
+        extra.add(line);
+    }
+  }
+  if (uid == null || uid.isEmpty) throw ICalException('VTODO without UID');
+  return Task(
+    uid: uid,
+    summary: summary ?? '',
+    description: description ?? '',
+    categories: cats,
+    status: status,
+    percentComplete: percent,
+    priority: priority,
+    due: due,
+    dtstart: start,
+    completed: completed,
+    rrule: rrule,
+    parentUid: parent,
+    created: created,
+    lastModified: modified,
+    dtstamp: stamp,
+    extraLines: extra,
+    propertyParams: params,
+  );
+}
+
+/// Parses every VTODO in an iCalendar document as its own Task.
+List<Task> parseTasks(String text) => [
+      for (final b in _splitCalendar(text).blocks)
+        if (b.type == 'VTODO') _todoFromLines(b.lines),
+    ];
+
+/// Parses one CalDAV resource into a single Task, keeping other VTODOs of the
+/// resource (recurrence overrides) in [Task.siblingLines] and VTIMEZONE and
+/// other calendar-level content in [Task.calendarLines]. Throws
+/// [ICalException] ("no VTODO found") if the resource holds no VTODO.
+Task parseTask(String text) {
+  final cal = _splitCalendar(text);
+  final todos = [
+    for (final b in cal.blocks)
+      if (b.type == 'VTODO') b
+  ];
+  if (todos.isEmpty) throw ICalException('no VTODO found');
+  bool isOverride(_Block b) =>
+      b.lines.any((l) => l.toUpperCase().startsWith('RECURRENCE-ID'));
+  final master =
+      todos.firstWhere((b) => !isOverride(b), orElse: () => todos.first);
+  final task = _todoFromLines(master.lines);
+  for (final b in cal.blocks) {
+    if (identical(b, master)) continue;
+    (b.type == 'VTODO' ? task.siblingLines : task.calendarLines)
+        .addAll(b.lines);
+  }
+  task.calendarLines.addAll(cal.looseLines);
+  return task;
+}
+
+/// Serializes [tasks] as one VCALENDAR with CRLF line endings.
+String serializeTasks(Iterable<Task> tasks) {
+  final out = StringBuffer();
+  void w(String l) => out.write('${fold(l)}\r\n');
+  w('BEGIN:VCALENDAR');
+  w('VERSION:2.0');
+  w('PRODID:$_prodId');
+  for (final t in tasks) {
+    t.calendarLines.forEach(w);
+    w('BEGIN:VTODO');
+    w('UID:${t.uid}');
+    w('DTSTAMP:${_formatDateTime(t.dtstamp)}');
+    if (t.created != null) w('CREATED:${_formatDateTime(t.created!)}');
+    if (t.lastModified != null) {
+      w('LAST-MODIFIED:${_formatDateTime(t.lastModified!)}');
+    }
+    String params(String name) => t.propertyParams[name] ?? '';
+    if (t.summary.isNotEmpty) {
+      w('SUMMARY${params('SUMMARY')}:${escapeText(t.summary)}');
+    }
+    if (t.description.isNotEmpty) {
+      w('DESCRIPTION${params('DESCRIPTION')}:${escapeText(t.description)}');
+    }
+    if (t.categories.isNotEmpty) {
+      w('CATEGORIES:${t.categories.map(escapeText).join(',')}');
+    }
+    if (t.status != null && t.status!.isNotEmpty) w('STATUS:${t.status}');
+    if (t.percentComplete != null) w('PERCENT-COMPLETE:${t.percentComplete}');
+    if (t.priority != null) w('PRIORITY:${t.priority}');
+    if (t.dtstart != null) w('DTSTART${t.dtstart!.params}:${t.dtstart!.value}');
+    if (t.due != null) w('DUE${t.due!.params}:${t.due!.value}');
+    if (t.completed != null) w('COMPLETED:${_formatDateTime(t.completed!)}');
+    if (t.rrule != null && t.rrule!.isNotEmpty) w('RRULE:${t.rrule}');
+    if (t.parentUid != null && t.parentUid!.isNotEmpty) {
+      w('RELATED-TO;RELTYPE=PARENT:${t.parentUid}');
+    }
+    t.extraLines.forEach(w);
+    w('END:VTODO');
+    t.siblingLines.forEach(w);
+  }
+  w('END:VCALENDAR');
+  return out.toString();
+}
+
+String serializeTask(Task t) => serializeTasks([t]);

@@ -3,4 +3,5 @@ library;
 
 export 'src/config.dart';
 export 'src/file_store.dart';
+export 'src/task_file_store.dart';
 export 'src/space_book.dart';

@@ -105,7 +105,13 @@ class FakeCalDav {
           }
           return _multi(b.toString(), 'v$version');
         }
-        return _multi([for (final n in ics.keys) _resp(n)].join());
+        final comp = RegExp(r'<c:comp-filter name="(VJOURNAL|VTODO|VEVENT)"')
+            .firstMatch(body)
+            ?.group(1);
+        return _multi([
+          for (final n in ics.keys)
+            if (comp == null || ics[n]!.contains('BEGIN:$comp')) _resp(n)
+        ].join());
     }
     return http.Response('', 405);
   }

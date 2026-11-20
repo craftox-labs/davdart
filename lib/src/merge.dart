@@ -1,5 +1,6 @@
 import 'note.dart';
 import 'plan_item.dart';
+import 'task.dart';
 
 /// One place where both sides changed the same lines (or the same scalar) to
 /// different values. The merge picked [chosen]; the other side is kept here so
@@ -263,4 +264,101 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
       .whereType<DateTime>()
       .fold<DateTime?>(null, (a, d) => a == null || d.isAfter(a) ? d : a);
   return NoteMerge(merged, conflicts);
+}
+
+/// Merged task plus what had to be decided.
+class TaskMerge {
+  TaskMerge(this.task, this.conflicts);
+  final Task task;
+  final List<MergeConflict> conflicts;
+  bool get hadConflict => conflicts.isNotEmpty;
+}
+
+/// Three-way merge of two edited copies of one task against [base], the copy
+/// last synced. Same policy as [mergeNotes]: each field (title, status,
+/// percent, priority, due, start, completed, recurrence rule, parent) merges
+/// on its own, tags as sets, the description per line. On a true conflict the
+/// side with the later lastModified wins that field only (ties go to
+/// [remote]) and the losing value is reported. Completion is kept consistent:
+/// if the merged status is not COMPLETED, a COMPLETED timestamp is dropped.
+/// The result keeps [remote]'s href and etag, ready to PUT.
+TaskMerge mergeTasks(Task base, Task local, Task remote) {
+  final conflicts = <MergeConflict>[];
+  final lm = local.lastModified, rm = remote.lastModified;
+  final preferLocal = lm != null && (rm == null || lm.isAfter(rm));
+
+  T? pick<T>(String what, T? b, T? l, T? r, [String Function(T?)? show]) {
+    if (l == r) return l;
+    if (l == b) return r;
+    if (r == b) return l;
+    final win = preferLocal ? l : r;
+    String s(T? v) => show != null ? show(v) : (v?.toString() ?? '');
+    conflicts.add(MergeConflict(what, s(l), s(r), s(win)));
+    return win;
+  }
+
+  bool sameList(List<String> a, List<String> b) =>
+      a.length == b.length &&
+      [for (var i = 0; i < a.length; i++) a[i] == b[i]].every((x) => x);
+
+  final merged = remote.copyWith();
+  merged.summary = pick('title', base.summary, local.summary, remote.summary)!;
+  merged.status = pick('status', base.status, local.status, remote.status);
+  merged.percentComplete = pick('percent', base.percentComplete,
+      local.percentComplete, remote.percentComplete);
+  merged.priority =
+      pick('priority', base.priority, local.priority, remote.priority);
+  merged.due = pick('due', base.due, local.due, remote.due);
+  merged.dtstart = pick('start', base.dtstart, local.dtstart, remote.dtstart);
+  merged.completed =
+      pick('completed', base.completed, local.completed, remote.completed);
+  merged.rrule = pick('repeat', base.rrule, local.rrule, remote.rrule);
+  merged.parentUid =
+      pick('parent', base.parentUid, local.parentUid, remote.parentUid);
+  if (merged.status != 'COMPLETED') merged.completed = null;
+
+  if (!sameList(local.extraLines, remote.extraLines)) {
+    final src = sameList(local.extraLines, base.extraLines)
+        ? remote.extraLines
+        : sameList(remote.extraLines, base.extraLines) || preferLocal
+            ? local.extraLines
+            : remote.extraLines;
+    final copy = List.of(src);
+    merged.extraLines
+      ..clear()
+      ..addAll(copy);
+  }
+  if (!_sameMap(local.propertyParams, remote.propertyParams)) {
+    final src = _sameMap(local.propertyParams, base.propertyParams)
+        ? remote.propertyParams
+        : _sameMap(remote.propertyParams, base.propertyParams) || preferLocal
+            ? local.propertyParams
+            : remote.propertyParams;
+    final copy = Map.of(src);
+    merged.propertyParams
+      ..clear()
+      ..addAll(copy);
+  }
+
+  final cats = <String>{...remote.categories};
+  for (final c in local.categories) {
+    if (!base.categories.contains(c)) cats.add(c);
+  }
+  for (final c in base.categories) {
+    if (!local.categories.contains(c)) cats.remove(c);
+  }
+  merged.categories = [
+    for (final c in [...remote.categories, ...local.categories])
+      if (cats.remove(c)) c
+  ];
+
+  final text = mergeText(
+      base.description, local.description, remote.description,
+      preferLocal: preferLocal);
+  conflicts.addAll(text.conflicts);
+  merged.description = text.text;
+  merged.lastModified = [lm, rm]
+      .whereType<DateTime>()
+      .fold<DateTime?>(null, (a, d) => a == null || d.isAfter(a) ? d : a);
+  return TaskMerge(merged, conflicts);
 }
