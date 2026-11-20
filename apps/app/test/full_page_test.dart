@@ -200,6 +200,30 @@ void main() {
       expect(s.dirtyFor('a'), isTrue);
     });
 
+    testWidgets('switching to a saved-view tab and back keeps the peek', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      s.setQuery('alpha');
+      await s.saveView('Alphas');
+      final v = s.savedViews.single;
+      s.applyView(v);
+      s.openNoteTab('b');
+      await _settle(t);
+      expect(s.peekUid, 'a');
+      await t.tap(_k('tab-v:${v.uid}'));
+      await _settle(t);
+      expect(s.activeTab, DocTab.view(v.uid));
+      expect(s.peekUid, 'a');
+      expect(_k('detail-pane'), findsOneWidget);
+      await t.tap(_k('tab-n:b'));
+      await _settle(t);
+      await t.tap(_k('tab-home'));
+      await _settle(t);
+      s.openFolder(null);
+      expect(s.peekUid, 'a');
+    });
+
     testWidgets('narrow layout has no Promote and no main tab page', (t) async {
       final s = await _pump(t, size: const Size(500, 900));
       expect(_k('peek-promote'), findsNothing);

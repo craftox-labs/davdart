@@ -314,7 +314,7 @@ class ViewsSection extends _Section {
           children: [
             Expanded(
               child: _item(FLucideIcons.bookmark, v.name, () {
-                state.guarded(() => state.applyView(v));
+                state.applyView(v);
                 onPick();
               }),
             ),

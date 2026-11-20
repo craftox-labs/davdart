@@ -534,7 +534,6 @@ class AppState extends ChangeNotifier {
       (t) => notes.any((n) => n.categories.contains(t)),
       orElse: () => null,
     );
-    _setPeek(null);
     scopeUid = v.folderUid != null && tree.find(v.folderUid!) != null
         ? v.folderUid
         : null;
@@ -597,7 +596,6 @@ class AppState extends ChangeNotifier {
   /// Shows only what is inside folder [uid] (null: the whole Space).
   void openFolder(String? uid) {
     scopeUid = uid;
-    _setPeek(null);
     final a = _activeViewTab;
     if (a != null && a.kind == TabKind.note) _activeViewTab = null;
     notifyListeners();
@@ -1129,11 +1127,10 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Focuses [t] (null: the home tab). Every note keeps its own draft, so
-  /// only applying a view (which closes the peek) asks about the peek's.
+  /// Focuses [t] (null: the home tab). Every note keeps its own draft and the
+  /// peek is independent of the main area, so this never asks or closes it.
   Future<void> activateTab(DocTab? t) {
     if (t == activeTab) return Future.value();
-    if (t != null && t.kind == TabKind.view) return guarded(() => _show(t));
     _show(t);
     return Future.value();
   }
@@ -1152,12 +1149,7 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     }
 
-    // Closing the focused tab may land on a view tab, which closes the peek.
-    final peekAtRisk =
-        activeTab == t &&
-        _tabs.tabs.any((o) => o != t && o.kind == TabKind.view);
-    final uids = [if (tabDirty(t)) t.id, if (peekAtRisk) ?peekUid];
-    return uids.isEmpty ? Future.sync(close) : guarded(close, uids: uids);
+    return tabDirty(t) ? guarded(close, uids: [t.id]) : Future.sync(close);
   }
 
   /// Closes the focused document tab (not the home tab).
