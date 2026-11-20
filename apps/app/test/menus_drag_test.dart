@@ -490,7 +490,7 @@ void main() {
       await t.runAsync(() => s.saveView('Vw'));
       s.applyView(s.savedViews.single);
       await t.pumpAndSettle();
-      await t.tap(find.text('Vw'), buttons: kSecondaryButton);
+      await t.tap(find.text('Vw').last, buttons: kSecondaryButton);
       await t.pumpAndSettle();
       expect(_k('menu-tab-open-view'), findsOneWidget);
       expect(_k('menu-tab-rename-view'), findsOneWidget);
