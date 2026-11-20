@@ -84,12 +84,18 @@ void main() {
             expect(_k(k), findsOneWidget);
             expect(t.getRect(_k(k)).height, greaterThanOrEqualTo(44));
           }
-          // Order: Back, Home, Search, counter.
-          final xs = [
-            for (final k in ['bar-back', 'bar-home', 'bar-search', 'bar-count'])
-              t.getRect(_k(k)).left,
+          // Order: Menu, Back, Home, Search, counter; the logo tops the screen.
+          final order = [
+            'menu',
+            'bar-back',
+            'bar-home',
+            'bar-search',
+            'bar-count',
           ];
+          final xs = [for (final k in order) t.getRect(_k(k)).left];
           expect(xs, [...xs]..sort());
+          expect(_k('top-logo'), findsOneWidget);
+          expect(_k('bar-count-box'), findsOneWidget);
           // The + is a floating button above the bar, at its right end.
           expect(
             t.getRect(_k('bar-add')).bottom,
@@ -134,6 +140,19 @@ void main() {
             greaterThan(t.getRect(find.text('Alpha').first).bottom),
           );
           expect(_k('menu-fold'), findsOneWidget);
+          // The fold control sits inline with + and new-folder; no Space
+          // chip heads the menu.
+          expect(
+            t.getRect(_k('menu-fold')).center.dy,
+            closeTo(t.getRect(_k('new-note')).center.dy, 1),
+          );
+          expect(
+            find.descendant(of: _k('side-menu'), matching: _k('space-chip')),
+            findsNothing,
+          );
+          // The pill is space-between: label left, chevron right.
+          final labelX = t.getRect(find.text('Notes').last).left;
+          expect(labelX, lessThan(size.width / 3));
           await _filter(t, 'tasks');
           expect(s.section, Section.tasks);
           expect(_k('menu-fold'), findsNothing);
@@ -143,11 +162,12 @@ void main() {
           await t.tap(_k('menu-settings'));
           await t.pumpAndSettle();
           expect(s.section, Section.settings);
-          // The bar stays; the logo replaces the menu button and closes it.
+          // The bar stays; its Menu toggle is still there and closes the
+          // menu; the top bar keeps the plain logo throughout.
           expect(_k('mobile-bar'), findsOneWidget);
-          expect(_k('menu'), findsNothing);
-          expect(_k('menu-close'), findsNothing);
-          await t.tap(_k('menu-logo'));
+          expect(_k('menu'), findsOneWidget);
+          expect(_k('top-logo'), findsOneWidget);
+          await t.tap(_k('menu'));
           await t.pumpAndSettle();
           expect(_k('side-menu'), findsNothing);
           expect(_k('menu'), findsOneWidget);
@@ -235,7 +255,7 @@ void main() {
         await t.pumpAndSettle();
         expect(_k('side-menu'), findsOneWidget);
         expect(s.taskById('k1')!.isClosed, isFalse);
-        await t.tap(_k('menu-logo'));
+        await t.tap(_k('menu'));
         await t.pumpAndSettle();
         // Further right: the task completes, no menu.
         await t.dragFrom(Offset(80, y), const Offset(220, 0));
@@ -326,7 +346,7 @@ void main() {
         // With the Tasks filter, task comes first.
         await _openMenu(t);
         await _filter(t, 'tasks');
-        await t.tap(_k('menu-logo'));
+        await t.tap(_k('menu'));
         await t.pumpAndSettle();
         await t.tap(_k('bar-add'));
         await t.pumpAndSettle();
@@ -471,7 +491,7 @@ void main() {
         expect(s.activeTab, isNotNull);
         await _openMenu(t);
         // A sheet above the menu closes before the menu.
-        await t.tap(_k('space-chip').first);
+        await t.tap(_k('menu-filter'));
         await t.pumpAndSettle();
         expect(_k('menu-sheet'), findsOneWidget);
         expect(await t.binding.handlePopRoute(), isTrue);

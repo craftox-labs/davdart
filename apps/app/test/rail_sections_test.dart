@@ -111,7 +111,7 @@ void main() {
           await t.pumpAndSettle();
           expect(t.takeException(), isNull, reason: '$sec at $w');
           if (w >= 880) continue;
-          await t.tap(_k('menu-logo'));
+          await t.tap(_k('menu'));
           await t.pumpAndSettle();
           s.setSection(Section.notes);
         }

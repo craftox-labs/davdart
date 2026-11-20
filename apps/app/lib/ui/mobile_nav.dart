@@ -102,7 +102,7 @@ void showAddMenu(
   });
 }
 
-/// The bottom bar: Back, Home, Search and the open-items counter, directly
+/// The bottom bar: Menu, Back, Home, Search and the open-items counter, directly
 /// under a hairline (no pill or card). New items come from [AddFab].
 class MobileBar extends StatelessWidget {
   const MobileBar({
@@ -113,10 +113,12 @@ class MobileBar extends StatelessWidget {
     required this.onSearch,
     required this.onGrid,
     required this.onHome,
+    required this.menuOpen,
+    required this.onMenu,
   });
   final AppState state;
-  final bool canBack;
-  final VoidCallback onBack, onSearch, onGrid, onHome;
+  final bool canBack, menuOpen;
+  final VoidCallback onBack, onSearch, onGrid, onHome, onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -137,6 +139,13 @@ class MobileBar extends StatelessWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
+            // Toggles the side menu; the icon says what a press does.
+            IconAction(
+              key: const Key('menu'),
+              tooltip: menuOpen ? 'Close menu' : 'Menu',
+              icon: menuOpen ? FLucideIcons.panelLeftClose : FLucideIcons.menu,
+              onPress: onMenu,
+            ),
             IconAction(
               key: const Key('bar-back'),
               tooltip: 'Back',
@@ -163,7 +172,23 @@ class MobileBar extends StatelessWidget {
               child: SizedBox(
                 width: t.sizes.touchTarget,
                 height: t.sizes.touchTarget,
-                child: Center(child: Text('$count', style: t.type.labelStyle)),
+                child: Center(
+                  // A quiet outlined box: the count reads as a bigger icon.
+                  child: Container(
+                    key: const Key('bar-count-box'),
+                    width: t.sizes.touchTarget - t.space.md,
+                    height: t.sizes.touchTarget - t.space.md,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: t.muted,
+                        width: t.borders.hairline,
+                      ),
+                      borderRadius: BorderRadius.circular(t.space.xs),
+                    ),
+                    child: Text('$count', style: t.type.labelStyle),
+                  ),
+                ),
               ),
             ),
           ],
@@ -277,15 +302,17 @@ class SideMenuPage extends StatefulWidget {
 
 class _SideMenuPageState extends State<SideMenuPage>
     with TickerProviderStateMixin {
+  int? _count(Section s) => switch (s) {
+    Section.notes => _noteCount(widget.state),
+    Section.tasks => widget.state.tasks.length,
+    Section.events => widget.state.events.length,
+    _ => null,
+  };
+
   String _label(Section s) {
-    final state = widget.state;
     final name = sectionMeta(s).$2;
-    return switch (s) {
-      Section.notes => '$name · ${_noteCount(state)}',
-      Section.tasks => '$name · ${state.tasks.length}',
-      Section.events => '$name · ${state.events.length}',
-      _ => name,
-    };
+    final n = _count(s);
+    return n == null ? name : '$name · $n';
   }
 
   void _pickFilter() {
@@ -345,27 +372,6 @@ class _SideMenuPageState extends State<SideMenuPage>
         childPad: false,
         child: Column(
           children: [
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                t.space.lg,
-                t.space.sm,
-                t.space.sm,
-                t.space.xs,
-              ),
-              child: Row(
-                children: [
-                  SpaceChip(state: state),
-                  const Spacer(),
-                  if (section == Section.notes)
-                    IconAction(
-                      key: const Key('menu-fold'),
-                      tooltip: 'Collapse or expand folders',
-                      icon: FLucideIcons.listChevronsDownUp,
-                      onPress: state.toggleAllFolders,
-                    ),
-                ],
-              ),
-            ),
             Expanded(
               child: AreaMark(
                 nav: state.nav,
@@ -382,15 +388,39 @@ class _SideMenuPageState extends State<SideMenuPage>
               ),
               child: touchBox(
                 context,
-                FButton(
+                // Full width, space between: icon and label left, count and
+                // chevron right.
+                FTappable(
                   key: const Key('menu-filter'),
-                  variant: FButtonVariant.secondary,
-                  size: FButtonSizeVariant.xs,
-                  prefix: Icon(sectionMeta(section).$1),
-                  suffix: const Icon(FLucideIcons.chevronDown),
+                  semanticsLabel: 'Filter',
+                  behavior: HitTestBehavior.opaque,
                   onPress: _pickFilter,
-                  child: Text(
-                    inFilter ? _label(section) : sectionMeta(section).$2,
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: t.space.md),
+                    decoration: BoxDecoration(
+                      color: context.theme.colors.secondary,
+                      borderRadius: BorderRadius.circular(t.radii.control),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(sectionMeta(section).$1, size: t.icons.md),
+                        SizedBox(width: t.space.sm),
+                        Expanded(
+                          child: Text(
+                            sectionMeta(section).$2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (inFilter && _count(section) != null) ...[
+                          Text(
+                            '${_count(section)}',
+                            style: t.type.captionStyle.copyWith(color: t.muted),
+                          ),
+                          SizedBox(width: t.space.sm),
+                        ],
+                        Icon(FLucideIcons.chevronDown, size: t.icons.md),
+                      ],
+                    ),
                   ),
                 ),
               ),

@@ -482,16 +482,15 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
       childPad: false,
       header: split || !showTopBar
           ? null
-          : TopBar(
-              state: state,
-              showMenu: !wide,
-              menuOpen: _menuOpen,
-              onMenu: () => setState(() => _menuOpen = true),
-              onCloseMenu: () => setState(() => _menuOpen = false),
-            ),
+          : TopBar(state: state, showMenu: !wide),
       footer: narrowBar
           ? MobileBar(
               state: state,
+              menuOpen: _menuOpen,
+              onMenu: () => setState(() {
+                _gridOpen = false;
+                _menuOpen = !_menuOpen;
+              }),
               canBack: _gridOpen || _menuOpen || state.activeTab != null,
               onBack: _back,
               onSearch: () {
@@ -805,25 +804,11 @@ class _LeaveGuardState extends State<_LeaveGuard> {
 }
 
 class TopBar extends StatelessWidget {
-  const TopBar({
-    super.key,
-    required this.state,
-    required this.showMenu,
-    this.onMenu,
-    this.menuOpen = false,
-    this.onCloseMenu,
-  });
+  const TopBar({super.key, required this.state, required this.showMenu});
   final AppState state;
 
-  /// Narrow: the side menu is open; the logo replaces the menu button.
-  final bool menuOpen;
-  final VoidCallback? onCloseMenu;
-
-  /// The narrow layout: menu button left, the title centred.
+  /// The narrow layout: the logo left, the title centred.
   final bool showMenu;
-
-  /// Narrow: opens the side menu.
-  final VoidCallback? onMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -877,25 +862,13 @@ class TopBar extends StatelessWidget {
     return PaneHeaderRow(
       key: const Key('top-bar'),
       children: [
-        if (showMenu && menuOpen)
-          FTappable(
-            key: const Key('menu-logo'),
-            semanticsLabel: 'Close menu',
-            behavior: HitTestBehavior.opaque,
-            onPress: onCloseMenu,
-            child: SizedBox(
-              width: t.sizes.touchTarget,
-              height: t.sizes.touchTarget,
-              child: Center(child: LogoMark(extent: t.icons.lg)),
-            ),
-          )
-        else if (showMenu)
-          IconAction(
-            compact: true,
-            key: const Key('menu'),
-            tooltip: 'Menu',
-            icon: FLucideIcons.menu,
-            onPress: onMenu,
+        // Narrow: the plain app logo (the menu toggle is in the bottom bar).
+        if (showMenu)
+          SizedBox(
+            key: const Key('top-logo'),
+            width: t.sizes.touchTarget,
+            height: t.sizes.touchTarget,
+            child: Center(child: LogoMark(extent: t.icons.lg)),
           ),
         SizedBox(width: t.space.xs),
         Expanded(child: showMenu ? Center(child: _title(t)) : _lead(t)),

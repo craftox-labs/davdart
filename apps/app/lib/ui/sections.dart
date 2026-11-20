@@ -298,6 +298,15 @@ class NotesSection extends _Section {
           ? Row(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Narrow side menu: collapse or expand all folders, inline.
+                if (narrowLayout(context))
+                  IconAction(
+                    compact: true,
+                    key: const Key('menu-fold'),
+                    tooltip: 'Collapse or expand folders',
+                    icon: FLucideIcons.listChevronsDownUp,
+                    onPress: state.toggleAllFolders,
+                  ),
                 IconAction(
                   compact: true,
                   key: const Key('new-note'),
