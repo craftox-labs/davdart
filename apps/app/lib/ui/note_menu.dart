@@ -352,6 +352,13 @@ class NoteContextMenu extends StatelessWidget {
           () {},
           key: const Key('menu-status'),
           children: [
+            NoteMenuItem(
+              'No status',
+              FLucideIcons.circle,
+              () => state.setStatus(note.uid, null),
+              key: const Key('menu-status-none'),
+              selected: status == null,
+            ),
             for (final s in boardOrder)
               NoteMenuItem(
                 s,

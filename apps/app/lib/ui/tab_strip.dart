@@ -82,20 +82,6 @@ class TabStrip extends StatelessWidget {
                     ActionContextMenu(
                       groups: [
                         [
-                          NoteMenuItem(
-                            state.view == ViewMode.board
-                                ? 'Show as list'
-                                : 'Show as board',
-                            state.view == ViewMode.board
-                                ? FLucideIcons.list
-                                : FLucideIcons.squareKanban,
-                            () => state.setView(
-                              state.view == ViewMode.board
-                                  ? ViewMode.list
-                                  : ViewMode.board,
-                            ),
-                            key: const Key('menu-home-toggle-view'),
-                          ),
                           if (state.tabs.isNotEmpty)
                             NoteMenuItem(
                               'Close all tabs',

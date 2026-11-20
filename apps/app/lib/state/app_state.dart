@@ -1519,11 +1519,14 @@ class AppState extends ChangeNotifier {
     ]..sort(NoteTree.byCreated);
   }
 
-  /// Board columns in a stable order; notes with no status go last.
-  List<(String, List<Note>)> get columns {
+  /// Board columns in a stable order; notes with no status go last, and are
+  /// left out when [includeNoStatus] is false (Home shows work items only).
+  List<(String, List<Note>)> columns({bool includeNoStatus = true}) {
     final by = <String, List<Note>>{};
     for (final n in filtered) {
-      (by[PlanItem.fromNote(n).status ?? 'notes'] ??= []).add(n);
+      final s = PlanItem.fromNote(n).status;
+      if (s == null && !includeNoStatus) continue;
+      (by[s ?? 'notes'] ??= []).add(n);
     }
     final keys = [
       ...boardOrder.where(by.containsKey),

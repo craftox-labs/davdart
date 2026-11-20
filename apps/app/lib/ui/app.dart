@@ -243,8 +243,11 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
             children: [
               ScopeText(state: state),
               Expanded(
-                child: state.view == ViewMode.board
-                    ? BoardView(state: state)
+                child: state.activeTab == null || state.view == ViewMode.board
+                    ? BoardView(
+                        state: state,
+                        includeNoStatus: state.activeTab != null,
+                      )
                     : NoteListView(state: state),
               ),
             ],
@@ -657,7 +660,9 @@ class TopBar extends StatelessWidget {
             ),
           ),
         if (home) ScopeActions(state: state),
-        if (!narrow) ...[
+        if (state.activeTab == null)
+          const SizedBox.shrink()
+        else if (!narrow) ...[
           toggle('Board', ViewMode.board),
           SizedBox(width: t.space.xs),
           toggle('List', ViewMode.list),

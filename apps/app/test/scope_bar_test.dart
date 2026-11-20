@@ -121,33 +121,45 @@ void main() {
     expect(t.getRect(find.byKey(const Key('crumb-space'))).left, root.left);
   });
 
-  testWidgets('top bar has no Board/List title, only the toggle', (t) async {
-    t.view.physicalSize = const Size(880, 800);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.reset);
-    final storage = MemoryStorage();
-    final s = AppState(
-      SpaceNoteSource(
-        Space(
-          SpaceConfig(id: 's', name: 'Space'),
-          PersistentNoteStore(storage),
+  testWidgets(
+    'top bar has no Board/List title, only the toggle on a view tab',
+    (t) async {
+      t.view.physicalSize = const Size(880, 800);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final storage = MemoryStorage();
+      final s = AppState(
+        SpaceNoteSource(
+          Space(
+            SpaceConfig(id: 's', name: 'Space'),
+            PersistentNoteStore(storage),
+          ),
+          flags: storage,
         ),
-        flags: storage,
-      ),
-    );
-    await s.load();
-    await t.pumpWidget(DavdartApp(state: s));
-    await t.pumpAndSettle();
-    final top = find.byKey(const Key('top-bar'));
-    for (final w in ['Board', 'List']) {
-      expect(find.descendant(of: top, matching: find.text(w)), findsOneWidget);
-    }
-    final x = t.getRect(find.byKey(const Key('crumb-space'))).left;
-    for (final w in ['Board', 'List']) {
-      expect(
-        t.getRect(find.descendant(of: top, matching: find.text(w))).left,
-        greaterThan(x + 200),
       );
-    }
-  });
+      await s.load();
+      await t.pumpWidget(DavdartApp(state: s));
+      await t.pumpAndSettle();
+      final top = find.byKey(const Key('top-bar'));
+      for (final w in ['Board', 'List']) {
+        expect(find.descendant(of: top, matching: find.text(w)), findsNothing);
+      }
+      await s.saveView('V');
+      s.applyView(s.savedViews.single);
+      await t.pumpAndSettle();
+      for (final w in ['Board', 'List']) {
+        expect(
+          find.descendant(of: top, matching: find.text(w)),
+          findsOneWidget,
+        );
+      }
+      final x = t.getRect(find.byKey(const Key('crumb-space'))).left;
+      for (final w in ['Board', 'List']) {
+        expect(
+          t.getRect(find.descendant(of: top, matching: find.text(w))).left,
+          greaterThan(x + 200),
+        );
+      }
+    },
+  );
 }

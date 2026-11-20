@@ -18,8 +18,18 @@ import 'package:forui/forui.dart';
 class _Seed implements NoteSource {
   @override
   Future<List<Note>> load() async => [
-    Note(uid: 'a', summary: 'Alpha', description: 'Alpha body'),
-    Note(uid: 'b', summary: 'Beta', description: 'Beta body'),
+    Note(
+      uid: 'a',
+      summary: 'Alpha',
+      description: 'Alpha body',
+      categories: ['status-backlog'],
+    ),
+    Note(
+      uid: 'b',
+      summary: 'Beta',
+      description: 'Beta body',
+      categories: ['status-todo'],
+    ),
     Note(uid: 'c', summary: 'Gamma', description: 'Gamma body'),
   ];
 }
@@ -40,6 +50,13 @@ Future<AppState> _pump(
   await t.pumpWidget(DavdartApp(state: s));
   await t.pumpAndSettle();
   return s;
+}
+
+/// Shows the list in a saved-view tab (Home is always the board).
+Future<void> _listTab(AppState s) async {
+  s.setView(ViewMode.list);
+  await s.saveView('List');
+  s.applyView(s.savedViews.single);
 }
 
 Finder _k(String k) => find.byKey(Key(k));
@@ -99,7 +116,7 @@ void main() {
 
     testWidgets('a list row click follows the setting', (t) async {
       final s = await _pump(t);
-      s.setView(ViewMode.list);
+      await _listTab(s);
       s.setOpenMode(OpenMode.main);
       await t.pumpAndSettle();
       await t.tap(
@@ -194,7 +211,7 @@ void main() {
 
     testWidgets('long-press opens it on a list row', (t) async {
       final s = await _pump(t);
-      s.setView(ViewMode.list);
+      await _listTab(s);
       await t.pumpAndSettle();
       await t.longPress(
         find.descendant(
@@ -231,7 +248,7 @@ void main() {
       await t.tap(
         find.descendant(
           of: find.byType(BoardView),
-          matching: find.text('Gamma'),
+          matching: find.text('Alpha'),
         ),
         buttons: kSecondaryButton,
       );
@@ -240,7 +257,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('delete-confirm'));
       await t.pumpAndSettle();
-      expect(s.tree.find('c'), isNull);
+      expect(s.tree.find('a'), isNull);
     });
   });
 

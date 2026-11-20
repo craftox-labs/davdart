@@ -78,11 +78,23 @@ Finder byAction(String tooltip) => find.byWidgetPredicate(
   description: 'IconAction "$tooltip"',
 );
 
+/// Home is always the board: the list lives in a saved-view tab.
+Future<void> listTab(WidgetTester t) async {
+  final s = t.widget<DavdartApp>(find.byType(DavdartApp)).state;
+  s.setView(ViewMode.list);
+  await t.runAsync(() => s.saveView('List'));
+  s.applyView(s.savedViews.single);
+  await t.pumpAndSettle();
+}
+
 Future<void> pump(WidgetTester t, {Size size = const Size(1400, 900)}) async {
   t.view.physicalSize = size;
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
-  await t.pumpWidget(DavdartApp(source: FakeSource(sample)));
+  final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+  await t.pumpWidget(
+    DavdartApp(source: SpaceNoteSource(space, seed: FakeSource(sample))),
+  );
   await t.pumpAndSettle();
 }
 
@@ -94,7 +106,7 @@ void main() {
     test('groups the board by status and filters by query and tag', () async {
       final s = AppState(FakeSource(sample));
       await s.load();
-      expect(s.columns.map((c) => c.$1), ['backlog', 'todo', 'notes']);
+      expect(s.columns().map((c) => c.$1), ['backlog', 'todo', 'notes']);
       s.setQuery('body text');
       expect(s.filtered.map((n) => n.uid), ['b']);
       s.setQuery('');
@@ -173,7 +185,7 @@ void main() {
       expect(a.notes.any(isViewNote), isFalse);
       expect(a.tree.find(stored.uid), isNull);
       expect(a.filtered.any(isViewNote), isFalse);
-      expect(a.columns.expand((c) => c.$2).any(isViewNote), isFalse);
+      expect(a.columns().expand((c) => c.$2).any(isViewNote), isFalse);
       expect(a.tags, isNot(contains('kind-view')));
       a.setQuery('');
       a.setTag(null);
@@ -411,8 +423,7 @@ void main() {
 
     testWidgets('switches to the list and shows the tree', (t) async {
       await pump(t);
-      await t.tap(find.text('List').first);
-      await t.pumpAndSettle();
+      await listTab(t);
       expect(find.text('Core slice'), findsWidgets);
       expect(find.text('Loose note'), findsWidgets);
     });
@@ -1063,8 +1074,7 @@ void main() {
 
     testWidgets('search narrows the list', (t) async {
       await pump(t);
-      await t.tap(find.text('List').first);
-      await t.pumpAndSettle();
+      await listTab(t);
       await t.tap(find.byKey(const Key('rail-search')));
       await t.pumpAndSettle();
       await t.enterText(find.byType(FTextField), 'loose');
@@ -1526,8 +1536,7 @@ void main() {
   testWidgets('a 320px phone does not overflow', (t) async {
     await pump(t, size: const Size(320, 640));
     expect(t.takeException(), isNull);
-    await t.tap(byAction('Show list'));
-    await t.pumpAndSettle();
+    await listTab(t);
     expect(t.takeException(), isNull);
   });
 

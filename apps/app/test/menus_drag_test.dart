@@ -6,6 +6,7 @@ import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/note_draft.dart';
 import 'package:davdart_app/state/tab_state.dart';
 import 'package:davdart_app/ui/app.dart';
+import 'package:davdart_app/ui/board_view.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
@@ -32,6 +33,11 @@ class _Seed implements NoteSource {
     ),
     Note(uid: 'c', summary: 'Gamma'),
   ];
+}
+
+class _Plain implements NoteSource {
+  @override
+  Future<List<Note>> load() async => [Note(uid: 'p', summary: 'Plain')];
 }
 
 Future<AppState> _pump(
@@ -222,14 +228,56 @@ void main() {
       expect(s.tabs.map((e) => e.id), ['a', 'b']);
     });
 
-    testWidgets('the home tab toggles Board and List', (t) async {
+    testWidgets('the home tab has no Board/List toggle', (t) async {
       final s = await _pump(t);
-      final before = s.view;
+      expect(s.view, ViewMode.board);
       await t.tap(_k('tab-home'), buttons: kSecondaryButton);
       await t.pumpAndSettle();
-      await t.tap(_k('menu-home-toggle-view'));
+      expect(_k('menu-home-toggle-view'), findsNothing);
+    });
+
+    testWidgets('Home stays a board whatever the persisted mode', (t) async {
+      final s = await _pump(t);
+      s.setView(ViewMode.list);
       await t.pumpAndSettle();
-      expect(s.view, isNot(before));
+      expect(find.byType(BoardView), findsOneWidget);
+      expect(_k('board-drop-notes'), findsNothing);
+      final top = find.byKey(const Key('top-bar'));
+      for (final w in ['Board', 'List']) {
+        expect(find.descendant(of: top, matching: find.text(w)), findsNothing);
+      }
+      expect(s.columns().map((c) => c.$1), contains('notes'));
+      expect(
+        s.columns(includeNoStatus: false).map((c) => c.$1),
+        isNot(contains('notes')),
+      );
+    });
+
+    testWidgets('a saved board view keeps the no-status column', (t) async {
+      final s = await _pump(t);
+      s.setView(ViewMode.board);
+      await t.runAsync(() => s.saveView('Board'));
+      s.applyView(s.savedViews.single);
+      await t.pumpAndSettle();
+      expect(_k('board-drop-notes'), findsOneWidget);
+    });
+
+    testWidgets('Home with only plain notes shows the empty state', (t) async {
+      t.view.physicalSize = const Size(1500, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+      await t.pumpWidget(
+        DavdartApp(
+          state: AppState(
+            SpaceNoteSource(space, seed: _Plain()),
+            prefs: MemoryStorage(),
+          ),
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(find.textContaining('No work items yet'), findsOneWidget);
+      expect(find.text('No notes'), findsNothing);
     });
 
     testWidgets('a board column adds a note in its status', (t) async {
@@ -311,17 +359,20 @@ void main() {
       expect(PlanItem.fromNote(s.tree.find('a')!.note).status, 'doing');
     });
 
-    testWidgets('a board card dropped on the no-status column clears it', (
-      t,
-    ) async {
+    testWidgets('a card clears its status from the menu', (t) async {
       final s = await _pump(t);
-      s.setView(ViewMode.board);
-      await t.pumpAndSettle();
-      final card = find.descendant(
-        of: _k('board-drop-backlog'),
-        matching: find.text('Alpha'),
+      await t.tap(
+        find.descendant(
+          of: _k('board-drop-backlog'),
+          matching: find.text('Alpha'),
+        ),
+        buttons: kSecondaryButton,
       );
-      await _drag(t, t.getCenter(card), t.getCenter(_k('board-drop-notes')));
+      await t.pumpAndSettle();
+      await t.tap(_k('menu-status'));
+      await t.pumpAndSettle();
+      await t.tap(_k('menu-status-none'));
+      await t.pumpAndSettle();
       expect(PlanItem.fromNote(s.tree.find('a')!.note).status, isNull);
       expect(
         s.tree.find('a')!.note.categories,
@@ -339,6 +390,7 @@ void main() {
         t.getCenter(_k('tab-home')),
       );
       expect(s.activeTab, const DocTab.note('c'));
+      await t.pump(const Duration(seconds: 1));
     });
 
     testWidgets('a note dropped on a Space in the popup moves there', (

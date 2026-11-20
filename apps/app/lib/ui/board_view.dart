@@ -11,8 +11,15 @@ import 'note_menu.dart';
 import 'theme.dart';
 
 class BoardView extends StatelessWidget {
-  const BoardView({super.key, required this.state});
+  const BoardView({
+    super.key,
+    required this.state,
+    this.includeNoStatus = true,
+  });
   final AppState state;
+
+  /// Whether notes with no status get a column (off on Home).
+  final bool includeNoStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -22,10 +29,20 @@ class BoardView extends StatelessWidget {
         child: Text(state.error!, style: TextStyle(color: t.muted)),
       );
     }
-    final cols = state.columns;
+    final cols = state.columns(includeNoStatus: includeNoStatus);
     if (cols.isEmpty && !state.loading) {
+      final hasNotes = state.filtered.isNotEmpty;
       return Center(
-        child: Text('No notes', style: TextStyle(color: t.muted)),
+        child: Padding(
+          padding: EdgeInsets.all(t.space.lg),
+          child: Text(
+            hasNotes
+                ? 'No work items yet. Give a note a status (backlog, todo, doing...) and it shows up here.'
+                : 'No notes',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: t.muted),
+          ),
+        ),
       );
     }
     return ListView(
