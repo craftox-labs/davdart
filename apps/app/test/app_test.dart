@@ -901,7 +901,7 @@ void main() {
       await t.pumpAndSettle();
       expect(state.scope, isNull);
       expect(find.byKey(const Key('crumb-folder')), findsNothing);
-      expect(textOfKey(t, 'crumb-space'), 'S');
+      expect(textOfKey(t, 'crumb-space'), 'Notes');
       state.openFolder(
         state.notes.firstWhere((n) => n.summary == 'Planning').uid,
       );

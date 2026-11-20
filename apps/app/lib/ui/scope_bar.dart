@@ -103,7 +103,7 @@ class ScopeBar extends StatelessWidget {
   }
 
   Widget _crumbs(BuildContext context, Tokens t, List<Note> path, bool scoped) {
-    final space = state.currentSpaceName ?? '';
+    final space = state.currentSpaceName ?? 'Notes';
     final style = t.type.bodyStrong;
     final sep = Text('  ›  ', style: style.copyWith(color: t.muted));
     final folders = path.map((n) => n.summary).where((e) => e.isNotEmpty);
