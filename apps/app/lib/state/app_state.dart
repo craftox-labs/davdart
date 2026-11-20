@@ -105,6 +105,9 @@ class SpaceHit {
 /// Which edge of the window the shell's icon rail sits on.
 enum LayoutSide { start, end }
 
+/// Where a plain click on a note opens it: the side peek or the main area.
+enum OpenMode { peek, main }
+
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
     final saved = prefs?.read(_sectionKey);
@@ -120,7 +123,74 @@ class AppState extends ChangeNotifier {
     layoutSide = prefs?.read(_layoutSideKey) == LayoutSide.end.name
         ? LayoutSide.end
         : LayoutSide.start;
+    openMode = prefs?.read(_openModeKey) == OpenMode.main.name
+        ? OpenMode.main
+        : OpenMode.peek;
   }
+
+  static const _openModeKey = 'davdart.open.mode.v1';
+
+  /// The setting "Open notes in": what a plain click on a note does in the
+  /// tree, lists, board, search and saved-view results. The context menu
+  /// offers both whatever this says.
+  OpenMode openMode = OpenMode.peek;
+
+  void setOpenMode(OpenMode m) {
+    if (openMode == m) return;
+    openMode = m;
+    if (m == OpenMode.peek) {
+      prefs?.remove(_openModeKey);
+    } else {
+      prefs?.write(_openModeKey, m.name);
+    }
+    notifyListeners();
+  }
+
+  /// Opens note [uid] in [mode] (default: the setting). The peek asks about
+  /// unsaved edits only when its own draft would be lost; focusing a note
+  /// that already has a main tab never asks.
+  Future<void> openNote(String uid, {OpenMode? mode}) async {
+    if (tree.find(uid) == null) return;
+    if ((mode ?? openMode) == OpenMode.main) {
+      openNoteTab(uid);
+    } else if (_tabs.contains(DocTab.note(uid)) || peekUid == uid) {
+      select(uid);
+    } else {
+      await guarded(() => select(uid));
+    }
+  }
+
+  String? _clickUid;
+  DateTime? _clickAt;
+
+  /// A plain click on a note entry: opens it per [openMode], and a second
+  /// click on the same note within [doubleClickWindow] promotes it to main.
+  Future<void> clickNote(String uid) {
+    final now = DateTime.now();
+    final dbl =
+        _clickUid == uid &&
+        _clickAt != null &&
+        now.difference(_clickAt!) < doubleClickWindow;
+    _clickUid = dbl ? null : uid;
+    _clickAt = dbl ? null : now;
+    return dbl ? Future.sync(() => openNoteTab(uid)) : openNote(uid);
+  }
+
+  /// Registers a click on a note that is already open (the peek tab) and
+  /// promotes it when it is a double click.
+  void clickOpenNote(String uid) {
+    if (uid.isEmpty) return;
+    final now = DateTime.now();
+    final dbl =
+        _clickUid == uid &&
+        _clickAt != null &&
+        now.difference(_clickAt!) < doubleClickWindow;
+    _clickUid = dbl ? null : uid;
+    _clickAt = dbl ? null : now;
+    if (dbl) openNoteTab(uid);
+  }
+
+  static const doubleClickWindow = Duration(milliseconds: 400);
 
   static const _detailWidthKey = 'davdart.detail.width.v1';
   static const _layoutSideKey = 'davdart.layout.side.v1';
@@ -381,15 +451,15 @@ class AppState extends ChangeNotifier {
   }
 
   /// Opens a search hit: switches to its Space and selects the note.
-  Future<void> openHit(SpaceHit h) async {
+  Future<void> openHit(SpaceHit h, {OpenMode? mode}) async {
     if (catalog?.spaces.any((s) => s.id == h.space.id) != true) return;
     final sameSpace = h.space.id == currentSpaceId;
     if (sameSpace) {
-      await guarded(() => select(h.note.uid));
+      await openNote(h.note.uid, mode: mode);
       return;
     }
     if (!await switchSpace(h.space.id)) return;
-    select(h.note.uid);
+    await openNote(h.note.uid, mode: mode);
   }
 
   /// Where the old local saved views (and the done-marker of their one-time
@@ -617,6 +687,8 @@ class AppState extends ChangeNotifier {
     }
     final target = c.sourceFor(targetId);
     final group = [node.note, ...tree.descendants(uid)];
+    // Unsaved edits would be lost with the old notes: settle them first.
+    if (!await _settleDrafts([for (final n in group) n.uid])) return null;
     final stamp = DateTime.now().toUtc().microsecondsSinceEpoch;
     final fresh = {
       for (var i = 0; i < group.length; i++) group[i].uid: 'davdart-$stamp-$i',
@@ -1088,6 +1160,14 @@ class AppState extends ChangeNotifier {
     uid ??= peekUid;
     if (uid == null || tree.find(uid) == null) return;
     openNoteTab(uid);
+  }
+
+  /// Moves open tab [t] to index [to] of the strip (clamped) and saves.
+  void moveTab(DocTab t, int to) {
+    if (_tabs.move(t, to)) {
+      _saveTabs();
+      notifyListeners();
+    }
   }
 
   /// Title of a tab: the note's title or the view's name.

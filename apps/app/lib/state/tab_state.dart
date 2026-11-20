@@ -58,6 +58,17 @@ class TabList {
     return tabs[i < tabs.length ? i : i - 1];
   }
 
+  /// Moves [t] to index [to] (clamped; the index it ends at). True if the
+  /// order changed.
+  bool move(DocTab t, int to) {
+    final i = tabs.indexOf(t);
+    if (i < 0) return false;
+    tabs.removeAt(i);
+    final j = to.clamp(0, tabs.length);
+    tabs.insert(j, t);
+    return j != i;
+  }
+
   /// Keeps only the tabs [keep] accepts. True if any were dropped.
   bool retain(bool Function(DocTab) keep) {
     final before = tabs.length;

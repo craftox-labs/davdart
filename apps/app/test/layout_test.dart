@@ -172,11 +172,15 @@ void main() {
       state.setSection(Section.settings);
       await t.pumpAndSettle();
       expect(find.text('Layout side'), findsOneWidget);
-      await t.tap(find.byType(FRadio).last);
+      final radios = find.descendant(
+        of: find.byKey(const Key('layout-side')),
+        matching: find.byType(FRadio),
+      );
+      await t.tap(radios.last);
       await t.pumpAndSettle();
       expect(state.layoutSide, LayoutSide.end);
       expect(AppState(_Source(), prefs: storage).layoutSide, LayoutSide.end);
-      await t.tap(find.byType(FRadio).first);
+      await t.tap(radios.first);
       await t.pumpAndSettle();
       expect(state.layoutSide, LayoutSide.start);
       expect(storage.read('davdart.layout.side.v1'), isNull);

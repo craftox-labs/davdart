@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'chips.dart';
+import 'note_menu.dart';
 import 'theme.dart';
 
 /// Notes as an indented tree; a flat list of matches while searching.
@@ -48,52 +49,56 @@ class NoteListView extends StatelessWidget {
         final (n, depth) = rows[i];
         final p = PlanItem.fromNote(n);
         final kids = state.tree.find(n.uid)?.children.isNotEmpty ?? false;
-        return FTappable(
-          onPress: () => state.guarded(() => state.select(n.uid)),
-          child: Container(
-            color: state.peekUid == n.uid ? t.selected : null,
-            padding: EdgeInsets.fromLTRB(
-              t.space.lg + depth * t.sizes.listIndent,
-              t.space.lg - t.space.xxs,
-              t.space.lg,
-              t.space.lg - t.space.xxs,
-            ),
-            child: Row(
-              children: [
-                SizedBox(
-                  width: t.sizes.listChevronBox,
-                  child: kids && !filtering
-                      ? FTappable(
-                          semanticsLabel: state.collapsed.contains(n.uid)
-                              ? 'Expand'
-                              : 'Collapse',
-                          behavior: HitTestBehavior.opaque,
-                          onPress: () => state.toggle(n.uid),
-                          child: Icon(
-                            state.collapsed.contains(n.uid)
-                                ? FLucideIcons.chevronRight
-                                : FLucideIcons.chevronDown,
-                            size: t.icons.lg,
-                            color: t.muted,
-                          ),
-                        )
-                      : null,
-                ),
-                StatusDot(p.status),
-                SizedBox(width: t.space.lg - t.space.xxs),
-                Expanded(
-                  child: Text(
-                    n.summary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+        return NoteContextMenu(
+          state: state,
+          uid: n.uid,
+          child: FTappable(
+            onPress: () => state.clickNote(n.uid),
+            child: Container(
+              color: state.peekUid == n.uid ? t.selected : null,
+              padding: EdgeInsets.fromLTRB(
+                t.space.lg + depth * t.sizes.listIndent,
+                t.space.lg - t.space.xxs,
+                t.space.lg,
+                t.space.lg - t.space.xxs,
+              ),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: t.sizes.listChevronBox,
+                    child: kids && !filtering
+                        ? FTappable(
+                            semanticsLabel: state.collapsed.contains(n.uid)
+                                ? 'Expand'
+                                : 'Collapse',
+                            behavior: HitTestBehavior.opaque,
+                            onPress: () => state.toggle(n.uid),
+                            child: Icon(
+                              state.collapsed.contains(n.uid)
+                                  ? FLucideIcons.chevronRight
+                                  : FLucideIcons.chevronDown,
+                              size: t.icons.lg,
+                              color: t.muted,
+                            ),
+                          )
+                        : null,
                   ),
-                ),
-                if (p.owner != null)
-                  Text(
-                    p.owner!,
-                    style: t.type.captionStyle.copyWith(color: t.muted),
+                  StatusDot(p.status),
+                  SizedBox(width: t.space.lg - t.space.xxs),
+                  Expanded(
+                    child: Text(
+                      n.summary,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-              ],
+                  if (p.owner != null)
+                    Text(
+                      p.owner!,
+                      style: t.type.captionStyle.copyWith(color: t.muted),
+                    ),
+                ],
+              ),
             ),
           ),
         );

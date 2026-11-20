@@ -4,6 +4,8 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/note_drag.dart';
+import 'note_menu.dart';
 import 'parts.dart';
 import 'tab_strip.dart';
 import 'theme.dart';
@@ -47,41 +49,49 @@ class DetailHeader extends StatelessWidget {
                   : FLucideIcons.fileText;
               return Align(
                 alignment: mirror ? Alignment.topRight : Alignment.topLeft,
-                child: Draggable<String>(
-                  key: const Key('detail-drag'),
-                  data: uid,
-                  maxSimultaneousDrags: uid == null ? 0 : 1,
-                  feedback: DefaultTextStyle(
-                    style: t.type.captionStyle.copyWith(color: t.fg),
-                    child: Container(
-                      width: w,
-                      height: t.sizes.tabStrip,
-                      alignment: Alignment.centerLeft,
-                      padding: EdgeInsets.symmetric(horizontal: t.space.md),
-                      decoration: BoxDecoration(
-                        color: t.panel,
-                        border: Border.all(color: t.divider),
-                        borderRadius: BorderRadius.circular(t.radii.small),
-                      ),
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                child: NoteContextMenu(
+                  state: state,
+                  uid: uid ?? '',
+                  surface: NoteSurface.peekTab,
+                  child: Draggable<NoteDrag>(
+                    key: const Key('detail-drag'),
+                    data: uid == null
+                        ? null
+                        : NoteDrag(uid, NoteDragSource.peek),
+                    maxSimultaneousDrags: uid == null ? 0 : 1,
+                    feedback: DefaultTextStyle(
+                      style: t.type.captionStyle.copyWith(color: t.fg),
+                      child: Container(
+                        width: w,
+                        height: t.sizes.tabStrip,
+                        alignment: Alignment.centerLeft,
+                        padding: EdgeInsets.symmetric(horizontal: t.space.md),
+                        decoration: BoxDecoration(
+                          color: t.panel,
+                          border: Border.all(color: t.divider),
+                          borderRadius: BorderRadius.circular(t.radii.small),
+                        ),
+                        child: Text(
+                          title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ),
-                  ),
-                  child: TabItem(
-                    key: const Key('detail-tab'),
-                    // The pane's divider side lines up with the divider.
-                    flushStart: !mirror,
-                    flushEnd: mirror,
-                    width: w,
-                    icon: icon,
-                    title: title,
-                    active: true,
-                    dirty: state.dirty,
-                    onPress: () {},
-                    onClose: () => state.guarded(() => state.select(null)),
+                    child: TabItem(
+                      key: const Key('detail-tab'),
+                      // The pane's divider side lines up with the divider.
+                      flushStart: !mirror,
+                      flushEnd: mirror,
+                      width: w,
+                      icon: icon,
+                      title: title,
+                      active: true,
+                      dirty: state.dirty,
+                      // A double click promotes the peek to the main area.
+                      onPress: () => state.clickOpenNote(uid ?? ''),
+                      onClose: () => state.guarded(() => state.select(null)),
+                    ),
                   ),
                 ),
               );

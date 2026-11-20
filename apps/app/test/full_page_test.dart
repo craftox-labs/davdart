@@ -380,6 +380,8 @@ void main() {
       await _settle(t);
       expect(s.peekUid, 'a');
       expect(s.dirty, isTrue);
+      // Past the double-click window, so this is a plain click again.
+      await t.runAsync(() => Future.delayed(AppState.doubleClickWindow * 2));
       await t.tap(find.text('Beta').first);
       await _settle(t);
       await t.tap(_k('leave-discard'));

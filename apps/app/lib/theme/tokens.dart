@@ -157,11 +157,15 @@ class MotionTokens {
   const MotionTokens({
     this.slide = const Duration(milliseconds: 200),
     this.curve = Curves.easeOutCubic,
+    this.dragGhost = 0.4,
   });
 
   /// Time for a pane to slide between closed and open.
   final Duration slide;
   final Curve curve;
+
+  /// Opacity of a tab left behind while it is dragged.
+  final double dragGhost;
 }
 
 /// Border widths.

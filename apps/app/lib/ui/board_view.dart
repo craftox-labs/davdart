@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'chips.dart';
+import 'note_menu.dart';
 import 'theme.dart';
 
 class BoardView extends StatelessWidget {
@@ -88,37 +89,41 @@ class _Card extends StatelessWidget {
     final selected = state.peekUid == note.uid;
     return Padding(
       padding: EdgeInsets.only(bottom: t.space.md),
-      child: FTappable(
-        onPress: () => state.guarded(() => state.select(note.uid)),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: t.card,
-            borderRadius: BorderRadius.circular(t.radii.card),
-            border: Border.all(color: selected ? t.accent : t.cardBorder),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(t.space.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(p.itemId ?? note.summary, style: t.type.semiboldStyle),
-                if (p.itemId != null) ...[
-                  SizedBox(height: t.space.xxs),
-                  Text(
-                    note.summary,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: t.type.bodyStyle.copyWith(color: t.muted),
-                  ),
+      child: NoteContextMenu(
+        state: state,
+        uid: note.uid,
+        child: FTappable(
+          onPress: () => state.clickNote(note.uid),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: t.card,
+              borderRadius: BorderRadius.circular(t.radii.card),
+              border: Border.all(color: selected ? t.accent : t.cardBorder),
+            ),
+            child: Padding(
+              padding: EdgeInsets.all(t.space.lg),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(p.itemId ?? note.summary, style: t.type.semiboldStyle),
+                  if (p.itemId != null) ...[
+                    SizedBox(height: t.space.xxs),
+                    Text(
+                      note.summary,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.type.bodyStyle.copyWith(color: t.muted),
+                    ),
+                  ],
+                  if (p.owner != null) ...[
+                    SizedBox(height: t.space.sm),
+                    Text(
+                      p.owner!,
+                      style: t.type.captionStyle.copyWith(color: t.muted),
+                    ),
+                  ],
                 ],
-                if (p.owner != null) ...[
-                  SizedBox(height: t.space.sm),
-                  Text(
-                    p.owner!,
-                    style: t.type.captionStyle.copyWith(color: t.muted),
-                  ),
-                ],
-              ],
+              ),
             ),
           ),
         ),

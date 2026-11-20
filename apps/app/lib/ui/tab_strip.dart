@@ -3,9 +3,13 @@ import 'dart:math' as math;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import 'package:flutter/gestures.dart' show kMiddleMouseButton;
+
 import '../state/app_state.dart';
+import '../state/note_drag.dart';
 import '../state/tab_state.dart';
 import 'new_note_dialog.dart';
+import 'note_menu.dart';
 import 'shell_frame.dart';
 import 'theme.dart';
 
@@ -81,20 +85,13 @@ class TabStrip extends StatelessWidget {
                         padding: EdgeInsets.symmetric(horizontal: flare),
                         child: Row(
                           children: [
-                            for (final tab in tabs)
-                              TabItem(
-                                key: Key('tab-${tab.code}'),
+                            for (var i = 0; i < tabs.length; i++)
+                              _ReorderableTab(
+                                state: state,
+                                tab: tabs[i],
+                                index: i,
                                 width: math.min(per, t.sizes.tabMax),
-                                icon: tab.kind == TabKind.view
-                                    ? FLucideIcons.bookmark
-                                    : state.tabIsFolder(tab)
-                                    ? FLucideIcons.folder
-                                    : FLucideIcons.fileText,
-                                title: state.tabTitle(tab),
-                                active: active == tab,
-                                dirty: state.tabDirty(tab),
-                                onPress: () => state.activateTab(tab),
-                                onClose: () => state.closeTab(tab),
+                                active: active == tabs[i],
                               ),
                           ],
                         ),
@@ -133,6 +130,97 @@ class TabStrip extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// One main tab: drag it to reorder (drop on another tab to take its place),
+/// middle-click closes it, right-click or long-press opens the note menu.
+class _ReorderableTab extends StatelessWidget {
+  const _ReorderableTab({
+    required this.state,
+    required this.tab,
+    required this.index,
+    required this.width,
+    required this.active,
+  });
+  final AppState state;
+  final DocTab tab;
+  final int index;
+  final double width;
+  final bool active;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final title = state.tabTitle(tab);
+    Widget item = TabItem(
+      key: Key('tab-${tab.code}'),
+      width: width,
+      icon: tab.kind == TabKind.view
+          ? FLucideIcons.bookmark
+          : state.tabIsFolder(tab)
+          ? FLucideIcons.folder
+          : FLucideIcons.fileText,
+      title: title,
+      active: active,
+      dirty: state.tabDirty(tab),
+      onPress: () => state.activateTab(tab),
+      onClose: () => state.closeTab(tab),
+    );
+    if (tab.kind == TabKind.note) {
+      item = NoteContextMenu(
+        state: state,
+        uid: tab.id,
+        surface: NoteSurface.mainTab,
+        child: item,
+      );
+    }
+    final drag = Draggable<TabDrag>(
+      key: Key('tab-drag-${tab.code}'),
+      data: TabDrag(tab.code),
+      axis: Axis.horizontal,
+      feedback: DefaultTextStyle(
+        style: t.type.captionStyle.copyWith(color: t.fg),
+        child: Container(
+          width: width,
+          height: t.sizes.tabStrip,
+          alignment: Alignment.centerLeft,
+          padding: EdgeInsets.symmetric(horizontal: t.space.md),
+          decoration: BoxDecoration(
+            color: t.panel,
+            border: Border.all(color: t.divider),
+            borderRadius: BorderRadius.circular(t.radii.small),
+          ),
+          child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ),
+      childWhenDragging: Opacity(opacity: t.motion.dragGhost, child: item),
+      child: item,
+    );
+    return Listener(
+      onPointerDown: (e) {
+        if (e.buttons == kMiddleMouseButton) state.closeTab(tab);
+      },
+      child: DragTarget<TabDrag>(
+        onWillAcceptWithDetails: (d) =>
+            d.data.code != tab.code && DocTab.parse(d.data.code) != null,
+        onAcceptWithDetails: (d) {
+          final moved = DocTab.parse(d.data.code);
+          if (moved != null) state.moveTab(moved, index);
+        },
+        builder: (context, candidates, _) => DecoratedBox(
+          position: DecorationPosition.foreground,
+          decoration: BoxDecoration(
+            border: candidates.isEmpty
+                ? null
+                : Border(
+                    left: BorderSide(color: t.accent, width: t.borders.focus),
+                  ),
+          ),
+          child: drag,
+        ),
+      ),
     );
   }
 }
@@ -299,9 +387,9 @@ class PromoteTarget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    return DragTarget<String>(
-      onWillAcceptWithDetails: (d) => state.tree.find(d.data) != null,
-      onAcceptWithDetails: (d) => state.promote(d.data),
+    return DragTarget<NoteDrag>(
+      onWillAcceptWithDetails: (d) => state.tree.find(d.data.uid) != null,
+      onAcceptWithDetails: (d) => state.promote(d.data.uid),
       builder: (context, candidates, _) => DecoratedBox(
         position: DecorationPosition.foreground,
         decoration: BoxDecoration(

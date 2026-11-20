@@ -7,6 +7,7 @@ import 'account_dialog.dart';
 import 'connect_dialog.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
+import 'note_menu.dart';
 import 'parts.dart';
 import 'save_view_dialog.dart';
 import 'theme.dart';
@@ -126,66 +127,69 @@ class NotesSection extends _Section {
         final open = !state.collapsed.contains(n.note.uid);
         final on = state.peekUid == n.note.uid || state.scopeUid == n.note.uid;
         tree.add(
-          FTappable(
-            onPress: () {
-              state.guarded(() {
+          NoteContextMenu(
+            state: state,
+            uid: n.note.uid,
+            onOpen: onPick,
+            child: FTappable(
+              onPress: () {
                 if (AppState.isFolder(n.note)) {
-                  state.openFolder(n.note.uid);
+                  state.guarded(() => state.openFolder(n.note.uid));
                 } else {
-                  state.select(n.note.uid);
+                  state.clickNote(n.note.uid);
                 }
-              });
-              onPick();
-            },
-            child: Container(
-              padding: EdgeInsets.fromLTRB(
-                t.space.xs + depth * t.sizes.treeIndent,
-                t.space.sm - t.borders.hairline,
-                t.space.md,
-                t.space.sm - t.borders.hairline,
-              ),
-              decoration: BoxDecoration(
-                color: on ? t.selected : null,
-                borderRadius: BorderRadius.circular(t.radii.small),
-              ),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: t.sizes.chevronBox,
-                    child: kids
-                        ? FTappable(
-                            semanticsLabel: open ? 'Collapse' : 'Expand',
-                            behavior: HitTestBehavior.opaque,
-                            onPress: () => state.toggle(n.note.uid),
-                            child: Icon(
-                              open
-                                  ? FLucideIcons.chevronDown
-                                  : FLucideIcons.chevronRight,
-                              size: t.icons.md,
-                              color: t.muted,
-                            ),
-                          )
-                        : null,
-                  ),
-                  if (AppState.isFolder(n.note)) ...[
-                    Icon(
-                      open && kids
-                          ? FLucideIcons.folderOpen
-                          : FLucideIcons.folder,
-                      size: t.icons.tree,
-                      color: t.muted,
+                onPick();
+              },
+              child: Container(
+                padding: EdgeInsets.fromLTRB(
+                  t.space.xs + depth * t.sizes.treeIndent,
+                  t.space.sm - t.borders.hairline,
+                  t.space.md,
+                  t.space.sm - t.borders.hairline,
+                ),
+                decoration: BoxDecoration(
+                  color: on ? t.selected : null,
+                  borderRadius: BorderRadius.circular(t.radii.small),
+                ),
+                child: Row(
+                  children: [
+                    SizedBox(
+                      width: t.sizes.chevronBox,
+                      child: kids
+                          ? FTappable(
+                              semanticsLabel: open ? 'Collapse' : 'Expand',
+                              behavior: HitTestBehavior.opaque,
+                              onPress: () => state.toggle(n.note.uid),
+                              child: Icon(
+                                open
+                                    ? FLucideIcons.chevronDown
+                                    : FLucideIcons.chevronRight,
+                                size: t.icons.md,
+                                color: t.muted,
+                              ),
+                            )
+                          : null,
                     ),
-                    SizedBox(width: t.space.sm),
+                    if (AppState.isFolder(n.note)) ...[
+                      Icon(
+                        open && kids
+                            ? FLucideIcons.folderOpen
+                            : FLucideIcons.folder,
+                        size: t.icons.tree,
+                        color: t.muted,
+                      ),
+                      SizedBox(width: t.space.sm),
+                    ],
+                    Expanded(
+                      child: Text(
+                        n.note.summary,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.type.bodyStyle,
+                      ),
+                    ),
                   ],
-                  Expanded(
-                    child: Text(
-                      n.note.summary,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: t.type.bodyStyle,
-                    ),
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -422,14 +426,20 @@ class _SearchSectionState extends State<SearchSection> {
         ),
         if (hits != null && hits.isEmpty) const _Muted('No matches'),
         for (final h in hits ?? const <SpaceHit>[])
-          FItem(
-            key: Key('hit-${h.note.uid}'),
-            title: Text(h.note.summary, overflow: TextOverflow.ellipsis),
-            subtitle: Text(h.space.name),
-            onPress: () {
-              widget.onPick();
-              state.openHit(h);
-            },
+          NoteContextMenu(
+            state: state,
+            uid: h.note.uid,
+            hit: h,
+            onOpen: widget.onPick,
+            child: FItem(
+              key: Key('hit-${h.note.uid}'),
+              title: Text(h.note.summary, overflow: TextOverflow.ellipsis),
+              subtitle: Text(h.space.name),
+              onPress: () {
+                widget.onPick();
+                state.openHit(h);
+              },
+            ),
           ),
       ],
     );
@@ -533,6 +543,35 @@ class SettingsSection extends _Section {
             FSelectGroupItemMixin.radio<LayoutSide>(
               value: LayoutSide.end,
               label: const Text('End'),
+            ),
+          ],
+        ),
+      ),
+      _label(context, 'NOTES'),
+      Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: tokensOf(context).space.md,
+          vertical: tokensOf(context).space.xs,
+        ),
+        child: FSelectGroup<OpenMode>(
+          key: const Key('open-mode'),
+          label: const Text('Open notes in'),
+          description: const Text('What a click on a note does.'),
+          control: FMultiValueControl.lifted(
+            value: {state.openMode},
+            onChange: (v) {
+              final picked = v.where((x) => x != state.openMode);
+              if (picked.isNotEmpty) state.setOpenMode(picked.first);
+            },
+          ),
+          children: [
+            FSelectGroupItemMixin.radio<OpenMode>(
+              value: OpenMode.peek,
+              label: const Text('Peek'),
+            ),
+            FSelectGroupItemMixin.radio<OpenMode>(
+              value: OpenMode.main,
+              label: const Text('Main'),
             ),
           ],
         ),
