@@ -600,6 +600,53 @@ void main() {
     }
   });
 
+  group('overflow with long content', () {
+    final long =
+        'An exceedingly long task title that goes on and on '
+        'without any sensible place to stop at all, really';
+    for (final w in [880.0, 1280.0, 1911.0]) {
+      testWidgets('home strip, tasks view, menu and detail at $w', (t) async {
+        final s = await pumpTasksApp(
+          t,
+          notes: _notes(),
+          tasks: [
+            for (var i = 0; i < 6; i++)
+              mkTask(
+                'l$i',
+                summary: '$long $i',
+                days: i - 2,
+                tags: ['alpha-tag', 'beta-tag-longer', 'gamma'],
+                priority: 1,
+                description: long * 3,
+              ),
+          ],
+          size: Size(w, 900),
+        );
+        expect(t.takeException(), isNull);
+        s.openTasksTab();
+        await t.pumpAndSettle();
+        expect(t.takeException(), isNull);
+        await t.tap(
+          find
+              .descendant(of: _k('task-row-l1'), matching: find.byType(Text))
+              .first,
+          buttons: kSecondaryButton,
+        );
+        await t.pumpAndSettle();
+        expect(_k('menu-task-toggle'), findsOneWidget);
+        expect(t.takeException(), isNull);
+        await t.tapAt(const Offset(2, 2));
+        await t.pumpAndSettle();
+        s.openTaskTab('l1');
+        await t.pumpAndSettle();
+        expect(t.takeException(), isNull);
+        s.startTaskEdit('l1');
+        await t.pumpAndSettle();
+        expect(t.takeException(), isNull);
+      });
+    }
+  });
+
   group('search, tree and moves', () {
     Future<AppState> catalogApp(WidgetTester t) async {
       t.view.physicalSize = const Size(1500, 900);
