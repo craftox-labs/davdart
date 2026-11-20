@@ -14,6 +14,7 @@ import '../state/note_draft.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
 import 'collapsible_section.dart';
+import 'command_palette.dart';
 import 'home_today.dart';
 import 'detail_header.dart';
 import 'detail_view.dart';
@@ -85,7 +86,10 @@ class DavdartApp extends StatelessWidget {
             ? themed
             : TokensScope(tokens: custom, child: themed);
       },
-      home: Shell(state: state),
+      home: PaletteShortcuts(
+        state: state,
+        child: Shell(state: state),
+      ),
     );
   }
 }
@@ -510,7 +514,15 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
                   ),
                 ),
               )
-            : ShellFrame(state: state, showRail: false, child: content),
+            // Focus so Ctrl/Cmd+K works before anything is clicked.
+            : Focus(
+                autofocus: true,
+                child: ShellFrame(
+                  state: state,
+                  showRail: false,
+                  child: content,
+                ),
+              ),
       ),
     );
   }
