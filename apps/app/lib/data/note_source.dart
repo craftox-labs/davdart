@@ -89,9 +89,18 @@ String davPath(Uri base, Uri href) => href.path.startsWith(base.path)
 
 /// A collection offered in the Connect dialog.
 class FoundCollection {
-  const FoundCollection(this.name, this.path);
+  const FoundCollection(
+    this.name,
+    this.path, {
+    this.notes = true,
+    this.tasks = true,
+    this.events = true,
+  });
   final String name;
   final String path;
+
+  /// Which components (VJOURNAL, VTODO, VEVENT) the server collection takes.
+  final bool notes, tasks, events;
 }
 
 class SpaceNoteSource implements EditableNoteSource {
@@ -300,7 +309,14 @@ class SpaceNoteSource implements EditableNoteSource {
     );
     return [
       for (final c in found)
-        if (c.holdsNotes) FoundCollection(c.name, davPath(davBase, c.href)),
+        if (c.holdsNotes || c.holdsTasks || c.holdsEvents)
+          FoundCollection(
+            c.name,
+            davPath(davBase, c.href),
+            notes: c.holdsNotes,
+            tasks: c.holdsTasks,
+            events: c.holdsEvents,
+          ),
     ];
   }
 

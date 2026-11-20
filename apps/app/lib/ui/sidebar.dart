@@ -45,6 +45,12 @@ class Sidebar extends StatelessWidget {
 
     var section = state.section;
     if (section == Section.account && !state.canSignIn) section = Section.notes;
+    // A section the Space's collection cannot hold falls back to one it can.
+    if (!topSections(state).contains(section) &&
+        section != Section.account &&
+        section != Section.settings) {
+      section = topSections(state).first;
+    }
     final body = switch (section) {
       Section.notes => NotesSection(state: state, onPick: close),
       Section.tasks => TasksPanel(state: state, onPick: close),

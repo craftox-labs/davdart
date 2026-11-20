@@ -1273,7 +1273,13 @@ class AppState extends ChangeNotifier {
     if (error == null && connected) sync();
   }
 
-  bool get editable => source is EditableNoteSource;
+  bool get editable => source is EditableNoteSource && supportsNotes;
+
+  /// Which sections the current Space's collection supports (VJOURNAL,
+  /// VTODO, VEVENT); all of them without a catalog or for local Spaces.
+  bool get supportsNotes => catalog?.currentInfo?.notes ?? true;
+  bool get supportsTasks => catalog?.currentInfo?.tasks ?? true;
+  bool get supportsEvents => catalog?.currentInfo?.events ?? true;
 
   /// Sync state for the sidebar: null when there is no server.
   bool syncing = false;
@@ -1620,7 +1626,7 @@ class AppState extends ChangeNotifier {
   String? selectedTaskUid;
 
   /// Tasks can be written only in a Space (the read-only dev feed rejects).
-  bool get tasksEditable => source is SpaceNoteSource;
+  bool get tasksEditable => source is SpaceNoteSource && supportsTasks;
 
   Future<void> _loadTasks(NoteSource src) async {
     if (src is! SpaceNoteSource) {
@@ -2049,7 +2055,7 @@ class AppState extends ChangeNotifier {
   String? eventError;
 
   /// Events can be written only in a Space (the read-only dev feed rejects).
-  bool get eventsEditable => source is SpaceNoteSource;
+  bool get eventsEditable => source is SpaceNoteSource && supportsEvents;
 
   Future<void> _loadEvents(NoteSource src) async {
     if (src is! SpaceNoteSource) {

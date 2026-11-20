@@ -163,10 +163,10 @@ class ShellFrame extends StatelessWidget {
 /// Sections shown on the rail below the Spaces item, top group then bottom
 /// group. Account only
 /// appears when the app can sign in.
-List<Section> topSections() => const [
-  Section.notes,
-  Section.tasks,
-  Section.events,
+List<Section> topSections([AppState? state]) => [
+  if (state?.supportsNotes ?? true) Section.notes,
+  if (state?.supportsTasks ?? true) Section.tasks,
+  if (state?.supportsEvents ?? true) Section.events,
   Section.views,
   Section.search,
 ];
@@ -498,7 +498,7 @@ class IconRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final mirror = state.layoutSide == LayoutSide.end;
-    final sections = [...topSections(), ...bottomSections(state)];
+    final sections = [...topSections(state), ...bottomSections(state)];
     state.nav.publish(KeyNav.railList, [
       for (final s in sections)
         NavEntry(
@@ -576,7 +576,7 @@ class IconRail extends StatelessWidget {
                 ],
               ),
             ),
-            for (final s in topSections()) button(s),
+            for (final s in topSections(state)) button(s),
             const Spacer(),
             for (final s in bottomSections(state)) button(s),
           ],
@@ -613,7 +613,7 @@ class SectionBar extends StatelessWidget {
             below: true,
             onPick: onPick,
           ),
-          for (final s in [...topSections(), ...bottomSections(state)])
+          for (final s in [...topSections(state), ...bottomSections(state)])
             SectionButton(
               key: Key('bar-${s.name}'),
               section: s,

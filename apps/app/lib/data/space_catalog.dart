@@ -10,9 +10,30 @@ import 'persistent_event_store.dart';
 import 'persistent_task_store.dart';
 
 class SpaceInfo {
-  const SpaceInfo(this.id, this.name, {this.collection});
+  const SpaceInfo(
+    this.id,
+    this.name, {
+    this.collection,
+    this.notes = true,
+    this.tasks = true,
+    this.events = true,
+  });
   final String id;
   final String name;
+
+  /// Which components the Space's server collection takes. A collection
+  /// with no VJOURNAL (events and tasks only) has no Notes section, and so
+  /// on. Local Spaces and new Spaces take all three.
+  final bool notes, tasks, events;
+
+  SpaceInfo renamed(String n) => SpaceInfo(
+    id,
+    n,
+    collection: collection,
+    notes: notes,
+    tasks: tasks,
+    events: events,
+  );
 
   /// The server collection (path under /dav/) of an account Space; null for
   /// a local Space.
@@ -106,6 +127,9 @@ class SpaceCatalog {
                 collection: j['collection'] is String
                     ? j['collection'] as String
                     : null,
+                notes: j['notes'] != false,
+                tasks: j['tasks'] != false,
+                events: j['events'] != false,
               ),
             );
           }
@@ -171,6 +195,9 @@ class SpaceCatalog {
             'id': s.id,
             'name': s.name,
             if (s.collection != null) 'collection': s.collection,
+            if (!s.notes) 'notes': false,
+            if (!s.tasks) 'tasks': false,
+            if (!s.events) 'events': false,
           },
       ]),
     );
@@ -237,7 +264,14 @@ class SpaceCatalog {
     );
     return [
       for (final c in found)
-        if (c.holdsNotes) FoundCollection(c.name, davPath(_davBase, c.href)),
+        if (c.holdsNotes || c.holdsTasks || c.holdsEvents)
+          FoundCollection(
+            c.name,
+            davPath(_davBase, c.href),
+            notes: c.holdsNotes,
+            tasks: c.holdsTasks,
+            events: c.holdsEvents,
+          ),
     ];
   }
 
@@ -270,7 +304,23 @@ class SpaceCatalog {
     final s = spaces[i];
     if (n.isEmpty || n == s.name) return;
     if (spaces.any((o) => o.id != s.id && o.name == n)) return;
-    spaces[i] = SpaceInfo(s.id, n, collection: s.collection);
+    spaces[i] = s.renamed(n);
+  }
+
+  /// The server's component set wins, like its name.
+  void _applyComponents(int i, FoundCollection f) {
+    final s = spaces[i];
+    if (s.notes == f.notes && s.tasks == f.tasks && s.events == f.events) {
+      return;
+    }
+    spaces[i] = SpaceInfo(
+      s.id,
+      s.name,
+      collection: s.collection,
+      notes: f.notes,
+      tasks: f.tasks,
+      events: f.events,
+    );
   }
 
   int _addFound(List<FoundCollection> found) {
@@ -281,6 +331,7 @@ class SpaceCatalog {
       final have = spaces.indexWhere((s) => s.collection == f.path);
       if (have >= 0) {
         _applyName(have, f.name);
+        _applyComponents(have, f);
         continue;
       }
       // A local copy left by an earlier sign-out, or a Space connected to
@@ -297,12 +348,24 @@ class SpaceCatalog {
           spaces[at].id,
           spaces[at].name,
           collection: f.path,
+          notes: f.notes,
+          tasks: f.tasks,
+          events: f.events,
         );
         _applyName(at, f.name);
         added++;
         continue;
       }
-      spaces.add(SpaceInfo(id, _unique(f.name), collection: f.path));
+      spaces.add(
+        SpaceInfo(
+          id,
+          _unique(f.name),
+          collection: f.path,
+          notes: f.notes,
+          tasks: f.tasks,
+          events: f.events,
+        ),
+      );
       added++;
     }
     if (current == null && spaces.isNotEmpty) current = spaces.first.id;
@@ -357,7 +420,7 @@ class SpaceCatalog {
     if (spaces.any((s) => s.id != id && s.name == n)) {
       return 'Another space took that name meanwhile';
     }
-    spaces[j] = SpaceInfo(id, n, collection: spaces[j].collection);
+    spaces[j] = spaces[j].renamed(n);
     _save();
     return null;
   }
