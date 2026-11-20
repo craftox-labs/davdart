@@ -127,6 +127,9 @@ enum LayoutSide { start, end }
 /// Where a plain click on a note opens it: the side peek or the main area.
 enum OpenMode { peek, main }
 
+/// Which tasks the Tasks view lists.
+enum TaskFilter { open, all, completed }
+
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
     final saved = prefs?.read(_sectionKey);
@@ -171,10 +174,11 @@ class AppState extends ChangeNotifier {
   /// Returns false when nothing opened (unknown note, or the user chose to
   /// keep editing the peek draft).
   Future<bool> openNote(String uid, {OpenMode? mode}) async {
-    if (tree.find(uid) == null) return false;
+    final isTask = _isTask(uid);
+    if (tree.find(uid) == null && !isTask) return false;
     if ((mode ?? openMode) == OpenMode.main) {
-      openNoteTab(uid);
-    } else if (_tabs.contains(DocTab.note(uid)) || peekUid == uid) {
+      _openTab(uid);
+    } else if (_tabs.contains(_tabOf(uid)) || peekUid == uid) {
       select(uid);
     } else {
       var done = false;
@@ -186,6 +190,22 @@ class AppState extends ChangeNotifier {
     }
     return true;
   }
+
+  /// Opens task [uid] like [openNote] (peek or main per the setting).
+  Future<bool> openTask(String uid, {OpenMode? mode}) =>
+      _isTask(uid) ? openNote(uid, mode: mode) : Future.value(false);
+
+  /// A plain click on a task entry; same rules as [clickNote].
+  Future<void> clickTask(String uid) => clickNote(uid);
+
+  /// True when [uid] names a task (and no note).
+  bool _isTask(String uid) => tree.find(uid) == null && _taskById(uid) != null;
+
+  DocTab _tabOf(String uid) =>
+      _isTask(uid) ? DocTab.task(uid) : DocTab.note(uid);
+
+  void _openTab(String uid) =>
+      _isTask(uid) ? openTaskTab(uid) : openNoteTab(uid);
 
   String? _clickUid;
   String? _clickSurface;
@@ -203,7 +223,7 @@ class AppState extends ChangeNotifier {
     _clickUid = dbl ? null : uid;
     _clickSurface = 'entry';
     _clickAt = dbl ? null : now;
-    return dbl ? Future.sync(() => openNoteTab(uid)) : openNote(uid);
+    return dbl ? Future.sync(() => _openTab(uid)) : openNote(uid);
   }
 
   /// Registers a click on a note that is already open (the peek tab) and
@@ -219,7 +239,7 @@ class AppState extends ChangeNotifier {
     _clickUid = dbl ? null : uid;
     _clickSurface = 'peek';
     _clickAt = dbl ? null : now;
-    if (dbl) openNoteTab(uid);
+    if (dbl) _openTab(uid);
   }
 
   static const doubleClickWindow = Duration(milliseconds: 400);
@@ -351,6 +371,9 @@ class AppState extends ChangeNotifier {
     tasks = [];
     taskError = null;
     selectedTaskUid = null;
+    taskFilter = TaskFilter.open;
+    taskTagFilter = null;
+    taskFolderFilter = null;
     tree = NoteTree.build(const []);
     peekUid = null;
     query = '';
@@ -549,9 +572,8 @@ class AppState extends ChangeNotifier {
     final sameSpace = h.space.id == currentSpaceId;
     if (!sameSpace && !await switchSpace(h.space.id)) return;
     if (h.isTask) {
-      // No task view yet: remember which task was asked for.
       if (tasks.any((t) => t.uid == h.note.uid)) selectedTaskUid = h.note.uid;
-      notifyListeners();
+      await openTask(h.note.uid, mode: mode);
       return;
     }
     await openNote(h.note.uid, mode: mode);
@@ -754,7 +776,7 @@ class AppState extends ChangeNotifier {
     tree = NoteTree.build(notes);
     if (scopeUid != null && tree.find(scopeUid!) == null) scopeUid = null;
     if (_tabsLoaded) _pruneTabs();
-    if (peekUid != null && tree.find(peekUid!) == null) peekUid = null;
+    if (peekUid != null && findItem(peekUid!) == null) peekUid = null;
     if (peekUid == null) peekCollapsed = false;
     _drafts.removeWhere((u, _) => tree.find(u) == null);
   }
@@ -920,7 +942,7 @@ class AppState extends ChangeNotifier {
       _setNotes(loaded);
       if (src is SpaceNoteSource) _setTasks(await src.loadTasks());
       if (src != source) return count;
-      if (peekUid != null && tree.find(peekUid!) == null) {
+      if (peekUid != null && findItem(peekUid!) == null) {
         _setPeek(null);
       }
       _drafts.removeWhere((u, _) => tree.find(u) == null);
@@ -986,8 +1008,9 @@ class AppState extends ChangeNotifier {
     final old = peekUid;
     peekUid = uid;
     if (uid != null) peekCollapsed = false;
-    if (old != null && old != uid && !_tabs.contains(DocTab.note(old))) {
+    if (old != null && old != uid && !_tabs.contains(_tabOf(old))) {
       _drafts.remove(old);
+      _taskDrafts.remove(old);
     }
   }
 
@@ -1320,7 +1343,52 @@ class AppState extends ChangeNotifier {
   /// when fine. Notes are unaffected by it.
   String? taskError;
 
-  /// The task a search hit asked for; no task view uses it yet.
+  /// Tasks view filters (not saved): which tasks, a tag, a parent folder or
+  /// note whose subtree to show.
+  TaskFilter taskFilter = TaskFilter.open;
+  String? taskTagFilter;
+  String? taskFolderFilter;
+
+  void setTaskFilter(TaskFilter f) {
+    taskFilter = f;
+    notifyListeners();
+  }
+
+  void setTaskTagFilter(String? tag) {
+    taskTagFilter = taskTagFilter == tag ? null : tag;
+    notifyListeners();
+  }
+
+  void setTaskFolderFilter(String? uid) {
+    taskFolderFilter = uid;
+    notifyListeners();
+  }
+
+  /// True when [t] sits under [uid] (a folder, note or task) at any depth.
+  bool taskIsUnder(Task t, String uid) {
+    var cur = t.parentUid;
+    for (var i = 0; cur != null && i <= tasks.length + notes.length; i++) {
+      if (cur == uid) return true;
+      final item = findItem(cur);
+      cur = item is Task
+          ? item.parentUid
+          : item is Note
+          ? item.parentUid
+          : null;
+    }
+    return false;
+  }
+
+  /// Tasks after the Tasks view's tag and folder filters (status filter not
+  /// applied; see [taskFilter]).
+  List<Task> get filteredTasks => [
+    for (final t in tasks)
+      if ((taskTagFilter == null || t.categories.contains(taskTagFilter)) &&
+          (taskFolderFilter == null || taskIsUnder(t, taskFolderFilter!)))
+        t,
+  ];
+
+  /// The task a search hit asked for.
   String? selectedTaskUid;
 
   /// Tasks can be written only in a Space (the read-only dev feed rejects).
@@ -1348,6 +1416,14 @@ class AppState extends ChangeNotifier {
     _taskDrafts.removeWhere((u, _) => !tasks.any((t) => t.uid == u));
     if (selectedTaskUid != null && _taskById(selectedTaskUid!) == null) {
       selectedTaskUid = null;
+    }
+    if (peekUid != null && findItem(peekUid!) == null) _setPeek(null);
+    if (_tabsLoaded) _pruneTabs();
+    if (taskTagFilter != null && !taskTags.contains(taskTagFilter)) {
+      taskTagFilter = null;
+    }
+    if (taskFolderFilter != null && findItem(taskFolderFilter!) == null) {
+      taskFolderFilter = null;
     }
   }
 
@@ -1429,6 +1505,9 @@ class AppState extends ChangeNotifier {
       for (final c in t.categories)
         if (!c.startsWith('status-') && !c.startsWith('kind-')) c,
   }.toList()..sort());
+
+  /// The user-facing tags of [t] (no `status-`/`kind-` markers).
+  List<String> taskTagsOf(Task t) => _plainTags(t.categories);
 
   bool isOverdue(Task t, [DateTime? now]) =>
       isTaskOverdue(t, now ?? DateTime.now());
@@ -1751,6 +1830,21 @@ class AppState extends ChangeNotifier {
         : null;
   }
 
+  /// The task the main pane shows full page, when its tab is a task tab.
+  String? get mainTaskUid {
+    final t = activeTab;
+    return t != null && t.kind == TabKind.task && _taskById(t.id) != null
+        ? t.id
+        : null;
+  }
+
+  /// The main pane shows the Tasks list.
+  bool get tasksTabActive => activeTab?.kind == TabKind.tasks;
+
+  /// Something other than Home or a view fills the main pane: a note or task
+  /// page, or the Tasks list.
+  bool get mainIsPage => mainNoteUid != null || mainTaskUid != null;
+
   String get _tabsKey => 'davdart.tabs.v1.${catalog?.current ?? 'default'}';
 
   void _saveTabs() {
@@ -1772,6 +1866,8 @@ class AppState extends ChangeNotifier {
   bool _tabExists(DocTab t) => switch (t.kind) {
     TabKind.note => tree.find(t.id) != null,
     TabKind.view => _viewNotes.containsKey(t.id),
+    TabKind.task => _taskById(t.id) != null,
+    TabKind.tasks => true,
   };
 
   void _pruneTabs() {
@@ -1790,6 +1886,20 @@ class AppState extends ChangeNotifier {
     _saveTabs();
   }
 
+  /// Opens (or focuses) the main tab of task [uid].
+  void openTaskTab(String uid) {
+    if (_taskById(uid) == null) return;
+    final t = DocTab.task(uid);
+    if (_tabs.add(t)) _saveTabs();
+    _show(t);
+  }
+
+  /// Opens (or focuses) the Tasks list tab.
+  void openTasksTab() {
+    if (_tabs.add(DocTab.tasksList)) _saveTabs();
+    _show(DocTab.tasksList);
+  }
+
   /// Opens (or focuses) the main tab of note [uid]. A peek of the same note
   /// closes (one place per note). The "+" button's new note opens this way.
   void openNoteTab(String uid) {
@@ -1803,8 +1913,8 @@ class AppState extends ChangeNotifier {
   /// and shows it there. The peek empties; the note's edit draft goes along.
   void promote([String? uid]) {
     uid ??= peekUid;
-    if (uid == null || tree.find(uid) == null) return;
-    openNoteTab(uid);
+    if (uid == null || findItem(uid) == null) return;
+    _openTab(uid);
   }
 
   /// Moves open tab [t] to index [to] of the strip (clamped) and saves.
@@ -1819,6 +1929,8 @@ class AppState extends ChangeNotifier {
   String tabTitle(DocTab t) => switch (t.kind) {
     TabKind.note => tree.find(t.id)?.note.summary ?? '',
     TabKind.view => _viewByUid(t.id)?.name ?? '',
+    TabKind.task => _taskById(t.id)?.summary ?? '',
+    TabKind.tasks => 'Tasks',
   };
 
   bool tabIsFolder(DocTab t) =>
@@ -1827,7 +1939,11 @@ class AppState extends ChangeNotifier {
       isFolder(tree.find(t.id)!.note);
 
   /// Whether the tab's note has unsaved edits.
-  bool tabDirty(DocTab t) => t.kind == TabKind.note && dirtyFor(t.id);
+  bool tabDirty(DocTab t) => switch (t.kind) {
+    TabKind.note => dirtyFor(t.id),
+    TabKind.task => dirtyTaskFor(t.id),
+    _ => false,
+  };
 
   SavedView? _viewByUid(String uid) {
     for (final v in savedViews) {
@@ -1845,6 +1961,14 @@ class AppState extends ChangeNotifier {
       if (tree.find(t.id) == null) return;
       _activeViewTab = t;
       if (peekUid == t.id) _setPeek(null);
+      notifyListeners();
+    } else if (t.kind == TabKind.task) {
+      if (_taskById(t.id) == null) return;
+      _activeViewTab = t;
+      if (peekUid == t.id) _setPeek(null);
+      notifyListeners();
+    } else if (t.kind == TabKind.tasks) {
+      _activeViewTab = t;
       notifyListeners();
     } else {
       final v = _viewByUid(t.id);
@@ -1869,6 +1993,7 @@ class AppState extends ChangeNotifier {
       final next = _tabs.remove(t);
       if (_activeViewTab == t) _activeViewTab = null;
       if (t.kind == TabKind.note && peekUid != t.id) _drafts.remove(t.id);
+      if (t.kind == TabKind.task && peekUid != t.id) _taskDrafts.remove(t.id);
       _saveTabs();
       if (wasActive) _show(next);
       notifyListeners();
@@ -2035,15 +2160,22 @@ class AppState extends ChangeNotifier {
 
   Note? get peek => peekUid == null ? null : tree.find(peekUid!)?.note;
 
+  /// The task shown in the peek, if the peek holds a task.
+  Task? get peekTask => peekUid == null ? null : _taskById(peekUid!);
+
+  /// The peek holds a note or a task.
+  bool get hasPeek => peek != null || peekTask != null;
+
   /// Shows note [uid] in the peek (null closes it). A note that has a main
   /// tab is focused there instead: it lives in one place.
   void select(String? uid) {
-    if (uid != null && _tabs.contains(DocTab.note(uid))) {
-      _show(DocTab.note(uid));
+    if (uid != null && _tabs.contains(_tabOf(uid))) {
+      _show(_tabOf(uid));
       return;
     }
     // Showing a note outside the open folder leaves the folder.
     if (uid != null &&
+        !_isTask(uid) &&
         scopeUid != null &&
         uid != scopeUid &&
         !tree.descendants(scopeUid!).any((n) => n.uid == uid)) {

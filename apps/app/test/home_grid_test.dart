@@ -80,7 +80,7 @@ void main() {
     await _pump(t, _four, w: 1700);
     final cols = _cols(t);
     final doing = _r(t, 'home-today-doing');
-    final recent = _r(t, 'home-today-recently-changed');
+    final recent = _r(t, 'home-today-tasks');
     expect(doing.left, closeTo(cols[0].left, 0.5));
     expect(doing.right, closeTo(cols[1].right, 0.5));
     expect(recent.left, closeTo(cols[2].left, 0.5));
@@ -133,7 +133,7 @@ void main() {
     await t.tap(_k('home-today-doing-toggle'));
     await t.pumpAndSettle();
     expect(_k('home-today-doing-n2'), findsNothing);
-    expect(_k('home-today-recently-changed-n2'), findsOneWidget);
+    expect(_k('home-today-tasks'), findsOneWidget);
     expect(prefs.read('davdart.home.today.doing.collapsed.v1'), 'true');
     await _pump(t, _four, prefs: prefs);
     expect(_k('home-today-doing-n2'), findsNothing);
@@ -142,7 +142,9 @@ void main() {
 
   testWidgets('Home with no Today rows still has the board', (t) async {
     await _pump(t, []);
-    expect(_k('home-today'), findsNothing);
+    // No notes in progress: only the Tasks panel (quick add) is left.
+    expect(_k('home-today-doing'), findsNothing);
+    expect(_k('home-today-tasks'), findsOneWidget);
     expect(_k('home-board-toggle'), findsOneWidget);
   });
 

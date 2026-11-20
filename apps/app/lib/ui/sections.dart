@@ -374,6 +374,13 @@ class ViewsSection extends _Section {
   Widget build(BuildContext context) => _Panel(
     heading: _title('Views'),
     children: [
+      KeyedSubtree(
+        key: const Key('views-tasks'),
+        child: _item(FLucideIcons.listChecks, 'Tasks', () {
+          state.openTasksTab();
+          onPick();
+        }, on: state.tasksTabActive),
+      ),
       if (state.savedViews.isEmpty && !state.hasFilter)
         const _Muted('No saved views yet'),
       for (final v in state.savedViews)
@@ -526,6 +533,13 @@ class _SearchSectionState extends State<SearchSection> {
             onOpen: widget.onPick,
             child: FItem(
               key: Key('hit-${h.note.uid}'),
+              prefix: h.isTask
+                  ? Icon(
+                      FLucideIcons.listTodo,
+                      size: t.icons.md,
+                      color: t.muted,
+                    )
+                  : null,
               title: Text(h.note.summary, overflow: TextOverflow.ellipsis),
               subtitle: Text(h.space.name),
               onPress: () {

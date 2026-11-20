@@ -113,7 +113,24 @@ Future<void> _dropOnSpace(
   SpaceInfo sp,
 ) async {
   final node = state.tree.find(uid);
-  if (node == null) return;
+  if (node == null) {
+    final task = state.taskById(uid);
+    if (task == null) return;
+    controller.hide();
+    final n = await state.moveToSpace(uid, sp.id);
+    if (!context.mounted) return;
+    showFToast(
+      context: context,
+      title: Text(
+        n == null
+            ? (state.error ?? 'Could not move "${task.summary}"')
+            : n == 1
+            ? 'Moved "${task.summary}" to "${sp.name}"'
+            : 'Moved $n tasks to "${sp.name}"',
+      ),
+    );
+    return;
+  }
   if (node.children.isNotEmpty || AppState.isFolder(node.note)) {
     final ok = await showAppDialog<bool>(
       context,
@@ -184,7 +201,7 @@ List<FItemGroup> spaceMenuGroups(
               accepts: (d) =>
                   sp.id != state.currentSpaceId &&
                   state.editable &&
-                  state.tree.find(d.uid) != null,
+                  state.findItem(d.uid) != null,
               onDrop: (d) =>
                   _dropOnSpace(context, state, controller, d.uid, sp),
               child: ActionContextMenu(

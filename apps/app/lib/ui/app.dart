@@ -25,6 +25,7 @@ import 'scope_bar.dart';
 import 'shell_frame.dart';
 import 'sidebar.dart';
 import 'tab_strip.dart';
+import 'tasks_view.dart';
 import 'theme.dart';
 
 /// The real app: Spaces kept in browser storage. `Planning` is filled once
@@ -146,7 +147,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
   );
   late final AnimationController _peek = AnimationController(
     vsync: this,
-    value: widget.state.peek != null && !widget.state.peekCollapsed ? 1 : 0,
+    value: widget.state.hasPeek && !widget.state.peekCollapsed ? 1 : 0,
   );
 
   /// The last peeked note, kept mounted while the pane slides shut.
@@ -188,9 +189,8 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
           final split = c.maxWidth >= Tokens.splitBreakpoint;
           // Only the wide header row has the expand button, so below it a
           // collapsed peek shows again.
-          final collapsedPeek =
-              wide && state.peek != null && state.peekCollapsed;
-          final hasDetail = state.peek != null && !collapsedPeek;
+          final collapsedPeek = wide && state.hasPeek && state.peekCollapsed;
+          final hasDetail = state.hasPeek && !collapsedPeek;
           final animate = !MediaQuery.disableAnimationsOf(context);
           if (state.peekUid != null) _heldPeek = state.peekUid;
           // Crossing the wide breakpoint jumps; only a toggle slides.
@@ -233,11 +233,13 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     // Once the slide-out is over the held note is let go.
     if (!hasDetail && _peek.value == 0) _heldPeek = null;
     final peekUid = state.peekUid ?? _heldPeek;
-    final mainNote = state.mainNoteUid;
+    final mainNote = state.mainNoteUid ?? state.mainTaskUid;
     final mirror = state.layoutSide == LayoutSide.end;
 
     Widget main() => state.noSpace
         ? FirstRunView(state: state)
+        : state.tasksTabActive
+        ? TasksView(state: state)
         : mainNote != null
         ? DetailView(
             key: const Key('main-note'),
@@ -639,10 +641,37 @@ class TopBar extends StatelessWidget {
   /// Left side of the row: the breadcrumb on Home and view tabs, the note's
   /// title where a note fills the main area (narrow layouts).
   Widget _lead(Tokens t) {
-    final uid = state.mainNoteUid;
-    if (uid != null) {
+    final uid = state.mainNoteUid ?? state.mainTaskUid;
+    if (state.tasksTabActive && showMenu) {
+      // Below wide there is no tab strip: Back returns home.
+      return Row(
+        children: [
+          IconAction(
+            compact: true,
+            key: const Key('tasks-back'),
+            tooltip: 'Back to Home',
+            icon: FLucideIcons.arrowLeft,
+            onPress: () => state.activateTab(null),
+          ),
+          SizedBox(width: t.space.xs),
+          Expanded(
+            child: Text(
+              'Tasks',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: t.type.titleStyle,
+            ),
+          ),
+        ],
+      );
+    }
+    if (uid != null || state.tasksTabActive) {
       return Text(
-        state.tree.find(uid)?.note.summary ?? '',
+        state.tasksTabActive
+            ? 'Tasks'
+            : state.tree.find(uid!)?.note.summary ??
+                  state.taskById(uid)?.summary ??
+                  '',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: t.type.titleStyle,
@@ -655,7 +684,7 @@ class TopBar extends StatelessWidget {
   }
 
   Widget _bar(BuildContext context, Tokens t, bool narrow) {
-    final home = state.mainNoteUid == null;
+    final home = !state.mainIsPage && !state.tasksTabActive;
     final board = state.view == ViewMode.board;
     Widget toggle(String label, ViewMode mode) => FButton(
       variant: state.view == mode
@@ -691,7 +720,7 @@ class TopBar extends StatelessWidget {
             ),
           ),
         if (home) ScopeActions(state: state),
-        if (state.activeTab == null)
+        if (state.activeTab == null || state.tasksTabActive)
           const SizedBox.shrink()
         else if (!narrow) ...[
           toggle('Board', ViewMode.board),

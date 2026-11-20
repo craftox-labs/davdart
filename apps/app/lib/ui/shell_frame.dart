@@ -460,7 +460,7 @@ class SpacesMenuButton extends StatelessWidget {
       onWillAcceptWithDetails: (d) =>
           state.editable &&
           state.spaces.length > 1 &&
-          state.tree.find(d.data.uid) != null,
+          state.findItem(d.data.uid) != null,
       onMove: (_) {
         if (!controller.status.isForwardOrCompleted) controller.show();
       },

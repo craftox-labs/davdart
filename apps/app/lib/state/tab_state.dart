@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 /// What a document tab shows.
-enum TabKind { note, view }
+enum TabKind { note, view, task, tasks }
 
 /// One closable tab of the strip: a note opened full page, or an applied
 /// saved view. Identified by the note's uid (for a view, the uid of the note
@@ -11,11 +11,21 @@ class DocTab {
   const DocTab(this.kind, this.id);
   const DocTab.note(String uid) : this(TabKind.note, uid);
   const DocTab.view(String uid) : this(TabKind.view, uid);
+  const DocTab.task(String uid) : this(TabKind.task, uid);
+
+  /// The Tasks list view (one per Space).
+  static const tasksList = DocTab(TabKind.tasks, 'all');
 
   final TabKind kind;
   final String id;
 
-  String get code => '${kind == TabKind.note ? 'n' : 'v'}:$id';
+  String get code =>
+      '${switch (kind) {
+        TabKind.note => 'n',
+        TabKind.view => 'v',
+        TabKind.task => 't',
+        TabKind.tasks => 'k',
+      }}:$id';
 
   static DocTab? parse(String s) {
     if (s.length < 3 || s[1] != ':') return null;
@@ -23,6 +33,8 @@ class DocTab {
     return switch (s[0]) {
       'n' => DocTab.note(id),
       'v' => DocTab.view(id),
+      't' => DocTab.task(id),
+      'k' => id == 'all' ? DocTab.tasksList : null,
       _ => null,
     };
   }

@@ -10,26 +10,17 @@ import 'collapsible_section.dart';
 import 'content_grid.dart';
 import 'drag_drop.dart';
 import 'note_menu.dart';
+import 'task_parts.dart';
 import 'theme.dart';
 
-// A small "Today" strip on Home: Doing and Recently changed. A pure view over
-// AppState.filtered. To remove: delete this file, its tests and the one
-// `HomeToday(...)` line in app.dart.
+// A small "Today" strip on Home: Doing (notes) and Tasks (overdue, due today,
+// next open). A pure view over AppState.filtered and AppState.tasks. To
+// remove: delete this file, its tests and the one `HomeToday(...)` line in
+// app.dart.
 
 const _prefKey = 'davdart.home.today.collapsed.v1';
 const _maxRows = 5;
-
-/// Short age: 'now', '5m', '2h', 'yesterday', '3d', '2w'.
-String shortAge(DateTime? at, DateTime now) {
-  if (at == null) return '';
-  final d = now.difference(at);
-  if (d.inMinutes < 1) return 'now';
-  if (d.inMinutes < 60) return '${d.inMinutes}m';
-  if (d.inHours < 24) return '${d.inHours}h';
-  if (d.inDays == 1) return 'yesterday';
-  if (d.inDays < 14) return '${d.inDays}d';
-  return '${d.inDays ~/ 7}w';
-}
+const _maxTaskRows = 6;
 
 class HomeToday extends StatefulWidget {
   const HomeToday({super.key, required this.state, this.now});
@@ -66,13 +57,84 @@ class _HomeTodayState extends State<HomeToday> {
           for (final n in all)
             if (PlanItem.fromNote(n).status == 'doing') n,
         ].take(_maxRows).toList();
-        final recent = all.take(_maxRows).toList();
-        if (doing.isEmpty && recent.isEmpty) return const SizedBox.shrink();
-        final now = widget.now ?? DateTime.now().toUtc();
+        final now = widget.now ?? DateTime.now();
+        final scope = state.scopeUid;
+        final open = [
+          for (final k in state.openTasks(now))
+            if (scope == null || state.taskIsUnder(k, scope)) k,
+        ];
+        // Read-only Space without tasks: nothing to add, nothing to show.
+        final showTasks = state.tasksEditable || state.tasks.isNotEmpty;
+        if (doing.isEmpty && !showTasks) return const SizedBox.shrink();
         final panels = [
-          if (doing.isNotEmpty) _Panel('Doing', doing, state, now, false),
-          if (recent.isNotEmpty)
-            _Panel('Recently changed', recent, state, now, true),
+          if (doing.isNotEmpty)
+            _Panel(
+              'Doing',
+              state,
+              count: doing.length,
+              rows: [
+                for (final n in doing)
+                  _Row(
+                    key: Key('home-today-doing-${n.uid}'),
+                    state: state,
+                    note: n,
+                  ),
+              ],
+            ),
+          if (showTasks)
+            _Panel(
+              'Tasks',
+              state,
+              count: open.length,
+              rows: [
+                if (open.isEmpty)
+                  Padding(
+                    padding: EdgeInsets.all(t.space.xs),
+                    child: Text(
+                      'No open tasks',
+                      key: const Key('home-tasks-empty'),
+                      style: t.type.captionStyle.copyWith(color: t.muted),
+                    ),
+                  ),
+                for (final k in open.take(_maxTaskRows))
+                  TaskRow(
+                    key: Key('home-today-tasks-${k.uid}'),
+                    state: state,
+                    task: k,
+                    now: now,
+                  ),
+              ],
+              footer: state.tasksEditable || open.length > _maxTaskRows
+                  ? Padding(
+                      padding: EdgeInsets.only(top: t.space.sm),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TaskQuickAdd(state: state),
+                          if (state.tasks.isNotEmpty)
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: FTappable(
+                                key: const Key('home-tasks-all'),
+                                onPress: state.openTasksTab,
+                                child: Padding(
+                                  padding: EdgeInsets.only(top: t.space.sm),
+                                  child: Text(
+                                    open.length > _maxTaskRows
+                                        ? 'All tasks (${open.length} open)'
+                                        : 'All tasks',
+                                    style: t.type.captionStyle.copyWith(
+                                      color: t.accent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    )
+                  : null,
+            ),
         ];
         return ContentCap(
           child: Padding(
@@ -126,12 +188,18 @@ class _HomeTodayState extends State<HomeToday> {
 }
 
 class _Panel extends StatelessWidget {
-  const _Panel(this.title, this.rows, this.state, this.now, this.showAge);
+  const _Panel(
+    this.title,
+    this.state, {
+    required this.count,
+    required this.rows,
+    this.footer,
+  });
   final String title;
-  final List<Note> rows;
   final AppState state;
-  final DateTime now;
-  final bool showAge;
+  final int count;
+  final List<Widget> rows;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -153,21 +221,13 @@ class _Panel extends StatelessWidget {
               id: 'home-today-$slug',
               title: title,
               upper: false,
-              count: rows.length,
+              count: count,
               prefs: state.prefs,
               prefKey: 'davdart.home.today.$slug.collapsed.v1',
               headerPadding: EdgeInsets.all(t.space.xs),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  for (final n in rows)
-                    _Row(
-                      key: Key('home-today-$slug-${n.uid}'),
-                      state: state,
-                      note: n,
-                      age: showAge ? shortAge(n.lastModified, now) : null,
-                    ),
-                ],
+                children: [...rows, ?footer],
               ),
             ),
           ],
@@ -178,10 +238,9 @@ class _Panel extends StatelessWidget {
 }
 
 class _Row extends StatelessWidget {
-  const _Row({super.key, required this.state, required this.note, this.age});
+  const _Row({super.key, required this.state, required this.note});
   final AppState state;
   final Note note;
-  final String? age;
 
   @override
   Widget build(BuildContext context) {
@@ -214,13 +273,6 @@ class _Row extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (age != null && age!.isNotEmpty) ...[
-                  SizedBox(width: t.space.md),
-                  Text(
-                    age!,
-                    style: t.type.captionStyle.copyWith(color: t.muted),
-                  ),
-                ],
               ],
             ),
           ),

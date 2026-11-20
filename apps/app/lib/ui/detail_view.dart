@@ -11,6 +11,7 @@ import 'parts.dart';
 import 'theme.dart';
 import 'move_space_dialog.dart';
 import 'note_editor.dart';
+import 'task_detail.dart';
 
 class DetailView extends StatelessWidget {
   const DetailView({
@@ -39,7 +40,16 @@ class DetailView extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final note = state.tree.find(uid)?.note;
-    if (note == null) return const SizedBox.shrink();
+    if (note == null) {
+      if (state.taskById(uid) == null) return const SizedBox.shrink();
+      return TaskDetail(
+        state: state,
+        uid: uid,
+        onClose: onClose,
+        full: full,
+        inHeader: inHeader,
+      );
+    }
     final p = PlanItem.fromNote(note);
     final path = <Note>[];
     for (var n = state.tree.find(note.uid)?.parent; n != null; n = n.parent) {
@@ -207,6 +217,12 @@ class DetailView extends StatelessWidget {
                       SizedBox(height: t.space.xl),
                       MarkdownLite(p.text),
                     ],
+                    if (draft == null &&
+                        state.tasksByParent(note.uid).isNotEmpty)
+                      Padding(
+                        padding: EdgeInsets.only(top: t.space.xxl),
+                        child: ChildTasks(state: state, parentUid: note.uid),
+                      ),
                     FutureBuilder<List<Revision>>(
                       key: ValueKey('rev-${note.uid}-${note.lastModified}'),
                       future: state.revisionsFor(note.uid),

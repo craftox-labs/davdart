@@ -12,6 +12,7 @@ import 'new_note_dialog.dart';
 import 'note_menu.dart';
 import 'save_view_dialog.dart';
 import 'shell_frame.dart';
+import 'task_menu.dart';
 import 'theme.dart';
 
 /// The document tab strip across the top of the content area: the pinned home
@@ -42,7 +43,11 @@ class TabStrip extends StatelessWidget {
     final t = tokensOf(context);
     return ListenableBuilder(
       // The dirty dot follows the open edit, which notifies on its own.
-      listenable: Listenable.merge([state, ...state.drafts]),
+      listenable: Listenable.merge([
+        state,
+        ...state.drafts,
+        ...state.taskDrafts,
+      ]),
       builder: (context, _) {
         final tabs = state.tabs;
         final active = state.activeTab;
@@ -207,6 +212,10 @@ class _ReorderableTab extends StatelessWidget {
       width: width,
       icon: tab.kind == TabKind.view
           ? FLucideIcons.bookmark
+          : tab.kind == TabKind.tasks
+          ? FLucideIcons.listChecks
+          : tab.kind == TabKind.task
+          ? FLucideIcons.listTodo
           : state.tabIsFolder(tab)
           ? FLucideIcons.folder
           : FLucideIcons.fileText,
@@ -221,6 +230,41 @@ class _ReorderableTab extends StatelessWidget {
         state: state,
         uid: tab.id,
         surface: NoteSurface.mainTab,
+        child: item,
+      );
+    } else if (tab.kind == TabKind.task) {
+      item = TaskContextMenu(
+        state: state,
+        uid: tab.id,
+        surface: NoteSurface.mainTab,
+        child: item,
+      );
+    } else if (tab.kind == TabKind.tasks) {
+      item = ActionContextMenu(
+        groups: [
+          [
+            NoteMenuItem(
+              'Close tab',
+              FLucideIcons.x,
+              () => state.closeTab(tab),
+              key: const Key('menu-close'),
+            ),
+            if (state.tabs.length > 1)
+              NoteMenuItem(
+                'Close other tabs',
+                FLucideIcons.x,
+                () => state.closeOtherTabs(tab),
+                key: const Key('menu-close-others'),
+              ),
+            if (state.tabs.last != tab)
+              NoteMenuItem(
+                'Close tabs to the right',
+                FLucideIcons.x,
+                () => state.closeTabsToRight(tab),
+                key: const Key('menu-close-right'),
+              ),
+          ],
+        ],
         child: item,
       );
     } else {
@@ -585,7 +629,7 @@ class PromoteTarget extends StatelessWidget {
       onWillAcceptWithDetails: (d) =>
           d.data.source != NoteDragSource.board &&
           d.data.source != NoteDragSource.list &&
-          state.tree.find(d.data.uid) != null,
+          state.findItem(d.data.uid) != null,
       onAcceptWithDetails: (d) => state.promote(d.data.uid),
       builder: (context, candidates, _) => DecoratedBox(
         position: DecorationPosition.foreground,

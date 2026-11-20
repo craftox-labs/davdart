@@ -11,6 +11,7 @@ import 'move_folder_dialog.dart';
 import 'move_space_dialog.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
+import 'task_menu.dart';
 import 'theme.dart';
 
 /// Where a note's menu was opened; it decides which built-in items appear.
@@ -330,6 +331,13 @@ class NoteContextMenu extends StatelessWidget {
           FLucideIcons.folderPlus,
           () => showNewFolderDialog(context, state, under: note),
           key: const Key('menu-new-folder-inside'),
+        ),
+      if (state.tasksEditable && !isViewNote(note))
+        NoteMenuItem(
+          'New task inside…',
+          FLucideIcons.listPlus,
+          () => showNewTaskDialog(context, state, parentUid: note.uid),
+          key: const Key('menu-new-task-inside'),
         ),
       if (edit)
         NoteMenuItem(
