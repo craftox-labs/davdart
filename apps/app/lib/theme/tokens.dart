@@ -249,6 +249,7 @@ class SizeTokens {
     this.tabMin = 88,
     this.tabMax = 180,
     this.tabClose = 16,
+    this.touchTarget = 44,
   });
 
   /// Edge of the logo on the first-run screen (and other large uses).
@@ -307,6 +308,9 @@ class SizeTokens {
   /// (tabs shrink towards [tabMin], then the strip scrolls) and the square
   /// of a tab's close button.
   final double tabStrip, tabMin, tabMax, tabClose;
+
+  /// Least hit target of an interactive control on the narrow (touch) layout.
+  final double touchTarget;
 }
 
 /// Design tokens shared with the web board (apps/web/lib/web_app.dart). One

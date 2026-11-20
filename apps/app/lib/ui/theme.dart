@@ -21,6 +21,21 @@ Tokens tokensOf(BuildContext context) =>
         ? Tokens.dark
         : Tokens.light);
 
+/// True below [Tokens.wideBreakpoint]: the narrow (drawer, phone) layout,
+/// where controls get touch-sized hit targets. Desktop is unaffected.
+bool narrowLayout(BuildContext context) =>
+    MediaQuery.sizeOf(context).width < Tokens.wideBreakpoint;
+
+/// Wraps a button so it is at least [Tokens.sizes] touchTarget tall (and wide
+/// when [square]) on the narrow layout; unchanged on desktop. Tight
+/// constraints make the button itself fill the box, so the whole box is its
+/// hit area.
+Widget touchBox(BuildContext context, Widget child, {bool square = false}) {
+  if (!narrowLayout(context)) return child;
+  final m = tokensOf(context).sizes.touchTarget;
+  return SizedBox(width: square ? m : null, height: m, child: child);
+}
+
 FColors _colors(Tokens t, FColors base) => base.copyWith(
   barrier: t.barrier,
   background: t.panel,

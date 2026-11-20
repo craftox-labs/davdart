@@ -119,11 +119,27 @@ class TaskCheckbox extends StatelessWidget {
       enabled: state.tasksEditable && blocker == null,
       onChange: (_) => state.toggleTask(task.uid),
     );
-    if (blocker == null) return box;
+    Widget target = box;
+    // Narrow: the box sits in a touch-sized hit area.
+    if (narrowLayout(context)) {
+      final m = tokensOf(context).sizes.touchTarget;
+      target = GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: state.tasksEditable && blocker == null
+            ? () => state.toggleTask(task.uid)
+            : null,
+        child: SizedBox(
+          width: m,
+          height: m,
+          child: Center(child: box),
+        ),
+      );
+    }
+    if (blocker == null) return target;
     return FTooltip(
       key: Key('task-check-tip-${task.uid}'),
       tipBuilder: (_, _) => Text(blocker),
-      child: box,
+      child: target,
     );
   }
 }
@@ -168,6 +184,9 @@ class TaskRow extends StatelessWidget {
           },
           child: Container(
             color: selected ? t.selected : null,
+            constraints: BoxConstraints(
+              minHeight: narrowLayout(context) ? t.sizes.touchTarget : 0,
+            ),
             padding: EdgeInsets.symmetric(
               horizontal: t.space.xs,
               vertical: t.space.sm,

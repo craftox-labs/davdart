@@ -689,15 +689,18 @@ class TopBar extends StatelessWidget {
   Widget _bar(BuildContext context, Tokens t, bool narrow) {
     final home = !state.mainIsPage;
     final board = state.view == ViewMode.board;
-    Widget toggle(String label, ViewMode mode) => FButton(
-      variant: state.view == mode
-          ? FButtonVariant.secondary
-          : FButtonVariant.outline,
-      size: FButtonSizeVariant.xs,
-      mainAxisSize: MainAxisSize.min,
-      selected: state.view == mode,
-      onPress: () => state.setView(mode),
-      child: Text(label),
+    Widget toggle(String label, ViewMode mode) => touchBox(
+      context,
+      FButton(
+        variant: state.view == mode
+            ? FButtonVariant.secondary
+            : FButtonVariant.outline,
+        size: FButtonSizeVariant.xs,
+        mainAxisSize: MainAxisSize.min,
+        selected: state.view == mode,
+        onPress: () => state.setView(mode),
+        child: Text(label),
+      ),
     );
     return PaneHeaderRow(
       key: const Key('top-bar'),

@@ -24,12 +24,16 @@ class IconAction extends StatelessWidget {
   @override
   Widget build(BuildContext context) => FTooltip(
     tipBuilder: (_, _) => Text(tooltip),
-    child: FButton.icon(
-      variant: FButtonVariant.ghost,
-      size: compact ? FButtonSizeVariant.xs : FButtonSizeVariant.sm,
-      semanticsLabel: tooltip,
-      onPress: onPress,
-      child: Icon(icon),
+    child: touchBox(
+      context,
+      square: true,
+      FButton.icon(
+        variant: FButtonVariant.ghost,
+        size: compact ? FButtonSizeVariant.xs : FButtonSizeVariant.sm,
+        semanticsLabel: tooltip,
+        onPress: onPress,
+        child: Icon(icon),
+      ),
     ),
   );
 }

@@ -228,16 +228,19 @@ class _Filters extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    Widget toggle(String label, TaskFilter v) => FButton(
-      key: Key('tasks-filter-${v.name}'),
-      variant: state.taskFilter == v
-          ? FButtonVariant.secondary
-          : FButtonVariant.outline,
-      size: FButtonSizeVariant.xs,
-      mainAxisSize: MainAxisSize.min,
-      selected: state.taskFilter == v,
-      onPress: () => state.setTaskFilter(v),
-      child: Text(label),
+    Widget toggle(String label, TaskFilter v) => touchBox(
+      context,
+      FButton(
+        key: Key('tasks-filter-${v.name}'),
+        variant: state.taskFilter == v
+            ? FButtonVariant.secondary
+            : FButtonVariant.outline,
+        size: FButtonSizeVariant.xs,
+        mainAxisSize: MainAxisSize.min,
+        selected: state.taskFilter == v,
+        onPress: () => state.setTaskFilter(v),
+        child: Text(label),
+      ),
     );
     // Folders (any depth) the scope filter can pick, indented like the tree.
     final folders = <(String, String, int)>[];
