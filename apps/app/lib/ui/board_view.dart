@@ -125,6 +125,7 @@ class BoardView extends StatelessWidget {
           ),
           Expanded(
             child: ListView(
+              padding: EdgeInsets.only(bottom: fabInset(context)),
               scrollCacheExtent: navCacheExtent,
               children: [
                 for (final n in notes)
@@ -146,7 +147,8 @@ class BoardView extends StatelessWidget {
         key: const Key('board-accordion'),
         shrinkWrap: embedded,
         physics: embedded ? const NeverScrollableScrollPhysics() : null,
-        padding: EdgeInsets.all(gap),
+        padding: EdgeInsets.all(gap)
+            .copyWith(bottom: gap + (embedded ? 0 : fabInset(context))),
         children: [
           for (final (name, notes) in cols)
             _drop(

@@ -26,6 +26,11 @@ Tokens tokensOf(BuildContext context) =>
 bool narrowLayout(BuildContext context) =>
     MediaQuery.sizeOf(context).width < Tokens.wideBreakpoint;
 
+/// Bottom room a scrollable leaves for the floating + button: [SizeTokens.fabClearance]
+/// on the narrow layout, 0 on wide.
+double fabInset(BuildContext context) =>
+    narrowLayout(context) ? tokensOf(context).sizes.fabClearance : 0;
+
 /// Wraps a button so it is at least [Tokens.sizes] touchTarget tall (and wide
 /// when [square]) on the narrow layout; unchanged on desktop. Tight
 /// constraints make the button itself fill the box, so the whole box is its

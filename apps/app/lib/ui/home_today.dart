@@ -31,8 +31,18 @@ const _maxRows = 6;
 // filter, the Board folder scope): it shows literally today's items.
 
 class HomeToday extends StatefulWidget {
-  const HomeToday({super.key, required this.state, this.now});
+  const HomeToday({
+    super.key,
+    required this.state,
+    this.now,
+    this.capStacked = false,
+  });
   final AppState state;
+
+  /// The split Home (600 to 880): stacked cards are capped to 40% of the
+  /// screen height and scroll inside, so the board below keeps room. Off on
+  /// the phone Home, where everything scrolls as one.
+  final bool capStacked;
 
   /// Clock override for tests (a function so the time can advance).
   final DateTime Function()? now;
@@ -47,7 +57,18 @@ class _HomeTodayState extends State<HomeToday> {
   AppState get state => widget.state;
   final _rows = <NavEntry>[];
   static const _prefKey = 'davdart.home.today.collapsed.v1';
+  // The one source of truth for the collapsed state; the section is
+  // controlled by it.
   late bool _collapsed = state.prefs?.read(_prefKey) == 'true';
+
+  void _setCollapsed(bool c) {
+    setState(() => _collapsed = c);
+    if (c) {
+      state.prefs?.write(_prefKey, 'true');
+    } else {
+      state.prefs?.remove(_prefKey);
+    }
+  }
 
   NavEntry _entry(String id, String uid, String block) => NavEntry(
     id,
@@ -122,58 +143,71 @@ class _HomeTodayState extends State<HomeToday> {
         ];
         state.nav.publishHome('today', List.of(_rows));
         return ContentCap(
-          child: CollapsibleSection(
-            id: 'today-section',
-            title: 'Today',
-            prefs: state.prefs,
-            prefKey: _prefKey,
-            initiallyCollapsed: _collapsed,
-            onChanged: (c) => setState(() => _collapsed = c),
-            headerPadding: EdgeInsets.fromLTRB(
-              t.space.lg,
-              t.space.md,
-              t.space.lg,
-              0,
-            ),
-            child: Padding(
-              key: const Key('home-today'),
-              padding: EdgeInsets.fromLTRB(
-                t.space.lg,
-                t.space.sm,
-                t.space.lg,
-                0,
-              ),
-              child: LayoutBuilder(
-                builder: (context, c) {
-                  final gap = t.space.lg;
-                  state.nav.homeStacked = c.maxWidth < Tokens.stackBreakpoint;
-                  if (c.maxWidth < Tokens.stackBreakpoint) {
-                    // Stacked cards; on a phone Home they scroll with the
-                    // board in one scroll view (see app.dart).
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (var i = 0; i < cards.length; i++) ...[
-                          if (i > 0) SizedBox(height: gap),
-                          cards[i],
-                        ],
-                      ],
-                    );
-                  }
-                  return IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        for (var i = 0; i < cards.length; i++) ...[
-                          if (i > 0) SizedBox(width: gap),
-                          Expanded(child: cards[i]),
-                        ],
-                      ],
+          child: LayoutBuilder(
+            builder: (context, outer) {
+              // Known even while the section is collapsed.
+              final stacked =
+                  outer.maxWidth - 2 * t.space.lg < Tokens.stackBreakpoint;
+              state.nav.homeStacked = stacked;
+              final gap = t.space.lg;
+              Widget body;
+              if (stacked) {
+                // Stacked cards; on a phone Home they scroll with the
+                // board in one scroll view (see app.dart).
+                body = Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (var i = 0; i < cards.length; i++) ...[
+                      if (i > 0) SizedBox(height: gap),
+                      cards[i],
+                    ],
+                  ],
+                );
+                if (widget.capStacked) {
+                  body = ConstrainedBox(
+                    key: const Key('home-today-cap'),
+                    constraints: BoxConstraints(
+                      maxHeight: MediaQuery.sizeOf(context).height * 0.4,
                     ),
+                    child: SingleChildScrollView(child: body),
                   );
-                },
-              ),
-            ),
+                }
+              } else {
+                body = IntrinsicHeight(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      for (var i = 0; i < cards.length; i++) ...[
+                        if (i > 0) SizedBox(width: gap),
+                        Expanded(child: cards[i]),
+                      ],
+                    ],
+                  ),
+                );
+              }
+              return CollapsibleSection(
+                id: 'today-section',
+                title: 'Today',
+                collapsed: _collapsed,
+                onChanged: _setCollapsed,
+                headerPadding: EdgeInsets.fromLTRB(
+                  t.space.lg,
+                  t.space.md,
+                  t.space.lg,
+                  0,
+                ),
+                child: Padding(
+                  key: const Key('home-today'),
+                  padding: EdgeInsets.fromLTRB(
+                    t.space.lg,
+                    t.space.sm,
+                    t.space.lg,
+                    0,
+                  ),
+                  child: body,
+                ),
+              );
+            },
           ),
         );
       },

@@ -355,12 +355,13 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
                       children: [
                         HomeToday(state: state),
                         homeBoard(embedded: true),
+                        SizedBox(height: fabInset(context)),
                       ],
                     ),
                   ),
                 )
               else if (state.activeTab == null) ...[
-                HomeToday(state: state),
+                HomeToday(state: state, capStacked: narrowLayout(context)),
                 Flexible(child: homeBoard()),
               ] else
                 Expanded(
@@ -516,16 +517,26 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
                   ),
                 ),
                 if (!_menuOpen && !_gridOpen) ...[
-                  Positioned(
-                    right: t.space.lg,
-                    bottom: t.space.lg,
-                    child: AddFab(state: state),
-                  ),
+                  // Not over an open item (full screen on narrow, it has its
+                  // own actions) and not while the keyboard is up.
+                  if (mainNote == null &&
+                      !hasDetail &&
+                      MediaQuery.viewInsetsOf(context).bottom == 0)
+                    Positioned(
+                      right: t.space.lg,
+                      bottom: t.space.lg,
+                      child: AddFab(state: state),
+                    ),
                   // The left edge: a short drag or a fling from it opens the
                   // side menu. The horizontal recogniser leaves taps and
                   // vertical scrolls to what is underneath.
+                  // It starts past the system back gesture inset, so Android's
+                  // back swipe keeps the very edge. Over a task row the strip
+                  // wins the drag (it is the upper layer and claims first), so a
+                  // swipe from inside it opens the menu and one starting further
+                  // right completes the task.
                   Positioned(
-                    left: 0,
+                    left: MediaQuery.systemGestureInsetsOf(context).left,
                     top: 0,
                     bottom: 0,
                     width: t.sizes.edgeSwipe,

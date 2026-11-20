@@ -45,6 +45,7 @@ class NoteListView extends StatelessWidget {
       );
     }
     final list = ListView.separated(
+      padding: EdgeInsets.only(bottom: fabInset(context)),
       itemCount: rows.length,
       separatorBuilder: (_, _) =>
           Container(height: t.borders.hairline, color: t.divider),

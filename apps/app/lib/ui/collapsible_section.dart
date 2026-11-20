@@ -26,6 +26,7 @@ class CollapsibleSection extends StatefulWidget {
     this.initiallyCollapsed = false,
     this.leading,
     this.onChanged,
+    this.collapsed,
   });
   final String id;
   final String title;
@@ -46,6 +47,10 @@ class CollapsibleSection extends StatefulWidget {
 
   /// Called with the new collapsed state after a toggle.
   final ValueChanged<bool>? onChanged;
+
+  /// When set, the caller owns the collapsed state (and its persistence):
+  /// the section shows it and only reports a toggle through [onChanged].
+  final bool? collapsed;
   final Widget child;
 
   @override
@@ -57,7 +62,13 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
       ? widget.prefs?.read(widget.prefKey!) == 'true'
       : widget.initiallyCollapsed;
 
+  bool get _isCollapsed => widget.collapsed ?? _collapsed;
+
   void _toggle() {
+    if (widget.collapsed != null) {
+      widget.onChanged?.call(!widget.collapsed!);
+      return;
+    }
     setState(() => _collapsed = !_collapsed);
     widget.onChanged?.call(_collapsed);
     final k = widget.prefKey;
@@ -73,7 +84,7 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final title = widget.upper ? widget.title.toUpperCase() : widget.title;
-    final fill = widget.fill && !_collapsed;
+    final fill = widget.fill && !_isCollapsed;
     return Column(
       mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -85,7 +96,7 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
             child: FTappable(
               key: Key('${widget.id}-toggle'),
               semanticsLabel:
-                  '${_collapsed ? 'Expand' : 'Collapse'} ${widget.title}',
+                  '${_isCollapsed ? 'Expand' : 'Collapse'} ${widget.title}',
               onPress: _toggle,
               child: ConstrainedBox(
                 constraints: BoxConstraints(
@@ -95,7 +106,7 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      _collapsed
+                      _isCollapsed
                           ? FLucideIcons.chevronRight
                           : FLucideIcons.chevronDown,
                       size: t.icons.lg,
@@ -128,7 +139,7 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
             ),
           ),
         ),
-        if (!_collapsed) fill ? Expanded(child: widget.child) : widget.child,
+        if (!_isCollapsed) fill ? Expanded(child: widget.child) : widget.child,
       ],
     );
   }

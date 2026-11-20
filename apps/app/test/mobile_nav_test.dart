@@ -180,6 +180,70 @@ void main() {
         _noError(t);
       });
 
+      testWidgets('the + hides on an open item and while the keyboard is up', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(
+          t,
+          notes: [_note('n1', 'Alpha')],
+          size: size,
+        );
+        expect(_k('bar-add'), findsOneWidget);
+        await s.openNote('n1');
+        await t.pumpAndSettle();
+        expect(_k('main-note'), findsOneWidget);
+        expect(_k('bar-add'), findsNothing);
+        await s.activateTab(null);
+        await t.pumpAndSettle();
+        expect(_k('bar-add'), findsOneWidget);
+        t.view.viewInsets = const FakeViewPadding(bottom: 250);
+        addTearDown(t.view.resetViewInsets);
+        await t.pumpAndSettle();
+        expect(_k('bar-add'), findsNothing);
+      });
+
+      testWidgets('Home leaves room under its last row for the +', (t) async {
+        await pumpTasksApp(
+          t,
+          notes: [
+            for (var i = 0; i < 30; i++)
+              Note(
+                uid: 'n$i',
+                summary: 'Note $i',
+                description: 'status: doing\n\nx',
+              ),
+          ],
+          size: size,
+        );
+        await t.fling(_k('home-scroll'), const Offset(0, -4000), 4000);
+        await t.pumpAndSettle();
+        final last = t.getRect(find.text('Note 29')).bottom;
+        expect(last, lessThanOrEqualTo(t.getRect(_k('bar-add')).top));
+      });
+
+      testWidgets('edge strip beats a task swipe inside 32dp, not beyond', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(
+          t,
+          tasks: [mkTask('k1', summary: 'Pay rent', days: 0)],
+          size: size,
+        );
+        final y = t.getCenter(_k('home-today-tasks-k1')).dy;
+        // Inside the strip: the menu opens, the task stays open.
+        await t.dragFrom(Offset(6, y), const Offset(200, 0));
+        await t.pumpAndSettle();
+        expect(_k('side-menu'), findsOneWidget);
+        expect(s.taskById('k1')!.isClosed, isFalse);
+        await t.tap(_k('menu-logo'));
+        await t.pumpAndSettle();
+        // Further right: the task completes, no menu.
+        await t.dragFrom(Offset(80, y), const Offset(220, 0));
+        await t.pumpAndSettle();
+        expect(s.taskById('k1')!.isClosed, isTrue);
+        expect(_k('side-menu'), findsNothing);
+      });
+
       testWidgets('the covered page is out of focus and semantics', (t) async {
         await pumpTasksApp(t, size: size);
         await _openMenu(t);

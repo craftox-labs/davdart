@@ -316,4 +316,24 @@ void main() {
     await t.pumpAndSettle();
     expect(_k('home-today'), findsOneWidget);
   });
+
+  testWidgets('homeStacked is kept while Today is collapsed; one state', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(t, size: const Size(400, 800));
+    await t.tap(_k('today-section-toggle'));
+    await t.pumpAndSettle();
+    expect(_k('home-today'), findsNothing);
+    expect(s.nav.homeStacked, isTrue);
+    // The pref is written once, by the owner, and read back on a rebuild.
+    expect(s.prefs?.read('davdart.home.today.collapsed.v1'), 'true');
+    t.view.physicalSize = const Size(1280, 900);
+    await t.pumpAndSettle();
+    expect(s.nav.homeStacked, isFalse);
+    expect(_k('home-today'), findsNothing);
+    await t.tap(_k('today-section-toggle'));
+    await t.pumpAndSettle();
+    expect(_k('home-today'), findsOneWidget);
+    expect(s.prefs?.read('davdart.home.today.collapsed.v1'), isNull);
+  });
 }

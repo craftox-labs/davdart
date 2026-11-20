@@ -252,6 +252,7 @@ class SizeTokens {
     this.touchTarget = 44,
     this.spaceChipMax = 140,
     this.edgeSwipe = 32,
+    this.fabClearance = 84,
   });
 
   /// Edge of the logo on the first-run screen (and other large uses).
@@ -317,6 +318,10 @@ class SizeTokens {
   /// Narrow layout: widest the Space chip in the top bar gets, and the width
   /// of the left-edge zone whose swipe opens the side menu.
   final double spaceChipMax, edgeSwipe;
+
+  /// Narrow layout: bottom room scrollables leave so the floating + button
+  /// never covers the last row.
+  final double fabClearance;
 }
 
 /// Design tokens shared with the web board (apps/web/lib/web_app.dart). One
