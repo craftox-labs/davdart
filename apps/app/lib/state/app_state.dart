@@ -425,11 +425,12 @@ class AppState extends ChangeNotifier {
   /// Whether the open Space belongs to the account (its notes sync).
   bool get currentOnServer => catalog?.currentInfo?.onServer ?? false;
 
-  /// Renames the open Space (on the server too for an account Space).
+  /// Renames Space [id] (default: the open one) without switching to it; on
+  /// the server too for an account Space.
   /// Returns null when done, else why not.
-  Future<String?> renameSpace(String name) async {
+  Future<String?> renameSpace(String name, {String? id}) async {
     final c = catalog;
-    final id = c?.current;
+    id ??= c?.current;
     if (c == null || id == null) return 'No spaces here';
     final err = await c.renameSpace(id, name);
     if (err == null) notifyListeners();

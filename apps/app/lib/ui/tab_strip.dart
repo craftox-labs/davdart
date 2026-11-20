@@ -228,12 +228,25 @@ class _ReorderableTab extends StatelessWidget {
       item = ActionContextMenu(
         groups: [
           [
+            NoteMenuItem(
+              'Open view',
+              FLucideIcons.bookmark,
+              () => state.activateTab(tab),
+              key: const Key('menu-tab-open-view'),
+            ),
             if (view != null && state.editable)
               NoteMenuItem(
                 'Rename view…',
                 FLucideIcons.pencil,
                 () => showRenameViewDialog(context, state, view),
                 key: const Key('menu-tab-rename-view'),
+              ),
+            if (view != null && state.editable)
+              NoteMenuItem(
+                'Remove view',
+                FLucideIcons.trash2,
+                () => state.deleteView(view.name),
+                key: const Key('menu-tab-delete-view'),
               ),
           ],
           [

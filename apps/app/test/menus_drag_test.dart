@@ -459,6 +459,47 @@ void main() {
     });
   });
 
+  group('renaming and view tab menus', () {
+    testWidgets('renaming a non-current Space does not switch to it', (
+      t,
+    ) async {
+      final storage = MemoryStorage();
+      final c = catalogWithPlanning(storage, planningSeed: _Seed());
+      final other = c.add('Other');
+      final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
+      await _pump(t, state: s);
+      final before = c.current;
+      await t.tap(_k('rail-spaces'));
+      await t.pumpAndSettle();
+      await t.tap(_k('space-${other.id}'), buttons: kSecondaryButton);
+      await t.pumpAndSettle();
+      await t.tap(_k('menu-space-rename-${other.id}'));
+      await t.pumpAndSettle();
+      await t.enterText(_k('space-rename-name'), 'Renamed');
+      await t.tap(_k('space-rename'));
+      await t.pumpAndSettle();
+      expect(c.current, before);
+      expect(c.spaces.firstWhere((x) => x.id == other.id).name, 'Renamed');
+    });
+
+    testWidgets('a view tab menu opens, renames and removes the view', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      s.setQuery('Alpha');
+      await t.runAsync(() => s.saveView('Vw'));
+      s.applyView(s.savedViews.single);
+      await t.pumpAndSettle();
+      await t.tap(find.text('Vw'), buttons: kSecondaryButton);
+      await t.pumpAndSettle();
+      expect(_k('menu-tab-open-view'), findsOneWidget);
+      expect(_k('menu-tab-rename-view'), findsOneWidget);
+      await t.tap(_k('menu-tab-delete-view'));
+      await t.pumpAndSettle();
+      expect(s.savedViews, isEmpty);
+    });
+  });
+
   group('closeAllTabs', () {
     test('stops when the unsaved-changes prompt cancels a close', () async {
       final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());

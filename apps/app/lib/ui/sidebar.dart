@@ -200,14 +200,14 @@ List<FItemGroup> spaceMenuGroups(
                         },
                         key: Key('menu-space-switch-${sp.id}'),
                       ),
-                    NoteMenuItem('Rename…', FLucideIcons.pencil, () async {
-                      if (sp.id != state.currentSpaceId &&
-                          !await state.switchSpace(sp.id)) {
-                        return;
-                      }
-                      if (!context.mounted) return;
+                    NoteMenuItem('Rename…', FLucideIcons.pencil, () {
                       onPick?.call();
-                      showRenameSpaceDialog(context, state);
+                      showRenameSpaceDialog(
+                        context,
+                        state,
+                        id: sp.id,
+                        currentName: sp.name,
+                      );
                     }, key: Key('menu-space-rename-${sp.id}')),
                   ],
                 ],

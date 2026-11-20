@@ -48,13 +48,20 @@ Future<void> showNewSpaceDialog(BuildContext context, AppState state) {
   );
 }
 
-/// Renames the open Space.
-Future<void> showRenameSpaceDialog(BuildContext context, AppState state) {
-  final name = TextEditingController(text: state.currentSpaceName ?? '');
+/// Renames Space [id] (default: the open one) in place, never switching.
+Future<void> showRenameSpaceDialog(
+  BuildContext context,
+  AppState state, {
+  String? id,
+  String? currentName,
+}) {
+  final name = TextEditingController(
+    text: id == null ? state.currentSpaceName ?? '' : currentName ?? '',
+  );
   String? error;
   void Function(void Function())? setError;
   Future<void> submit(BuildContext ctx) async {
-    final err = await state.renameSpace(name.text);
+    final err = await state.renameSpace(name.text, id: id);
     if (!ctx.mounted) return;
     if (err == null) {
       Navigator.of(ctx).pop();
