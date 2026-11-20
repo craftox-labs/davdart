@@ -214,6 +214,7 @@ class SizeTokens {
     this.spinner = 14,
     this.statusField = 160,
     this.metaLabel = 104,
+    this.eventTime = 56,
     this.chevronBox = 20,
     this.listChevronBox = 24,
     this.listMarker = 22,
@@ -264,7 +265,8 @@ class SizeTokens {
       statusDot,
       spinner,
       statusField,
-      metaLabel;
+      metaLabel,
+      eventTime;
   final double chevronBox, listChevronBox, listMarker;
   final double treeIndent, listIndent;
   final double dialogSm, dialog, dialogMd, dialogLg, dialogXl;

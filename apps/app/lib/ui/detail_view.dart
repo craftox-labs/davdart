@@ -11,6 +11,7 @@ import 'parts.dart';
 import 'theme.dart';
 import 'move_space_dialog.dart';
 import 'note_editor.dart';
+import 'event_detail.dart';
 import 'task_detail.dart';
 
 class DetailView extends StatelessWidget {
@@ -41,6 +42,15 @@ class DetailView extends StatelessWidget {
     final t = tokensOf(context);
     final note = state.tree.find(uid)?.note;
     if (note == null) {
+      if (state.eventById(uid) != null) {
+        return EventDetail(
+          state: state,
+          uid: uid,
+          onClose: onClose,
+          full: full,
+          inHeader: inHeader,
+        );
+      }
       if (state.taskById(uid) == null) return const SizedBox.shrink();
       return TaskDetail(
         state: state,

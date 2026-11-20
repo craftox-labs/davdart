@@ -232,7 +232,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     // Once the slide-out is over the held note is let go.
     if (!hasDetail && _peek.value == 0) _heldPeek = null;
     final peekUid = state.peekUid ?? _heldPeek;
-    final mainNote = state.mainNoteUid ?? state.mainTaskUid;
+    final mainNote = state.mainItemUid;
     final mirror = state.layoutSide == LayoutSide.end;
 
     Widget main() => state.noSpace
@@ -638,11 +638,12 @@ class TopBar extends StatelessWidget {
   /// Left side of the row: the breadcrumb on Home and view tabs, the note's
   /// title where a note fills the main area (narrow layouts).
   Widget _lead(Tokens t) {
-    final uid = state.mainNoteUid ?? state.mainTaskUid;
+    final uid = state.mainItemUid;
     if (uid != null) {
       return Text(
         state.tree.find(uid)?.note.summary ??
             state.taskById(uid)?.summary ??
+            state.eventById(uid)?.summary ??
             '',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,

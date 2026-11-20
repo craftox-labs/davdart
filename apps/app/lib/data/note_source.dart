@@ -104,8 +104,10 @@ class SpaceNoteSource implements EditableNoteSource {
     this.account,
     this.pendingPath,
     TaskStore? taskStore,
+    EventStore? eventStore,
   }) : davBase = davBase ?? Uri.base.resolve('/dav/'),
-       taskStore = taskStore ?? MemoryTaskStore() {
+       taskStore = taskStore ?? MemoryTaskStore(),
+       eventStore = eventStore ?? MemoryEventStore() {
     final saved = flags?.read(loginKey);
     if (saved != null && saved.isNotEmpty) {
       try {
@@ -120,6 +122,7 @@ class SpaceNoteSource implements EditableNoteSource {
         final client = _clientFor(j['path'] as String, user, pw);
         space.connectExisting(client);
         _useTaskClient(client);
+        _useEventClient(client);
       } catch (_) {
         flags?.write(loginKey, '');
       }
@@ -187,6 +190,63 @@ class SpaceNoteSource implements EditableNoteSource {
       }
     }
     await _clearTaskToken();
+  }
+
+  /// The Space's events (VEVENT in the same collection as its notes).
+  final EventStore eventStore;
+  EventSyncEngine? _eventEngine;
+  CalDavClient? _eventClient;
+
+  void _useEventClient(CalDavClient? c) {
+    _eventClient = c;
+    _eventEngine = null;
+  }
+
+  EventSyncEngine get _events => _eventEngine ??= EventSyncEngine(
+    _eventClient ??
+        CalDavClient(
+          collection: Uri.parse('http://localhost/'),
+          username: '',
+          password: '',
+        ),
+    eventStore,
+  );
+
+  Future<List<Event>> loadEvents() => _events.events();
+  Future<Event> saveEvent(Event e) => _events.save(e);
+  Future<void> deleteEvent(String uid) => _events.delete(uid);
+
+  /// Syncs the events with the server; null for a local Space. Independent of
+  /// the notes' and tasks' sync: a failure here is non-fatal for them.
+  Future<SyncReport?> syncEvents() async {
+    if (_eventClient == null) return null;
+    return _events.sync();
+  }
+
+  Future<List<Revision>> eventRevisions(String uid) =>
+      eventStore.revisions(uid);
+
+  Future<void> _clearEventToken() async {
+    if (await eventStore.getSyncToken() != null) {
+      await eventStore.setSyncToken(null);
+    }
+  }
+
+  /// Like [Space.attach] for events: every event counts as not yet on the
+  /// server, so the first sync sends them and merges by UID.
+  Future<void> _attachEvents() async {
+    for (final s in await eventStore.all()) {
+      s.base = null;
+      s.local.href = null;
+      s.local.etag = null;
+      s.dirty = !s.deleted;
+      if (s.deleted) {
+        await eventStore.remove(s.local.uid);
+      } else {
+        await eventStore.put(s.local.uid, s);
+      }
+    }
+    await _clearEventToken();
   }
 
   /// Set for a Space that belongs to the signed-in account.
@@ -266,6 +326,10 @@ class SpaceNoteSource implements EditableNoteSource {
         await taskStore.remove(t.local.uid);
       }
       await _clearTaskToken();
+      for (final e in await eventStore.all()) {
+        await eventStore.remove(e.local.uid);
+      }
+      await _clearEventToken();
       _markSeeded();
     }
     // Reconnecting to the collection this Space last synced with keeps the
@@ -279,8 +343,10 @@ class SpaceNoteSource implements EditableNoteSource {
     } else {
       await space.attach(client);
       await _attachTasks();
+      await _attachEvents();
     }
     _useTaskClient(client);
+    _useEventClient(client);
     flags?.write(lastServerKey, client.collection.toString());
     _login = (path, user);
     flags?.write(
@@ -297,6 +363,8 @@ class SpaceNoteSource implements EditableNoteSource {
     await space.detach();
     _useTaskClient(null);
     await _clearTaskToken();
+    _useEventClient(null);
+    await _clearEventToken();
     _login = null;
     flags?.write(loginKey, '');
   }
@@ -340,6 +408,9 @@ class SpaceNoteSource implements EditableNoteSource {
       if (e.dirty || e.deleted) n++;
     }
     for (final e in await taskStore.all()) {
+      if (e.dirty || e.deleted) n++;
+    }
+    for (final e in await eventStore.all()) {
       if (e.dirty || e.deleted) n++;
     }
     return n;

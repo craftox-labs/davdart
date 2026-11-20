@@ -43,7 +43,7 @@ void main() {
       await _end(t);
     });
 
-    testWidgets('Events is a placeholder with an empty state', (t) async {
+    testWidgets('Events shows an empty state without events', (t) async {
       await pumpTasksApp(t);
       await t.tap(_k('rail-events'));
       await t.pumpAndSettle();

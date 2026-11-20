@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'key_value_storage.dart';
 import 'note_source.dart';
 import 'persistent_store.dart';
+import 'persistent_event_store.dart';
 import 'persistent_task_store.dart';
 
 class SpaceInfo {
@@ -147,6 +148,12 @@ class SpaceCatalog {
   static const legacyTaskKeys = [
     'davdart.tasks.v1',
     'davdart.tasks.v1.unreadable',
+  ];
+
+  /// The legacy Planning Space's event keys (same rule as the task keys).
+  static const legacyEventKeys = [
+    'davdart.events.v1',
+    'davdart.events.v1.unreadable',
   ];
 
   /// Whether this device holds data of the legacy Planning Space.
@@ -406,7 +413,7 @@ class SpaceCatalog {
     if (at < 0) return false;
     _deleted.add(id);
     if (id == planningId) {
-      for (final k in [...legacyKeys, ...legacyTaskKeys]) {
+      for (final k in [...legacyKeys, ...legacyTaskKeys, ...legacyEventKeys]) {
         storage.remove(k);
       }
     } else {
@@ -458,6 +465,10 @@ class SpaceCatalog {
       taskStore: PersistentTaskStore(
         scoped,
         key: id == planningId ? 'davdart.tasks.v1' : 'tasks.v1',
+      ),
+      eventStore: PersistentEventStore(
+        scoped,
+        key: id == planningId ? 'davdart.events.v1' : 'events.v1',
       ),
       account: info.onServer ? account : null,
       pendingPath: info.collection,

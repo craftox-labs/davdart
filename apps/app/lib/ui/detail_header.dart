@@ -5,6 +5,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../state/note_drag.dart';
+import 'event_menu.dart';
 import 'note_menu.dart';
 import 'parts.dart';
 import 'tab_strip.dart';
@@ -34,14 +35,16 @@ class DetailHeader extends StatelessWidget {
     final uid = state.peekUid;
     final note = state.peek;
     final task = state.peekTask;
-    final name = note?.summary ?? task?.summary ?? '';
+    final event = state.peekEvent;
+    final name = note?.summary ?? task?.summary ?? event?.summary ?? '';
     final title = name.isEmpty ? 'Details' : name;
     final draft = state.draft;
     final taskDraft = uid == null ? null : state.taskDraftFor(uid);
+    final eventDraft = uid == null ? null : state.eventDraftFor(uid);
     final tab = Expanded(
       child: ListenableBuilder(
         // The dirty dot follows the open edit, which notifies on its own.
-        listenable: Listenable.merge([state, ?draft, ?taskDraft]),
+        listenable: Listenable.merge([state, ?draft, ?taskDraft, ?eventDraft]),
         builder: (context, _) => Padding(
           padding: EdgeInsets.only(left: 0, right: 0),
           child: LayoutBuilder(
@@ -49,6 +52,8 @@ class DetailHeader extends StatelessWidget {
               final w = math.min(c.maxWidth, t.sizes.tabMax);
               final icon = task != null
                   ? FLucideIcons.listTodo
+                  : event != null
+                  ? FLucideIcons.calendarDays
                   : note != null && AppState.isFolder(note)
                   ? FLucideIcons.folder
                   : FLucideIcons.fileText;
@@ -56,6 +61,13 @@ class DetailHeader extends StatelessWidget {
                   ? child
                   : task != null
                   ? TaskContextMenu(
+                      state: state,
+                      uid: uid,
+                      surface: NoteSurface.peekTab,
+                      child: child,
+                    )
+                  : event != null
+                  ? EventContextMenu(
                       state: state,
                       uid: uid,
                       surface: NoteSurface.peekTab,
@@ -106,7 +118,9 @@ class DetailHeader extends StatelessWidget {
                       active: true,
                       dirty:
                           state.dirty ||
-                          (uid != null && state.dirtyTaskFor(uid)),
+                          (uid != null &&
+                              (state.dirtyTaskFor(uid) ||
+                                  state.dirtyEventFor(uid))),
                       // A double click promotes the peek to the main area.
                       onPress: () => state.clickOpenNote(uid ?? ''),
                       onClose: () => state.guarded(() => state.select(null)),
@@ -177,7 +191,7 @@ class PeekExpandButton extends StatelessWidget {
     child: IconAction(
       key: const Key('peek-expand'),
       tooltip:
-          'Show ${state.peek?.summary ?? state.peekTask?.summary ?? 'note'}',
+          'Show ${state.peek?.summary ?? state.peekTask?.summary ?? state.peekEvent?.summary ?? 'note'}',
       icon: mirror ? FLucideIcons.panelLeftOpen : FLucideIcons.panelRightOpen,
       onPress: () => state.setPeekCollapsed(false),
     ),

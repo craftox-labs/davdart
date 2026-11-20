@@ -505,8 +505,8 @@ void main() {
       final client = MockClient((r) async {
         if (r.method == 'REPORT' && r.body.contains('sync-collection')) {
           passes++;
-          // each pass pulls notes first, then tasks
-          if (failTasks && passes.isEven) throw http.ClientException('boom');
+          // each pass pulls notes, then tasks, then events
+          if (failTasks && passes % 3 == 2) throw http.ClientException('boom');
         }
         return server.respond(r);
       });

@@ -45,7 +45,7 @@ class Sidebar extends StatelessWidget {
     final body = switch (section) {
       Section.notes => NotesSection(state: state, onPick: close),
       Section.tasks => TasksPanel(state: state, onPick: close),
-      Section.events => const EventsPanel(),
+      Section.events => EventsPanel(state: state, onPick: close),
       Section.views => ViewsSection(state: state, onPick: close),
       Section.search => SearchSection(state: state, onPick: close),
       Section.account => AccountSection(state: state, onPick: close),
@@ -119,7 +119,9 @@ Future<void> _dropOnSpace(
   final node = state.tree.find(uid);
   if (node == null) {
     final task = state.taskById(uid);
-    if (task == null) return;
+    final event = task == null ? state.eventById(uid) : null;
+    final name = task?.summary ?? event?.summary;
+    if (name == null) return;
     controller.hide();
     final n = await state.moveToSpace(uid, sp.id);
     if (!context.mounted) return;
@@ -127,10 +129,10 @@ Future<void> _dropOnSpace(
       context: context,
       title: Text(
         n == null
-            ? (state.error ?? 'Could not move "${task.summary}"')
+            ? (state.error ?? 'Could not move "$name"')
             : n == 1
-            ? 'Moved "${task.summary}" to "${sp.name}"'
-            : 'Moved $n tasks to "${sp.name}"',
+            ? 'Moved "$name" to "${sp.name}"'
+            : 'Moved $n items to "${sp.name}"',
       ),
     );
     return;

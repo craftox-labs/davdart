@@ -8,6 +8,7 @@ import 'package:flutter/gestures.dart' show kMiddleMouseButton;
 import '../state/app_state.dart';
 import '../state/note_drag.dart';
 import '../state/tab_state.dart';
+import 'event_menu.dart';
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
 import 'save_view_dialog.dart';
@@ -47,6 +48,7 @@ class TabStrip extends StatelessWidget {
         state,
         ...state.drafts,
         ...state.taskDrafts,
+        ...state.eventDrafts,
       ]),
       builder: (context, _) {
         final tabs = state.tabs;
@@ -214,6 +216,8 @@ class _ReorderableTab extends StatelessWidget {
           ? FLucideIcons.bookmark
           : tab.kind == TabKind.task
           ? FLucideIcons.listTodo
+          : tab.kind == TabKind.event
+          ? FLucideIcons.calendarDays
           : state.tabIsFolder(tab)
           ? FLucideIcons.folder
           : FLucideIcons.fileText,
@@ -232,6 +236,13 @@ class _ReorderableTab extends StatelessWidget {
       );
     } else if (tab.kind == TabKind.task) {
       item = TaskContextMenu(
+        state: state,
+        uid: tab.id,
+        surface: NoteSurface.mainTab,
+        child: item,
+      );
+    } else if (tab.kind == TabKind.event) {
+      item = EventContextMenu(
         state: state,
         uid: tab.id,
         surface: NoteSurface.mainTab,

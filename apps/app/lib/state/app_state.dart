@@ -9,6 +9,8 @@ import '../data/note_source.dart';
 import '../data/space_catalog.dart';
 import 'note_draft.dart';
 import 'tab_state.dart';
+import 'event_draft.dart';
+import 'event_rules.dart';
 import 'task_draft.dart';
 import 'task_rules.dart';
 
@@ -99,13 +101,14 @@ class SavedView {
 
 /// A note found by a search across every Space.
 class SpaceHit {
-  const SpaceHit(this.space, this.note, {this.task});
+  const SpaceHit(this.space, this.note, {this.task, this.event});
 
   /// A hit on a task: [note] is a stand-in carrying its uid, title, text and
   /// tags so code that only reads those keeps working; [task] is the real
   /// item.
   SpaceHit.forTask(this.space, Task t)
     : task = t,
+      event = null,
       note = Note(
         uid: t.uid,
         summary: t.summary,
@@ -115,10 +118,27 @@ class SpaceHit {
         created: t.created,
         lastModified: t.lastModified,
       );
+
+  /// A hit on an event, built like [SpaceHit.forTask]: [event] is the real
+  /// item.
+  SpaceHit.forEvent(this.space, Event e)
+    : event = e,
+      task = null,
+      note = Note(
+        uid: e.uid,
+        summary: e.summary,
+        description: e.description,
+        categories: List.of(e.categories),
+        parentUid: e.parentUid,
+        created: e.created,
+        lastModified: e.lastModified,
+      );
   final SpaceInfo space;
   final Note note;
   final Task? task;
+  final Event? event;
   bool get isTask => task != null;
+  bool get isEvent => event != null;
 }
 
 /// Which edge of the window the shell's icon rail sits on.
@@ -174,8 +194,8 @@ class AppState extends ChangeNotifier {
   /// Returns false when nothing opened (unknown note, or the user chose to
   /// keep editing the peek draft).
   Future<bool> openNote(String uid, {OpenMode? mode}) async {
-    final isTask = _isTask(uid);
-    if (tree.find(uid) == null && !isTask) return false;
+    final isItem = _isTask(uid) || _isEvent(uid);
+    if (tree.find(uid) == null && !isItem) return false;
     if ((mode ?? openMode) == OpenMode.main) {
       _openTab(uid);
     } else if (_tabs.contains(_tabOf(uid)) || peekUid == uid) {
@@ -198,14 +218,33 @@ class AppState extends ChangeNotifier {
   /// A plain click on a task entry; same rules as [clickNote].
   Future<void> clickTask(String uid) => clickNote(uid);
 
+  /// Opens event [uid] like [openNote] (peek or main per the setting).
+  Future<bool> openEvent(String uid, {OpenMode? mode}) =>
+      _isEvent(uid) ? openNote(uid, mode: mode) : Future.value(false);
+
+  /// A plain click on an event entry; same rules as [clickNote].
+  Future<void> clickEvent(String uid) => clickNote(uid);
+
   /// True when [uid] names a task (and no note).
   bool _isTask(String uid) => tree.find(uid) == null && _taskById(uid) != null;
 
-  DocTab _tabOf(String uid) =>
-      _isTask(uid) ? DocTab.task(uid) : DocTab.note(uid);
+  /// True when [uid] names an event (and no note or task).
+  bool _isEvent(String uid) =>
+      tree.find(uid) == null &&
+      _taskById(uid) == null &&
+      _eventById(uid) != null;
 
-  void _openTab(String uid) =>
-      _isTask(uid) ? openTaskTab(uid) : openNoteTab(uid);
+  DocTab _tabOf(String uid) => _isTask(uid)
+      ? DocTab.task(uid)
+      : _isEvent(uid)
+      ? DocTab.event(uid)
+      : DocTab.note(uid);
+
+  void _openTab(String uid) => _isTask(uid)
+      ? openTaskTab(uid)
+      : _isEvent(uid)
+      ? openEventTab(uid)
+      : openNoteTab(uid);
 
   String? _clickUid;
   String? _clickSurface;
@@ -364,6 +403,7 @@ class AppState extends ChangeNotifier {
     if (!await _settleDrafts(_allDraftUids())) return false;
     _drafts.clear();
     _taskDrafts.clear();
+    _eventDrafts.clear();
     c.select(id);
     await _openCurrent();
     return true;
@@ -378,6 +418,8 @@ class AppState extends ChangeNotifier {
     notes = [];
     tasks = [];
     taskError = null;
+    events = [];
+    eventError = null;
     selectedTaskUid = null;
     taskFilter = TaskFilter.open;
     taskTagFilter = null;
@@ -498,6 +540,7 @@ class AppState extends ChangeNotifier {
     final synced = src is SpaceNoteSource ? await src.unsyncedCount() : 0;
     return _drafts.keys.where(dirtyFor).length +
         _taskDrafts.keys.where(dirtyTaskFor).length +
+        _eventDrafts.keys.where(dirtyEventFor).length +
         synced;
   }
 
@@ -517,6 +560,7 @@ class AppState extends ChangeNotifier {
       if (!await _settleDrafts(_allDraftUids())) return;
       _drafts.clear();
       _taskDrafts.clear();
+      _eventDrafts.clear();
     }
     prefs?.remove(viewsKey);
     prefs?.remove('$viewsKey.migrated');
@@ -528,8 +572,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Notes and tasks in any Space whose title or text contain [q]
-  /// (case-insensitive). Task hits have [SpaceHit.task] set.
+  /// Notes, tasks and events in any Space whose title or text contain [q]
+  /// (case-insensitive). Task hits have [SpaceHit.task] set, event hits
+  /// [SpaceHit.event].
   Future<List<SpaceHit>> searchAllSpaces(String q) async {
     final needle = q.trim().toLowerCase();
     final c = catalog;
@@ -538,12 +583,15 @@ class AppState extends ChangeNotifier {
     final cur = c.current; // snapshot: the user may switch while we search
     final curNotes = List.of(notes);
     final curTasks = List.of(tasks);
+    final curEvents = List.of(events);
     for (final sp in List.of(c.spaces)) {
       List<Note> list = const [];
       List<Task> taskList = const [];
+      List<Event> eventList = const [];
       if (sp.id == cur) {
         list = curNotes;
         taskList = curTasks;
+        eventList = curEvents;
       } else {
         final other = c.sourceFor(sp.id);
         try {
@@ -555,6 +603,11 @@ class AppState extends ChangeNotifier {
           taskList = await other.loadTasks();
         } catch (_) {
           // an unreadable task store never hides notes
+        }
+        try {
+          eventList = await other.loadEvents();
+        } catch (_) {
+          // nor does an unreadable event store
         }
       }
       for (final n in list) {
@@ -570,6 +623,13 @@ class AppState extends ChangeNotifier {
           hits.add(SpaceHit.forTask(sp, t));
         }
       }
+      for (final e in eventList) {
+        if (e.summary.toLowerCase().contains(needle) ||
+            e.description.toLowerCase().contains(needle) ||
+            e.location.toLowerCase().contains(needle)) {
+          hits.add(SpaceHit.forEvent(sp, e));
+        }
+      }
     }
     return hits;
   }
@@ -582,6 +642,10 @@ class AppState extends ChangeNotifier {
     if (h.isTask) {
       if (tasks.any((t) => t.uid == h.note.uid)) selectedTaskUid = h.note.uid;
       await openTask(h.note.uid, mode: mode);
+      return;
+    }
+    if (h.isEvent) {
+      await openEvent(h.note.uid, mode: mode);
       return;
     }
     await openNote(h.note.uid, mode: mode);
@@ -807,21 +871,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Moves note or task [uid] and everything under it to Space [targetId],
+  /// Moves note, task or event [uid] and everything under it to Space [targetId],
   /// at its top level. Under a note go its sub-notes and every task whose
   /// parent chain leads to it; under a task go its sub-tasks. The items are
   /// copied into the other Space first, checked, and removed here only after
   /// that worked, so a failure leaves a duplicate, never a loss. The copies
   /// get new ids; earlier versions stay behind. A server Space syncs the new
   /// items the next time it is opened. Returns how many items moved, or null
-  /// with [error] set. A repeating task with per-occurrence overrides is not
-  /// moved (the overrides carry the old id).
+  /// with [error] set. A repeating task or event with per-occurrence
+  /// overrides is not moved (the overrides carry the old id). Tasks under an
+  /// event go with it.
   Future<int?> moveToSpace(String uid, String targetId) async {
     final c = catalog;
     final src = source;
     final node = tree.find(uid);
     final rootTask = node == null ? _taskById(uid) : null;
-    if (c == null || (node == null && rootTask == null)) return null;
+    final rootEvent = node == null && rootTask == null ? _eventById(uid) : null;
+    if (c == null || (node == null && rootTask == null && rootEvent == null)) {
+      return null;
+    }
     if (src is! EditableNoteSource) return null;
     if (targetId == c.current || !c.spaces.any((s) => s.id == targetId)) {
       return null;
@@ -830,7 +898,11 @@ class AppState extends ChangeNotifier {
         ? <Note>[]
         : [node.note, ...tree.descendants(uid)];
     // Tasks under the group, parents before children.
-    final ids = {for (final n in noteGroup) n.uid, ?rootTask?.uid};
+    final ids = {
+      for (final n in noteGroup) n.uid,
+      ?rootTask?.uid,
+      ?rootEvent?.uid,
+    };
     final taskGroup = <Task>[?rootTask];
     for (var grew = true; grew;) {
       grew = false;
@@ -841,14 +913,23 @@ class AppState extends ChangeNotifier {
         grew = true;
       }
     }
-    if (taskGroup.isNotEmpty && src is! SpaceNoteSource) return null;
+    if ((taskGroup.isNotEmpty || rootEvent != null) &&
+        src is! SpaceNoteSource) {
+      return null;
+    }
+    if (rootEvent != null && rootEvent.siblingLines.isNotEmpty) {
+      error = 'A repeating event with changed occurrences cannot be moved yet.';
+      notifyListeners();
+      return null;
+    }
     if (taskGroup.any((t) => t.siblingLines.isNotEmpty)) {
       error = 'A repeating task with changed occurrences cannot be moved yet.';
       notifyListeners();
       return null;
     }
     final target = c.sourceFor(targetId);
-    final count = noteGroup.length + taskGroup.length;
+    final count =
+        noteGroup.length + taskGroup.length + (rootEvent == null ? 0 : 1);
     // Unsaved edits would be lost with the old items: settle them first.
     if (!await _settleDrafts([...ids])) return null;
     final stamp = DateTime.now().toUtc().microsecondsSinceEpoch;
@@ -870,6 +951,29 @@ class AppState extends ChangeNotifier {
             lastModified: DateTime.now().toUtc(),
             extraLines: List.of(n.extraLines),
             propertyParams: Map.of(n.propertyParams),
+          ),
+        );
+      }
+      if (rootEvent != null) {
+        await target.saveEvent(
+          Event(
+            uid: fresh[rootEvent.uid]!,
+            summary: rootEvent.summary,
+            description: rootEvent.description,
+            location: rootEvent.location,
+            categories: List.of(rootEvent.categories),
+            status: rootEvent.status,
+            dtstart: rootEvent.dtstart,
+            dtend: rootEvent.dtend,
+            duration: rootEvent.duration,
+            rrule: rootEvent.rrule,
+            exdates: List.of(rootEvent.exdates),
+            rdates: List.of(rootEvent.rdates),
+            created: rootEvent.created,
+            lastModified: DateTime.now().toUtc(),
+            extraLines: List.of(rootEvent.extraLines),
+            calendarLines: List.of(rootEvent.calendarLines),
+            propertyParams: Map.of(rootEvent.propertyParams),
           ),
         );
       }
@@ -906,6 +1010,23 @@ class AppState extends ChangeNotifier {
                 t.uid: t,
             };
       var changed = false;
+      if (rootEvent != null) {
+        final now = (await (src as SpaceNoteSource).loadEvents())
+            .where((e) => e.uid == rootEvent.uid)
+            .firstOrNull;
+        if (now == null ||
+            now.summary != rootEvent.summary ||
+            now.description != rootEvent.description ||
+            now.location != rootEvent.location ||
+            now.lastModified != rootEvent.lastModified ||
+            now.status != rootEvent.status ||
+            now.dtstart != rootEvent.dtstart ||
+            now.dtend != rootEvent.dtend ||
+            now.rrule != rootEvent.rrule ||
+            now.categories.join('\n') != rootEvent.categories.join('\n')) {
+          changed = true;
+        }
+      }
       for (final n in noteGroup) {
         final now = current[n.uid];
         if (now == null ||
@@ -941,6 +1062,9 @@ class AppState extends ChangeNotifier {
       for (final t in taskGroup.reversed) {
         await (src as SpaceNoteSource).deleteTask(t.uid);
       }
+      if (rootEvent != null) {
+        await (src as SpaceNoteSource).deleteEvent(rootEvent.uid);
+      }
       for (final n in noteGroup.reversed) {
         await src.delete(n.uid);
       }
@@ -948,7 +1072,10 @@ class AppState extends ChangeNotifier {
       final loaded = await src.load();
       if (src != source) return count;
       _setNotes(loaded);
-      if (src is SpaceNoteSource) _setTasks(await src.loadTasks());
+      if (src is SpaceNoteSource) {
+        _setTasks(await src.loadTasks());
+        _setEvents(await src.loadEvents());
+      }
       if (src != source) return count;
       if (peekUid != null && findItem(peekUid!) == null) {
         _setPeek(null);
@@ -963,7 +1090,10 @@ class AppState extends ChangeNotifier {
         // Some originals may already be gone: show what is really there.
         try {
           _setNotes(await src.load());
-          if (src is SpaceNoteSource) _setTasks(await src.loadTasks());
+          if (src is SpaceNoteSource) {
+            _setTasks(await src.loadTasks());
+            _setEvents(await src.loadEvents());
+          }
         } catch (_) {}
         error = 'Move failed: $e';
         notifyListeners();
@@ -1019,6 +1149,7 @@ class AppState extends ChangeNotifier {
     if (old != null && old != uid && !_tabs.contains(_tabOf(old))) {
       _drafts.remove(old);
       _taskDrafts.remove(old);
+      _eventDrafts.remove(old);
     }
   }
 
@@ -1045,6 +1176,8 @@ class AppState extends ChangeNotifier {
       if (src != source) return; // another Space was opened meanwhile
       _setNotes(loaded);
       await _loadTasks(src);
+      if (src != source) return;
+      await _loadEvents(src);
       if (src != source) return;
       if (src is EditableNoteSource) {
         try {
@@ -1145,9 +1278,9 @@ class AppState extends ChangeNotifier {
     syncMessage = 'Syncing…';
     notifyListeners();
     var message = syncMessage;
-    // Notes and tasks sync in the same pass, each isolated from the other:
-    // a failing task sync leaves the notes (and their message) alone and the
-    // other way round.
+    // Notes, tasks and events sync in the same pass, each isolated from the
+    // others: a failing task or event sync leaves the notes (and their
+    // message) alone and the other way round.
     try {
       final r = await s.sync();
       if (s != _space) return;
@@ -1182,10 +1315,29 @@ class AppState extends ChangeNotifier {
       taskProblem ??= 'Tasks could not be read: $e';
     }
     if (s != _space) return;
+    String? eventProblem;
+    try {
+      final er = await s.syncEvents();
+      if (s != _space) return;
+      if (er != null && er.errors.isNotEmpty) {
+        eventProblem = 'Events: sync problem: ${er.errors.first}';
+      }
+    } catch (e) {
+      if (s != _space) return;
+      eventProblem = 'Events: sync failed: $e';
+    }
+    try {
+      _setEvents(await s.loadEvents());
+    } catch (e) {
+      eventProblem ??= 'Events could not be read: $e';
+    }
+    if (s != _space) return;
     taskError = taskProblem;
-    syncMessage = taskProblem == null
-        ? message
-        : (message == null ? taskProblem : '$message. $taskProblem');
+    eventError = eventProblem;
+    for (final p in [?taskProblem, ?eventProblem]) {
+      message = message == null ? p : '$message. $p';
+    }
+    syncMessage = message;
     syncing = false;
     notifyListeners();
     if (_syncAgain) {
@@ -1444,11 +1596,16 @@ class AppState extends ChangeNotifier {
 
   Task? taskById(String uid) => _taskById(uid);
 
-  Set<String> _allDraftUids() => {..._drafts.keys, ..._taskDrafts.keys};
+  Set<String> _allDraftUids() => {
+    ..._drafts.keys,
+    ..._taskDrafts.keys,
+    ..._eventDrafts.keys,
+  };
 
-  /// The item (a [Note] or a [Task]) with this uid, or null. Parents of
-  /// tasks may be either.
-  Object? findItem(String uid) => tree.find(uid)?.note ?? _taskById(uid);
+  /// The item (a [Note], a [Task] or an [Event]) with this uid, or null.
+  /// Parents of tasks may be any of them.
+  Object? findItem(String uid) =>
+      tree.find(uid)?.note ?? _taskById(uid) ?? _eventById(uid);
 
   // Selectors. [now] defaults to the current time (tests pass their own).
 
@@ -1801,6 +1958,327 @@ class AppState extends ChangeNotifier {
     return true;
   }
 
+  // --- Events ---
+  //
+  // Events (VEVENT) live in the same server collection as the notes and tasks
+  // of a Space, sync in the same pass ([sync]) and fail separately: an event
+  // problem is shown in [eventError] and the sync message, never as [error],
+  // and never touches notes or tasks. Times are wall-clock fields (no time
+  // zone database): "now" is the user's local clock read the same way. A
+  // Space with no events behaves exactly as before.
+
+  /// The open Space's events.
+  List<Event> events = [];
+
+  /// A non-fatal event problem (unreadable store, failed event sync); null
+  /// when fine.
+  String? eventError;
+
+  /// Events can be written only in a Space (the read-only dev feed rejects).
+  bool get eventsEditable => source is SpaceNoteSource;
+
+  Future<void> _loadEvents(NoteSource src) async {
+    if (src is! SpaceNoteSource) {
+      events = [];
+      return;
+    }
+    try {
+      final loaded = await src.loadEvents();
+      if (src != source) return;
+      _setEvents(loaded);
+      eventError = null;
+    } catch (e) {
+      if (src != source) return;
+      events = [];
+      eventError = 'Events could not be read: $e';
+    }
+  }
+
+  void _setEvents(List<Event> loaded) {
+    events = List.unmodifiable(loaded);
+    _eventDrafts.removeWhere((u, _) => !events.any((e) => e.uid == u));
+    if (peekUid != null && findItem(peekUid!) == null) _setPeek(null);
+    if (_tabsLoaded) _pruneTabs();
+  }
+
+  Event? _eventById(String uid) {
+    for (final e in events) {
+      if (e.uid == uid) return e;
+    }
+    return null;
+  }
+
+  Event? eventById(String uid) => _eventById(uid);
+
+  /// Tags used on events (without the `status-`/`kind-` markers), sorted.
+  List<String> get eventTags =>
+      ({for (final e in events) ..._plainTags(e.categories)}.toList()..sort());
+
+  List<String> eventTagsOf(Event e) => _plainTags(e.categories);
+
+  /// Agenda groups from the day of [from] for [days] days: Today, Tomorrow,
+  /// This week, Later (empty groups left out). Recurring events are expanded;
+  /// see [upcomingGroups].
+  List<AgendaGroup> upcomingOccurrences(DateTime from, int days) =>
+      upcomingGroups(events, from, days);
+
+  /// Occurrences that ended before the day of [from], within the last [days]
+  /// days, latest first.
+  List<EventOccurrence> pastOccurrences(DateTime from, [int days = 30]) =>
+      pastAgenda(events, from, days);
+
+  /// Saves, reloads the events and syncs. False (with [error] set when the
+  /// cause is the Space) if nothing was saved.
+  Future<bool> _eventEdit(
+    Future<void> Function(SpaceNoteSource src) change,
+  ) async {
+    final src = source;
+    if (src is! SpaceNoteSource) {
+      error = 'This space is read-only.';
+      notifyListeners();
+      return false;
+    }
+    try {
+      await change(src);
+      final loaded = await src.loadEvents();
+      if (src != source) return true;
+      _setEvents(loaded);
+      error = null;
+    } catch (e) {
+      if (src != source) return false;
+      error = 'Save failed: $e';
+      notifyListeners();
+      return false;
+    }
+    notifyListeners();
+    if (connected) sync();
+    return true;
+  }
+
+  /// Adds an event and returns its uid, or null (empty title, read-only
+  /// Space, failure). [start] and [end] are wall-clock fields; for an
+  /// [allDay] event only their dates count and [end] is the last day,
+  /// inclusive (default: [start]'s day). A timed event without [end] has no
+  /// end. A new timed event is a floating time (no zone).
+  Future<String?> addEvent(
+    String title, {
+    required DateTime start,
+    DateTime? end,
+    bool allDay = false,
+    String location = '',
+    String? description,
+    List<String> tags = const [],
+  }) async {
+    final t = title.trim();
+    if (t.isEmpty) return null;
+    final now = DateTime.now().toUtc();
+    final first = allDay ? wallDay(start) : start;
+    ICalDate? last;
+    if (allDay) {
+      final day = end == null ? first : wallDay(end);
+      last = eventDate(
+        (day.isBefore(first) ? first : day).add(const Duration(days: 1)),
+        allDay: true,
+      );
+    } else if (end != null && end.isAfter(start)) {
+      last = eventDate(end);
+    }
+    final event = Event(
+      uid: 'davdart-${now.microsecondsSinceEpoch}',
+      summary: t,
+      description: description ?? '',
+      location: location.trim(),
+      categories: _plainTags(tags),
+      dtstart: eventDate(first, allDay: allDay),
+      dtend: last,
+      created: now,
+      lastModified: now,
+    );
+    return await _eventEdit((src) => src.saveEvent(event)) ? event.uid : null;
+  }
+
+  /// Changes an event (a recurring one: the whole series; overrides, EXDATEs
+  /// and other lines stay as they are). Only what is passed changes;
+  /// [setStatus] says that a null [status] means "clear"; [setWhen] applies
+  /// [allDay], [start] and [end] (all-day end inclusive, see [addEvent]) and
+  /// keeps the zone flavour of the old value. Returns false when nothing was
+  /// saved.
+  Future<bool> updateEvent(
+    String uid, {
+    String? title,
+    String? description,
+    String? location,
+    List<String>? tags,
+    bool setStatus = false,
+    String? status,
+    bool setWhen = false,
+    bool allDay = false,
+    DateTime? start,
+    DateTime? end,
+  }) async {
+    final e = _eventById(uid);
+    if (e == null) return false;
+    final sum = title?.trim();
+    if (sum != null && sum.isEmpty) return false;
+    var copy = e.copyWith(
+      summary: sum,
+      description: description,
+      location: location?.trim(),
+      status: setStatus ? status : null,
+      clearStatus: setStatus && status == null,
+    );
+    if (setWhen && start != null) {
+      final first = allDay ? wallDay(start) : start;
+      var last = end ?? first;
+      if (last.isBefore(first)) last = first;
+      final from = eventDate(first, allDay: allDay, like: e.dtstart);
+      if (allDay) {
+        copy = copy.copyWith(
+          dtstart: from,
+          dtend: eventDate(
+            wallDay(last).add(const Duration(days: 1)),
+            allDay: true,
+          ),
+          clearDuration: true,
+        );
+      } else if (last == first) {
+        copy = copy.copyWith(
+          dtstart: from,
+          clearEnd: true,
+          clearDuration: true,
+        );
+      } else {
+        copy = copy.copyWith(
+          dtstart: from,
+          dtend: eventDate(last, like: e.dtend ?? e.dtstart),
+          clearDuration: true,
+        );
+      }
+    }
+    if (tags != null) {
+      copy.categories = [
+        ...e.categories.where(
+          (c) => c.startsWith('status-') || c.startsWith('kind-'),
+        ),
+        ..._plainTags(tags),
+      ];
+    }
+    return _eventEdit((src) => src.saveEvent(copy));
+  }
+
+  /// Deletes an event (the whole series); tasks under it move up to its
+  /// parent so none are lost.
+  Future<bool> deleteEvent(String uid) async {
+    final e = _eventById(uid);
+    if (e == null) return false;
+    final parent = e.parentUid;
+    final kidTasks = [
+      for (final k in tasks)
+        if (k.parentUid == uid) k.copyWith(),
+    ];
+    final ok = await _eventEdit((src) async {
+      for (final k in kidTasks) {
+        await src.saveTask(
+          parent == null
+              ? k.copyWith(clearParent: true)
+              : k.copyWith(parentUid: parent),
+        );
+      }
+      await src.deleteEvent(uid);
+    });
+    if (ok) {
+      _eventDrafts.remove(uid);
+      if (kidTasks.isNotEmpty && source is SpaceNoteSource) {
+        try {
+          _setTasks(await (source as SpaceNoteSource).loadTasks());
+        } catch (_) {}
+      }
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  // Event drafts: one per event being edited, like the task drafts.
+
+  final Map<String, EventDraft> _eventDrafts = {};
+
+  List<EventDraft> get eventDrafts => List.unmodifiable(_eventDrafts.values);
+  EventDraft? eventDraftFor(String uid) => _eventDrafts[uid];
+  bool dirtyEventFor(String uid) => _eventDrafts[uid]?.dirty ?? false;
+
+  /// Starts editing event [uid] (no-op if read-only, unknown or already
+  /// open).
+  void startEventEdit(String uid) {
+    final e = _eventById(uid);
+    if (e == null || !eventsEditable || _eventDrafts.containsKey(uid)) return;
+    final allDay = e.allDay;
+    final start = e.startWall ?? wallDay(wallNow(DateTime.now()));
+    final endWall = e.endWall ?? start;
+    var end = allDay ? endWall.subtract(const Duration(days: 1)) : endWall;
+    if (end.isBefore(start)) end = start;
+    _eventDrafts[uid] = EventDraft(
+      uid: uid,
+      title: e.summary,
+      body: e.description,
+      tags: _plainTags(e.categories).join(', '),
+      location: e.location,
+      allDay: allDay,
+      start: start,
+      end: end,
+      status: e.status,
+    );
+    notifyListeners();
+  }
+
+  void discardEventDraft(String uid) {
+    _eventDrafts.remove(uid);
+    notifyListeners();
+  }
+
+  /// Saves the edit of event [uid]. Text typed while the save runs stays as
+  /// the draft, still dirty. False if nothing was saved.
+  Future<bool> saveEventDraft(String uid) async {
+    final d = _eventDrafts[uid];
+    if (d == null || d.titleEmpty || d.endBeforeStart) return false;
+    final title = d.titleController.text;
+    final body = d.bodyController.text;
+    final tagText = d.tagsController.text;
+    final location = d.locationController.text;
+    final allDay = d.allDay;
+    final start = d.start;
+    final end = d.end;
+    final status = d.status;
+    final ok = await updateEvent(
+      uid,
+      title: title,
+      description: body,
+      location: location,
+      tags: d.tagList,
+      setStatus: status != d.originalStatus,
+      status: status,
+      setWhen: d.whenChanged,
+      allDay: allDay,
+      start: start,
+      end: end,
+    );
+    if (!ok) return false;
+    if (_eventDrafts[uid] == d) {
+      d.markSaved(
+        title: title,
+        body: body,
+        tags: tagText,
+        location: location,
+        allDay: allDay,
+        start: start,
+        end: end,
+        status: status,
+      );
+      if (!d.dirty) _eventDrafts.remove(uid);
+    }
+    notifyListeners();
+    return true;
+  }
+
   // --- Document tabs ---
   //
   // Two independent places show notes. The MAIN area is a layout of panes,
@@ -1847,9 +2325,20 @@ class AppState extends ChangeNotifier {
         : null;
   }
 
-  /// Something other than Home or a view fills the main pane: a note or task
-  /// page.
-  bool get mainIsPage => mainNoteUid != null || mainTaskUid != null;
+  /// The event the main pane shows full page, when its tab is an event tab.
+  String? get mainEventUid {
+    final t = activeTab;
+    return t != null && t.kind == TabKind.event && _eventById(t.id) != null
+        ? t.id
+        : null;
+  }
+
+  /// The note, task or event the main pane shows full page, if any.
+  String? get mainItemUid => mainNoteUid ?? mainTaskUid ?? mainEventUid;
+
+  /// Something other than Home or a view fills the main pane: a note, task
+  /// or event page.
+  bool get mainIsPage => mainItemUid != null;
 
   String get _tabsKey => 'davdart.tabs.v1.${catalog?.current ?? 'default'}';
 
@@ -1873,6 +2362,7 @@ class AppState extends ChangeNotifier {
     TabKind.note => tree.find(t.id) != null,
     TabKind.view => _viewNotes.containsKey(t.id),
     TabKind.task => _taskById(t.id) != null,
+    TabKind.event => _eventById(t.id) != null,
   };
 
   void _pruneTabs() {
@@ -1895,6 +2385,14 @@ class AppState extends ChangeNotifier {
   void openTaskTab(String uid) {
     if (_taskById(uid) == null) return;
     final t = DocTab.task(uid);
+    if (_tabs.add(t)) _saveTabs();
+    _show(t);
+  }
+
+  /// Opens (or focuses) the main tab of event [uid].
+  void openEventTab(String uid) {
+    if (_eventById(uid) == null) return;
+    final t = DocTab.event(uid);
     if (_tabs.add(t)) _saveTabs();
     _show(t);
   }
@@ -1932,6 +2430,7 @@ class AppState extends ChangeNotifier {
     TabKind.note => tree.find(t.id)?.note.summary ?? '',
     TabKind.view => _viewByUid(t.id)?.name ?? '',
     TabKind.task => _taskById(t.id)?.summary ?? '',
+    TabKind.event => _eventById(t.id)?.summary ?? '',
   };
 
   bool tabIsFolder(DocTab t) =>
@@ -1943,6 +2442,7 @@ class AppState extends ChangeNotifier {
   bool tabDirty(DocTab t) => switch (t.kind) {
     TabKind.note => dirtyFor(t.id),
     TabKind.task => dirtyTaskFor(t.id),
+    TabKind.event => dirtyEventFor(t.id),
     _ => false,
   };
 
@@ -1965,6 +2465,11 @@ class AppState extends ChangeNotifier {
       notifyListeners();
     } else if (t.kind == TabKind.task) {
       if (_taskById(t.id) == null) return;
+      _activeViewTab = t;
+      if (peekUid == t.id) _setPeek(null);
+      notifyListeners();
+    } else if (t.kind == TabKind.event) {
+      if (_eventById(t.id) == null) return;
       _activeViewTab = t;
       if (peekUid == t.id) _setPeek(null);
       notifyListeners();
@@ -1992,6 +2497,9 @@ class AppState extends ChangeNotifier {
       if (_activeViewTab == t) _activeViewTab = null;
       if (t.kind == TabKind.note && peekUid != t.id) _drafts.remove(t.id);
       if (t.kind == TabKind.task && peekUid != t.id) _taskDrafts.remove(t.id);
+      if (t.kind == TabKind.event && peekUid != t.id) {
+        _eventDrafts.remove(t.id);
+      }
       _saveTabs();
       if (wasActive) _show(next);
       notifyListeners();
@@ -2139,15 +2647,28 @@ class AppState extends ChangeNotifier {
     final g = leaveGuard;
     for (final u in uids) {
       final isTask = _taskDrafts.containsKey(u);
-      if (!(isTask ? dirtyTaskFor(u) : dirtyFor(u)) || g == null) continue;
+      final isEvent = _eventDrafts.containsKey(u);
+      final dirty = isTask
+          ? dirtyTaskFor(u)
+          : isEvent
+          ? dirtyEventFor(u)
+          : dirtyFor(u);
+      if (!dirty || g == null) continue;
       switch (await g()) {
         case DraftChoice.keep:
           return false;
         case DraftChoice.save:
-          if (!await (isTask ? saveTaskDraft(u) : saveDraft(u))) return false;
+          final saved = isTask
+              ? await saveTaskDraft(u)
+              : isEvent
+              ? await saveEventDraft(u)
+              : await saveDraft(u);
+          if (!saved) return false;
         case DraftChoice.discard:
           if (isTask) {
             _taskDrafts.remove(u);
+          } else if (isEvent) {
+            _eventDrafts.remove(u);
           } else {
             _drafts.remove(u);
           }
@@ -2161,8 +2682,11 @@ class AppState extends ChangeNotifier {
   /// The task shown in the peek, if the peek holds a task.
   Task? get peekTask => peekUid == null ? null : _taskById(peekUid!);
 
-  /// The peek holds a note or a task.
-  bool get hasPeek => peek != null || peekTask != null;
+  /// The event shown in the peek, if the peek holds an event.
+  Event? get peekEvent => peekUid == null ? null : _eventById(peekUid!);
+
+  /// The peek holds a note, a task or an event.
+  bool get hasPeek => peek != null || peekTask != null || peekEvent != null;
 
   /// Shows note [uid] in the peek (null closes it). A note that has a main
   /// tab is focused there instead: it lives in one place.
@@ -2174,6 +2698,7 @@ class AppState extends ChangeNotifier {
     // Showing a note outside the open folder leaves the folder.
     if (uid != null &&
         !_isTask(uid) &&
+        !_isEvent(uid) &&
         scopeUid != null &&
         uid != scopeUid &&
         !tree.descendants(scopeUid!).any((n) => n.uid == uid)) {

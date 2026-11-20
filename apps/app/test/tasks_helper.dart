@@ -19,6 +19,8 @@ class FlagState extends AppState {
   bool readOnly;
   @override
   bool get tasksEditable => !readOnly && super.tasksEditable;
+  @override
+  bool get eventsEditable => !readOnly && super.eventsEditable;
 }
 
 /// The ICalDate of the local day [days] from today.
@@ -55,6 +57,7 @@ Future<AppState> pumpTasksApp(
   WidgetTester t, {
   List<Note> notes = const [],
   List<Task> tasks = const [],
+  List<Event> events = const [],
   Size size = const Size(1280, 900),
   MemoryStorage? prefs,
   bool readOnly = false,
@@ -70,9 +73,49 @@ Future<AppState> pumpTasksApp(
     for (final k in tasks) {
       await src.saveTask(k);
     }
+    for (final e in events) {
+      await src.saveEvent(e);
+    }
   });
   final s = FlagState(src, prefs: prefs ?? MemoryStorage(), readOnly: readOnly);
   await t.pumpWidget(DavdartApp(state: s));
   await t.pumpAndSettle();
   return s;
 }
+
+/// The ICalDate (timed, floating) of local day offset [days] at [hour]:[min].
+ICalDate timedIn(int days, int hour, [int min = 0]) {
+  final n = DateTime.now().add(Duration(days: days));
+  String t(int v) => v.toString().padLeft(2, '0');
+  return ICalDate('${n.year}${t(n.month)}${t(n.day)}T${t(hour)}${t(min)}00');
+}
+
+/// A timed event [days] from today starting at [hour], [hours] long; an
+/// all-day event with [allDay] (the end is the day after [days] + [span] - 1).
+Event mkEvent(
+  String uid, {
+  String? summary,
+  int days = 0,
+  int hour = 9,
+  int hours = 1,
+  bool allDay = false,
+  int span = 1,
+  String? rrule,
+  String location = '',
+  String? status,
+  List<String> tags = const [],
+  String description = '',
+  List<String> siblingLines = const [],
+}) => Event(
+  uid: uid,
+  summary: summary ?? uid,
+  dtstart: allDay ? dueIn(days) : timedIn(days, hour),
+  dtend: allDay ? dueIn(days + span) : timedIn(days, hour + hours),
+  rrule: rrule,
+  location: location,
+  status: status,
+  categories: tags,
+  description: description,
+  siblingLines: List.of(siblingLines),
+  lastModified: DateTime.now().toUtc(),
+);

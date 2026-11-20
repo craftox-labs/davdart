@@ -512,9 +512,11 @@ class _SearchSectionState extends State<SearchSection> {
             onOpen: widget.onPick,
             child: FItem(
               key: Key('hit-${h.note.uid}'),
-              prefix: h.isTask
+              prefix: h.isTask || h.isEvent
                   ? Icon(
-                      FLucideIcons.listTodo,
+                      h.isTask
+                          ? FLucideIcons.listTodo
+                          : FLucideIcons.calendarDays,
                       size: t.icons.md,
                       color: t.muted,
                     )
