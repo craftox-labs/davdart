@@ -237,6 +237,9 @@ class SizeTokens {
     this.dialogMd = 380,
     this.dialogLg = 480,
     this.dialogXl = 560,
+    this.dialogHelp = 960,
+    this.helpKeys = 124,
+    this.helpRow = 28,
     this.narrowBar = 440,
     this.pageMax = 860,
     this.editorLines = 10,
@@ -286,6 +289,10 @@ class SizeTokens {
   final double chevronBox, listChevronBox, listMarker;
   final double treeIndent, listIndent;
   final double dialogSm, dialog, dialogMd, dialogLg, dialogXl;
+
+  /// The keyboard help dialog's widest size, the width of its key column
+  /// and the least height of one binding row.
+  final double dialogHelp, helpKeys, helpRow;
 
   /// Width below which the top bar swaps its view toggle for one icon.
   final double narrowBar;

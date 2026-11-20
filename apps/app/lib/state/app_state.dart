@@ -356,6 +356,8 @@ class AppState extends ChangeNotifier {
     if (sidebarCollapsed == v) return;
     sidebarCollapsed = v;
     prefs?.write(_collapsedKey, '$v');
+    // The panel is gone: the keyboard focus it held moves to the main pane.
+    if (v && nav.area == NavArea.panel) nav.focusArea(NavArea.main);
     notifyListeners();
   }
 

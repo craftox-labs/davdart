@@ -260,6 +260,15 @@ List<AppAction> buildActions(AppState state) {
       run: (c) => showNewSpaceDialog(c.context, c.state),
     ),
     AppAction(
+      id: 'panel.toggle',
+      title: state.sidebarCollapsed ? 'Show left panel' : 'Hide left panel',
+      group: 'Panes',
+      keywords: const ['toggle', 'left', 'panel', 'sidebar', 'fold', 'list'],
+      shortcuts: const ['b'],
+      enabled: yes,
+      run: (c) => c.state.setSidebarCollapsed(!c.state.sidebarCollapsed),
+    ),
+    AppAction(
       id: 'peek.toggle',
       title: state.peekCollapsed ? 'Expand peek' : 'Collapse peek',
       group: 'Panes',
@@ -587,14 +596,15 @@ Future<void> _stepTab(AppState s, int by) {
   return s.activateTab(next);
 }
 
-/// The keyboard help: every binding in the registry, by group.
+/// The keyboard help: every binding in the registry, by group, in columns
+/// (one on a phone) of key chips and descriptions.
 Future<void> showKeyboardHelp(BuildContext context, AppState state) {
   final t = tokensOf(context);
   final rows = helpRows(buildActions(state));
   return showAppDialog(
     context,
     title: 'Keyboard shortcuts',
-    width: t.sizes.dialogXl,
+    width: t.sizes.dialogHelp,
     content: Column(
       key: const Key('keyboard-help'),
       mainAxisSize: MainAxisSize.min,
@@ -609,28 +619,130 @@ Future<void> showKeyboardHelp(BuildContext context, AppState state) {
               style: t.type.captionStyle.copyWith(color: t.muted),
             ),
           ),
-        for (final (group, items) in rows) ...[
-          Padding(
-            padding: EdgeInsets.only(top: t.space.md, bottom: t.space.xs),
-            child: Text(
-              group,
-              style: t.type.labelStyle.copyWith(color: t.muted),
-            ),
-          ),
-          for (final (keys, what) in items)
-            Padding(
-              padding: EdgeInsets.only(bottom: t.space.xs),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 2, child: Text(keys)),
-                  Expanded(flex: 3, child: Text(what)),
-                ],
-              ),
-            ),
-        ],
+        HelpColumns(groups: rows),
       ],
     ),
     actions: const [CancelButton(label: 'Close')],
   );
+}
+
+/// Help groups laid out masonry-style: 1 column under 520px of width, 2
+/// under 800, else 3. Each group goes to the shortest column so the columns
+/// stay balanced by row count.
+class HelpColumns extends StatelessWidget {
+  const HelpColumns({super.key, required this.groups});
+  final List<(String, List<(String, String)>)> groups;
+
+  static int columnsFor(double width) =>
+      width < 520 ? 1 : (width < 800 ? 2 : 3);
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return LayoutBuilder(
+      builder: (context, box) {
+        final n = columnsFor(box.maxWidth);
+        final cols = [for (var i = 0; i < n; i++) <int>[]];
+        final heights = List<int>.filled(n, 0);
+        for (var i = 0; i < groups.length; i++) {
+          var at = 0;
+          for (var c = 1; c < n; c++) {
+            if (heights[c] < heights[at]) at = c;
+          }
+          cols[at].add(i);
+          heights[at] += groups[i].$2.length + 2; // rows plus the heading
+        }
+        return Row(
+          key: Key('help-columns-$n'),
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            for (var c = 0; c < n; c++) ...[
+              if (c > 0) SizedBox(width: t.space.xxxl),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    for (final i in cols[c])
+                      _HelpGroup(title: groups[i].$1, items: groups[i].$2),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _HelpGroup extends StatelessWidget {
+  const _HelpGroup({required this.title, required this.items});
+  final String title;
+  final List<(String, String)> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return Padding(
+      padding: EdgeInsets.only(bottom: t.space.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: t.type.labelStyle.copyWith(color: t.muted),
+          ),
+          SizedBox(height: t.space.xs),
+          SizedBox(
+            height: t.borders.hairline,
+            child: ColoredBox(color: t.divider),
+          ),
+          SizedBox(height: t.space.xs),
+          for (final (keys, what) in items)
+            ConstrainedBox(
+              constraints: BoxConstraints(minHeight: t.sizes.helpRow),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: t.sizes.helpKeys,
+                    child: Wrap(
+                      spacing: t.space.xs,
+                      runSpacing: t.space.xs,
+                      children: [for (final k in keys.split(' / ')) _KeyCap(k)],
+                    ),
+                  ),
+                  SizedBox(width: t.space.md),
+                  Expanded(child: Text(what, style: t.type.captionStyle)),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _KeyCap extends StatelessWidget {
+  const _KeyCap(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: t.card,
+        border: Border.all(color: t.cardBorder, width: t.borders.hairline),
+        borderRadius: BorderRadius.circular(t.radii.small),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: t.space.sm,
+          vertical: t.space.xxs,
+        ),
+        child: Text(label, style: t.type.monoStyle.copyWith(color: t.fg)),
+      ),
+    );
+  }
 }

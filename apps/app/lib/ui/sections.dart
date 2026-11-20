@@ -742,7 +742,7 @@ class SettingsSection extends _Section {
           horizontal: tokensOf(context).space.md,
           vertical: tokensOf(context).space.xs,
         ),
-        child: FSwitch(
+        child: FCheckbox(
           key: const Key('vim-keys'),
           label: const Text('Vim keys'),
           description: const Text(

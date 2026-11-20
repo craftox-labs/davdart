@@ -7,6 +7,7 @@ import 'package:davdart_app/state/key_nav.dart';
 import 'package:davdart_app/ui/app_actions.dart';
 import 'package:davdart_app/ui/key_nav_ui.dart';
 import 'package:davdart_app/ui/parts.dart';
+import 'package:davdart_app/ui/theme.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -707,15 +708,19 @@ void main() {
       await t.pumpAndSettle();
       expect(_k('keyboard-help'), findsOneWidget);
       for (final g in ['Navigation', 'Open', 'Edit', 'Go to', 'Panes']) {
-        expect(find.text(g), findsOneWidget, reason: g);
+        expect(find.text(g.toUpperCase()), findsOneWidget, reason: g);
       }
       for (final a in buildActions(s)) {
         if (a.shortcuts.isEmpty) continue;
-        expect(find.text(a.shortcuts.join(' / ')), findsWidgets, reason: a.id);
+        for (final k in a.shortcuts) {
+          expect(find.text(k), findsWidgets, reason: a.id);
+        }
         expect(find.text(a.title), findsWidgets, reason: a.id);
       }
       for (final (keys, _) in knownShortcuts) {
-        expect(find.text(keys), findsOneWidget);
+        for (final k in keys.split(' / ')) {
+          expect(find.text(k), findsWidgets);
+        }
       }
       await _press(t, LogicalKeyboardKey.escape);
       await t.pumpAndSettle();
@@ -733,6 +738,163 @@ void main() {
       await t.pumpAndSettle();
       expect(_k('keyboard-help'), findsOneWidget);
       expect(find.textContaining('Vim keys are off'), findsOneWidget);
+    });
+  });
+
+  group('help layout', () {
+    Future<void> open(WidgetTester t, Size size) async {
+      final s = await pumpTasksApp(t, size: size);
+      await _shift(t, LogicalKeyboardKey.slash);
+      await t.pumpAndSettle();
+      expect(_k('keyboard-help'), findsOneWidget);
+      expect(s.nav, isNotNull);
+    }
+
+    testWidgets('wide: three columns, nothing scrolls, no overflow', (t) async {
+      await open(t, const Size(1400, 1000));
+      expect(_k('help-columns-3'), findsOneWidget);
+      expect(t.takeException(), isNull);
+      expect(t.getSize(_k('help-columns-3')).width, greaterThan(800));
+      final scroll = t.state<ScrollableState>(
+        find.descendant(
+          of: find.byType(FDialog),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(scroll.position.maxScrollExtent, 0);
+      await _press(t, LogicalKeyboardKey.escape);
+    });
+
+    testWidgets('medium: two columns', (t) async {
+      await open(t, const Size(800, 900));
+      expect(_k('help-columns-2'), findsOneWidget);
+      expect(t.takeException(), isNull);
+      await _press(t, LogicalKeyboardKey.escape);
+    });
+
+    testWidgets('phone: one scrolling column, no overflow', (t) async {
+      await open(t, const Size(360, 640));
+      expect(_k('help-columns-1'), findsOneWidget);
+      expect(t.takeException(), isNull);
+      final scroll = t.state<ScrollableState>(
+        find.descendant(
+          of: find.byType(FDialog),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(scroll.position.maxScrollExtent, greaterThan(0));
+      await _press(t, LogicalKeyboardKey.escape);
+      await t.pumpAndSettle();
+      expect(_k('keyboard-help'), findsNothing);
+    });
+
+    testWidgets('Toggle left panel is listed under Panes', (t) async {
+      final s = await pumpTasksApp(t);
+      final rows = helpRows(buildActions(s));
+      final panes = rows.firstWhere((r) => r.$1 == 'Panes').$2;
+      expect(panes.any((r) => r.$1 == 'b'), isTrue);
+    });
+  });
+
+  group('left panel toggle', () {
+    testWidgets('b hides and shows the panel, persisted', (t) async {
+      final prefs = MemoryStorage();
+      final s = await pumpTasksApp(t, prefs: prefs, tasks: [mkTask('a')]);
+      expect(s.sidebarCollapsed, isFalse);
+      await _press(t, LogicalKeyboardKey.keyB);
+      expect(s.sidebarCollapsed, isTrue);
+      expect(prefs.read('davdart.sidebar.collapsed.v1'), 'true');
+      expect(
+        AppState(SeedNotes(const []), prefs: prefs).sidebarCollapsed,
+        true,
+      );
+      await _press(t, LogicalKeyboardKey.keyB);
+      expect(s.sidebarCollapsed, isFalse);
+      expect(t.takeException(), isNull);
+    });
+
+    testWidgets('the palette action toggles it; title follows state', (
+      t,
+    ) async {
+      final s = await pumpTasksApp(t);
+      final c = ActionContext(s, t.element(find.byType(FScaffold)));
+      AppAction a() =>
+          buildActions(s).firstWhere((a) => a.id == 'panel.toggle');
+      expect(a().title, 'Hide left panel');
+      await a().run(c);
+      await t.pump();
+      expect(s.sidebarCollapsed, isTrue);
+      expect(a().title, 'Show left panel');
+    });
+
+    testWidgets('clicking the active rail item folds it, an inactive one '
+        'switches and opens', (t) async {
+      final s = await pumpTasksApp(t);
+      await t.tap(_k('rail-tasks'));
+      await t.pumpAndSettle();
+      expect(s.sidebarCollapsed, isFalse);
+      await t.tap(_k('rail-tasks'));
+      await t.pumpAndSettle();
+      expect(s.sidebarCollapsed, isTrue);
+      await t.tap(_k('rail-events'));
+      await t.pumpAndSettle();
+      expect(s.sidebarCollapsed, isFalse);
+      expect(s.section, Section.events);
+    });
+
+    testWidgets('focus moves from the panel to main when it folds', (t) async {
+      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      s.nav.focusArea(NavArea.panel);
+      expect(s.nav.area, NavArea.panel);
+      await _press(t, LogicalKeyboardKey.keyB);
+      await t.pumpAndSettle();
+      expect(s.sidebarCollapsed, isTrue);
+      expect(s.nav.area, NavArea.main);
+    });
+  });
+
+  group('settings switch', () {
+    testWidgets('the Vim keys control in Settings is compact', (t) async {
+      final s = await pumpTasksApp(t, size: const Size(1280, 1200));
+      s.setSection(Section.settings);
+      await t.pumpAndSettle();
+      final box = t.getSize(_k('vim-keys'));
+      expect(box.height, lessThan(120));
+      expect(box.width, lessThan(400));
+      expect(
+        find.descendant(of: _k('vim-keys'), matching: find.byType(FSwitch)),
+        findsNothing,
+      );
+      expect(t.takeException(), isNull);
+    });
+
+    testWidgets('row fits a 240px settings pane without overflow', (t) async {
+      t.view.physicalSize = const Size(1280, 800);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      await t.pumpWidget(
+        FTheme(
+          data: buildTheme(Brightness.light, touch: false),
+          child: const Directionality(
+            textDirection: TextDirection.ltr,
+            child: Center(
+              child: SizedBox(
+                width: 240,
+                child: FCheckbox(
+                  key: Key('narrow-vim'),
+                  label: Text('Vim keys'),
+                  description: Text(
+                    'Letter keys move and open things (press ? for the list).',
+                  ),
+                  value: true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      expect(t.takeException(), isNull);
+      expect(t.getSize(find.byType(FCheckbox)).width, lessThanOrEqualTo(240));
     });
   });
 
