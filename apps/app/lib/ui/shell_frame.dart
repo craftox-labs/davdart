@@ -496,6 +496,16 @@ class IconRail extends StatelessWidget {
       mirror: mirror,
       onPress: () => state.pressRail(s),
     );
+    final gap = t.space.xs;
+    final tabMid = math.max(0.0, t.sizes.frameInset + t.sizes.tabStrip / 2);
+    final logoBand = tabMid + t.sizes.railItem / 2;
+    final headerMid =
+        t.sizes.frameInset +
+        t.sizes.tabStrip +
+        t.borders.hairline +
+        t.sizes.topBar / 2;
+    final spacesTop = headerMid - t.sizes.railItem / 2;
+    final oldSpacesTop = logoBand + 3 * gap;
     return SizedBox(
       key: const Key('icon-rail'),
       width: t.sizes.rail,
@@ -504,21 +514,38 @@ class IconRail extends StatelessWidget {
         child: Column(
           spacing: t.space.xs,
           children: [
-            // The logo slot's centre is on the header row's centreline.
+            // The logo's centre is on the tab row's centreline and the Spaces
+            // item's centre on the side panel header's; the block is as tall
+            // as when Spaces sat right under the logo, so the items below
+            // keep their positions.
             SizedBox(
-              height:
-                  math.max(0.0, t.sizes.frameInset + t.sizes.tabStrip / 2) +
-                  t.sizes.railItem / 2,
-              child: const Align(
-                alignment: Alignment.bottomCenter,
-                child: LogoSlot(),
+              height: math.max(oldSpacesTop, spacesTop) + t.sizes.railItem,
+              child: Stack(
+                children: [
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: logoBand,
+                    child: const Align(
+                      alignment: Alignment.bottomCenter,
+                      child: LogoSlot(),
+                    ),
+                  ),
+                  Positioned(
+                    top: spacesTop,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: SpacesMenuButton(
+                        key: const Key('rail-spaces'),
+                        state: state,
+                        mirror: mirror,
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            SizedBox(height: t.space.xs),
-            SpacesMenuButton(
-              key: const Key('rail-spaces'),
-              state: state,
-              mirror: mirror,
             ),
             for (final s in topSections()) button(s),
             const Spacer(),

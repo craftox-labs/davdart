@@ -87,6 +87,18 @@ void main() {
     }
   }
 
+  testWidgets('rail Spaces icon is level with the side panel header', (
+    t,
+  ) async {
+    await _pump(t, 1280, LayoutSide.start);
+    expect(
+      (t.getRect(_k('rail-spaces')).center.dy -
+              t.getRect(_k('side-header')).center.dy)
+          .abs(),
+      lessThanOrEqualTo(1),
+    );
+  });
+
   testWidgets('header controls share one centreline at 1280', (t) async {
     final s = await _pump(t, 1280, LayoutSide.start);
     s.select('a');

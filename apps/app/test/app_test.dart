@@ -1414,10 +1414,7 @@ void main() {
         matching: find.byType(Icon),
       );
       expect(t.getSize(glyph).width, tk.icons.rail);
-      expect(
-        (t.getCenter(mark).dx - t.getCenter(glyph).dx).abs(),
-        lessThan(1),
-      );
+      expect((t.getCenter(mark).dx - t.getCenter(glyph).dx).abs(), lessThan(1));
       final keys = [
         'logo-slot',
         'rail-spaces',
