@@ -171,8 +171,9 @@ class RailTabPainter extends CustomPainter {
   final bool vertical;
 
   /// A header tab that starts (or ends) at a divider rather than in free
-  /// space: that side has no concave corner and no rounding, so the tab's
-  /// edge lines up with the divider. Only with [vertical].
+  /// space: that side has no concave corner at its base, so the tab's edge
+  /// runs straight into the divider (its top corner stays rounded like any
+  /// tab's). Only with [vertical].
   final bool squareStart, squareEnd;
 
   /// Mirrors the tab to open leftwards (the rail is on the right).
@@ -206,8 +207,8 @@ class RailTabPainter extends CustomPainter {
     canvas.drawRRect(
       RRect.fromRectAndCorners(
         Rect.fromLTWH(0, 0, size.width + reach, size.height),
-        topLeft: squareStart ? Radius.zero : Radius.circular(r),
-        bottomLeft: squareEnd ? Radius.zero : Radius.circular(r),
+        topLeft: Radius.circular(r),
+        bottomLeft: Radius.circular(r),
       ),
       fillPaint,
     );
@@ -215,6 +216,28 @@ class RailTabPainter extends CustomPainter {
       ..color = border
       ..style = PaintingStyle.stroke
       ..strokeWidth = borderWidth;
+    if (vertical) {
+      // The tab's outline in the panel's border colour: top and both sides
+      // (inset by half the width so the stroke stays inside the box), left
+      // open at the base where the tab joins the panel.
+      final o = borderWidth / 2;
+      final inner = Radius.circular(r - o);
+      final to = edge + borderWidth; // past the panel's outer top edge
+      canvas.drawPath(
+        Path()
+          ..moveTo(squareStart ? to : edge - r, o)
+          ..lineTo(r, o)
+          ..arcToPoint(Offset(o, r), radius: inner, clockwise: false)
+          ..lineTo(o, size.height - r)
+          ..arcToPoint(
+            Offset(r, size.height - o),
+            radius: inner,
+            clockwise: false,
+          )
+          ..lineTo(squareEnd ? to : edge - r, size.height - o),
+        arc,
+      );
+    }
     for (final above in [true, false]) {
       if (above ? squareStart : squareEnd) continue;
       final cy = above ? -r : size.height + r;
@@ -546,10 +569,7 @@ class JoinedTab extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: hovered ? t.hover : null,
-        borderRadius: BorderRadius.only(
-          topLeft: flushStart ? Radius.zero : Radius.circular(t.radii.tab),
-          topRight: flushEnd ? Radius.zero : Radius.circular(t.radii.tab),
-        ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(t.radii.tab)),
       ),
       child: box,
     );

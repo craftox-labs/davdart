@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+import 'dart:ui' as ui;
+
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
@@ -101,6 +104,57 @@ void main() {
       expect(p.reach, _hair);
       // Home is now inactive: no joined paint.
       expect(_in('tab-home', 'joined-tab'), findsNothing);
+    });
+  });
+
+  group('joined tab outline', () {
+    Future<ByteData> paint(WidgetTester t, {required bool flush}) async {
+      const fill = Color(0xFF112233), line = Color(0xFFAA0000);
+      const w = 100.0, h = 34.0;
+      final painter = RailTabPainter(
+        fill: fill,
+        border: line,
+        borderWidth: 1,
+        radius: 8,
+        margin: 0,
+        vertical: true,
+        squareStart: flush,
+      );
+      final rec = ui.PictureRecorder();
+      // Room around the box for the flare and the base overlap.
+      final c = Canvas(rec)..translate(20, 20);
+      painter.paint(c, const Size(w, h));
+      final img = await t.runAsync(() => rec.endRecording().toImage(160, 80));
+      return (await t.runAsync(img!.toByteData))!;
+    }
+
+    int px(ByteData d, int x, int y) => d.getUint32((y * 160 + x) * 4);
+
+    testWidgets('strokes the top and both sides, rounded at the top', (
+      t,
+    ) async {
+      final d = await paint(t, flush: false);
+      const line = 0xAA0000FF;
+      // Top edge and the two sides (tab box at x 20..120, y 20..54).
+      expect(px(d, 70, 20), line);
+      expect(px(d, 20, 40), line);
+      expect(px(d, 119, 40), line);
+      // The rounded top corner leaves its very corner unpainted.
+      expect(px(d, 20, 20), isNot(line));
+      // Inside is the fill.
+      expect(px(d, 70, 40), 0x112233FF);
+    });
+
+    testWidgets('a flush start keeps the rounded top, drops the flare', (
+      t,
+    ) async {
+      final free = await paint(t, flush: false);
+      final flush = await paint(t, flush: true);
+      // Left of the box: the flare paints there only when not flush.
+      expect(px(free, 17, 54), isNot(0));
+      expect(px(flush, 17, 54), 0);
+      expect(px(flush, 20, 20), isNot(0xAA0000FF));
+      expect(px(flush, 20, 40), 0xAA0000FF);
     });
   });
 
