@@ -1257,6 +1257,8 @@ class AppState extends ChangeNotifier {
           syncMessage = 'Could not reach the server: $e';
         }
       }
+      await _checkHeld(src);
+      if (src != source) return;
       // A section the collection cannot hold is never loaded or synced.
       section = _supportedSection(section);
       var loaded = supportsNotes ? await src.load() : <Note>[];
@@ -1301,8 +1303,28 @@ class AppState extends ChangeNotifier {
   /// Which sections the current Space's collection supports (VJOURNAL,
   /// VTODO, VEVENT); all of them without a catalog or for local Spaces.
   bool get supportsNotes => catalog?.currentInfo?.notes ?? true;
-  bool get supportsTasks => catalog?.currentInfo?.tasks ?? true;
-  bool get supportsEvents => catalog?.currentInfo?.events ?? true;
+
+  ///
+  /// A type also counts when the Space already holds items of it (a
+  /// collection that does not advertise it but has some).
+  bool get supportsTasks => (catalog?.currentInfo?.tasks ?? true) || _heldTasks;
+  bool get supportsEvents =>
+      (catalog?.currentInfo?.events ?? true) || _heldEvents;
+  bool _heldTasks = false, _heldEvents = false;
+
+  /// Notes the items stored locally for a type the collection does not
+  /// advertise, so the type stays usable.
+  Future<void> _checkHeld(NoteSource src) async {
+    _heldTasks = false;
+    _heldEvents = false;
+    if (src is! SpaceNoteSource) return;
+    final info = catalog?.currentInfo;
+    if (info == null) return;
+    try {
+      if (!info.tasks) _heldTasks = (await src.loadTasks()).isNotEmpty;
+      if (!info.events) _heldEvents = (await src.loadEvents()).isNotEmpty;
+    } catch (_) {}
+  }
 
   /// Sync state for the sidebar: null when there is no server.
   bool syncing = false;

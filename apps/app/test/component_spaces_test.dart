@@ -1,10 +1,14 @@
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/space_catalog.dart';
+import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
+
+import 'tasks_helper.dart';
+
 import 'package:http/testing.dart';
 
 // A server with a notes calendar and a bot calendar that takes only VEVENT
@@ -127,15 +131,28 @@ void main() {
     expect(botSeen, hasLength(3), reason: '$botSeen');
     expect(botSeen.where((r) => r.startsWith('VJOURNAL')), isEmpty);
     expect(bot.syncMessage, startsWith('Synced'));
-    final (noTasks, s1) = await open(['VJOURNAL', 'VEVENT'], 'Bot');
-    expect(s1, hasLength(4));
-    expect(noTasks.tasksEditable, isFalse);
-    expect(noTasks.editable && noTasks.eventsEditable, isTrue);
-    final (noEvents, s2) = await open(['VJOURNAL', 'VTODO'], 'Bot');
-    expect(s2, hasLength(4));
-    expect(noEvents.eventsEditable, isFalse);
-    expect(noEvents.tasksEditable, isTrue);
+    // A VJOURNAL collection is a project Space: tasks and events too,
+    // whatever it advertises (the real davdart collection holds events).
+    final (davdart, s1) = await open(['VJOURNAL', 'VTODO'], 'Bot');
+    expect(s1, hasLength(5), reason: '$s1');
+    expect(davdart.supportsEvents && davdart.supportsTasks, isTrue);
+    expect(davdart.editable && davdart.eventsEditable, isTrue);
+    final (onlyNotes, s2) = await open(['VJOURNAL'], 'Bot');
+    expect(onlyNotes.supportsEvents && onlyNotes.tasksEditable, isTrue);
+    expect(s2, hasLength(5), reason: '$s2');
   });
+
+  test(
+    'a type the collection does not advertise stays when items exist',
+    () async {
+      final (tasksOnly, _) = await open(['VTODO'], 'Bot');
+      expect(tasksOnly.supportsEvents, isFalse);
+      await (tasksOnly.source as SpaceNoteSource).saveEvent(mkEvent('e1'));
+      await tasksOnly.load();
+      expect(tasksOnly.supportsEvents, isTrue);
+      expect(tasksOnly.supportsNotes, isFalse);
+    },
+  );
 
   test('sections redirect to a supported one in the state itself', () async {
     final (bot, _) = await open(['VEVENT', 'VTODO'], 'Bot');
@@ -143,9 +160,10 @@ void main() {
     expect(bot.section, Section.tasks);
     bot.openEventsPanel();
     expect(bot.section, Section.events);
-    final (noTasks, _) = await open(['VJOURNAL', 'VEVENT'], 'Bot');
-    noTasks.openTasksPanel();
-    expect(noTasks.section, Section.notes);
+    // An org-style collection has no Notes; a project one keeps Tasks.
+    final (proj, _) = await open(['VJOURNAL', 'VEVENT'], 'Bot');
+    proj.openTasksPanel();
+    expect(proj.section, Section.tasks);
   });
 
   test('persisted Space JSON without component fields supports all', () {
@@ -160,5 +178,15 @@ void main() {
     expect((a.notes, a.tasks, a.events), (true, true, true));
     expect((b.notes, b.tasks, b.events), (true, true, true));
     expect((cc.notes, cc.tasks, cc.events), (false, true, true));
+    // An old save with events off on a notes Space is migrated on.
+    final m2 = MemoryStorage();
+    m2.write(
+      'davdart.spaces.v1',
+      '[{"id":"d","name":"D","notes":true,"events":false},'
+          '{"id":"e","name":"E","notes":false,"events":false}]',
+    );
+    final c2 = SpaceCatalog(m2);
+    expect(c2.spaces[0].events, isTrue);
+    expect(c2.spaces[1].events, isFalse);
   });
 }

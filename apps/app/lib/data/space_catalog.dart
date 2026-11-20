@@ -15,15 +15,19 @@ class SpaceInfo {
     this.name, {
     this.collection,
     this.notes = true,
-    this.tasks = true,
-    this.events = true,
-  });
+    bool tasks = true,
+    bool events = true,
+  }) : // A Space that takes notes (VJOURNAL) is a project Space: it gets
+       // tasks and events too, whatever the collection advertises.
+       tasks = tasks || notes,
+       events = events || notes;
   final String id;
   final String name;
 
   /// Which components the Space's server collection takes. A collection
-  /// with no VJOURNAL (events and tasks only) has no Notes section, and so
-  /// on. Local Spaces and new Spaces take all three.
+  /// with no VJOURNAL (events and tasks only) has no Notes section, and
+  /// keeps just what it advertises. With VJOURNAL all three are on. Local
+  /// Spaces and new Spaces take all three.
   final bool notes, tasks, events;
 
   SpaceInfo renamed(String n) => SpaceInfo(
