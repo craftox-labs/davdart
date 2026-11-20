@@ -15,6 +15,7 @@ import 'move_space_dialog.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
 import 'new_space_dialog.dart';
+import 'note_editor.dart';
 import 'parts.dart';
 import 'task_menu.dart';
 import 'theme.dart';
@@ -57,6 +58,21 @@ Object? targetItem(AppState s) {
   return u == null ? null : s.findItem(u);
 }
 
+/// The item in edit mode that Esc or Ctrl+Enter act on: the focused area's
+/// (peek or main page), else any open one; null when none is editing.
+String? editingUid(AppState s) {
+  final byArea = switch (s.nav.area) {
+    NavArea.peek => s.hasPeek ? s.peekUid : null,
+    NavArea.main => s.mainItemUid,
+    _ => null,
+  };
+  if (byArea != null && s.isEditing(byArea)) return byArea;
+  for (final u in [s.mainItemUid, if (s.hasPeek) s.peekUid]) {
+    if (u != null && s.isEditing(u)) return u;
+  }
+  return null;
+}
+
 /// Gives the side panel the keyboard focus, on its list's cursor.
 void focusPanel(AppState s) {
   void f() => s.nav.focusArea(NavArea.panel, list: navListId(s, NavArea.panel));
@@ -91,6 +107,11 @@ void _left(ActionContext c) {
       }
     }
   }
+  if (nav.area == NavArea.main &&
+      navListId(s, NavArea.main) == KeyNav.homeList &&
+      nav.homeSide(-1)) {
+    return;
+  }
   nav.moveArea(-1, (a) => navListId(s, a));
 }
 
@@ -110,6 +131,11 @@ void _right(ActionContext c) {
       }
       return;
     }
+  }
+  if (nav.area == NavArea.main &&
+      navListId(s, NavArea.main) == KeyNav.homeList &&
+      nav.homeSide(1)) {
+    return;
   }
   nav.moveArea(1, (a) => navListId(s, a));
 }
@@ -540,6 +566,28 @@ List<AppAction> buildActions(AppState state) {
       const ['l', 'Right'],
       _right,
     ),
+    key(
+      'nav.section-prev',
+      'Previous section on Home',
+      'Navigation',
+      const ['{'],
+      (c) {
+        final s = c.state;
+        if (s.nav.area == NavArea.main &&
+            navListId(s, NavArea.main) == KeyNav.homeList) {
+          s.nav.homeSection(-1);
+        }
+      },
+    ),
+    key('nav.section-next', 'Next section on Home', 'Navigation', const ['}'], (
+      c,
+    ) {
+      final s = c.state;
+      if (s.nav.area == NavArea.main &&
+          navListId(s, NavArea.main) == KeyNav.homeList) {
+        s.nav.homeSection(1);
+      }
+    }),
     key('focus.left', 'Focus the area on the left', 'Navigation', const ['H'], (
       c,
     ) {
@@ -556,11 +604,32 @@ List<AppAction> buildActions(AppState state) {
     ),
     key(
       'nav.escape',
-      'Clear typed keys, or move focus up one area',
+      'Hide the cursor and rings; leave edit mode; else move focus up one area',
       'Navigation',
       const ['Esc'],
       (c) {
-        c.state.nav.up((a) => navListId(c.state, a));
+        final s = c.state;
+        // Nothing shows and the focus is on the key catcher: Esc leaves an
+        // open edit before it moves the area focus.
+        final u = editingUid(s);
+        if (u != null && !popoverOpen()) {
+          s.nav.hide();
+          s.leaveEdit(u);
+          return;
+        }
+        s.nav.up((a) => navListId(s, a));
+      },
+    ),
+    AppAction(
+      id: 'edit.save-exit',
+      title: 'Save and leave edit mode',
+      group: 'Edit',
+      keywords: const ['done', 'finish', 'close'],
+      shortcuts: const ['Ctrl+Enter', 'Cmd+Enter'],
+      enabled: (s) => editingUid(s) != null,
+      run: (c) {
+        final u = editingUid(c.state);
+        if (u != null) c.state.saveAndLeave(u);
       },
     ),
     key('nav.open', 'Open the item under the cursor', 'Open', const [

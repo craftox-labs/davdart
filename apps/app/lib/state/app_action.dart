@@ -77,6 +77,12 @@ const knownShortcuts = <(String, String)>[
   ('Up / Down, Enter, Esc', 'Move, run and close in the palette'),
 ];
 
+/// Keys of an open edit that live in the editors, for the Edit group of the
+/// help dialog (Ctrl/Cmd+Enter is a registry action).
+const editShortcuts = <(String, String)>[
+  ('Esc', 'Leave edit mode (asks first if unsaved)'),
+];
+
 /// The help dialog's groups, in order. An action sits in the group named by
 /// [helpGroupOf] its own group.
 const helpGroups = ['Navigation', 'Open', 'Edit', 'Go to', 'Panes', 'App'];
@@ -98,6 +104,7 @@ List<(String, List<(String, String)>)> helpRows(List<AppAction> actions) {
     if (a.shortcuts.isEmpty) continue;
     by[helpGroupOf(a.group)]!.add((a.shortcuts.join(' / '), a.helpTitle));
   }
+  by['Edit']!.addAll(editShortcuts);
   by['App']!.addAll(knownShortcuts);
   return [
     for (final g in helpGroups)

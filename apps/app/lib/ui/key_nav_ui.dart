@@ -8,6 +8,7 @@ import '../state/key_bindings.dart';
 import '../state/key_nav.dart';
 import 'app_actions.dart';
 import 'command_palette.dart';
+import 'note_editor.dart';
 import 'theme.dart';
 
 /// Rows are all built (a big cache extent) so a cursor can scroll to any row.
@@ -107,10 +108,31 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
       if (route != null && !route.isCurrent) return;
       final f = FocusManager.instance.primaryFocus;
       if (f != null && f is! FocusScopeNode) return;
+      // A dropdown that is open manages its own focus; it is restored when
+      // the dropdown closes (the focus change fires again).
+      if (popoverOpen()) return;
       if (nav.node.context != null && nav.node.canRequestFocus) {
         nav.node.requestFocus();
       }
     });
+  }
+
+  /// After a click: a focused control (not a text field, not inside a popover
+  /// or dialog) hands the focus back to the key catcher, so it keeps no ring.
+  void _releaseSoon() {
+    if (!mounted) return;
+    final route = ModalRoute.of(context);
+    if (route != null && !route.isCurrent) return;
+    final f = FocusManager.instance.primaryFocus;
+    if (f == null || f == nav.node || f is FocusScopeNode) return;
+    if (_typing) return;
+    final c = f.context;
+    if (c == null || c.findAncestorWidgetOfExactType<OverlayPortal>() != null) {
+      return;
+    }
+    if (nav.node.context != null && nav.node.canRequestFocus) {
+      nav.node.requestFocus();
+    }
   }
 
   @override
@@ -137,6 +159,18 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
       return KeyEventResult.ignored;
     }
     final kb = HardwareKeyboard.instance;
+    if ((kb.isControlPressed || kb.isMetaPressed) &&
+        !kb.isAltPressed &&
+        (e.logicalKey == LogicalKeyboardKey.enter ||
+            e.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+      // Ctrl/Cmd+Enter: save and leave the open edit (the key catcher holds
+      // the focus; inside a field the editor handles it).
+      if (editingUid(state) == null) return KeyEventResult.ignored;
+      final save = buildActions(state)
+          .firstWhere((a) => a.id == 'edit.save-exit');
+      Future.sync(() => save.run(ActionContext(state, context)));
+      return KeyEventResult.handled;
+    }
     if (kb.isControlPressed || kb.isMetaPressed || kb.isAltPressed) {
       return KeyEventResult.ignored;
     }
@@ -156,10 +190,23 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
       }
     }
 
-    // Esc first clears a half-typed sequence or count.
-    if (token == 'Esc' && (pending.isNotEmpty || nav.count > 0)) {
-      nav.clearPending();
-      return KeyEventResult.handled;
+    // Esc first clears a half-typed sequence or count, then hides the cursor
+    // and rings (and takes the focus off a control); only when nothing shows
+    // does it move the area focus up (the registry's Esc action).
+    if (token == 'Esc') {
+      final f = FocusManager.instance.primaryFocus;
+      final off = f != null && f != nav.node && f is! FocusScopeNode;
+      if (pending.isNotEmpty || nav.count > 0) {
+        nav.clearPending();
+        if (nav.shown) nav.hide();
+        if (off) nav.node.requestFocus();
+        return KeyEventResult.handled;
+      }
+      if (nav.shown || off) {
+        nav.hide();
+        if (off) nav.node.requestFocus();
+        return KeyEventResult.handled;
+      }
     }
     // A numeric prefix (5j), Vim keys only.
     if (state.vimKeys &&
@@ -214,9 +261,16 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
       onKeyEvent: _key,
       child: Listener(
         behavior: HitTestBehavior.translucent,
-        // A press on empty space drops the focus to the scope; take it back.
-        onPointerDown: (_) =>
-            WidgetsBinding.instance.addPostFrameCallback((_) => _restoreSoon()),
+        // A press hides the cursor and rings (keyboard modality ends). A press
+        // on empty space drops the focus to the scope; take it back. After a
+        // click on a control, the focus returns to the key catcher too (a
+        // text field keeps it), so no ring stays on it.
+        onPointerDown: (_) {
+          nav.hide();
+          WidgetsBinding.instance.addPostFrameCallback((_) => _restoreSoon());
+        },
+        onPointerUp: (_) =>
+            WidgetsBinding.instance.addPostFrameCallback((_) => _releaseSoon()),
         child: Stack(
           fit: StackFit.expand,
           children: [

@@ -11,9 +11,13 @@ enum NavArea { rail, panel, main, peek }
 /// it), the item [uid] when the row is a note, task or event, and how to open
 /// it. [hidden] is asked at move time (a row inside a folded group).
 class NavEntry {
-  const NavEntry(this.id, {this.uid, this.open, this.hidden});
+  const NavEntry(this.id, {this.uid, this.open, this.hidden, this.block});
   final String id;
   final String? uid;
+
+  /// Home grid only: the block (Tasks card, Events card, a board column) the
+  /// row belongs to. Board columns are named `col:<status>`.
+  final String? block;
 
   /// Opens the row; [mode] null means the "open in" setting.
   final Future<void> Function(OpenMode? mode)? open;
@@ -35,8 +39,13 @@ class KeyNav extends ChangeNotifier {
 
   NavArea _area = NavArea.panel;
 
-  /// Whether the keyboard has been used (the area mark and cursor show).
+  /// Keyboard modality, like `:focus-visible`: the area mark, the cursor and
+  /// the rings show only after a navigation key and are hidden by any pointer
+  /// press or Esc. The key handler itself stays alive either way.
   bool shown = false;
+
+  /// Home Today cards are stacked (narrow), set by the cards each build.
+  bool homeStacked = false;
 
   /// Layout, set by the shell each build: which areas are on screen.
   final Set<NavArea> _visible = {NavArea.main};
@@ -64,6 +73,14 @@ class KeyNav extends ChangeNotifier {
   void markShown() {
     if (shown) return;
     shown = true;
+    notifyListeners();
+  }
+
+  /// A pointer press or Esc: the mark, cursor and rings hide; the next
+  /// navigation key shows them again where they were.
+  void hide() {
+    if (!shown) return;
+    shown = false;
     notifyListeners();
   }
 
@@ -156,6 +173,16 @@ class KeyNav extends ChangeNotifier {
   /// A list's current rows, in order. Called from `build`: stores only.
   void publish(String list, List<NavEntry> rows) => _lists[list] = rows;
 
+  final Map<String, List<NavEntry>> _homeGroups = {};
+
+  /// Fills one group of the Home grid (`today`: the Tasks and Events card
+  /// rows; `board`: the board cards, column by column). The `home` list is
+  /// the groups in that order.
+  void publishHome(String group, List<NavEntry> rows) {
+    _homeGroups[group] = rows;
+    _lists[homeList] = [...?_homeGroups['today'], ...?_homeGroups['board']];
+  }
+
   List<NavEntry> _rows(String list) => [
     for (final e in _lists[list] ?? const <NavEntry>[])
       if (!(e.hidden?.call() ?? false)) e,
@@ -211,8 +238,116 @@ class KeyNav extends ChangeNotifier {
     setCursor(list, id);
   }
 
+  // --- Home grid: blocks (Tasks card, Events card, board columns) ---
+
+  static String _sectionOf(String? block) =>
+      block != null && block.startsWith('col:') ? 'board' : (block ?? '');
+
+  /// The visible Home rows grouped by block, in order.
+  List<List<NavEntry>> _homeBlocks() {
+    final out = <List<NavEntry>>[];
+    String? last;
+    for (final e in _rows(homeList)) {
+      if (e.block != last || out.isEmpty) {
+        out.add([]);
+        last = e.block;
+      }
+      out.last.add(e);
+    }
+    return out;
+  }
+
+  (int, int) _homePos(List<List<NavEntry>> blocks) {
+    final c = cursorId(homeList);
+    for (var b = 0; b < blocks.length; b++) {
+      final i = blocks[b].indexWhere((e) => e.id == c);
+      if (i >= 0) return (b, i);
+    }
+    return (-1, -1);
+  }
+
+  /// One step down (+1) or up (-1) on Home: stays inside the card or board
+  /// column; when the cards are stacked it flows into the next block.
+  void _homeStep(int dir) {
+    final blocks = _homeBlocks();
+    final (b, i) = _homePos(blocks);
+    if (b < 0) {
+      if (blocks.isNotEmpty) {
+        setCursor(homeList, blocks.first.first.id, dir: dir);
+      }
+      return;
+    }
+    final j = i + dir;
+    if (j >= 0 && j < blocks[b].length) {
+      setCursor(homeList, blocks[b][j].id, dir: dir);
+      return;
+    }
+    if (!homeStacked) return;
+    // The vertical chain when stacked: the card blocks, then the first board
+    // column (any column's top leads back up to the last card).
+    final chain = <int>[
+      for (var k = 0; k < blocks.length; k++)
+        if (_sectionOf(blocks[k].first.block) != 'board') k,
+    ];
+    final board = blocks.indexWhere(
+      (bl) => _sectionOf(bl.first.block) == 'board',
+    );
+    if (board >= 0) chain.add(board);
+    final onBoard = _sectionOf(blocks[b].first.block) == 'board';
+    final at = chain.indexOf(onBoard ? board : b);
+    final k = at + dir;
+    if (at < 0 || k < 0 || k >= chain.length) return;
+    final target = blocks[chain[k]];
+    setCursor(homeList, (dir > 0 ? target.first : target.last).id, dir: dir);
+  }
+
+  /// h/l on Home: to the card or column beside this one, on the same row
+  /// number (clamped). False when there is none (the area moves instead).
+  bool homeSide(int dir) {
+    final blocks = _homeBlocks();
+    final (b, i) = _homePos(blocks);
+    if (b < 0) return false;
+    final sec = _sectionOf(blocks[b].first.block);
+    final peers = [
+      for (var k = 0; k < blocks.length; k++)
+        if (sec == 'board'
+            ? _sectionOf(blocks[k].first.block) == 'board'
+            : !homeStacked && _sectionOf(blocks[k].first.block) != 'board')
+          k,
+    ];
+    final at = peers.indexOf(b);
+    final k = at + dir;
+    if (at < 0 || k < 0 || k >= peers.length) return false;
+    final target = blocks[peers[k]];
+    setCursor(homeList, target[i.clamp(0, target.length - 1)].id);
+    return true;
+  }
+
+  /// `{` and `}`: the first row of the previous or next section (Tasks card,
+  /// Events card, Board), skipping empty ones. False at either end.
+  bool homeSection(int dir) {
+    final blocks = _homeBlocks();
+    final (b, _) = _homePos(blocks);
+    final firsts = <String, NavEntry>{};
+    for (final bl in blocks) {
+      firsts.putIfAbsent(_sectionOf(bl.first.block), () => bl.first);
+    }
+    final secs = firsts.keys.toList();
+    final cur = b < 0 ? -1 : secs.indexOf(_sectionOf(blocks[b].first.block));
+    final k = cur < 0 ? (dir > 0 ? 0 : secs.length - 1) : cur + dir;
+    if (k < 0 || k >= secs.length) return false;
+    setCursor(homeList, firsts[secs[k]]!.id, dir: dir);
+    return true;
+  }
+
   /// Moves the cursor of [list] by [by] rows, clamped.
   void move(String list, int by) {
+    if (list == homeList) {
+      for (var n = 0; n < by.abs(); n++) {
+        _homeStep(by.sign);
+      }
+      return;
+    }
     final rows = _rows(list);
     if (rows.isEmpty) return;
     final c = cursorId(list);

@@ -1,4 +1,5 @@
 import 'package:davdart/davdart.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -185,3 +186,88 @@ class NoteEditor extends StatelessWidget {
     );
   }
 }
+
+/// True while an input method is composing text (Esc then belongs to it).
+bool imeComposing() {
+  final c = FocusManager.instance.primaryFocus?.context;
+  final ed = c?.findAncestorStateOfType<EditableTextState>();
+  return ed != null && ed.textEditingValue.composing.isValid;
+}
+
+/// Whether a dropdown, picker or calendar popover is showing (or still
+/// animating closed): Esc belongs to it first. Found by the content widget
+/// forui builds only while its popover is open.
+bool popoverOpen() {
+  var open = false;
+  final re = RegExp(r'^(Content<|FCalendar|FTimePicker|FPicker|FAutocomplete)');
+  void visit(Element e) {
+    if (open) return;
+    if (re.hasMatch(e.widget.runtimeType.toString())) {
+      open = true;
+      return;
+    }
+    e.visitChildren(visit);
+  }
+
+  WidgetsBinding.instance.rootElement?.visitChildren(visit);
+  return open;
+}
+
+/// Keys of an open edit, while the focus is inside the editor: Esc leaves
+/// edit mode (a dirty edit asks first), Ctrl/Cmd+Enter saves and leaves. An
+/// open dropdown or dialog takes Esc first (it handles the key before it
+/// bubbles here); so does an IME that is composing.
+class EditKeys extends StatelessWidget {
+  const EditKeys({
+    super.key,
+    required this.state,
+    required this.uid,
+    required this.child,
+  });
+  final AppState state;
+  final String uid;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Focus(
+    canRequestFocus: false,
+    skipTraversal: true,
+    onKeyEvent: (_, e) {
+      if (e is! KeyDownEvent) return KeyEventResult.ignored;
+      final kb = HardwareKeyboard.instance;
+      if (e.logicalKey == LogicalKeyboardKey.escape &&
+          !kb.isControlPressed &&
+          !kb.isMetaPressed &&
+          !kb.isAltPressed) {
+        if (imeComposing() || popoverOpen()) return KeyEventResult.ignored;
+        state.leaveEdit(uid);
+        return KeyEventResult.handled;
+      }
+      if ((e.logicalKey == LogicalKeyboardKey.enter ||
+              e.logicalKey == LogicalKeyboardKey.numpadEnter) &&
+          (kb.isControlPressed || kb.isMetaPressed)) {
+        state.saveAndLeave(uid);
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    },
+    child: child,
+  );
+}
+
+/// The edit-mode icons of a detail header: Cancel (Esc) and Save and close
+/// (Ctrl+Enter).
+List<Widget> editIcons(AppState state, String uid) => [
+  IconAction(
+    key: const Key('edit-cancel-action'),
+    tooltip: 'Cancel (Esc)',
+    icon: FLucideIcons.x,
+    onPress: () => state.leaveEdit(uid),
+  ),
+  IconAction(
+    key: const Key('edit-save-action'),
+    tooltip: 'Save and close (Ctrl+Enter)',
+    icon: FLucideIcons.check,
+    onPress: () => state.saveAndLeave(uid),
+  ),
+];

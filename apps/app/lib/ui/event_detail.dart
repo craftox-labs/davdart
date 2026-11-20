@@ -11,6 +11,7 @@ import 'event_menu.dart';
 import 'event_when.dart';
 import 'markdown_lite.dart';
 import 'parts.dart';
+import 'note_editor.dart';
 import 'theme.dart';
 
 const _statusWords = [
@@ -241,6 +242,7 @@ class EventDetail extends StatelessWidget {
                   autofocus: true,
                 ),
           actions: [
+            if (draft != null) ...editIcons(state, uid),
             if (edit) ...[
               if (state.spaces.length > 1)
                 IconAction(
@@ -385,6 +387,6 @@ class EventDetail extends StatelessWidget {
       },
       child: page,
     );
-    return page;
+    return draft == null ? page : EditKeys(state: state, uid: uid, child: page);
   }
 }

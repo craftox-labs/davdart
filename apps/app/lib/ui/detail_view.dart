@@ -78,6 +78,7 @@ class DetailView extends StatelessWidget {
                   autofocus: true,
                 ),
           actions: [
+            if (draft != null) ...editIcons(state, uid),
             if (state.editable) ...[
               if (state.spaces.length > 1)
                 IconAction(
@@ -309,6 +310,6 @@ class DetailView extends StatelessWidget {
       },
       child: page,
     );
-    return page;
+    return draft == null ? page : EditKeys(state: state, uid: uid, child: page);
   }
 }

@@ -46,16 +46,17 @@ class _HomeTodayState extends State<HomeToday> {
   AppState get state => widget.state;
   final _rows = <NavEntry>[];
 
-  NavEntry _entry(String id, String uid) => NavEntry(
+  NavEntry _entry(String id, String uid, String block) => NavEntry(
     id,
     uid: uid,
+    block: block,
     open: (mode) async {
       await state.openNote(uid, mode: mode);
     },
   );
 
-  Widget _navRow(String id, String uid, Widget row) {
-    _rows.add(_entry(id, uid));
+  Widget _navRow(String block, String id, String uid, Widget row) {
+    _rows.add(_entry(id, uid, block));
     return NavRow(
       key: ValueKey('nav-home-$id'),
       nav: state.nav,
@@ -115,7 +116,7 @@ class _HomeTodayState extends State<HomeToday> {
           _tasksCard(context, clock),
           _eventsCard(context, clock),
         ];
-        state.nav.publish(KeyNav.homeList, List.of(_rows));
+        state.nav.publishHome('today', List.of(_rows));
         return ContentCap(
           child: Padding(
             key: const Key('home-today'),
@@ -123,6 +124,7 @@ class _HomeTodayState extends State<HomeToday> {
             child: LayoutBuilder(
               builder: (context, c) {
                 final gap = t.space.lg;
+                state.nav.homeStacked = c.maxWidth < Tokens.stackBreakpoint;
                 if (c.maxWidth < Tokens.stackBreakpoint) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -181,6 +183,7 @@ class _HomeTodayState extends State<HomeToday> {
       rows: [
         for (final k in due.take(_maxRows))
           _navRow(
+            'tasks',
             'task-${k.uid}',
             k.uid,
             TaskRow(
@@ -228,6 +231,7 @@ class _HomeTodayState extends State<HomeToday> {
       rows: [
         for (final o in sorted.take(_maxRows))
           _navRow(
+            'events',
             eventRowId(o),
             o.event.uid,
             EventRow(key: eventRowKey(o), state: state, occurrence: o),
@@ -286,31 +290,37 @@ class TodayCard extends StatelessWidget {
               padding: EdgeInsets.all(t.space.xs),
               child: Row(
                 children: [
-                  Flexible(
-                    child: OverflowTip(
-                      title,
-                      style: t.type.labelStyle.copyWith(
-                        fontSize: t.type.caption,
-                        color: t.muted,
-                      ),
+                  // Title and count take the free width, so the link and
+                  // the add button end at the card's right edge.
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Flexible(
+                          child: OverflowTip(
+                            title,
+                            style: t.type.labelStyle.copyWith(
+                              fontSize: t.type.caption,
+                              color: t.muted,
+                            ),
+                          ),
+                        ),
+                        SizedBox(width: t.space.sm),
+                        Text(
+                          '$count',
+                          key: Key('home-today-$slug-count'),
+                          style: muted,
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(width: t.space.sm),
-                  Text(
-                    '$count',
-                    key: Key('home-today-$slug-count'),
-                    style: muted,
-                  ),
-                  const Spacer(),
                   if (link != null)
-                    Flexible(
-                      child: FTappable(
-                        key: Key('home-today-$slug-all'),
-                        onPress: onLink,
-                        child: OverflowTip(
-                          link!,
-                          style: muted.copyWith(color: t.accent),
-                        ),
+                    FTappable(
+                      key: Key('home-today-$slug-all'),
+                      onPress: onLink,
+                      child: Text(
+                        link!,
+                        maxLines: 1,
+                        style: muted.copyWith(color: t.accent),
                       ),
                     ),
                   if (add != null) ...[SizedBox(width: t.space.sm), add!],

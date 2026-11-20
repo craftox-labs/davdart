@@ -170,8 +170,10 @@ void main() {
       await _press(t, LogicalKeyboardKey.keyL);
       expect(s.nav.area, NavArea.peek);
       // Esc goes up a level at a time.
+      await _press(t, LogicalKeyboardKey.escape); // hides first
       await _press(t, LogicalKeyboardKey.escape);
       expect(s.nav.area, NavArea.main);
+      await _press(t, LogicalKeyboardKey.escape); // hides first
       await _press(t, LogicalKeyboardKey.escape);
       expect(s.nav.area, NavArea.panel);
       // A folded panel is skipped.
@@ -366,7 +368,7 @@ void main() {
       s.nav.focusArea(NavArea.main, list: KeyNav.homeList);
       await t.pump();
       expect(s.nav.cursorId(KeyNav.homeList), 'task-a');
-      await _press(t, _j);
+      await _press(t, LogicalKeyboardKey.keyL);
       expect(s.nav.cursorId(KeyNav.homeList), 'event-row-e1');
       await _press(t, LogicalKeyboardKey.enter);
       expect(s.peekUid, 'e1');

@@ -3,7 +3,10 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/key_nav.dart';
+import 'key_nav_ui.dart';
 import '../state/note_drag.dart';
+import '../theme/tokens.dart';
 import 'drag_drop.dart';
 import 'chips.dart';
 import 'content_grid.dart';
@@ -12,13 +15,36 @@ import 'note_menu.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
+/// Publishes the Home board's cards (column by column) as the keyboard rows
+/// of the Home grid; a collapsed Board is skipped at move time.
+void publishBoardNav(AppState state) {
+  state.nav.publishHome('board', [
+    for (final (name, notes) in state.columns(includeNoStatus: false))
+      for (final n in notes)
+        NavEntry(
+          'card-${n.uid}',
+          uid: n.uid,
+          block: 'col:$name',
+          open: (mode) async {
+            await state.openNote(n.uid, mode: mode);
+          },
+          hidden: () =>
+              state.prefs?.read('davdart.home.board.collapsed.v1') == 'true',
+        ),
+  ]);
+}
+
 class BoardView extends StatelessWidget {
   const BoardView({
     super.key,
     required this.state,
     this.includeNoStatus = true,
+    this.keyboard = false,
   });
   final AppState state;
+
+  /// Home's board: the cards are rows of the keyboard grid.
+  final bool keyboard;
 
   /// Whether notes with no status get a column (off on Home).
   final bool includeNoStatus;
@@ -82,9 +108,10 @@ class BoardView extends StatelessWidget {
           ),
           Expanded(
             child: ListView(
+              scrollCacheExtent: navCacheExtent,
               children: [
                 for (final n in notes)
-                  _Card(state: state, note: n, column: name),
+                  _Card(state: state, note: n, column: name, home: keyboard),
               ],
             ),
           ),
@@ -163,7 +190,13 @@ class BoardView extends StatelessWidget {
 }
 
 class _Card extends StatelessWidget {
-  const _Card({required this.state, required this.note, required this.column});
+  const _Card({
+    required this.state,
+    required this.note,
+    required this.column,
+    this.home = false,
+  });
+  final bool home;
   final AppState state;
   final Note note;
 
@@ -193,36 +226,42 @@ class _Card extends StatelessWidget {
           uid: note.uid,
           source: NoteDragSource.board,
           label: note.summary,
-          child: FTappable(
-            onPress: () => state.clickNote(note.uid),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: t.card,
-                borderRadius: BorderRadius.circular(t.radii.card),
-                border: Border.all(color: selected ? t.accent : t.cardBorder),
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(t.space.lg),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(p.itemId ?? note.summary, style: t.type.semiboldStyle),
-                    if (p.itemId != null) ...[
-                      SizedBox(height: t.space.xxs),
-                      OverflowTip(
-                        note.summary,
-                        maxLines: 2,
-                        style: t.type.bodyStyle.copyWith(color: t.muted),
-                      ),
-                    ],
-                    if (p.owner != null) ...[
-                      SizedBox(height: t.space.sm),
+          child: _keyRow(
+            t,
+            FTappable(
+              onPress: () => state.clickNote(note.uid),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: t.card,
+                  borderRadius: BorderRadius.circular(t.radii.card),
+                  border: Border.all(color: selected ? t.accent : t.cardBorder),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.all(t.space.lg),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        p.owner!,
-                        style: t.type.captionStyle.copyWith(color: t.muted),
+                        p.itemId ?? note.summary,
+                        style: t.type.semiboldStyle,
                       ),
+                      if (p.itemId != null) ...[
+                        SizedBox(height: t.space.xxs),
+                        OverflowTip(
+                          note.summary,
+                          maxLines: 2,
+                          style: t.type.bodyStyle.copyWith(color: t.muted),
+                        ),
+                      ],
+                      if (p.owner != null) ...[
+                        SizedBox(height: t.space.sm),
+                        Text(
+                          p.owner!,
+                          style: t.type.captionStyle.copyWith(color: t.muted),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -231,4 +270,15 @@ class _Card extends StatelessWidget {
       ),
     );
   }
+
+  Widget _keyRow(Tokens t, Widget child) => home
+      ? NavRow(
+          key: ValueKey('nav-card-${note.uid}'),
+          nav: state.nav,
+          list: KeyNav.homeList,
+          id: 'card-${note.uid}',
+          radius: t.radii.card,
+          child: child,
+        )
+      : child;
 }

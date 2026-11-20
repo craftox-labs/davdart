@@ -270,24 +270,31 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
                 Flexible(
                   child: ListenableBuilder(
                     listenable: state,
-                    builder: (context, _) => CollapsibleSection(
-                      id: 'home-board',
-                      title: 'Board',
-                      count: [
-                        for (final c in state.columns(includeNoStatus: false))
-                          ...c.$2,
-                      ].length,
-                      prefs: state.prefs,
-                      prefKey: 'davdart.home.board.collapsed.v1',
-                      fill: true,
-                      headerPadding: EdgeInsets.fromLTRB(
-                        t.space.lg,
-                        t.space.md,
-                        t.space.lg,
-                        0,
-                      ),
-                      child: BoardView(state: state, includeNoStatus: false),
-                    ),
+                    builder: (context, _) {
+                      publishBoardNav(state);
+                      return CollapsibleSection(
+                        id: 'home-board',
+                        title: 'Board',
+                        count: [
+                          for (final c in state.columns(includeNoStatus: false))
+                            ...c.$2,
+                        ].length,
+                        prefs: state.prefs,
+                        prefKey: 'davdart.home.board.collapsed.v1',
+                        fill: true,
+                        headerPadding: EdgeInsets.fromLTRB(
+                          t.space.lg,
+                          t.space.md,
+                          t.space.lg,
+                          0,
+                        ),
+                        child: BoardView(
+                          state: state,
+                          includeNoStatus: false,
+                          keyboard: true,
+                        ),
+                      );
+                    },
                   ),
                 )
               else

@@ -2710,6 +2710,51 @@ class AppState extends ChangeNotifier {
     return true;
   }
 
+  /// Whether item [uid] (note, task or event) is open in edit mode.
+  bool isEditing(String uid) =>
+      _drafts.containsKey(uid) ||
+      _taskDrafts.containsKey(uid) ||
+      _eventDrafts.containsKey(uid);
+
+  void _dropDraft(String uid) {
+    _drafts.remove(uid);
+    _taskDrafts.remove(uid);
+    _eventDrafts.remove(uid);
+    notifyListeners();
+  }
+
+  /// Leaves edit mode for [uid] (Esc, Cancel): a clean edit just closes; a
+  /// dirty one asks first (save, discard or keep editing). False when the
+  /// user keeps editing.
+  Future<bool> leaveEdit(String uid) async {
+    if (!isEditing(uid)) return true;
+    if (!await _settleDrafts([uid])) return false;
+    if (isEditing(uid)) _dropDraft(uid);
+    return true;
+  }
+
+  /// Saves the edit of [uid] and leaves edit mode (Ctrl/Cmd+Enter, the Save
+  /// icon). A clean edit just closes. False when nothing was saved (empty
+  /// title, failure): edit mode stays.
+  Future<bool> saveAndLeave(String uid) async {
+    if (!isEditing(uid)) return true;
+    final dirty = _taskDrafts.containsKey(uid)
+        ? dirtyTaskFor(uid)
+        : _eventDrafts.containsKey(uid)
+        ? dirtyEventFor(uid)
+        : dirtyFor(uid);
+    if (!dirty) {
+      _dropDraft(uid);
+      return true;
+    }
+    final saved = _taskDrafts.containsKey(uid)
+        ? await saveTaskDraft(uid)
+        : _eventDrafts.containsKey(uid)
+        ? await saveEventDraft(uid)
+        : await saveDraft(uid);
+    return saved;
+  }
+
   /// Runs [action] once unsaved edits are settled: saved or discarded as the
   /// user chooses, or not run at all. Settles the drafts of [uids] (the peek
   /// note by default: navigating away from the peek).

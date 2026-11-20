@@ -11,6 +11,7 @@ import 'parts.dart';
 import 'chips.dart';
 import 'task_menu.dart';
 import 'task_parts.dart';
+import 'note_editor.dart';
 import 'theme.dart';
 
 const _statusWords = [
@@ -355,6 +356,7 @@ class TaskDetail extends StatelessWidget {
                   autofocus: true,
                 ),
           actions: [
+            if (draft != null) ...editIcons(state, uid),
             if (edit) ...[
               if (state.spaces.length > 1)
                 IconAction(
@@ -559,6 +561,6 @@ class TaskDetail extends StatelessWidget {
       },
       child: page,
     );
-    return page;
+    return draft == null ? page : EditKeys(state: state, uid: uid, child: page);
   }
 }

@@ -82,7 +82,7 @@ String? keyToken(KeyEvent e, {required bool shift}) {
   if (c == null) return null;
   if (shift) {
     // A simulated or raw key reports the unshifted character.
-    const shifted = {'/': '?', ';': ':'};
+    const shifted = {'/': '?', ';': ':', '[': '{', ']': '}'};
     c = shifted[c] ?? c.toUpperCase();
   } else if (RegExp('[A-Z]').hasMatch(c) && !_capsOn()) {
     c = c.toLowerCase();
