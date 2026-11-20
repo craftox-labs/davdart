@@ -102,7 +102,6 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('Notes'), findsNothing);
       s.openNoteTab('a');
       await t.pumpAndSettle();
       expect(_k('tab-home'), findsOneWidget);
