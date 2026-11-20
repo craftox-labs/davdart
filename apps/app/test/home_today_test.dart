@@ -303,4 +303,17 @@ void main() {
       expect(t.takeException(), isNull);
     });
   }
+
+  testWidgets('the Today header chevron collapses and expands it (desktop)', (
+    t,
+  ) async {
+    await pumpTasksApp(t, size: const Size(1280, 900));
+    expect(_k('home-today'), findsOneWidget);
+    await t.tap(_k('today-section-toggle'));
+    await t.pumpAndSettle();
+    expect(_k('home-today'), findsNothing);
+    await t.tap(_k('today-section-toggle'));
+    await t.pumpAndSettle();
+    expect(_k('home-today'), findsOneWidget);
+  });
 }

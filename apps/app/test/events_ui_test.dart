@@ -756,7 +756,7 @@ void main() {
         await t.tap(find.text('Cancel'));
         await t.pumpAndSettle();
         if (narrow) {
-          await t.tap(_k('menu-close'));
+          await t.tap(_k('menu-logo'));
           await t.pumpAndSettle();
         }
         s.select('l1');

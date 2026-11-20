@@ -75,54 +75,96 @@ Color _border(WidgetTester t, String key) {
 void main() {
   for (final size in _phones) {
     group('narrow at $size', () {
-      testWidgets('the bar has Back, Search, +, counter, Home at 44dp', (
-        t,
-      ) async {
-        await pumpTasksApp(t, size: size);
-        expect(_k('mobile-bar'), findsOneWidget);
-        for (final k in ['bar-back', 'bar-search', 'bar-add', 'bar-count']) {
-          expect(_k(k), findsOneWidget);
-          expect(t.getRect(_k(k)).height, greaterThanOrEqualTo(44));
-        }
-        expect(_k('bar-home'), findsOneWidget);
-        // The old chrome is gone.
-        expect(_k('bottom-nav'), findsNothing);
-        expect(_k('fab-add'), findsNothing);
-        expect(_k('peek-sheet'), findsNothing);
-        // Space chip on Home, centred in the top bar.
-        expect(_k('space-chip'), findsOneWidget);
-        _noError(t);
-      });
+      testWidgets(
+        'the bar has Back, Home, Search, counter at 44dp; + floats above',
+        (t) async {
+          await pumpTasksApp(t, size: size);
+          expect(_k('mobile-bar'), findsOneWidget);
+          for (final k in ['bar-back', 'bar-home', 'bar-search', 'bar-count']) {
+            expect(_k(k), findsOneWidget);
+            expect(t.getRect(_k(k)).height, greaterThanOrEqualTo(44));
+          }
+          // Order: Back, Home, Search, counter.
+          final xs = [
+            for (final k in ['bar-back', 'bar-home', 'bar-search', 'bar-count'])
+              t.getRect(_k(k)).left,
+          ];
+          expect(xs, [...xs]..sort());
+          // The + is a floating button above the bar, at its right end.
+          expect(
+            t.getRect(_k('bar-add')).bottom,
+            lessThanOrEqualTo(t.getRect(_k('mobile-bar')).top),
+          );
+          expect(t.getRect(_k('bar-add')).right, greaterThan(size.width / 2));
+          // No pill: the bar has a top rule only.
+          final deco =
+              t.widget<DecoratedBox>(_k('mobile-bar')).decoration
+                  as BoxDecoration;
+          expect(deco.borderRadius, isNull);
+          expect(deco.color, isNull);
+          // The old chrome is gone.
+          expect(_k('bottom-nav'), findsNothing);
+          expect(_k('fab-add'), findsNothing);
+          expect(_k('peek-sheet'), findsNothing);
+          // Space chip on Home, centred in the top bar.
+          expect(_k('space-chip'), findsOneWidget);
+          _noError(t);
+        },
+      );
 
-      testWidgets('side menu: button, filter, panel, gear, close', (t) async {
-        final s = await pumpTasksApp(
-          t,
-          notes: [_note('n1', 'Alpha')],
-          tasks: [mkTask('k1', summary: 'Pay rent')],
-          size: size,
-        );
-        await _openMenu(t);
-        expect(_k('side-menu'), findsOneWidget);
-        expect(_k('space-chip'), findsWidgets);
-        expect(find.text('Alpha'), findsWidgets);
-        // The filter is the rail's section: it persists in AppState.
-        await _filter(t, 'tasks');
-        expect(s.section, Section.tasks);
-        expect(_k('tasks-view'), findsOneWidget);
-        await _filter(t, 'events');
-        expect(_k('events-panel'), findsOneWidget);
-        await t.tap(_k('menu-settings'));
-        await t.pumpAndSettle();
-        expect(s.section, Section.settings);
-        await t.tap(_k('menu-close'));
-        await t.pumpAndSettle();
-        expect(_k('side-menu'), findsNothing);
-        _noError(t);
-      });
+      testWidgets(
+        'side menu: button, panel, filter at the bottom, gear, logo',
+        (t) async {
+          final s = await pumpTasksApp(
+            t,
+            notes: [_note('n1', 'Alpha')],
+            tasks: [mkTask('k1', summary: 'Pay rent')],
+            size: size,
+          );
+          await _openMenu(t);
+          expect(_k('side-menu'), findsOneWidget);
+          expect(_k('space-chip'), findsWidgets);
+          expect(find.text('Alpha'), findsWidgets);
+          // The filter is the rail's section: it persists in AppState.
+          // The filter pill is full width and sits below the panel.
+          final pill = t.getRect(_k('menu-filter'));
+          expect(pill.width, greaterThan(size.width - 48));
+          expect(
+            pill.top,
+            greaterThan(t.getRect(find.text('Alpha').first).bottom),
+          );
+          expect(_k('menu-fold'), findsOneWidget);
+          await _filter(t, 'tasks');
+          expect(s.section, Section.tasks);
+          expect(_k('menu-fold'), findsNothing);
+          expect(_k('tasks-view'), findsOneWidget);
+          await _filter(t, 'events');
+          expect(_k('events-panel'), findsOneWidget);
+          await t.tap(_k('menu-settings'));
+          await t.pumpAndSettle();
+          expect(s.section, Section.settings);
+          // The bar stays; the logo replaces the menu button and closes it.
+          expect(_k('mobile-bar'), findsOneWidget);
+          expect(_k('menu'), findsNothing);
+          expect(_k('menu-close'), findsNothing);
+          await t.tap(_k('menu-logo'));
+          await t.pumpAndSettle();
+          expect(_k('side-menu'), findsNothing);
+          expect(_k('menu'), findsOneWidget);
+          _noError(t);
+        },
+      );
 
       testWidgets('a left-edge swipe opens the side menu', (t) async {
         await pumpTasksApp(t, size: size);
         await t.dragFrom(Offset(4, size.height / 2), const Offset(120, 0));
+        await t.pumpAndSettle();
+        expect(_k('side-menu'), findsOneWidget);
+      });
+
+      testWidgets('a short drag from 28dp in opens the menu', (t) async {
+        await pumpTasksApp(t, size: size);
+        await t.dragFrom(Offset(28, size.height / 2), const Offset(40, 0));
         await t.pumpAndSettle();
         expect(_k('side-menu'), findsOneWidget);
         _noError(t);
@@ -220,7 +262,7 @@ void main() {
         // With the Tasks filter, task comes first.
         await _openMenu(t);
         await _filter(t, 'tasks');
-        await t.tap(_k('menu-close'));
+        await t.tap(_k('menu-logo'));
         await t.pumpAndSettle();
         await t.tap(_k('bar-add'));
         await t.pumpAndSettle();

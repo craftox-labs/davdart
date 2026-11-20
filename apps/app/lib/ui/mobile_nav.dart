@@ -102,8 +102,9 @@ void showAddMenu(
   });
 }
 
-/// The floating bottom bar: Back, Search, +, the open-items counter, Home.
-class MobileBar extends StatefulWidget {
+/// The bottom bar: Back, Home, Search and the open-items counter, directly
+/// under a hairline (no pill or card). New items come from [AddFab].
+class MobileBar extends StatelessWidget {
   const MobileBar({
     super.key,
     required this.state,
@@ -118,29 +119,20 @@ class MobileBar extends StatefulWidget {
   final VoidCallback onBack, onSearch, onGrid, onHome;
 
   @override
-  State<MobileBar> createState() => _MobileBarState();
-}
-
-class _MobileBarState extends State<MobileBar> with TickerProviderStateMixin {
-  @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final count = widget.state.tabs.length;
-    final canAdd = addEntries(widget.state).isNotEmpty;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        t.space.lg,
-        t.space.xs,
-        t.space.lg,
-        t.space.md,
+    final count = state.tabs.length;
+    return DecoratedBox(
+      key: const Key('mobile-bar'),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(color: t.panelBorder, width: t.borders.hairline),
+        ),
       ),
-      child: Container(
-        key: const Key('mobile-bar'),
-        padding: EdgeInsets.symmetric(horizontal: t.space.sm),
-        decoration: BoxDecoration(
-          color: t.panel,
-          borderRadius: BorderRadius.circular(t.radii.panel + t.space.md),
-          border: Border.all(color: t.panelBorder, width: t.borders.hairline),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: t.space.lg,
+          vertical: t.space.xs,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -149,57 +141,63 @@ class _MobileBarState extends State<MobileBar> with TickerProviderStateMixin {
               key: const Key('bar-back'),
               tooltip: 'Back',
               icon: FLucideIcons.arrowLeft,
-              onPress: widget.canBack ? widget.onBack : null,
-            ),
-            IconAction(
-              key: const Key('bar-search'),
-              tooltip: 'Search',
-              icon: FLucideIcons.search,
-              onPress: widget.onSearch,
-            ),
-            IconAction(
-              key: const Key('bar-add'),
-              tooltip: 'New',
-              icon: FLucideIcons.plus,
-              onPress: canAdd
-                  ? () => showAddMenu(context, this, widget.state)
-                  : null,
-            ),
-            FTappable(
-              key: const Key('bar-count'),
-              semanticsLabel: 'Open items: $count',
-              behavior: HitTestBehavior.opaque,
-              onPress: widget.onGrid,
-              child: SizedBox(
-                width: t.sizes.touchTarget,
-                height: t.sizes.touchTarget,
-                child: Center(
-                  child: Container(
-                    constraints: BoxConstraints(
-                      minWidth: t.icons.lg + t.space.sm,
-                      minHeight: t.icons.lg + t.space.sm,
-                    ),
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(t.radii.control),
-                      border: Border.all(
-                        color: t.fg,
-                        width: t.borders.hairline * 2,
-                      ),
-                    ),
-                    child: Text('$count', style: t.type.captionStyle),
-                  ),
-                ),
-              ),
+              onPress: canBack ? onBack : null,
             ),
             IconAction(
               key: const Key('bar-home'),
               tooltip: 'Home',
               icon: FLucideIcons.house,
-              onPress: widget.onHome,
+              onPress: onHome,
+            ),
+            IconAction(
+              key: const Key('bar-search'),
+              tooltip: 'Search',
+              icon: FLucideIcons.search,
+              onPress: onSearch,
+            ),
+            FTappable(
+              key: const Key('bar-count'),
+              semanticsLabel: 'Open items: $count',
+              behavior: HitTestBehavior.opaque,
+              onPress: onGrid,
+              child: SizedBox(
+                width: t.sizes.touchTarget,
+                height: t.sizes.touchTarget,
+                child: Center(child: Text('$count', style: t.type.labelStyle)),
+              ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The floating accent + button above the bar's right end; opens the + menu.
+class AddFab extends StatefulWidget {
+  const AddFab({super.key, required this.state});
+  final AppState state;
+
+  @override
+  State<AddFab> createState() => _AddFabState();
+}
+
+class _AddFabState extends State<AddFab> with TickerProviderStateMixin {
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    if (addEntries(widget.state).isEmpty) return const SizedBox.shrink();
+    final size = t.sizes.touchTarget + t.space.sm;
+    return FTappable(
+      key: const Key('bar-add'),
+      semanticsLabel: 'New',
+      behavior: HitTestBehavior.opaque,
+      onPress: () => showAddMenu(context, this, widget.state),
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(color: t.accent, shape: BoxShape.circle),
+        child: Icon(FLucideIcons.plus, size: t.icons.lg, color: t.onAccent),
       ),
     );
   }
@@ -358,34 +356,14 @@ class _SideMenuPageState extends State<SideMenuPage>
                 children: [
                   SpaceChip(state: state),
                   const Spacer(),
-                  IconAction(
-                    key: const Key('menu-close'),
-                    tooltip: 'Close menu',
-                    icon: FLucideIcons.x,
-                    onPress: widget.onClose,
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.symmetric(horizontal: t.space.lg),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: touchBox(
-                  context,
-                  FButton(
-                    key: const Key('menu-filter'),
-                    variant: FButtonVariant.secondary,
-                    size: FButtonSizeVariant.xs,
-                    mainAxisSize: MainAxisSize.min,
-                    prefix: Icon(sectionMeta(section).$1),
-                    suffix: const Icon(FLucideIcons.chevronDown),
-                    onPress: _pickFilter,
-                    child: Text(
-                      inFilter ? _label(section) : sectionMeta(section).$2,
+                  if (section == Section.notes)
+                    IconAction(
+                      key: const Key('menu-fold'),
+                      tooltip: 'Collapse or expand folders',
+                      icon: FLucideIcons.listChevronsDownUp,
+                      onPress: state.toggleAllFolders,
                     ),
-                  ),
-                ),
+                ],
               ),
             ),
             Expanded(
@@ -393,6 +371,28 @@ class _SideMenuPageState extends State<SideMenuPage>
                 nav: state.nav,
                 area: NavArea.panel,
                 child: sectionBody(state, section, widget.onClose),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                t.space.lg,
+                t.space.xs,
+                t.space.lg,
+                t.space.xs,
+              ),
+              child: touchBox(
+                context,
+                FButton(
+                  key: const Key('menu-filter'),
+                  variant: FButtonVariant.secondary,
+                  size: FButtonSizeVariant.xs,
+                  prefix: Icon(sectionMeta(section).$1),
+                  suffix: const Icon(FLucideIcons.chevronDown),
+                  onPress: _pickFilter,
+                  child: Text(
+                    inFilter ? _label(section) : sectionMeta(section).$2,
+                  ),
+                ),
               ),
             ),
             Padding(

@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/key_nav.dart';
 import '../theme/tokens.dart';
+import 'collapsible_section.dart';
 import 'content_grid.dart';
 import 'event_menu.dart';
 import '../state/event_rules.dart';
@@ -45,11 +46,14 @@ class _HomeTodayState extends State<HomeToday> {
 
   AppState get state => widget.state;
   final _rows = <NavEntry>[];
+  static const _prefKey = 'davdart.home.today.collapsed.v1';
+  late bool _collapsed = state.prefs?.read(_prefKey) == 'true';
 
   NavEntry _entry(String id, String uid, String block) => NavEntry(
     id,
     uid: uid,
     block: block,
+    hidden: () => _collapsed,
     open: (mode) async {
       await state.openNote(uid, mode: mode);
     },
@@ -118,47 +122,57 @@ class _HomeTodayState extends State<HomeToday> {
         ];
         state.nav.publishHome('today', List.of(_rows));
         return ContentCap(
-          child: Padding(
-            key: const Key('home-today'),
-            padding: EdgeInsets.fromLTRB(t.space.lg, t.space.md, t.space.lg, 0),
-            child: LayoutBuilder(
-              builder: (context, c) {
-                final gap = t.space.lg;
-                state.nav.homeStacked = c.maxWidth < Tokens.stackBreakpoint;
-                if (c.maxWidth < Tokens.stackBreakpoint) {
-                  // Stacked cards can outgrow a phone screen: cap them and
-                  // scroll inside, so the board below keeps some room.
-                  final stack = Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < cards.length; i++) ...[
-                        if (i > 0) SizedBox(height: gap),
-                        cards[i],
+          child: CollapsibleSection(
+            id: 'today-section',
+            title: 'Today',
+            prefs: state.prefs,
+            prefKey: _prefKey,
+            initiallyCollapsed: _collapsed,
+            onChanged: (c) => setState(() => _collapsed = c),
+            headerPadding: EdgeInsets.fromLTRB(
+              t.space.lg,
+              t.space.md,
+              t.space.lg,
+              0,
+            ),
+            child: Padding(
+              key: const Key('home-today'),
+              padding: EdgeInsets.fromLTRB(
+                t.space.lg,
+                t.space.sm,
+                t.space.lg,
+                0,
+              ),
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final gap = t.space.lg;
+                  state.nav.homeStacked = c.maxWidth < Tokens.stackBreakpoint;
+                  if (c.maxWidth < Tokens.stackBreakpoint) {
+                    // Stacked cards; on a phone Home they scroll with the
+                    // board in one scroll view (see app.dart).
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < cards.length; i++) ...[
+                          if (i > 0) SizedBox(height: gap),
+                          cards[i],
+                        ],
                       ],
-                    ],
-                  );
-                  // Only on the narrow layout: a wide window whose main pane
-                  // is narrow keeps the uncapped desktop behaviour.
-                  if (!narrowLayout(context)) return stack;
-                  return ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.sizeOf(context).height * 0.4,
+                    );
+                  }
+                  return IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        for (var i = 0; i < cards.length; i++) ...[
+                          if (i > 0) SizedBox(width: gap),
+                          Expanded(child: cards[i]),
+                        ],
+                      ],
                     ),
-                    child: SingleChildScrollView(child: stack),
                   );
-                }
-                return IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < cards.length; i++) ...[
-                        if (i > 0) SizedBox(width: gap),
-                        Expanded(child: cards[i]),
-                      ],
-                    ],
-                  ),
-                );
-              },
+                },
+              ),
             ),
           ),
         );

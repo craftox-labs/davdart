@@ -2971,6 +2971,25 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Collapses every folder that has children, or expands all when none is
+  /// open (the side menu's fold button).
+  void toggleAllFolders() {
+    final parents = <String>[];
+    void walk(List<NoteNode> nodes) {
+      for (final n in nodes) {
+        if (n.children.isNotEmpty) parents.add(n.note.uid);
+        walk(n.children);
+      }
+    }
+
+    walk(tree.roots);
+    final anyOpen = parents.any((u) => !collapsed.contains(u));
+    collapsed.clear();
+    if (anyOpen) collapsed.addAll(parents);
+    _saveCollapsed();
+    notifyListeners();
+  }
+
   String get _spaceKey => catalog?.current ?? 'default';
   String get _foldersKey => 'davdart.folders.collapsed.v1.$_spaceKey';
   String get _tagsOpenKey => 'davdart.tags.open.v1.$_spaceKey';

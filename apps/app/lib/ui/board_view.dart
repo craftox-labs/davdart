@@ -52,8 +52,13 @@ class BoardView extends StatelessWidget {
     required this.state,
     this.includeNoStatus = true,
     this.keyboard = false,
+    this.embedded = false,
   });
   final AppState state;
+
+  /// Phone Home: the accordion sizes to its content and does not scroll, so
+  /// a parent scroll view carries it with the Today section.
+  final bool embedded;
 
   /// Home's board: the cards are rows of the keyboard grid.
   final bool keyboard;
@@ -139,6 +144,8 @@ class BoardView extends StatelessWidget {
       if (keyboard) state.nav.boardAccordion = true;
       return ListView(
         key: const Key('board-accordion'),
+        shrinkWrap: embedded,
+        physics: embedded ? const NeverScrollableScrollPhysics() : null,
         padding: EdgeInsets.all(gap),
         children: [
           for (final (name, notes) in cols)

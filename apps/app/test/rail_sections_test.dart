@@ -99,7 +99,7 @@ void main() {
           size: Size(w, 900),
         );
         for (final sec in ['tasks', 'events']) {
-          if (_k('menu').evaluate().isNotEmpty) {
+          if (w < 880) {
             await t.tap(_k('menu'));
             await t.pumpAndSettle();
             await t.tap(_k('menu-filter'));
@@ -110,8 +110,8 @@ void main() {
           }
           await t.pumpAndSettle();
           expect(t.takeException(), isNull, reason: '$sec at $w');
-          if (_k('menu').evaluate().isEmpty) continue;
-          await t.tap(_k('menu-close'));
+          if (w >= 880) continue;
+          await t.tap(_k('menu-logo'));
           await t.pumpAndSettle();
           s.setSection(Section.notes);
         }

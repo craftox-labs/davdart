@@ -23,6 +23,7 @@ import 'detail_view.dart';
 import 'first_run_view.dart';
 import 'list_view.dart';
 import '../state/tab_state.dart';
+import 'logo.dart';
 import 'mobile_nav.dart';
 import 'parts.dart';
 import 'resize_handle.dart';
@@ -300,6 +301,35 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
       mirror: mirror,
     );
 
+    Widget homeBoard({bool embedded = false}) => ListenableBuilder(
+      listenable: state,
+      builder: (context, _) {
+        publishBoardNav(state);
+        return CollapsibleSection(
+          id: 'home-board',
+          title: 'Board',
+          count: [
+            for (final c in state.columns(includeNoStatus: false)) ...c.$2,
+          ].length,
+          prefs: state.prefs,
+          prefKey: 'davdart.home.board.collapsed.v1',
+          fill: !embedded,
+          headerPadding: EdgeInsets.fromLTRB(
+            t.space.lg,
+            t.space.md,
+            t.space.lg,
+            0,
+          ),
+          child: BoardView(
+            state: state,
+            includeNoStatus: false,
+            keyboard: true,
+            embedded: embedded,
+          ),
+        );
+      },
+    );
+
     Widget mainBody() => state.noSpace
         ? FirstRunView(state: state)
         : mainNote != null
@@ -314,39 +344,25 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
         : Column(
             children: [
               ScopeText(state: state),
-              if (state.activeTab == null) HomeToday(state: state),
-              if (state.activeTab == null)
-                Flexible(
-                  child: ListenableBuilder(
-                    listenable: state,
-                    builder: (context, _) {
-                      publishBoardNav(state);
-                      return CollapsibleSection(
-                        id: 'home-board',
-                        title: 'Board',
-                        count: [
-                          for (final c in state.columns(includeNoStatus: false))
-                            ...c.$2,
-                        ].length,
-                        prefs: state.prefs,
-                        prefKey: 'davdart.home.board.collapsed.v1',
-                        fill: true,
-                        headerPadding: EdgeInsets.fromLTRB(
-                          t.space.lg,
-                          t.space.md,
-                          t.space.lg,
-                          0,
-                        ),
-                        child: BoardView(
-                          state: state,
-                          includeNoStatus: false,
-                          keyboard: true,
-                        ),
-                      );
-                    },
+              if (state.activeTab == null &&
+                  MediaQuery.sizeOf(context).width < Tokens.stackBreakpoint)
+                // Phone Home: Today and the board scroll as one.
+                Expanded(
+                  child: SingleChildScrollView(
+                    key: const Key('home-scroll'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        HomeToday(state: state),
+                        homeBoard(embedded: true),
+                      ],
+                    ),
                   ),
                 )
-              else
+              else if (state.activeTab == null) ...[
+                HomeToday(state: state),
+                Flexible(child: homeBoard()),
+              ] else
                 Expanded(
                   child: state.view == ViewMode.board
                       ? BoardView(state: state)
@@ -468,7 +484,9 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
           : TopBar(
               state: state,
               showMenu: !wide,
+              menuOpen: _menuOpen,
               onMenu: () => setState(() => _menuOpen = true),
+              onCloseMenu: () => setState(() => _menuOpen = false),
             ),
       footer: narrowBar
           ? MobileBar(
@@ -483,48 +501,71 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
               onHome: () => _show(null),
             )
           : null,
-      child: body,
+      // Narrow: the side menu and the edge strip live in the body, so the top
+      // bar and the bottom bar stay visible and usable.
+      child: narrowBar
+          ? Stack(
+              children: [
+                Positioned.fill(
+                  child: ExcludeFocus(
+                    excluding: _menuOpen || _gridOpen,
+                    child: ExcludeSemantics(
+                      excluding: _menuOpen || _gridOpen,
+                      child: body,
+                    ),
+                  ),
+                ),
+                if (!_menuOpen && !_gridOpen) ...[
+                  Positioned(
+                    right: t.space.lg,
+                    bottom: t.space.lg,
+                    child: AddFab(state: state),
+                  ),
+                  // The left edge: a short drag or a fling from it opens the
+                  // side menu. The horizontal recogniser leaves taps and
+                  // vertical scrolls to what is underneath.
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: t.sizes.edgeSwipe,
+                    child: GestureDetector(
+                      key: const Key('menu-edge'),
+                      behavior: HitTestBehavior.translucent,
+                      onHorizontalDragStart: (_) => _edgeDx = 0,
+                      onHorizontalDragUpdate: (d) {
+                        _edgeDx += d.primaryDelta ?? 0;
+                        if (_edgeDx > 16) setState(() => _menuOpen = true);
+                      },
+                      onHorizontalDragEnd: (d) {
+                        if (!_menuOpen && (d.primaryVelocity ?? 0) > 250) {
+                          setState(() => _menuOpen = true);
+                        }
+                      },
+                    ),
+                  ),
+                ],
+                if (_menuOpen)
+                  Positioned.fill(
+                    child: SideMenuPage(
+                      state: state,
+                      onClose: () => setState(() => _menuOpen = false),
+                    ),
+                  ),
+              ],
+            )
+          : body,
     );
-    if (!wide && !state.noSpace) {
+    if (narrowBar) {
       final base = content;
       content = Stack(
         children: [
           Positioned.fill(
             child: ExcludeFocus(
-              excluding: _menuOpen || _gridOpen,
-              child: ExcludeSemantics(
-                excluding: _menuOpen || _gridOpen,
-                child: base,
-              ),
+              excluding: _gridOpen,
+              child: ExcludeSemantics(excluding: _gridOpen, child: base),
             ),
           ),
-          if (!_menuOpen && !_gridOpen)
-            // The left edge: a swipe from it opens the side menu.
-            Positioned(
-              left: 0,
-              top: 0,
-              bottom: 0,
-              width: t.sizes.edgeSwipe,
-              child: GestureDetector(
-                key: const Key('menu-edge'),
-                behavior: HitTestBehavior.translucent,
-                // A clearly horizontal drag that began in the strip: the
-                // horizontal recogniser leaves taps and vertical scrolls to
-                // what is underneath.
-                onHorizontalDragStart: (_) => _edgeDx = 0,
-                onHorizontalDragUpdate: (d) {
-                  _edgeDx += d.primaryDelta ?? 0;
-                  if (_edgeDx > 24) setState(() => _menuOpen = true);
-                },
-              ),
-            ),
-          if (_menuOpen)
-            Positioned.fill(
-              child: SideMenuPage(
-                state: state,
-                onClose: () => setState(() => _menuOpen = false),
-              ),
-            ),
           if (_gridOpen)
             Positioned.fill(
               child: OpenItemsGrid(
@@ -758,8 +799,14 @@ class TopBar extends StatelessWidget {
     required this.state,
     required this.showMenu,
     this.onMenu,
+    this.menuOpen = false,
+    this.onCloseMenu,
   });
   final AppState state;
+
+  /// Narrow: the side menu is open; the logo replaces the menu button.
+  final bool menuOpen;
+  final VoidCallback? onCloseMenu;
 
   /// The narrow layout: menu button left, the title centred.
   final bool showMenu;
@@ -819,7 +866,19 @@ class TopBar extends StatelessWidget {
     return PaneHeaderRow(
       key: const Key('top-bar'),
       children: [
-        if (showMenu)
+        if (showMenu && menuOpen)
+          FTappable(
+            key: const Key('menu-logo'),
+            semanticsLabel: 'Close menu',
+            behavior: HitTestBehavior.opaque,
+            onPress: onCloseMenu,
+            child: SizedBox(
+              width: t.sizes.touchTarget,
+              height: t.sizes.touchTarget,
+              child: Center(child: LogoMark(extent: t.icons.lg)),
+            ),
+          )
+        else if (showMenu)
           IconAction(
             compact: true,
             key: const Key('menu'),

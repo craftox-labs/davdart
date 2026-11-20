@@ -251,7 +251,7 @@ class SizeTokens {
     this.tabClose = 16,
     this.touchTarget = 44,
     this.spaceChipMax = 140,
-    this.edgeSwipe = 16,
+    this.edgeSwipe = 32,
   });
 
   /// Edge of the logo on the first-run screen (and other large uses).

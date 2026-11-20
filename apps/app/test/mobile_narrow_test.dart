@@ -62,11 +62,20 @@ void main() {
         size: size,
       );
       expect(find.byKey(const Key('home-today')), findsOneWidget);
-      // The board still gets room below the Today block (it scrolls).
+      // Today and the board share one scroll view.
+      final scroll = find.byKey(const Key('home-scroll'));
+      expect(scroll, findsOneWidget);
       expect(
-        t.getRect(find.byKey(const Key('home-today'))).bottom,
-        lessThan(size.height),
+        find.descendant(
+          of: scroll,
+          matching: find.byKey(const Key('home-today')),
+        ),
+        findsOneWidget,
       );
+      // The Today section collapses from its header chevron.
+      await t.tap(find.byKey(const Key('today-section-toggle')));
+      await t.pumpAndSettle();
+      expect(find.byKey(const Key('home-today')), findsNothing);
       final ex = t.takeException();
       expect(
         ex,
