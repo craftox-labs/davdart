@@ -73,6 +73,7 @@ void showAddMenu(
   AppState state, {
   String prefix = '',
   VoidCallback? before,
+  BuildContext? host,
 }) {
   final entries = addEntries(state);
   if (entries.isEmpty) return;
@@ -89,7 +90,10 @@ void showAddMenu(
               onPress: () {
                 c.hide();
                 before?.call();
-                e.run(context);
+                // The caller may be gone by now (the grid closes): run in
+                // a stable context when given.
+                final run = host ?? context;
+                if (run.mounted) e.run(run);
               },
             ),
         ],
@@ -449,9 +453,13 @@ class OpenItemsGrid extends StatefulWidget {
     required this.state,
     required this.onDone,
     required this.onOpen,
+    required this.host,
   });
   final AppState state;
   final VoidCallback onDone;
+
+  /// A context that outlives the grid (dialogs launched from it).
+  final BuildContext host;
 
   /// Shows tab [t] (null: Home) and closes the grid.
   final void Function(DocTab? t) onOpen;
@@ -505,6 +513,7 @@ class _OpenItemsGridState extends State<OpenItemsGrid>
                           state,
                           prefix: 'grid-',
                           before: widget.onDone,
+                          host: widget.host,
                         ),
                 ),
                 touchBox(

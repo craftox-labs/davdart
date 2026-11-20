@@ -128,6 +128,56 @@ void main() {
         _noError(t);
       });
 
+      testWidgets('a vertical drag in the edge strip does not open the menu', (
+        t,
+      ) async {
+        await pumpTasksApp(t, size: size);
+        await t.dragFrom(Offset(4, size.height / 2), const Offset(0, -120));
+        await t.pumpAndSettle();
+        expect(_k('side-menu'), findsNothing);
+        _noError(t);
+      });
+
+      testWidgets('the covered page is out of focus and semantics', (t) async {
+        await pumpTasksApp(t, size: size);
+        await _openMenu(t);
+        expect(
+          find
+              .byType(ExcludeSemantics)
+              .evaluate()
+              .any((e) => (e.widget as ExcludeSemantics).excluding),
+          isTrue,
+        );
+        _noError(t);
+      });
+
+      testWidgets('a task swipe starting inside the row completes it', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(
+          t,
+          tasks: [mkTask('k1', summary: 'Pay rent')],
+          size: size,
+        );
+        await _openMenu(t);
+        await _filter(t, 'tasks');
+        final y = t.getCenter(_k('task-row-k1')).dy;
+        await t.dragFrom(Offset(60, y), const Offset(220, 0));
+        await t.pumpAndSettle();
+        expect(s.taskById('k1')!.isClosed, isTrue);
+        _noError(t);
+      });
+
+      testWidgets('menus offer no Open in peek on narrow', (t) async {
+        await pumpTasksApp(t, notes: [_note('n1', 'Alpha')], size: size);
+        await _openMenu(t);
+        await t.longPress(find.text('Alpha').first);
+        await t.pumpAndSettle();
+        expect(_k('menu-open-main'), findsOneWidget);
+        expect(_k('menu-open-peek'), findsNothing);
+        _noError(t);
+      });
+
       testWidgets('an item opens full screen and closes the menu', (t) async {
         final s = await pumpTasksApp(
           t,

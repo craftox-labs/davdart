@@ -24,7 +24,6 @@ import 'first_run_view.dart';
 import 'list_view.dart';
 import '../state/tab_state.dart';
 import 'mobile_nav.dart';
-import 'overflow_tip.dart';
 import 'parts.dart';
 import 'resize_handle.dart';
 import 'scope_bar.dart';
@@ -169,6 +168,15 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
 
   /// Narrow layout: the full-screen side menu and the open-items grid.
   bool _menuOpen = false, _gridOpen = false;
+  double _edgeDx = 0;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Set before the first build of a size, never during one.
+    widget.state.narrow =
+        MediaQuery.sizeOf(context).width < Tokens.wideBreakpoint;
+  }
 
   /// Narrow Back: the grid or the menu first, then an open item or view (to
   /// Home). False when nothing is left to close (the app may be left).
@@ -274,7 +282,6 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     if (!hasDetail && _peek.value == 0) _heldPeek = null;
     final peekUid = state.peekUid ?? _heldPeek;
     final mainNote = state.mainItemUid;
-    state.narrow = !wide;
     // Narrow has no peek: an item peeked before (on a wide window) opens
     // full screen.
     if (!wide && state.hasPeek) {
@@ -287,7 +294,8 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     state.nav.setLayout(
       rail: wide,
       panel: (wide && _dockOpen) || _menuOpen,
-      main: split || !hasDetail || !wide,
+      // Narrow: the page is covered while the menu or grid is open.
+      main: wide ? (split || !hasDetail) : !(_menuOpen || _gridOpen),
       peek: hasDetail,
       mirror: mirror,
     );
@@ -481,7 +489,15 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
       final base = content;
       content = Stack(
         children: [
-          Positioned.fill(child: base),
+          Positioned.fill(
+            child: ExcludeFocus(
+              excluding: _menuOpen || _gridOpen,
+              child: ExcludeSemantics(
+                excluding: _menuOpen || _gridOpen,
+                child: base,
+              ),
+            ),
+          ),
           if (!_menuOpen && !_gridOpen)
             // The left edge: a swipe from it opens the side menu.
             Positioned(
@@ -492,8 +508,13 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
               child: GestureDetector(
                 key: const Key('menu-edge'),
                 behavior: HitTestBehavior.translucent,
+                // A clearly horizontal drag that began in the strip: the
+                // horizontal recogniser leaves taps and vertical scrolls to
+                // what is underneath.
+                onHorizontalDragStart: (_) => _edgeDx = 0,
                 onHorizontalDragUpdate: (d) {
-                  if (d.primaryDelta! > 8) setState(() => _menuOpen = true);
+                  _edgeDx += d.primaryDelta ?? 0;
+                  if (_edgeDx > 24) setState(() => _menuOpen = true);
                 },
               ),
             ),
@@ -510,6 +531,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
                 state: state,
                 onDone: () => setState(() => _gridOpen = false),
                 onOpen: _show,
+                host: context,
               ),
             ),
         ],
@@ -757,8 +779,9 @@ class TopBar extends StatelessWidget {
   /// on Home the Space chip.
   Widget _title(Tokens t) {
     final tab = state.activeTab;
+    // An open item carries its title in its own header.
     if (state.mainItemUid != null && tab != null) {
-      return OverflowTip(state.tabTitle(tab), style: paneTitleStyle(t));
+      return const SizedBox.shrink();
     }
     if (state.scope != null || state.activeViewName != null) {
       return ScopeCrumbs(state: state, label: state.activeViewName);

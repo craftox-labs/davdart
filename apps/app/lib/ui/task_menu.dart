@@ -134,13 +134,14 @@ class TaskContextMenu extends StatelessWidget {
     return [
       FItemGroup(
         children: [
-          row(
-            'Open in peek',
-            FLucideIcons.panelRight,
-            () => state.openTask(uid, mode: OpenMode.peek),
-            key: const Key('menu-open-peek'),
-            afterOpen: true,
-          ),
+          if (!state.narrow)
+            row(
+              'Open in peek',
+              FLucideIcons.panelRight,
+              () => state.openTask(uid, mode: OpenMode.peek),
+              key: const Key('menu-open-peek'),
+              afterOpen: true,
+            ),
           row(
             'Open in main',
             FLucideIcons.squareArrowOutUpRight,

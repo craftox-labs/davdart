@@ -323,15 +323,16 @@ class NoteContextMenu extends StatelessWidget {
     final groups = <FItemGroup>[
       FItemGroup(
         children: [
-          row(
-            'Open in peek',
-            FLucideIcons.panelRight,
-            () => hit != null
-                ? state.openHit(hit!, mode: OpenMode.peek)
-                : state.openNote(uid, mode: OpenMode.peek),
-            key: const Key('menu-open-peek'),
-            afterOpen: true,
-          ),
+          if (!state.narrow)
+            row(
+              'Open in peek',
+              FLucideIcons.panelRight,
+              () => hit != null
+                  ? state.openHit(hit!, mode: OpenMode.peek)
+                  : state.openNote(uid, mode: OpenMode.peek),
+              key: const Key('menu-open-peek'),
+              afterOpen: true,
+            ),
           row(
             'Open in main',
             FLucideIcons.squareArrowOutUpRight,
