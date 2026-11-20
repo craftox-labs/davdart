@@ -229,18 +229,23 @@ Future<DateTime?> showTaskDateDialog(
   return showAppDialog<DateTime>(
     context,
     title: 'Due date',
-    width: tokensOf(context).sizes.dialogSm,
+    width: tokensOf(context).sizes.dialogLg,
     content: Builder(
-      builder: (ctx) => Center(
-        child: FCalendar.grid(
-          key: const Key('task-date-calendar'),
-          selectionControl: FDateSelectionControl.managedSingle(
-            initial: initial,
-            onChange: (d) {
-              if (d != null) {
-                Navigator.of(ctx).pop(DateTime.utc(d.year, d.month, d.day));
-              }
-            },
+      builder: (ctx) => FittedBox(
+        // The calendar needs its own width; narrow dialogs scale it down.
+        fit: BoxFit.scaleDown,
+        child: SizedBox(
+          width: tokensOf(ctx).sizes.dialogMd,
+          child: FCalendar.grid(
+            key: const Key('task-date-calendar'),
+            selectionControl: FDateSelectionControl.managedSingle(
+              initial: initial,
+              onChange: (d) {
+                if (d != null) {
+                  Navigator.of(ctx).pop(DateTime.utc(d.year, d.month, d.day));
+                }
+              },
+            ),
           ),
         ),
       ),
