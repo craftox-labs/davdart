@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 
 import '../state/app_action.dart';
 import '../state/app_state.dart';
@@ -44,7 +45,9 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
   /// changes (shortcut labels are otherwise fixed; `enabled` runs at key
   /// time).
   KeyBindings get _bindings {
-    final sig = state.spaces.map((s) => s.id).join('\u0000');
+    final sig = state.spaces
+        .map((s) => '${s.id}\u0001${s.name}')
+        .join('\u0000');
     if (_table == null || _tableVim != state.vimKeys || _tableSpaces != sig) {
       _table = KeyBindings(buildActions(state), vim: state.vimKeys);
       _tableVim = state.vimKeys;
@@ -57,7 +60,31 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
   /// Enter and Space belong to it.
   bool get _control {
     final f = FocusManager.instance.primaryFocus;
-    return f != null && f != nav.node && f is! FocusScopeNode;
+    if (f == null || f == nav.node || f is FocusScopeNode) return false;
+    final c = f.context;
+    if (c == null) return false;
+    var found = false;
+    bool check(Widget w) {
+      if (w is SelectableRegion) return true; // selectable text
+      if (w is FTappable || w is FButton) {
+        found = true;
+        return true;
+      }
+      if (w is Actions &&
+          (w.actions.containsKey(ActivateIntent) ||
+              w.actions.containsKey(ButtonActivateIntent))) {
+        found = true;
+        return true;
+      }
+      return false;
+    }
+
+    if (check(c.widget)) return found;
+    c.visitAncestorElements((e) {
+      if (e.widget == widget) return false;
+      return !check(e.widget);
+    });
+    return found;
   }
 
   bool _restoring = false;
@@ -119,8 +146,14 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
 
     // Enter and Space activate a focused control; the cursor row's Enter
     // applies only when the key catcher itself holds the focus.
-    if ((token == 'Enter' || token == ' ') && _control) {
-      return KeyEventResult.ignored;
+    if (token == 'Enter' || token == ' ') {
+      if (_control) return KeyEventResult.ignored;
+      // Selectable text or a plain focus node: the cursor row's action runs
+      // and the key catcher takes the focus back.
+      final f = FocusManager.instance.primaryFocus;
+      if (f != null && f != nav.node && f is! FocusScopeNode) {
+        nav.node.requestFocus();
+      }
     }
 
     // Esc first clears a half-typed sequence or count.

@@ -5,6 +5,8 @@ import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/key_bindings.dart';
 import 'package:davdart_app/state/key_nav.dart';
 import 'package:davdart_app/ui/app_actions.dart';
+import 'package:davdart_app/ui/key_nav_ui.dart';
+import 'package:davdart_app/ui/parts.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -515,6 +517,44 @@ void main() {
       await t.pump(_ms);
       await _press(t, LogicalKeyboardKey.enter);
       expect(s.peekUid, row);
+    });
+
+    testWidgets('focused selectable text does not block the cursor row', (
+      t,
+    ) async {
+      final s = await pumpTasksApp(t, tasks: [mkTask('a'), mkTask('b')]);
+      s.setSection(Section.tasks);
+      await t.pumpAndSettle();
+      await _press(t, _j);
+      final row = s.nav.cursorId('tasks');
+      expect(row, isNotNull);
+      Overlay.of(t.element(find.byType(KeyNavHandler))).insert(
+        OverlayEntry(
+          builder: (_) => const Align(
+            alignment: Alignment.bottomRight,
+            child: SelectableBody(child: Text('selectable words')),
+          ),
+        ),
+      );
+      await t.pump();
+      await t.tap(find.text('selectable words'));
+      await t.pump(_ms);
+      // The region sits in the navigator's overlay, outside the handler;
+      // a plain node in its context, parented under the catcher, stands in
+      // for the focus it takes (events then bubble through the handler).
+      final plain = FocusNode(debugLabel: 'selectable');
+      final attach = plain.attach(t.element(find.text('selectable words')));
+      attach.reparent(parent: s.nav.node);
+      addTearDown(() {
+        attach.detach();
+        plain.dispose();
+      });
+      plain.requestFocus();
+      await t.pump(_ms);
+      expect(FocusManager.instance.primaryFocus, plain);
+      await _press(t, LogicalKeyboardKey.enter);
+      expect(s.peekUid, row);
+      expect(FocusManager.instance.primaryFocus, s.nav.node);
     });
 
     testWidgets('finishing an edit leaves keys working', (t) async {
