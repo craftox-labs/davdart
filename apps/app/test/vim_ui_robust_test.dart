@@ -154,6 +154,61 @@ void main() {
     expect(keyToken(ev(LogicalKeyboardKey.semicolon, null), shift: true), ':');
   });
 
+  test('Caps Lock with Shift: the typed lowercase letter is the truth', () {
+    KeyEvent ev(LogicalKeyboardKey k, String? ch) => KeyDownEvent(
+      physicalKey: PhysicalKeyboardKey.keyA,
+      logicalKey: k,
+      character: ch,
+      timeStamp: Duration.zero,
+    );
+    HardwareKeyboard.instance.handleKeyEvent(
+      const KeyDownEvent(
+        physicalKey: PhysicalKeyboardKey.capsLock,
+        logicalKey: LogicalKeyboardKey.capsLock,
+        timeStamp: Duration.zero,
+      ),
+    );
+    addTearDown(() {
+      HardwareKeyboard.instance.handleKeyEvent(
+        const KeyUpEvent(
+          physicalKey: PhysicalKeyboardKey.capsLock,
+          logicalKey: LogicalKeyboardKey.capsLock,
+          timeStamp: Duration.zero,
+        ),
+      );
+    });
+    expect(
+      HardwareKeyboard.instance.lockModesEnabled,
+      contains(KeyboardLockMode.capsLock),
+    );
+    expect(keyToken(ev(LogicalKeyboardKey.keyA, 'a'), shift: true), 'a');
+    expect(keyToken(ev(LogicalKeyboardKey.keyA, 'A'), shift: false), 'A');
+  });
+
+  testWidgets('Insert Enter on CRLF text inserts CRLF; LF text stays LF', (
+    t,
+  ) async {
+    final s = await _open(t);
+    final c = s.draftFor('n1')!.bodyController;
+    c.text = 'one\r\ntwo';
+    await t.pumpAndSettle();
+    await t.tap(_k('edit-body'));
+    await t.pumpAndSettle();
+    expect(_mode(t), 'INSERT');
+    c.selection = const TextSelection.collapsed(offset: 3);
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pumpAndSettle();
+    expect(c.text, 'one\r\n\r\ntwo');
+    expect(c.selection.baseOffset, 5);
+    // LF text: the native Enter is untouched.
+    c.text = 'one\ntwo';
+    await t.pumpAndSettle();
+    c.selection = const TextSelection.collapsed(offset: 3);
+    await t.sendKeyEvent(LogicalKeyboardKey.enter);
+    await t.pumpAndSettle();
+    expect(c.text.contains('\r'), isFalse);
+  });
+
   testWidgets(':w with an empty title shows an error; :wq stays', (t) async {
     final s = await _open(t);
     await _toNormal(t);

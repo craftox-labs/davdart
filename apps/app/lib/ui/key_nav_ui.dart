@@ -195,7 +195,11 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
     final route = ModalRoute.of(context);
     final kb0 = HardwareKeyboard.instance;
     final paletteChord = state.chords.idFor(e, kb0) == 'palette.open';
-    if (route != null && !route.isCurrent && !paletteChord) {
+    // Behind another route nothing runs, except the palette chord closing the
+    // palette itself (never opening it over a dialog).
+    if (route != null &&
+        !route.isCurrent &&
+        !(paletteChord && paletteOpen(context))) {
       return KeyEventResult.ignored;
     }
     if (e is! KeyUpEvent) {

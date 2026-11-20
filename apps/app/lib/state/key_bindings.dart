@@ -85,6 +85,11 @@ String? keyToken(KeyEvent e, {required bool shift}) {
   if (real && !(shift && typed.toLowerCase() == label.toLowerCase())) {
     return typed;
   }
+  // Caps Lock on with Shift down types the lowercase letter: that character
+  // is the truth, not the key label.
+  if (real && shift && _capsOn() && RegExp('^[a-z]\$').hasMatch(typed)) {
+    return typed;
+  }
   var c = real ? typed : (label.length == 1 ? label : null);
   if (c == null) return null;
   if (shift) {

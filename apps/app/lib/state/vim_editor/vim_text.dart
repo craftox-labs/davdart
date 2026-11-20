@@ -22,24 +22,62 @@ int nextChar(String t, int i) => i >= t.length ? t.length : snapUp(t, i + 1);
 /// The start of the cluster that ends at [i].
 int prevChar(String t, int i) => i <= 0 ? 0 : snapDown(t, i - 1);
 
-/// [i] moved [n] clusters forward, not past [limit].
+/// [i] moved [n] clusters forward, not past [limit]. Graphemes are walked
+/// once per chunk, so a long single line costs O(n), not O(n * window).
 int stepFwd(String t, int i, int n, int limit) {
-  var p = i;
-  for (var k = 0; k < n && p < limit; k++) {
-    p = nextChar(t, p);
+  if (n <= 0 || i >= limit) return math.min(i, limit);
+  var p = snapDown(t, i);
+  var k = 0;
+  while (k < n && p < limit) {
+    final end = math.min(t.length, p + 512);
+    final sub = t.substring(p, end);
+    var moved = false;
+    var pos = p;
+    for (final g in Characters(sub)) {
+      final next = pos + g.length;
+      // Clusters near the cut of a chunk may be mis-split: redo them in the
+      // next chunk.
+      if (end < t.length && next > end - 32) break;
+      pos = next;
+      moved = true;
+      k++;
+      if (k >= n || pos >= limit) break;
+    }
+    if (!moved) {
+      // A single cluster longer than the chunk: step it the slow way.
+      pos = nextChar(t, p);
+      k++;
+    }
+    p = pos;
   }
   return math.min(p, limit);
 }
 
 /// [i] moved [n] clusters back, not before [limit].
 int stepBack(String t, int i, int n, int limit) {
+  if (n <= 0 || i <= limit) return math.max(i, limit);
   var p = i;
-  for (var k = 0; k < n && p > limit; k++) {
-    p = prevChar(t, p);
+  var k = 0;
+  while (k < n && p > limit) {
+    final s = snapDown(t, math.max(0, p - 512));
+    final starts = <int>[];
+    var pos = s;
+    for (final g in Characters(t.substring(s, p))) {
+      starts.add(pos);
+      pos += g.length;
+    }
+    if (starts.isEmpty) break;
+    var j = starts.length - 1;
+    while (j >= 0 && k < n && p > limit) {
+      p = starts[j--];
+      k++;
+    }
   }
   return math.max(p, limit);
 }
 
+/// Grapheme boundary near [i], decided from a window of code units around
+/// it. The window grows when the cluster at [i] reaches its edge.
 int _snap(String t, int i, bool up) {
   if (i <= 0) return 0;
   if (i >= t.length) return t.length;
@@ -47,15 +85,24 @@ int _snap(String t, int i, bool up) {
   final b = t.codeUnitAt(i);
   // Below U+0300 nothing combines, except the CR LF pair.
   if (a < 0x300 && b < 0x300 && !(a == 13 && b == 10)) return i;
-  final s = math.max(lineStart(t, i), i - 4096);
-  final sub = t.substring(s, math.min(t.length, i + 4096));
-  var pos = s;
-  for (final g in Characters(sub)) {
-    final end = pos + g.length;
-    if (end > i) return pos == i ? i : (up ? end : pos);
-    pos = end;
+  for (var w = 64; ; w *= 4) {
+    final s = math.max(0, i - w);
+    final e = math.min(t.length, i + w);
+    var pos = s;
+    var first = true;
+    for (final g in Characters(t.substring(s, e))) {
+      final end = pos + g.length;
+      if (end > i) {
+        final nearS = s > 0 && (first || pos - s < 16);
+        final nearE = e < t.length && e - end < 16;
+        if ((nearS || nearE) && w < 1 << 20) break;
+        return pos == i ? i : (up ? end : pos);
+      }
+      pos = end;
+      first = false;
+    }
+    if (w >= 1 << 20) return i;
   }
-  return i;
 }
 
 /// Length of the line terminator at [le] (a line end): 2 for CRLF, 1 for LF,

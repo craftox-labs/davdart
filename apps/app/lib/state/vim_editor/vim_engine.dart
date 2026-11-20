@@ -151,8 +151,6 @@ class VimEngine extends ChangeNotifier {
   int get cursor => _c;
   VimRegister? get register => _reg;
 
-  /// Hands the unnamed register over (a fresh engine for another item).
-  void carryRegister(VimRegister? r) => _reg = r;
   bool get canUndo => _undo.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
 
@@ -312,6 +310,9 @@ class VimEngine extends ChangeNotifier {
     final le = lineEnd(_t, _c);
     if (le > ls && _c >= le) _c = prevChar(_t, le);
   }
+
+  /// Whether the text's line break is CRLF.
+  bool get crlf => _nl == '\r\n';
 
   /// The line break of the text: CRLF when it has any, else LF.
   String get _nl => _t.contains('\r\n') ? '\r\n' : '\n';

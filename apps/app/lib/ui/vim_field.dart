@@ -72,15 +72,14 @@ class _VimFieldState extends State<VimField> {
   @override
   void didUpdateWidget(VimField old) {
     super.didUpdateWidget(old);
-    if (old.controller != widget.controller || old.uid != widget.uid) {
-      // Another item (or its controller): a fresh engine, so no undo
-      // history, insert session, mode or pending keys leak across. The
-      // register stays, so yank in one item can be put in another.
+    // The callers key this widget by item uid, so another item builds a new
+    // State (fresh engine; the register is not carried across items). Only a
+    // swapped controller reaches here.
+    if (old.controller != widget.controller) {
       old.controller.removeListener(_ctl);
       widget.controller.addListener(_ctl);
-      final reg = engine.register;
       engine.dispose();
-      engine = _newEngine()..carryRegister(reg);
+      engine = _newEngine();
     }
   }
 
@@ -207,6 +206,24 @@ class _VimFieldState extends State<VimField> {
     }
     if (kb.isAltPressed && !altGr) return KeyEventResult.ignored;
     if (key == LogicalKeyboardKey.escape) return _feed('Esc');
+    if (engine.mode == VimMode.insert &&
+        engine.lineText == null &&
+        engine.crlf &&
+        (key == LogicalKeyboardKey.enter ||
+            key == LogicalKeyboardKey.numpadEnter)) {
+      // The native Enter inserts `\n`: on a CRLF text insert the file's own
+      // ending, so the endings do not mix.
+      final c = widget.controller;
+      final v = c.value;
+      final sel = v.selection.isValid
+          ? v.selection
+          : TextSelection.collapsed(offset: v.text.length);
+      c.value = TextEditingValue(
+        text: v.text.replaceRange(sel.start, sel.end, '\r\n'),
+        selection: TextSelection.collapsed(offset: sel.start + 2),
+      );
+      return KeyEventResult.handled;
+    }
     if (engine.mode == VimMode.insert && engine.lineText == null) {
       return KeyEventResult.ignored;
     }

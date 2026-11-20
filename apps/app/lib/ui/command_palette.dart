@@ -39,6 +39,9 @@ class PaletteShortcuts extends StatelessWidget {
 /// Navigators that have a palette open (a second chord does nothing).
 final _open = Expando<bool>('palette open');
 
+/// Whether the palette is the route on top of [context]'s Navigator.
+bool paletteOpen(BuildContext context) => _open[Navigator.of(context)] == true;
+
 /// Opens the palette over [context]'s Navigator. On close the focus returns
 /// to what had it, then the chosen entry runs.
 Future<void> showCommandPalette(BuildContext context, AppState state) async {
@@ -48,6 +51,8 @@ Future<void> showCommandPalette(BuildContext context, AppState state) async {
     nav.pop();
     return;
   }
+  // Never over a dialog or another route: its actions would run behind it.
+  if (nav.canPop()) return;
   _open[nav] = true;
   final before = FocusManager.instance.primaryFocus;
   final recents = PaletteRecents(state.prefs);
