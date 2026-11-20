@@ -8,6 +8,7 @@ import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Seed implements NoteSource {
@@ -91,13 +92,32 @@ void main() {
       expect(s.activeTab, isNull);
       expect(_close('tab-home'), findsNothing);
       expect(
-        find.descendant(of: _k('tab-home'), matching: find.text('Notes')),
+        find.descendant(of: _k('tab-home'), matching: find.text('Home')),
         findsOneWidget,
       );
+      expect(
+        find.descendant(
+          of: _k('tab-home'),
+          matching: find.byIcon(FLucideIcons.house),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Notes'), findsNothing);
       s.openNoteTab('a');
       await t.pumpAndSettle();
       expect(_k('tab-home'), findsOneWidget);
       expect(_close('tab-home'), findsNothing);
+    });
+
+    testWidgets('home tab is sized to its content, narrower than a note tab', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      s.openNoteTab('a');
+      await t.pumpAndSettle();
+      final home = t.getSize(_k('tab-home')).width;
+      expect(home, lessThan(t.getSize(_k('tab-n:a')).width));
+      expect(t.takeException(), isNull);
     });
 
     testWidgets('peeking creates no strip tab; opening a note tab does', (

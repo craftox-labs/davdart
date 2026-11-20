@@ -86,6 +86,9 @@ Future<void> pump(WidgetTester t, {Size size = const Size(1400, 900)}) async {
   await t.pumpAndSettle();
 }
 
+String textOfKey(WidgetTester t, String key) =>
+    t.widget<Text>(find.byKey(Key(key))).data!;
+
 void main() {
   group('AppState', () {
     test('groups the board by status and filters by query and tag', () async {
@@ -890,6 +893,19 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byKey(const Key('scope-bar')), findsOneWidget);
       expect(find.byKey(const Key('scope-text')), findsOneWidget);
+      // Breadcrumb: Home > Space > folder; the Space name clears the scope.
+      expect(find.text('Home'), findsWidgets);
+      expect(find.byKey(const Key('crumb-space')), findsOneWidget);
+      expect(textOfKey(t, 'crumb-folder'), 'Planning');
+      await t.tap(find.byKey(const Key('crumb-space')));
+      await t.pumpAndSettle();
+      expect(state.scope, isNull);
+      expect(find.byKey(const Key('crumb-folder')), findsNothing);
+      expect(textOfKey(t, 'crumb-space'), 'S');
+      state.openFolder(
+        state.notes.firstWhere((n) => n.summary == 'Planning').uid,
+      );
+      await t.pumpAndSettle();
       expect(find.byIcon(FLucideIcons.folderOpen), findsWidgets);
       // A note made now lands inside the open folder.
       await t.tap(byAction('New note'));
@@ -904,7 +920,8 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('scope-close')));
       await t.pumpAndSettle();
-      expect(find.byKey(const Key('scope-bar')), findsNothing);
+      expect(find.byKey(const Key('scope-close')), findsNothing);
+      expect(find.byKey(const Key('crumb-folder')), findsNothing);
     });
 
     testWidgets('detail lists earlier versions kept by a merge', (t) async {

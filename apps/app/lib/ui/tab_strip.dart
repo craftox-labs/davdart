@@ -57,11 +57,23 @@ class TabStrip extends StatelessWidget {
             padding: EdgeInsets.only(left: startPad, right: endPad),
             child: LayoutBuilder(
               builder: (context, c) {
-                final n = tabs.length + 1;
-                final per = (((c.maxWidth - plus - 2 * flare) / n)).clamp(
-                  t.sizes.tabMin,
-                  t.sizes.tabMax,
-                );
+                // Home is sized to its content; the rest share what is left.
+                final label = TextPainter(
+                  text: TextSpan(text: 'Home', style: t.type.captionStyle),
+                  textDirection: TextDirection.ltr,
+                  textScaler: MediaQuery.textScalerOf(context),
+                  maxLines: 1,
+                )..layout();
+                final homeW =
+                    t.space.md +
+                    t.icons.sm +
+                    t.space.sm +
+                    label.width.ceilToDouble() +
+                    t.space.xs +
+                    t.space.md;
+                final n = math.max(tabs.length, 1);
+                final per = (((c.maxWidth - plus - homeW - 2 * flare) / n))
+                    .clamp(t.sizes.tabMin, t.sizes.tabMax);
                 return Row(
                   children: [
                     ActionContextMenu(
@@ -95,14 +107,11 @@ class TabStrip extends StatelessWidget {
                       child: TabItem(
                         key: const Key('tab-home'),
                         flushStart: flushStart,
-                        width: per,
-                        icon: state.view == ViewMode.board
-                            ? FLucideIcons.squareKanban
-                            : FLucideIcons.list,
-                        title:
-                            state.scope?.summary ??
-                            state.currentSpaceName ??
-                            'Notes',
+                        width: homeW,
+                        icon: FLucideIcons.house,
+                        title: 'Home',
+                        tooltip:
+                            'Home: everything in ${state.scope?.summary ?? state.currentSpaceName ?? 'this space'}',
                         active: active == null,
                         onPress: () => state.activateTab(null),
                       ),
@@ -434,6 +443,7 @@ class TabItem extends StatefulWidget {
     required this.active,
     required this.onPress,
     this.onClose,
+    this.tooltip,
     this.dirty = false,
     this.flushStart = false,
     this.flushEnd = false,
@@ -445,6 +455,7 @@ class TabItem extends StatefulWidget {
   final bool active, dirty;
   final VoidCallback onPress;
   final VoidCallback? onClose;
+  final String? tooltip;
 
   @override
   State<TabItem> createState() => TabItemState();
@@ -473,7 +484,7 @@ class TabItemState extends State<TabItem> {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    return Align(
+    final tab = Align(
       alignment: Alignment.topLeft,
       widthFactor: 1,
       child: SizedBox(
@@ -549,6 +560,10 @@ class TabItemState extends State<TabItem> {
         ),
       ),
     );
+    final tip = widget.tooltip;
+    return tip == null
+        ? tab
+        : FTooltip(tipBuilder: (_, _) => Text(tip), child: tab);
   }
 }
 
