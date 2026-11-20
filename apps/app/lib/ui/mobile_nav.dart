@@ -264,24 +264,32 @@ class _SpaceChipState extends State<SpaceChip> with TickerProviderStateMixin {
                 this,
                 (ctx, c) => spaceMenuGroups(context, state, c),
               ),
-              child: JoinedTab(
-                active: true,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: t.space.md),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    spacing: t.space.sm,
-                    children: [
-                      Icon(spacesIcon, size: t.icons.sm, color: t.fg),
-                      Flexible(
-                        child: Text(
-                          name,
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                          style: t.type.captionStyle.copyWith(color: t.fg),
-                        ),
+              // A 44dp hit box around the painted tab (34dp), same look.
+              child: SizedBox(
+                height: t.sizes.touchTarget,
+                child: Align(
+                  alignment: Alignment.bottomCenter,
+                  widthFactor: 1,
+                  child: JoinedTab(
+                    active: true,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: t.space.md),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        spacing: t.space.sm,
+                        children: [
+                          Icon(spacesIcon, size: t.icons.sm, color: t.fg),
+                          Flexible(
+                            child: Text(
+                              name,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: t.type.captionStyle.copyWith(color: t.fg),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),

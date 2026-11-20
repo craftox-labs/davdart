@@ -277,7 +277,10 @@ void main() {
         final bar = t.getRect(_k('top-bar'));
         expect(t.getRect(chip).bottom, closeTo(bar.bottom + 1, 1.5));
         expect(t.getRect(_k('top-logo')).right, lessThan(t.getRect(chip).left));
-        await t.tap(_k('space-chip'));
+        // The hit box is 44dp tall: a tap above the painted 34dp tab works.
+        final box = t.getRect(_k('space-chip'));
+        expect(box.height, greaterThanOrEqualTo(44));
+        await t.tapAt(Offset(box.center.dx, box.top + 3));
         await t.pumpAndSettle();
         expect(_k('menu-sheet'), findsOneWidget);
         _noError(t);
