@@ -264,6 +264,25 @@ void main() {
         expect(_k('side-menu'), findsNothing);
       });
 
+      testWidgets('the Space chip is a joined tab on the top bar edge', (
+        t,
+      ) async {
+        await pumpTasksApp(t, size: size);
+        final chip = find.descendant(
+          of: _k('space-chip'),
+          matching: _k('joined-tab'),
+        );
+        expect(chip, findsOneWidget);
+        // Flush on the bottom edge of the top bar (over its hairline).
+        final bar = t.getRect(_k('top-bar'));
+        expect(t.getRect(chip).bottom, closeTo(bar.bottom + 1, 1.5));
+        expect(t.getRect(_k('top-logo')).right, lessThan(t.getRect(chip).left));
+        await t.tap(_k('space-chip'));
+        await t.pumpAndSettle();
+        expect(_k('menu-sheet'), findsOneWidget);
+        _noError(t);
+      });
+
       testWidgets('the covered page is out of focus and semantics', (t) async {
         await pumpTasksApp(t, size: size);
         await _openMenu(t);

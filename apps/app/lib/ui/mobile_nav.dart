@@ -244,25 +244,48 @@ class _SpaceChipState extends State<SpaceChip> with TickerProviderStateMixin {
     final t = tokensOf(context);
     final state = widget.state;
     final name = state.currentSpaceName ?? 'Spaces';
-    return ConstrainedBox(
-      constraints: BoxConstraints(maxWidth: t.sizes.spaceChipMax),
-      child: touchBox(
-        context,
-        FButton(
-          key: const Key('space-chip'),
-          variant: FButtonVariant.outline,
-          size: FButtonSizeVariant.xs,
-          mainAxisSize: MainAxisSize.min,
-          prefix: Icon(spacesIcon, size: t.icons.md),
-          onPress: () => showMenuSheet(
-            context,
-            this,
-            (ctx, c) => spaceMenuGroups(context, state, c),
-          ),
-          // The button does not shrink its label, so the label is capped.
+    // The active desktop header tab: panel tone, flared concave bottom
+    // corners, flush on the top bar's bottom edge (over its hairline).
+    final flare = t.radii.tab;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Transform.translate(
+        offset: Offset(0, t.borders.hairline),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: flare),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: t.sizes.spaceChipMax - 56),
-            child: Text(name, overflow: TextOverflow.ellipsis, maxLines: 1),
+            constraints: BoxConstraints(maxWidth: t.sizes.spaceChipMax),
+            child: FTappable(
+              key: const Key('space-chip'),
+              semanticsLabel: name,
+              behavior: HitTestBehavior.opaque,
+              onPress: () => showMenuSheet(
+                context,
+                this,
+                (ctx, c) => spaceMenuGroups(context, state, c),
+              ),
+              child: JoinedTab(
+                active: true,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: t.space.md),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    spacing: t.space.sm,
+                    children: [
+                      Icon(spacesIcon, size: t.icons.sm, color: t.fg),
+                      Flexible(
+                        child: Text(
+                          name,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: t.type.captionStyle.copyWith(color: t.fg),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),

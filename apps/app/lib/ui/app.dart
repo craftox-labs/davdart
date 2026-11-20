@@ -827,7 +827,9 @@ class TopBar extends StatelessWidget {
       return const SizedBox.shrink();
     }
     if (state.scope != null || state.activeViewName != null) {
-      return ScopeCrumbs(state: state, label: state.activeViewName);
+      return Center(
+        child: ScopeCrumbs(state: state, label: state.activeViewName),
+      );
     }
     return SpaceChip(state: state);
   }
@@ -871,7 +873,7 @@ class TopBar extends StatelessWidget {
             child: Center(child: LogoMark(extent: t.icons.lg)),
           ),
         SizedBox(width: t.space.xs),
-        Expanded(child: showMenu ? Center(child: _title(t)) : _lead(t)),
+        Expanded(child: showMenu ? _title(t) : _lead(t)),
         SizedBox(width: t.space.md),
         if (state.loading)
           Padding(
