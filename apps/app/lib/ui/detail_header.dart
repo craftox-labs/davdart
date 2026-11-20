@@ -47,13 +47,18 @@ class DetailHeader extends StatelessWidget {
               final icon = note != null && AppState.isFolder(note)
                   ? FLucideIcons.folder
                   : FLucideIcons.fileText;
+              Widget menu(Widget child) => uid == null
+                  ? child
+                  : NoteContextMenu(
+                      state: state,
+                      uid: uid,
+                      surface: NoteSurface.peekTab,
+                      child: child,
+                    );
               return Align(
                 alignment: mirror ? Alignment.topRight : Alignment.topLeft,
-                child: NoteContextMenu(
-                  state: state,
-                  uid: uid ?? '',
-                  surface: NoteSurface.peekTab,
-                  child: Draggable<NoteDrag>(
+                child: menu(
+                  Draggable<NoteDrag>(
                     key: const Key('detail-drag'),
                     data: uid == null
                         ? null

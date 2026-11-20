@@ -142,12 +142,18 @@ class NoteContextMenu extends StatelessWidget {
   Widget build(BuildContext context) => FContextMenu(
     longPress: true,
     secondaryPress: true,
-    menuBuilder: (ctx, controller, _) => _groups(ctx, controller),
+    menuBuilder: (ctx, controller, _) => _groups(context, ctx, controller),
     child: child,
   );
 
-  List<FItemGroup> _groups(BuildContext context, FPopoverController c) {
-    final t = tokensOf(context);
+  /// [context] is the surface's own (it outlives the popup, so dialogs and
+  /// flows launched from a row use it); [menuContext] only themes the rows.
+  List<FItemGroup> _groups(
+    BuildContext context,
+    BuildContext menuContext,
+    FPopoverController c,
+  ) {
+    final t = tokensOf(menuContext);
     FItem row(
       String label,
       IconData icon,
@@ -193,7 +199,7 @@ class NoteContextMenu extends StatelessWidget {
     final manage = note == null ? <NoteMenuItem>[] : _manage(context, note);
     final all = [...manage, ...items];
     if (all.isNotEmpty) {
-      groups.add(FItemGroup(children: menuRows(context, c, all)));
+      groups.add(FItemGroup(children: menuRows(menuContext, c, all)));
     }
     final tab = DocTab.note(uid);
     final own = <FItem>[
@@ -202,8 +208,7 @@ class NoteContextMenu extends StatelessWidget {
           'Edit',
           FLucideIcons.pencil,
           () async {
-            await state.openNote(uid);
-            state.startEdit(uid);
+            if (await state.openNote(uid)) state.startEdit(uid);
           },
           key: const Key('menu-edit'),
           afterOpen: true,

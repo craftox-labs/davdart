@@ -149,18 +149,27 @@ class AppState extends ChangeNotifier {
   /// Opens note [uid] in [mode] (default: the setting). The peek asks about
   /// unsaved edits only when its own draft would be lost; focusing a note
   /// that already has a main tab never asks.
-  Future<void> openNote(String uid, {OpenMode? mode}) async {
-    if (tree.find(uid) == null) return;
+  /// Returns false when nothing opened (unknown note, or the user chose to
+  /// keep editing the peek draft).
+  Future<bool> openNote(String uid, {OpenMode? mode}) async {
+    if (tree.find(uid) == null) return false;
     if ((mode ?? openMode) == OpenMode.main) {
       openNoteTab(uid);
     } else if (_tabs.contains(DocTab.note(uid)) || peekUid == uid) {
       select(uid);
     } else {
-      await guarded(() => select(uid));
+      var done = false;
+      await guarded(() {
+        select(uid);
+        done = true;
+      });
+      return done;
     }
+    return true;
   }
 
   String? _clickUid;
+  String? _clickSurface;
   DateTime? _clickAt;
 
   /// A plain click on a note entry: opens it per [openMode], and a second
@@ -169,9 +178,11 @@ class AppState extends ChangeNotifier {
     final now = DateTime.now();
     final dbl =
         _clickUid == uid &&
+        _clickSurface == 'entry' &&
         _clickAt != null &&
         now.difference(_clickAt!) < doubleClickWindow;
     _clickUid = dbl ? null : uid;
+    _clickSurface = 'entry';
     _clickAt = dbl ? null : now;
     return dbl ? Future.sync(() => openNoteTab(uid)) : openNote(uid);
   }
@@ -183,9 +194,11 @@ class AppState extends ChangeNotifier {
     final now = DateTime.now();
     final dbl =
         _clickUid == uid &&
+        _clickSurface == 'peek' &&
         _clickAt != null &&
         now.difference(_clickAt!) < doubleClickWindow;
     _clickUid = dbl ? null : uid;
+    _clickSurface = 'peek';
     _clickAt = dbl ? null : now;
     if (dbl) openNoteTab(uid);
   }

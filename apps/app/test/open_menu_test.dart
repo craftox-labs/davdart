@@ -9,6 +9,7 @@ import 'package:davdart_app/state/tab_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:davdart_app/ui/board_view.dart';
 import 'package:davdart_app/ui/list_view.dart';
+import 'package:davdart_app/ui/note_menu.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -312,6 +313,164 @@ void main() {
       const d = NoteDrag('a', NoteDragSource.tree);
       expect(d.uid, 'a');
       expect(d.source, NoteDragSource.tree);
+    });
+  });
+
+  group('review fixes', () {
+    testWidgets('Edit starts a draft on the opened note', (t) async {
+      final s = await _pump(t);
+      await t.tap(
+        find.descendant(
+          of: find.byType(BoardView),
+          matching: find.text('Beta'),
+        ),
+        buttons: kSecondaryButton,
+      );
+      await t.pumpAndSettle();
+      await t.tap(_k('menu-edit'));
+      await t.pumpAndSettle();
+      expect(s.peekUid, 'b');
+      expect(s.draftFor('b'), isNotNull);
+    });
+
+    testWidgets('Edit does not start a draft when keep editing wins', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      s.select('a');
+      s.startEdit('a');
+      s.draftFor('a')!.titleController.text = 'Changed';
+      s.leaveGuard = () async => DraftChoice.keep;
+      await t.pumpAndSettle();
+      await t.tap(
+        find.descendant(
+          of: find.byType(BoardView),
+          matching: find.text('Beta'),
+        ),
+        buttons: kSecondaryButton,
+      );
+      await t.pumpAndSettle();
+      await t.tap(_k('menu-edit'));
+      await t.pumpAndSettle();
+      expect(s.peekUid, 'a');
+      expect(s.draftFor('b'), isNull);
+    });
+
+    testWidgets('middle-click on a dirty tab asks first', (t) async {
+      final s = await _pump(t);
+      s.openNoteTab('a');
+      s.startEdit('a');
+      s.draftFor('a')!.titleController.text = 'Changed';
+      var asked = 0;
+      s.leaveGuard = () async {
+        asked++;
+        return DraftChoice.keep;
+      };
+      await t.pumpAndSettle();
+      await t.tap(_k('tab-n:a'), buttons: kMiddleMouseButton);
+      await t.pumpAndSettle();
+      expect(asked, 1);
+      expect(s.tabs, [const DocTab.note('a')]);
+    });
+
+    testWidgets('a search hit has a menu with both opens', (t) async {
+      t.view.physicalSize = const Size(1400, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(storage, planningSeed: _Seed());
+      c.add('Inbox');
+      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      await t.pumpWidget(DavdartApp(state: s));
+      await t.pumpAndSettle();
+      await t.tap(_k('rail-search'));
+      await t.pumpAndSettle();
+      await t.enterText(_k('search-all-field'), 'Alpha');
+      await t.pumpAndSettle();
+      await t.tap(_k('hit-a'), buttons: kSecondaryButton);
+      await t.pumpAndSettle();
+      expect(_k('menu-open-peek'), findsOneWidget);
+      expect(_k('menu-open-main'), findsOneWidget);
+      expect(_k('menu-delete'), findsNothing);
+      await t.tap(_k('menu-open-main'));
+      await t.pumpAndSettle();
+      expect(s.activeTab, const DocTab.note('a'));
+    });
+
+    testWidgets('an empty peek has no menu', (t) async {
+      final s = await _pump(t);
+      expect(s.peekUid, isNull);
+      expect(
+        find.descendant(
+          of: _k('detail-header'),
+          matching: find.byType(NoteContextMenu),
+        ),
+        findsNothing,
+      );
+      s.select('a');
+      await t.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: _k('detail-header'),
+          matching: find.byType(NoteContextMenu),
+        ),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('a click on an entry then the peek tab is not a double', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      await t.tap(
+        find.descendant(
+          of: find.byType(BoardView),
+          matching: find.text('Alpha'),
+        ),
+      );
+      await t.pumpAndSettle();
+      expect(s.peekUid, 'a');
+      await t.tap(_k('detail-tab'));
+      await t.pumpAndSettle();
+      expect(s.tabs, isEmpty);
+    });
+
+    testWidgets('dragging a tab rightward reorders', (t) async {
+      final s = await _pump(t);
+      s.openNoteTab('a');
+      s.openNoteTab('b');
+      s.openNoteTab('c');
+      await t.pumpAndSettle();
+      final g = await t.startGesture(t.getCenter(_k('tab-n:a')));
+      await t.pump();
+      await g.moveTo(t.getCenter(_k('tab-n:c')) + const Offset(4, 0));
+      await t.pump();
+      await g.moveTo(t.getCenter(_k('tab-n:c')));
+      await t.pump();
+      await g.up();
+      await t.pumpAndSettle();
+      expect(s.tabs.map((e) => e.id), ['b', 'c', 'a']);
+    });
+
+    testWidgets('dragging a note tab onto a view tab reorders', (t) async {
+      final s = await _pump(t);
+      s.setQuery('alpha');
+      await s.saveView('Alphas');
+      final v = s.savedViews.single;
+      s.openNoteTab('a');
+      s.openNoteTab('b');
+      s.applyView(v);
+      await t.pumpAndSettle();
+      expect(s.tabs.last, DocTab.view(v.uid));
+      final g = await t.startGesture(t.getCenter(_k('tab-n:a')));
+      await t.pump();
+      await g.moveTo(t.getCenter(_k('tab-v:${v.uid}')) + const Offset(4, 0));
+      await t.pump();
+      await g.moveTo(t.getCenter(_k('tab-v:${v.uid}')));
+      await t.pump();
+      await g.up();
+      await t.pumpAndSettle();
+      expect(s.tabs.map((e) => e.code), ['n:b', 'v:${v.uid}', 'n:a']);
     });
   });
 
