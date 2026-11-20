@@ -74,8 +74,9 @@ class MobileBottomNav extends StatelessWidget {
         onChange: (i) {
           final tab = tabs[i];
           // More keeps the last section of its group.
-          final keep = tab == NavTab.more && tabOfSection(state.section) == tab;
-          onOpen(keep ? state.section : sectionOfTab(tab));
+          final shown = visibleSection(state);
+          final keep = tab == NavTab.more && tabOfSection(shown) == tab;
+          onOpen(keep ? shown : sectionOfTab(tab));
         },
         children: [
           for (final tab in tabs)

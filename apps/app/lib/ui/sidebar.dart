@@ -18,18 +18,14 @@ import 'theme.dart';
 import 'overflow_tip.dart';
 
 /// The side panel: shows the section chosen on the icon rail ([AppState.section]).
-/// In the narrow sheet ([inDrawer]) a [SectionBar] on top picks the section,
-/// because there is no rail.
 class Sidebar extends StatelessWidget {
   const Sidebar({
     super.key,
     required this.state,
-    this.inDrawer = false,
     this.width,
     this.mirror = false,
   });
   final AppState state;
-  final bool inDrawer;
 
   /// Draws the panel's border on its start edge (the rail is on the right).
   final bool mirror;
@@ -39,12 +35,8 @@ class Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    void close() {
-      if (inDrawer) Navigator.of(context).pop();
-    }
-
     final section = visibleSection(state);
-    final body = sectionBody(state, section, close);
+    final body = sectionBody(state, section, () {});
     final t = tokensOf(context);
     return FSidebar.raw(
       style: .delta(
@@ -75,10 +67,7 @@ class Sidebar extends StatelessWidget {
                 ),
               ),
       ),
-      header: inDrawer ? SectionBar(state: state, onPick: close) : null,
-      child: inDrawer
-          ? body
-          : AreaMark(nav: state.nav, area: NavArea.panel, child: body),
+      child: AreaMark(nav: state.nav, area: NavArea.panel, child: body),
     );
   }
 }

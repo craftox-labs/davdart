@@ -208,6 +208,12 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
           // Crossing the wide breakpoint jumps; only a toggle slides.
           final crossed = _wasWide != null && _wasWide != wide;
           _wasWide = wide;
+          // Growing to wide closes a menu or Space sheet left open.
+          if (crossed && wide) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
+            });
+          }
           _drive(_dock, wide && _dockOpen, t, animate && wide && !crossed);
           _drive(_peek, hasDetail, t, animate && split);
           return AnimatedBuilder(
@@ -469,9 +475,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
         narrowSection,
         mainNote,
         main,
-        () {
-          return peekView();
-        },
+        peekView,
       );
     } else if (hasDetail) {
       // Wide but not split: the peeked note replaces the main area;
@@ -613,37 +617,55 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
 
     return _LeaveGuard(
       state: state,
-      child: SafeArea(
-        child: wide
-            ? CallbackShortcuts(
-                bindings: {
-                  const SingleActivator(LogicalKeyboardKey.keyW, control: true):
-                      state.closeActiveTab,
-                  const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
-                      state.closeActiveTab,
-                },
-                // Focus so the shortcuts work before anything is clicked.
-                child: Focus(
+      child: PopScope(
+        // Narrow Back: the peek, then an open item or view, then a tab
+        // page, then Home; only from Home does it leave the app.
+        canPop:
+            wide || !(hasDetail || narrowSection || state.activeTab != null),
+        onPopInvokedWithResult: (didPop, _) {
+          if (didPop) return;
+          if (hasDetail) {
+            state.guarded(() => state.select(null));
+          } else if (state.activeTab != null) {
+            state.activateTab(null);
+          } else if (narrowSection) {
+            setState(() => _sectionOpen = false);
+          }
+        },
+        child: SafeArea(
+          child: wide
+              ? CallbackShortcuts(
+                  bindings: {
+                    const SingleActivator(
+                      LogicalKeyboardKey.keyW,
+                      control: true,
+                    ): state.closeActiveTab,
+                    const SingleActivator(LogicalKeyboardKey.keyW, meta: true):
+                        state.closeActiveTab,
+                  },
+                  // Focus so the shortcuts work before anything is clicked.
+                  child: Focus(
+                    focusNode: state.nav.node,
+                    autofocus: true,
+                    child: ShellFrame(
+                      state: state,
+                      showRail: true,
+                      header: header,
+                      child: content,
+                    ),
+                  ),
+                )
+              // Focus so Ctrl/Cmd+K works before anything is clicked.
+              : Focus(
                   focusNode: state.nav.node,
                   autofocus: true,
                   child: ShellFrame(
                     state: state,
-                    showRail: true,
-                    header: header,
+                    showRail: false,
                     child: content,
                   ),
                 ),
-              )
-            // Focus so Ctrl/Cmd+K works before anything is clicked.
-            : Focus(
-                focusNode: state.nav.node,
-                autofocus: true,
-                child: ShellFrame(
-                  state: state,
-                  showRail: false,
-                  child: content,
-                ),
-              ),
+        ),
       ),
     );
   }

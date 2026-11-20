@@ -586,46 +586,6 @@ class IconRail extends StatelessWidget {
   }
 }
 
-/// The narrow-screen section selector at the top of the sheet.
-class SectionBar extends StatelessWidget {
-  const SectionBar({super.key, required this.state, this.onPick});
-  final AppState state;
-  final VoidCallback? onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return Padding(
-      key: const Key('section-bar'),
-      padding: EdgeInsets.fromLTRB(
-        t.space.lg,
-        t.space.lg,
-        t.space.lg,
-        t.space.xs,
-      ),
-      child: Wrap(
-        spacing: t.space.xs,
-        runSpacing: t.space.xs,
-        children: [
-          SpacesMenuButton(
-            key: const Key('bar-spaces'),
-            state: state,
-            below: true,
-            onPick: onPick,
-          ),
-          for (final s in [...topSections(state), ...bottomSections(state)])
-            SectionButton(
-              key: Key('bar-${s.name}'),
-              section: s,
-              active: state.section == s,
-              onPress: () => state.setSection(s),
-            ),
-        ],
-      ),
-    );
-  }
-}
-
 /// A header tab. Active, it is a panel-coloured [RailTabPainter] tab that
 /// ends flush on the panel's top edge, covering the panel border and flaring
 /// into it with concave corners; inactive, it is [child] on the frame tone

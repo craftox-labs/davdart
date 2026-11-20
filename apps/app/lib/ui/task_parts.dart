@@ -247,7 +247,7 @@ class TaskRow extends StatelessWidget {
       return row;
     }
     return Dismissible(
-      key: ValueKey('swipe-${task.uid}'),
+      key: ValueKey('swipe-${source.name}-${task.uid}'),
       direction: DismissDirection.startToEnd,
       dismissThresholds: const {DismissDirection.startToEnd: 0.4},
       background: Container(
@@ -269,9 +269,19 @@ class TaskRow extends StatelessWidget {
               variant: FButtonVariant.outline,
               size: FButtonSizeVariant.xs,
               mainAxisSize: MainAxisSize.min,
-              onPress: () {
-                state.setTaskDone(task.uid, false);
+              onPress: () async {
                 entry.dismiss();
+                // Only the task this swipe completed, and only if it is
+                // still completed (not reopened or cancelled meanwhile).
+                final now = state.taskById(task.uid);
+                if (now == null || !now.isCompleted) return;
+                final ok = await state.setTaskDone(task.uid, false);
+                if (!ok && host.mounted) {
+                  showFToast(
+                    context: host,
+                    title: Text(state.error ?? 'Could not reopen the task'),
+                  );
+                }
               },
               child: const Text('Undo'),
             ),

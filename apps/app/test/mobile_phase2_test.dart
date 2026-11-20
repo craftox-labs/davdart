@@ -265,6 +265,60 @@ void main() {
     });
   }
 
+  testWidgets('Back closes the peek, then the page, then Home', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [_note('n1', 'Alpha')],
+      size: const Size(360, 640),
+    );
+    await t.tap(_k('bnav-notes'));
+    await t.pumpAndSettle();
+    await s.openNote('n1', mode: OpenMode.peek);
+    await t.pumpAndSettle();
+    expect(_k('peek-sheet'), findsOneWidget);
+    expect(await t.binding.handlePopRoute(), isTrue);
+    await t.pumpAndSettle();
+    expect(_k('peek-sheet'), findsNothing);
+    expect(_k('bnav-notes'), findsOneWidget);
+    expect(await t.binding.handlePopRoute(), isTrue);
+    await t.pumpAndSettle();
+    expect(_k('home-today'), findsOneWidget);
+    // A menu sheet closes first.
+    await t.tap(_k('bnav-notes'));
+    await t.pumpAndSettle();
+    await t.tap(_k('space-chip'));
+    await t.pumpAndSettle();
+    expect(_k('menu-sheet'), findsOneWidget);
+    expect(await t.binding.handlePopRoute(), isTrue);
+    await t.pumpAndSettle();
+    expect(_k('menu-sheet'), findsNothing);
+    expect(_k('bnav-notes'), findsOneWidget);
+    _noError(t);
+  });
+
+  testWidgets('More with an unavailable section opens the More page', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(t, size: const Size(360, 640));
+    s.section = Section.account; // no sign-in here
+    await t.tap(_k('bnav-more'));
+    await t.pumpAndSettle();
+    expect(_k('more-page'), findsOneWidget);
+    expect(s.section, Section.views);
+    _noError(t);
+  });
+
+  testWidgets('growing to wide closes an open sheet', (t) async {
+    await pumpTasksApp(t, size: const Size(360, 640));
+    await t.tap(_k('space-chip'));
+    await t.pumpAndSettle();
+    expect(_k('menu-sheet'), findsOneWidget);
+    t.view.physicalSize = const Size(1280, 900);
+    await t.pumpAndSettle();
+    expect(_k('menu-sheet'), findsNothing);
+    _noError(t);
+  });
+
   testWidgets('wide layout is unchanged: no bottom nav, chip, FAB or sheet', (
     t,
   ) async {
