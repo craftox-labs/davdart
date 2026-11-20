@@ -3,6 +3,7 @@ import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/data/space_catalog.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/state/note_draft.dart';
 import 'package:davdart_app/state/tab_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/foundation.dart';
@@ -79,6 +80,12 @@ void main() {
       final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
       s = AppState(SpaceNoteSource(space, seed: _Seed()));
       await s.load();
+    });
+
+    test('a stale error does not make a valid move report failure', () async {
+      s.error = 'old';
+      expect(await s.moveNote('b', 'f'), isTrue);
+      expect(s.error, isNull);
     });
 
     test('reparents and moves to the top', () async {
@@ -268,6 +275,24 @@ void main() {
       expect(PlanItem.fromNote(s.tree.find('a')!.note).status, 'doing');
     });
 
+    testWidgets('a board card dropped on the no-status column clears it', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      s.setView(ViewMode.board);
+      await t.pumpAndSettle();
+      final card = find.descendant(
+        of: _k('board-drop-backlog'),
+        matching: find.text('Alpha'),
+      );
+      await _drag(t, t.getCenter(card), t.getCenter(_k('board-drop-notes')));
+      expect(PlanItem.fromNote(s.tree.find('a')!.note).status, isNull);
+      expect(
+        s.tree.find('a')!.note.categories,
+        isNot(contains('status-backlog')),
+      );
+    });
+
     testWidgets('the peek tab still promotes onto the strip', (t) async {
       final s = await _pump(t);
       s.select('c');
@@ -309,6 +334,57 @@ void main() {
       await g.up();
       await t.pumpAndSettle();
       expect(s.tree.find('c'), isNull);
+    });
+
+    testWidgets('a folder dropped on a Space asks first; cancel keeps it', (
+      t,
+    ) async {
+      final storage = MemoryStorage();
+      final c = SpaceCatalog(storage, planningSeed: _Seed());
+      final other = c.add('Other');
+      final s = AppState(c.sourceFor(c.current), prefs: storage, catalog: c);
+      await _pump(t, state: s);
+      final from = t.getCenter(_tree('Plans'));
+      final g = await t.startGesture(from, kind: PointerDeviceKind.mouse);
+      await t.pump();
+      await g.moveTo(from + const Offset(0, 12));
+      await t.pump();
+      await g.moveTo(t.getCenter(_k('rail-spaces')));
+      await t.pump();
+      await g.moveTo(t.getCenter(_k('rail-spaces')) + const Offset(1, 1));
+      await t.pumpAndSettle();
+      final target = t.getCenter(_k('space-drop-${other.id}'));
+      await g.moveTo(target);
+      await t.pump();
+      await g.moveTo(target + const Offset(1, 1));
+      await t.pump();
+      await g.up();
+      await t.pumpAndSettle();
+      expect(find.text('Move folder?'), findsOneWidget);
+      expect(find.textContaining('"Other"'), findsOneWidget);
+      expect(s.tree.find('f'), isNotNull);
+      await t.tap(find.text('Cancel'));
+      await t.pumpAndSettle();
+      expect(s.tree.find('f'), isNotNull);
+    });
+  });
+
+  group('closeAllTabs', () {
+    test('stops when the unsaved-changes prompt cancels a close', () async {
+      final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+      final s = AppState(SpaceNoteSource(space, seed: _Seed()));
+      await s.load();
+      s.openNoteTab('a');
+      s.openNoteTab('b');
+      s.openNoteTab('c');
+      s.startEdit('b');
+      s.draftFor('b')!.titleController.text = 'Changed';
+      s.leaveGuard = () async => DraftChoice.keep;
+      await s.closeAllTabs();
+      expect(s.tabs, [const DocTab.note('b'), const DocTab.note('c')]);
+      s.leaveGuard = () async => DraftChoice.discard;
+      await s.closeAllTabs();
+      expect(s.tabs, isEmpty);
     });
   });
 }

@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import 'drag_drop.dart';
 import 'new_space_dialog.dart';
 import 'note_menu.dart';
+import 'parts.dart';
 import 'resize_handle.dart';
 import 'sections.dart';
 import 'shell_frame.dart';
@@ -97,6 +98,45 @@ String spaceSyncLabel(AppState state, SpaceInfo sp) =>
     ? 'Synced with the server'
     : 'On this device only';
 
+/// Moves note [uid] (with everything under it) to Space [sp]. A folder is
+/// confirmed first; a failure or the success is shown as a toast.
+Future<void> _dropOnSpace(
+  BuildContext context,
+  AppState state,
+  FPopoverController controller,
+  String uid,
+  SpaceInfo sp,
+) async {
+  final node = state.tree.find(uid);
+  if (node == null) return;
+  if (node.children.isNotEmpty || AppState.isFolder(node.note)) {
+    final ok = await showAppDialog<bool>(
+      context,
+      title: 'Move folder?',
+      content: Text(
+        '"${node.note.summary}" and everything in it will move to '
+        '"${sp.name}".',
+      ),
+      actions: [
+        const CancelButton(),
+        ActionButton(
+          'Move',
+          key: const Key('space-move-confirm'),
+          onPress: (ctx) => Navigator.of(ctx).pop(true),
+        ),
+      ],
+    );
+    if (ok != true) return;
+  }
+  controller.hide();
+  final n = await state.moveToSpace(uid, sp.id);
+  if (!context.mounted) return;
+  final msg = n == null
+      ? (state.error ?? 'Could not move "${node.note.summary}"')
+      : 'Moved ${n == 1 ? '"${node.note.summary}"' : '$n notes'} to "${sp.name}"';
+  showFToast(context: context, title: Text(msg));
+}
+
 /// The Spaces popup's groups: every Space (the current one first, marked)
 /// with its sync state, then the manage actions (new, rename, delete).
 /// Picking a Space switches to it and shows Files; [onPick] runs only before a
@@ -140,10 +180,8 @@ List<FItemGroup> spaceMenuGroups(
                   sp.id != state.currentSpaceId &&
                   state.editable &&
                   state.tree.find(d.uid) != null,
-              onDrop: (d) {
-                controller.hide();
-                state.moveToSpace(d.uid, sp.id);
-              },
+              onDrop: (d) =>
+                  _dropOnSpace(context, state, controller, d.uid, sp),
               child: ActionContextMenu(
                 groups: [
                   [

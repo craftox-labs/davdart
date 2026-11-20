@@ -988,11 +988,17 @@ class AppState extends ChangeNotifier {
   }
 
   /// Moves a note to another status (keeps the header and status tag in step).
-  Future<void> setStatus(String uid, String status) async {
+  /// A null [status] clears it (removes the status line and tag).
+  Future<void> setStatus(String uid, String? status) async {
     final n = tree.find(uid)?.note;
     if (n == null) return;
     final copy = n.copyWith();
-    final p = PlanItem.fromNote(copy)..setStatus(status);
+    final p = PlanItem.fromNote(copy);
+    if (status == null) {
+      p.clearStatus();
+    } else {
+      p.setStatus(status);
+    }
     await _save(p.apply());
   }
 
@@ -1044,6 +1050,7 @@ class AppState extends ChangeNotifier {
     if (node == null || !editable) return false;
     if (node.parent?.note.uid == parentUid) return false;
     if (!tree.canMove(uid, parentUid)) return false;
+    error = null;
     await updateNote(uid, setParent: true, parentUid: parentUid);
     return error == null;
   }
@@ -1264,6 +1271,15 @@ class AppState extends ChangeNotifier {
     await activateTab(keep);
     for (final t in List<DocTab>.of(_tabs.tabs)) {
       if (t != keep) await closeTab(t);
+    }
+  }
+
+  /// Closes every document tab, stopping when the unsaved-changes prompt
+  /// cancels one (the tab stays open).
+  Future<void> closeAllTabs() async {
+    for (final t in List<DocTab>.of(_tabs.tabs)) {
+      await closeTab(t);
+      if (_tabs.contains(t)) return;
     }
   }
 

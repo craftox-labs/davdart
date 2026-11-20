@@ -39,7 +39,8 @@ void main() {
     expect(
       SavedViewSpec.fromNote(
         Note(uid: 'e', summary: 'Empty', categories: [viewTag]),
-      )!.mode,
+      )!
+          .mode,
       'board',
     );
     expect(SavedViewSpec.fromNote(Note(uid: 'x', summary: 'n')), isNull);

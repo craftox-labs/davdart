@@ -58,4 +58,16 @@ void main() {
         Note(uid: 'u', description: 'owner: tm', categories: ['status-done']));
     expect(p.status, 'done');
   });
+
+  test('clearStatus removes the status line and tags, keeps the rest', () {
+    final p = PlanItem.fromNote(Note(
+        uid: 'u',
+        description: body,
+        categories: ['davdart', 'status-backlog']));
+    p.clearStatus();
+    expect(p.status, isNull);
+    expect(p.note.categories, ['davdart']);
+    expect(p.toDescription(), isNot(contains('status:')));
+    expect(p.toDescription(), contains('custom_key: keep'));
+  });
 }

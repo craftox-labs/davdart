@@ -78,6 +78,12 @@ class PlanItem {
       ..add('status-$word');
   }
 
+  /// Removes the status field and every `status-*` tag.
+  void clearStatus() {
+    fields.remove('status');
+    note.categories.removeWhere((c) => c.startsWith('status-'));
+  }
+
   /// The body text: header lines, a blank line, then [text].
   String toDescription() {
     if (fields.isEmpty) return text;

@@ -86,9 +86,7 @@ class TabStrip extends StatelessWidget {
                               'Close all tabs',
                               FLucideIcons.x,
                               () async {
-                                for (final x in state.tabs) {
-                                  await state.closeTab(x);
-                                }
+                                await state.closeAllTabs();
                               },
                               key: const Key('menu-home-close-all'),
                             ),

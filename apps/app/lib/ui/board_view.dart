@@ -87,7 +87,6 @@ class BoardView extends StatelessWidget {
   /// gives it a right-click menu to add a note in that status.
   Widget _drop(String name, BuildContext context, Widget column) {
     final status = name == 'notes' ? null : name;
-    if (status == null) return column; // the no-status column is not a status
     return NoteDropTarget(
       key: Key('board-drop-$name'),
       accepts: (d) {
@@ -100,7 +99,7 @@ class BoardView extends StatelessWidget {
       onDrop: (d) => state.setStatus(d.uid, status),
       child: ActionContextMenu(
         groups: [
-          if (state.editable)
+          if (state.editable && status != null)
             [
               NoteMenuItem(
                 'New note in $name…',
