@@ -104,6 +104,57 @@ void main() {
     });
   });
 
+  group('first tab at a divider', () {
+    testWidgets('home tab lines up with the side panel, no concave start', (
+      t,
+    ) async {
+      await _pump(t);
+      final dock = t.getRect(find.byType(DockedSidebar));
+      expect(t.getRect(_k('tab-home')).left, dock.right);
+      final p =
+          t.widget<CustomPaint>(_in('tab-home', 'joined-tab')).painter!
+              as RailTabPainter;
+      expect(p.squareStart, isTrue);
+      expect(p.squareEnd, isFalse);
+    });
+
+    testWidgets('other tabs keep both concave corners', (t) async {
+      final s = await _pump(t);
+      s.openNoteTab('b');
+      await t.pumpAndSettle();
+      final p =
+          t.widget<CustomPaint>(_in('tab-n:b', 'joined-tab')).painter!
+              as RailTabPainter;
+      expect(p.squareStart, isFalse);
+      expect(p.squareEnd, isFalse);
+    });
+
+    testWidgets('the peek tab lines up with its divider', (t) async {
+      final s = await _pump(t);
+      s.select('a');
+      await t.pumpAndSettle();
+      expect(
+        t.getRect(_k('detail-tab')).left,
+        t.getRect(_k('detail-pane')).left,
+      );
+      final p =
+          t.widget<CustomPaint>(_in('detail-tab', 'joined-tab')).painter!
+              as RailTabPainter;
+      expect(p.squareStart, isTrue);
+    });
+
+    testWidgets('mirrored: the peek tab ends at its divider', (t) async {
+      final s = await _pump(t, side: LayoutSide.end);
+      s.select('a');
+      await t.pumpAndSettle();
+      final p =
+          t.widget<CustomPaint>(_in('detail-tab', 'joined-tab')).painter!
+              as RailTabPainter;
+      expect(p.squareEnd, isTrue);
+      expect(p.squareStart, isFalse);
+    });
+  });
+
   group('detail header', () {
     testWidgets(
       'sits above the pane: closable tab, then Promote and Collapse',

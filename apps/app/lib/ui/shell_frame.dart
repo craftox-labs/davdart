@@ -158,6 +158,8 @@ class RailTabPainter extends CustomPainter {
     required this.margin,
     this.flip = false,
     this.vertical = false,
+    this.squareStart = false,
+    this.squareEnd = false,
   });
   final Color fill, border;
   final double borderWidth, radius, margin;
@@ -167,6 +169,11 @@ class RailTabPainter extends CustomPainter {
   /// [flip] are in that turned frame: the tab box ends at the panel's outer
   /// top edge, so [margin] is normally 0).
   final bool vertical;
+
+  /// A header tab that starts (or ends) at a divider rather than in free
+  /// space: that side has no concave corner and no rounding, so the tab's
+  /// edge lines up with the divider. Only with [vertical].
+  final bool squareStart, squareEnd;
 
   /// Mirrors the tab to open leftwards (the rail is on the right).
   final bool flip;
@@ -199,8 +206,8 @@ class RailTabPainter extends CustomPainter {
     canvas.drawRRect(
       RRect.fromRectAndCorners(
         Rect.fromLTWH(0, 0, size.width + reach, size.height),
-        topLeft: Radius.circular(r),
-        bottomLeft: Radius.circular(r),
+        topLeft: squareStart ? Radius.zero : Radius.circular(r),
+        bottomLeft: squareEnd ? Radius.zero : Radius.circular(r),
       ),
       fillPaint,
     );
@@ -209,6 +216,7 @@ class RailTabPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = borderWidth;
     for (final above in [true, false]) {
+      if (above ? squareStart : squareEnd) continue;
       final cy = above ? -r : size.height + r;
       final y0 = above ? 0.0 : size.height;
       final center = Offset(edge - r, cy);
@@ -239,7 +247,9 @@ class RailTabPainter extends CustomPainter {
       radius != old.radius ||
       margin != old.margin ||
       flip != old.flip ||
-      vertical != old.vertical;
+      vertical != old.vertical ||
+      squareStart != old.squareStart ||
+      squareEnd != old.squareEnd;
 }
 
 /// One rail or selector button: an icon in a rounded square that takes the
@@ -503,7 +513,12 @@ class JoinedTab extends StatelessWidget {
     required this.active,
     required this.child,
     this.hovered = false,
+    this.flushStart = false,
+    this.flushEnd = false,
   });
+
+  /// The tab starts or ends at a divider: see [RailTabPainter.squareStart].
+  final bool flushStart, flushEnd;
   final bool active;
   final bool hovered;
   final Widget child;
@@ -522,6 +537,8 @@ class JoinedTab extends StatelessWidget {
           radius: t.radii.tab,
           margin: 0,
           vertical: true,
+          squareStart: flushStart,
+          squareEnd: flushEnd,
         ),
         child: box,
       );
@@ -529,7 +546,10 @@ class JoinedTab extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: hovered ? t.hover : null,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(t.radii.tab)),
+        borderRadius: BorderRadius.only(
+          topLeft: flushStart ? Radius.zero : Radius.circular(t.radii.tab),
+          topRight: flushEnd ? Radius.zero : Radius.circular(t.radii.tab),
+        ),
       ),
       child: box,
     );

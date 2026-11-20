@@ -23,9 +23,14 @@ class TabStrip extends StatelessWidget {
     required this.state,
     this.startPad = 0,
     this.endPad = 0,
+    this.flushStart = false,
   });
   final AppState state;
   final double startPad, endPad;
+
+  /// The strip starts at a divider (the side panel or the peek), so the home
+  /// tab lines up with it: no concave corner on its start side.
+  final bool flushStart;
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +61,7 @@ class TabStrip extends StatelessWidget {
                   children: [
                     TabItem(
                       key: const Key('tab-home'),
+                      flushStart: flushStart,
                       width: per,
                       icon: state.view == ViewMode.board
                           ? FLucideIcons.squareKanban
@@ -166,7 +172,10 @@ class TabItem extends StatefulWidget {
     required this.onPress,
     this.onClose,
     this.dirty = false,
+    this.flushStart = false,
+    this.flushEnd = false,
   });
+  final bool flushStart, flushEnd;
   final double width;
   final IconData icon;
   final String title;
@@ -216,6 +225,8 @@ class TabItemState extends State<TabItem> {
             return JoinedTab(
               active: widget.active,
               hovered: hovered,
+              flushStart: widget.flushStart,
+              flushEnd: widget.flushEnd,
               child: Padding(
                 padding: EdgeInsets.only(left: t.space.md, right: t.space.xs),
                 child: Row(

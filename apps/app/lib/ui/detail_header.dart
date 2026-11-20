@@ -38,11 +38,7 @@ class DetailHeader extends StatelessWidget {
         // The dirty dot follows the open edit, which notifies on its own.
         listenable: Listenable.merge([state, ?draft]),
         builder: (context, _) => Padding(
-          // Room for the tab's concave corner on its open side.
-          padding: EdgeInsets.only(
-            left: mirror ? 0 : t.radii.tab,
-            right: mirror ? t.radii.tab : 0,
-          ),
+          padding: EdgeInsets.only(left: 0, right: 0),
           child: LayoutBuilder(
             builder: (context, c) {
               final w = math.min(c.maxWidth, t.sizes.tabMax);
@@ -76,6 +72,9 @@ class DetailHeader extends StatelessWidget {
                   ),
                   child: TabItem(
                     key: const Key('detail-tab'),
+                    // The pane's divider side lines up with the divider.
+                    flushStart: !mirror,
+                    flushEnd: mirror,
                     width: w,
                     icon: icon,
                     title: title,

@@ -245,9 +245,13 @@ class Shell extends StatelessWidget {
                 state: state,
                 child: TabStrip(
                   state: state,
-                  startPad: mirror
-                      ? (detailW != null ? t.radii.tab : edgePad)
-                      : (dockW > 0 ? t.radii.tab : edgePad),
+                  // Beside a divider (the side panel or the peek) the home
+                  // tab lines up with it; at the panel's corner it keeps the
+                  // clearance for the rounded corner.
+                  flushStart: mirror ? detailW != null : dockW > 0,
+                  startPad: (mirror ? detailW != null : dockW > 0)
+                      ? 0
+                      : edgePad,
                   endPad: !mirror && detailW != null ? t.radii.tab : t.space.sm,
                 ),
               ),
