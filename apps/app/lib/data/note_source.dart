@@ -103,7 +103,9 @@ class SpaceNoteSource implements EditableNoteSource {
     this.httpClient,
     this.account,
     this.pendingPath,
-  }) : davBase = davBase ?? Uri.base.resolve('/dav/') {
+    TaskStore? taskStore,
+  }) : davBase = davBase ?? Uri.base.resolve('/dav/'),
+       taskStore = taskStore ?? MemoryTaskStore() {
     final saved = flags?.read(loginKey);
     if (saved != null && saved.isNotEmpty) {
       try {
@@ -115,7 +117,9 @@ class SpaceNoteSource implements EditableNoteSource {
             : j['password'] as String;
         final user = j['account'] == true ? account!.user : j['user'] as String;
         _login = (j['path'] as String, user);
-        space.connectExisting(_clientFor(j['path'] as String, user, pw));
+        final client = _clientFor(j['path'] as String, user, pw);
+        space.connectExisting(client);
+        _useTaskClient(client);
       } catch (_) {
         flags?.write(loginKey, '');
       }
@@ -123,6 +127,67 @@ class SpaceNoteSource implements EditableNoteSource {
   }
 
   final Space space;
+
+  /// The Space's tasks (VTODO in the same collection as its notes).
+  final TaskStore taskStore;
+  TaskSyncEngine? _taskEngine;
+  CalDavClient? _taskClient;
+
+  void _useTaskClient(CalDavClient? c) {
+    _taskClient = c;
+    _taskEngine = null;
+  }
+
+  // Local edits never touch the network, so the offline engine's client is
+  // a placeholder (same as Space does for notes).
+  TaskSyncEngine get _tasks => _taskEngine ??= TaskSyncEngine(
+    _taskClient ??
+        CalDavClient(
+          collection: Uri.parse('http://localhost/'),
+          username: '',
+          password: '',
+        ),
+    taskStore,
+  );
+
+  Future<List<Task>> loadTasks() => _tasks.tasks();
+  Future<Task> saveTask(Task t) => _tasks.save(t);
+  Future<void> deleteTask(String uid) => _tasks.delete(uid);
+
+  /// Syncs the tasks with the server; null for a local Space. Independent of
+  /// the notes' [sync]: callers run both and treat a task failure as
+  /// non-fatal.
+  Future<SyncReport?> syncTasks() async {
+    if (_taskClient == null) return null;
+    return _tasks.sync();
+  }
+
+  Future<List<Revision>> taskRevisions(String uid) => taskStore.revisions(uid);
+
+  // Writes only when there is something to clear, so a Space without tasks
+  // never gets a tasks key.
+  Future<void> _clearTaskToken() async {
+    if (await taskStore.getSyncToken() != null) {
+      await taskStore.setSyncToken(null);
+    }
+  }
+
+  /// Like [Space.attach] for tasks: every task counts as not yet on the
+  /// server, so the first sync sends them and merges by UID.
+  Future<void> _attachTasks() async {
+    for (final s in await taskStore.all()) {
+      s.base = null;
+      s.local.href = null;
+      s.local.etag = null;
+      s.dirty = !s.deleted;
+      if (s.deleted) {
+        await taskStore.remove(s.local.uid);
+      } else {
+        await taskStore.put(s.local.uid, s);
+      }
+    }
+    await _clearTaskToken();
+  }
 
   /// Set for a Space that belongs to the signed-in account.
   final Account? account;
@@ -197,6 +262,10 @@ class SpaceNoteSource implements EditableNoteSource {
       for (final n in await space.store.all()) {
         await space.store.remove(n.local.uid);
       }
+      for (final t in await taskStore.all()) {
+        await taskStore.remove(t.local.uid);
+      }
+      await _clearTaskToken();
       _markSeeded();
     }
     // Reconnecting to the collection this Space last synced with keeps the
@@ -209,7 +278,9 @@ class SpaceNoteSource implements EditableNoteSource {
       space.connectExisting(client);
     } else {
       await space.attach(client);
+      await _attachTasks();
     }
+    _useTaskClient(client);
     flags?.write(lastServerKey, client.collection.toString());
     _login = (path, user);
     flags?.write(
@@ -224,6 +295,8 @@ class SpaceNoteSource implements EditableNoteSource {
 
   Future<void> disconnect() async {
     await space.detach();
+    _useTaskClient(null);
+    await _clearTaskToken();
     _login = null;
     flags?.write(loginKey, '');
   }
@@ -264,6 +337,9 @@ class SpaceNoteSource implements EditableNoteSource {
     if (!connected) return 0;
     var n = 0;
     for (final e in await space.store.all()) {
+      if (e.dirty || e.deleted) n++;
+    }
+    for (final e in await taskStore.all()) {
       if (e.dirty || e.deleted) n++;
     }
     return n;

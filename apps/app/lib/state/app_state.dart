@@ -9,6 +9,8 @@ import '../data/note_source.dart';
 import '../data/space_catalog.dart';
 import 'note_draft.dart';
 import 'tab_state.dart';
+import 'task_draft.dart';
+import 'task_rules.dart';
 
 enum ViewMode { board, list }
 
@@ -97,9 +99,26 @@ class SavedView {
 
 /// A note found by a search across every Space.
 class SpaceHit {
-  const SpaceHit(this.space, this.note);
+  const SpaceHit(this.space, this.note, {this.task});
+
+  /// A hit on a task: [note] is a stand-in carrying its uid, title, text and
+  /// tags so code that only reads those keeps working; [task] is the real
+  /// item.
+  SpaceHit.forTask(this.space, Task t)
+    : task = t,
+      note = Note(
+        uid: t.uid,
+        summary: t.summary,
+        description: t.description,
+        categories: List.of(t.categories),
+        parentUid: t.parentUid,
+        created: t.created,
+        lastModified: t.lastModified,
+      );
   final SpaceInfo space;
   final Note note;
+  final Task? task;
+  bool get isTask => task != null;
 }
 
 /// Which edge of the window the shell's icon rail sits on.
@@ -314,8 +333,9 @@ class AppState extends ChangeNotifier {
     final c = catalog;
     if (c == null || id == c.current) return false;
     if (!c.spaces.any((s) => s.id == id)) return false;
-    if (!await _settleDrafts(_drafts.keys.toList())) return false;
+    if (!await _settleDrafts(_allDraftUids())) return false;
     _drafts.clear();
+    _taskDrafts.clear();
     c.select(id);
     await _openCurrent();
     return true;
@@ -328,6 +348,9 @@ class AppState extends ChangeNotifier {
     final id = c.current;
     source = id == null ? const EmptyNoteSource() : c.sourceFor(id);
     notes = [];
+    tasks = [];
+    taskError = null;
+    selectedTaskUid = null;
     tree = NoteTree.build(const []);
     peekUid = null;
     query = '';
@@ -442,7 +465,9 @@ class AppState extends ChangeNotifier {
   Future<int> unsyncedInCurrent() async {
     final src = source;
     final synced = src is SpaceNoteSource ? await src.unsyncedCount() : 0;
-    return _drafts.keys.where(dirtyFor).length + synced;
+    return _drafts.keys.where(dirtyFor).length +
+        _taskDrafts.keys.where(dirtyTaskFor).length +
+        synced;
   }
 
   /// Deletes the open Space from this device only (server notes are never
@@ -458,8 +483,9 @@ class AppState extends ChangeNotifier {
     if (next != null) {
       if (!await switchSpace(next)) return;
     } else {
-      if (!await _settleDrafts(_drafts.keys.toList())) return;
+      if (!await _settleDrafts(_allDraftUids())) return;
       _drafts.clear();
+      _taskDrafts.clear();
     }
     prefs?.remove(viewsKey);
     prefs?.remove('$viewsKey.migrated');
@@ -471,7 +497,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Notes in any Space whose title or text contain [q] (case-insensitive).
+  /// Notes and tasks in any Space whose title or text contain [q]
+  /// (case-insensitive). Task hits have [SpaceHit.task] set.
   Future<List<SpaceHit>> searchAllSpaces(String q) async {
     final needle = q.trim().toLowerCase();
     final c = catalog;
@@ -479,15 +506,24 @@ class AppState extends ChangeNotifier {
     final hits = <SpaceHit>[];
     final cur = c.current; // snapshot: the user may switch while we search
     final curNotes = List.of(notes);
+    final curTasks = List.of(tasks);
     for (final sp in List.of(c.spaces)) {
-      List<Note> list;
+      List<Note> list = const [];
+      List<Task> taskList = const [];
       if (sp.id == cur) {
         list = curNotes;
+        taskList = curTasks;
       } else {
+        final other = c.sourceFor(sp.id);
         try {
-          list = await c.sourceFor(sp.id).load();
+          list = await other.load();
         } catch (_) {
-          continue; // one unreadable Space should not hide the others
+          // one unreadable Space should not hide the others
+        }
+        try {
+          taskList = await other.loadTasks();
+        } catch (_) {
+          // an unreadable task store never hides notes
         }
       }
       for (final n in list) {
@@ -495,6 +531,12 @@ class AppState extends ChangeNotifier {
         if (n.summary.toLowerCase().contains(needle) ||
             n.description.toLowerCase().contains(needle)) {
           hits.add(SpaceHit(sp, n));
+        }
+      }
+      for (final t in taskList) {
+        if (t.summary.toLowerCase().contains(needle) ||
+            t.description.toLowerCase().contains(needle)) {
+          hits.add(SpaceHit.forTask(sp, t));
         }
       }
     }
@@ -505,11 +547,13 @@ class AppState extends ChangeNotifier {
   Future<void> openHit(SpaceHit h, {OpenMode? mode}) async {
     if (catalog?.spaces.any((s) => s.id == h.space.id) != true) return;
     final sameSpace = h.space.id == currentSpaceId;
-    if (sameSpace) {
-      await openNote(h.note.uid, mode: mode);
+    if (!sameSpace && !await switchSpace(h.space.id)) return;
+    if (h.isTask) {
+      // No task view yet: remember which task was asked for.
+      if (tasks.any((t) => t.uid == h.note.uid)) selectedTaskUid = h.note.uid;
+      notifyListeners();
       return;
     }
-    if (!await switchSpace(h.space.id)) return;
     await openNote(h.note.uid, mode: mode);
   }
 
@@ -733,30 +777,57 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Moves note [uid] and everything under it to Space [targetId], at its
-  /// top level. The notes are copied into the other Space first and removed
-  /// here only after that worked, so a failure leaves a duplicate, never a
-  /// loss. The copies get new ids; earlier versions stay behind. A server
-  /// Space syncs the new notes the next time it is opened. Returns how many
-  /// notes moved, or null with [error] set.
+  /// Moves note or task [uid] and everything under it to Space [targetId],
+  /// at its top level. Under a note go its sub-notes and every task whose
+  /// parent chain leads to it; under a task go its sub-tasks. The items are
+  /// copied into the other Space first, checked, and removed here only after
+  /// that worked, so a failure leaves a duplicate, never a loss. The copies
+  /// get new ids; earlier versions stay behind. A server Space syncs the new
+  /// items the next time it is opened. Returns how many items moved, or null
+  /// with [error] set. A repeating task with per-occurrence overrides is not
+  /// moved (the overrides carry the old id).
   Future<int?> moveToSpace(String uid, String targetId) async {
     final c = catalog;
     final src = source;
     final node = tree.find(uid);
-    if (c == null || node == null || src is! EditableNoteSource) return null;
+    final rootTask = node == null ? _taskById(uid) : null;
+    if (c == null || (node == null && rootTask == null)) return null;
+    if (src is! EditableNoteSource) return null;
     if (targetId == c.current || !c.spaces.any((s) => s.id == targetId)) {
       return null;
     }
+    final noteGroup = node == null
+        ? <Note>[]
+        : [node.note, ...tree.descendants(uid)];
+    // Tasks under the group, parents before children.
+    final ids = {for (final n in noteGroup) n.uid, ?rootTask?.uid};
+    final taskGroup = <Task>[?rootTask];
+    for (var grew = true; grew;) {
+      grew = false;
+      for (final t in tasks) {
+        if (ids.contains(t.uid) || !ids.contains(t.parentUid)) continue;
+        ids.add(t.uid);
+        taskGroup.add(t);
+        grew = true;
+      }
+    }
+    if (taskGroup.isNotEmpty && src is! SpaceNoteSource) return null;
+    if (taskGroup.any((t) => t.siblingLines.isNotEmpty)) {
+      error = 'A repeating task with changed occurrences cannot be moved yet.';
+      notifyListeners();
+      return null;
+    }
     final target = c.sourceFor(targetId);
-    final group = [node.note, ...tree.descendants(uid)];
-    // Unsaved edits would be lost with the old notes: settle them first.
-    if (!await _settleDrafts([for (final n in group) n.uid])) return null;
+    final count = noteGroup.length + taskGroup.length;
+    // Unsaved edits would be lost with the old items: settle them first.
+    if (!await _settleDrafts([...ids])) return null;
     final stamp = DateTime.now().toUtc().microsecondsSinceEpoch;
-    final fresh = {
-      for (var i = 0; i < group.length; i++) group[i].uid: 'davdart-$stamp-$i',
-    };
+    final fresh = <String, String>{};
+    for (final u in ids) {
+      fresh[u] = 'davdart-$stamp-${fresh.length}';
+    }
     try {
-      for (final n in group) {
+      for (final n in noteGroup) {
         await target.save(
           Note(
             uid: fresh[n.uid]!,
@@ -772,32 +843,83 @@ class AppState extends ChangeNotifier {
           ),
         );
       }
-      // Something may have changed the notes while they were being copied
+      for (final t in taskGroup) {
+        await target.saveTask(
+          Task(
+            uid: fresh[t.uid]!,
+            summary: t.summary,
+            description: t.description,
+            categories: List.of(t.categories),
+            status: t.status,
+            percentComplete: t.percentComplete,
+            priority: t.priority,
+            due: t.due,
+            dtstart: t.dtstart,
+            completed: t.completed,
+            rrule: t.rrule,
+            parentUid: t.uid == uid ? null : fresh[t.parentUid],
+            created: t.created,
+            lastModified: DateTime.now().toUtc(),
+            extraLines: List.of(t.extraLines),
+            calendarLines: List.of(t.calendarLines),
+            propertyParams: Map.of(t.propertyParams),
+          ),
+        );
+      }
+      // Something may have changed the items while they were being copied
       // (an edit, a sync). Keep the originals then; nothing is lost.
       final current = {for (final n in await src.load()) n.uid: n};
-      for (final n in group) {
+      final currentTasks = taskGroup.isEmpty
+          ? const <String, Task>{}
+          : {
+              for (final t in await (src as SpaceNoteSource).loadTasks())
+                t.uid: t,
+            };
+      var changed = false;
+      for (final n in noteGroup) {
         final now = current[n.uid];
         if (now == null ||
             now.summary != n.summary ||
             now.description != n.description ||
             now.lastModified != n.lastModified ||
             now.parentUid != n.parentUid) {
-          if (src == source) {
-            error =
-                'A note changed while moving. The copies are in the other '
-                'space; the originals were kept.';
-            notifyListeners();
-          }
-          return null;
+          changed = true;
         }
       }
-      for (final n in group.reversed) {
+      for (final t in taskGroup) {
+        final now = currentTasks[t.uid];
+        if (now == null ||
+            now.summary != t.summary ||
+            now.description != t.description ||
+            now.lastModified != t.lastModified ||
+            now.parentUid != t.parentUid ||
+            now.status != t.status ||
+            now.due != t.due ||
+            now.categories.join('\n') != t.categories.join('\n')) {
+          changed = true;
+        }
+      }
+      if (changed) {
+        if (src == source) {
+          error =
+              'An item changed while moving. The copies are in the other '
+              'space; the originals were kept.';
+          notifyListeners();
+        }
+        return null;
+      }
+      for (final t in taskGroup.reversed) {
+        await (src as SpaceNoteSource).deleteTask(t.uid);
+      }
+      for (final n in noteGroup.reversed) {
         await src.delete(n.uid);
       }
-      if (src != source) return group.length;
+      if (src != source) return count;
       final loaded = await src.load();
-      if (src != source) return group.length;
+      if (src != source) return count;
       _setNotes(loaded);
+      if (src is SpaceNoteSource) _setTasks(await src.loadTasks());
+      if (src != source) return count;
       if (peekUid != null && tree.find(peekUid!) == null) {
         _setPeek(null);
       }
@@ -805,12 +927,13 @@ class AppState extends ChangeNotifier {
       error = null;
       notifyListeners();
       if (connected) sync();
-      return group.length;
+      return count;
     } catch (e) {
       if (src == source) {
         // Some originals may already be gone: show what is really there.
         try {
           _setNotes(await src.load());
+          if (src is SpaceNoteSource) _setTasks(await src.loadTasks());
         } catch (_) {}
         error = 'Move failed: $e';
         notifyListeners();
@@ -890,6 +1013,8 @@ class AppState extends ChangeNotifier {
       var loaded = await src.load();
       if (src != source) return; // another Space was opened meanwhile
       _setNotes(loaded);
+      await _loadTasks(src);
+      if (src != source) return;
       if (src is EditableNoteSource) {
         try {
           await _migrateViews(src);
@@ -988,10 +1113,14 @@ class AppState extends ChangeNotifier {
     syncing = true;
     syncMessage = 'Syncing…';
     notifyListeners();
+    var message = syncMessage;
+    // Notes and tasks sync in the same pass, each isolated from the other:
+    // a failing task sync leaves the notes (and their message) alone and the
+    // other way round.
     try {
       final r = await s.sync();
       if (s != _space) return;
-      syncMessage = r == null
+      message = r == null
           ? null
           : r.errors.isNotEmpty
           ? 'Sync problem: ${r.errors.first}'
@@ -1003,8 +1132,29 @@ class AppState extends ChangeNotifier {
       _setNotes(loaded);
     } catch (e) {
       if (s != _space) return;
-      syncMessage = 'Sync failed: $e';
+      message = 'Sync failed: $e';
     }
+    String? taskProblem;
+    try {
+      final tr = await s.syncTasks();
+      if (s != _space) return;
+      if (tr != null && tr.errors.isNotEmpty) {
+        taskProblem = 'Tasks: sync problem: ${tr.errors.first}';
+      }
+    } catch (e) {
+      if (s != _space) return;
+      taskProblem = 'Tasks: sync failed: $e';
+    }
+    try {
+      _setTasks(await s.loadTasks());
+    } catch (e) {
+      taskProblem ??= 'Tasks could not be read: $e';
+    }
+    if (s != _space) return;
+    taskError = taskProblem;
+    syncMessage = taskProblem == null
+        ? message
+        : (message == null ? taskProblem : '$message. $taskProblem');
     syncing = false;
     notifyListeners();
     if (_syncAgain) {
@@ -1153,6 +1303,414 @@ class AppState extends ChangeNotifier {
         await guarded(() => select(n.uid));
       }
     }
+  }
+
+  // --- Tasks ---
+  //
+  // Tasks (VTODO) live in the same server collection as the notes of a Space
+  // but in their own store and sync engine. They load with the notes, sync in
+  // the same pass ([sync]) and fail separately: a task problem is shown in
+  // [taskError] and the sync message, never as [error], and never touches
+  // the notes. A Space with no tasks behaves exactly as before.
+
+  /// The open Space's tasks (all, including completed and cancelled).
+  List<Task> tasks = [];
+
+  /// A non-fatal task problem (unreadable store, failed task sync); null
+  /// when fine. Notes are unaffected by it.
+  String? taskError;
+
+  /// The task a search hit asked for; no task view uses it yet.
+  String? selectedTaskUid;
+
+  /// Tasks can be written only in a Space (the read-only dev feed rejects).
+  bool get tasksEditable => source is SpaceNoteSource;
+
+  Future<void> _loadTasks(NoteSource src) async {
+    if (src is! SpaceNoteSource) {
+      tasks = [];
+      return;
+    }
+    try {
+      final loaded = await src.loadTasks();
+      if (src != source) return;
+      _setTasks(loaded);
+      taskError = null;
+    } catch (e) {
+      if (src != source) return;
+      tasks = [];
+      taskError = 'Tasks could not be read: $e';
+    }
+  }
+
+  void _setTasks(List<Task> loaded) {
+    tasks = List.unmodifiable(loaded);
+    _taskDrafts.removeWhere((u, _) => !tasks.any((t) => t.uid == u));
+    if (selectedTaskUid != null && _taskById(selectedTaskUid!) == null) {
+      selectedTaskUid = null;
+    }
+  }
+
+  Task? _taskById(String uid) {
+    for (final t in tasks) {
+      if (t.uid == uid) return t;
+    }
+    return null;
+  }
+
+  Task? taskById(String uid) => _taskById(uid);
+
+  Set<String> _allDraftUids() => {..._drafts.keys, ..._taskDrafts.keys};
+
+  /// The item (a [Note] or a [Task]) with this uid, or null. Parents of
+  /// tasks may be either.
+  Object? findItem(String uid) => tree.find(uid)?.note ?? _taskById(uid);
+
+  // Selectors. [now] defaults to the current time (tests pass their own).
+
+  /// Open tasks (not completed, not cancelled): overdue first, then by due
+  /// date, priority, title.
+  List<Task> openTasks([DateTime? now]) {
+    final n = now ?? DateTime.now();
+    return [
+      for (final t in tasks)
+        if (!t.isClosed) t,
+    ]..sort((a, b) => compareTasks(a, b, n));
+  }
+
+  /// Open tasks past due (see [isTaskOverdue] for how zoned times are
+  /// treated), most overdue first.
+  List<Task> overdueTasks([DateTime? now]) {
+    final n = now ?? DateTime.now();
+    return [
+      for (final t in openTasks(n))
+        if (isTaskOverdue(t, n)) t,
+    ];
+  }
+
+  /// Open tasks due on the user's current day, not yet past due.
+  List<Task> dueTodayTasks([DateTime? now]) {
+    final n = now ?? DateTime.now();
+    return [
+      for (final t in openTasks(n))
+        if (isTaskDueToday(t, n) && !isTaskOverdue(t, n)) t,
+    ];
+  }
+
+  /// Completed tasks, latest completion first.
+  List<Task> completedTasks() =>
+      [
+        for (final t in tasks)
+          if (t.isCompleted) t,
+      ]..sort(
+        (a, b) => (b.completed ?? b.lastModified ?? DateTime(0)).compareTo(
+          a.completed ?? a.lastModified ?? DateTime(0),
+        ),
+      );
+
+  /// Tasks directly under [parentUid] (a note or a task). Null gives the top
+  /// level: no parent, or a parent that does not exist (a missing parent
+  /// falls back to the top level, as for notes). Open tasks first.
+  List<Task> tasksByParent(String? parentUid, [DateTime? now]) {
+    final n = now ?? DateTime.now();
+    bool top(Task t) => t.parentUid == null || findItem(t.parentUid!) == null;
+    return [
+      for (final t in tasks)
+        if (parentUid == null ? top(t) : t.parentUid == parentUid) t,
+    ]..sort((a, b) {
+      if (a.isClosed != b.isClosed) return a.isClosed ? 1 : -1;
+      return compareTasks(a, b, n);
+    });
+  }
+
+  /// Tags used on tasks (without the `status-`/`kind-` markers), sorted.
+  List<String> get taskTags => ({
+    for (final t in tasks)
+      for (final c in t.categories)
+        if (!c.startsWith('status-') && !c.startsWith('kind-')) c,
+  }.toList()..sort());
+
+  bool isOverdue(Task t, [DateTime? now]) =>
+      isTaskOverdue(t, now ?? DateTime.now());
+
+  /// Why task [uid] cannot be completed, or null when it can.
+  String? taskCompletionBlockerFor(String uid) {
+    final t = _taskById(uid);
+    return t == null ? null : taskCompletionBlocker(t);
+  }
+
+  /// True when task [uid] may sit under [parentUid] (null: the top level):
+  /// the parent exists as a note or a task and is not the task itself or
+  /// one of its descendants.
+  bool canMoveTask(String uid, String? parentUid) {
+    if (_taskById(uid) == null) return false;
+    if (parentUid == null) return true;
+    if (parentUid == uid || findItem(parentUid) == null) return false;
+    // Walk up from the new parent through tasks and notes: meeting the task
+    // itself would make a loop.
+    var cur = parentUid;
+    for (var i = 0; i <= tasks.length + notes.length; i++) {
+      if (cur == uid) return false;
+      final t = _taskById(cur);
+      final next = t != null ? t.parentUid : tree.find(cur)?.note.parentUid;
+      if (next == null) return true;
+      cur = next;
+    }
+    return false;
+  }
+
+  /// Saves, reloads the tasks and syncs. False (with [error] set when the
+  /// cause is the Space) if nothing was saved.
+  Future<bool> _taskEdit(
+    Future<void> Function(SpaceNoteSource src) change,
+  ) async {
+    final src = source;
+    if (src is! SpaceNoteSource) {
+      error = 'This space is read-only.';
+      notifyListeners();
+      return false;
+    }
+    try {
+      await change(src);
+      final loaded = await src.loadTasks();
+      if (src != source) return true;
+      _setTasks(loaded);
+      error = null;
+    } catch (e) {
+      if (src != source) return false;
+      error = 'Save failed: $e';
+      notifyListeners();
+      return false;
+    }
+    notifyListeners();
+    if (connected) sync();
+    return true;
+  }
+
+  /// Adds a task and returns its uid, or null (empty title, read-only Space,
+  /// failure). [tags] never carry `status-`/`kind-` markers.
+  Future<String?> addTask(
+    String title, {
+    String? description,
+    String? parentUid,
+    ICalDate? due,
+    int? priority,
+    List<String> tags = const [],
+  }) async {
+    final t = title.trim();
+    if (t.isEmpty) return null;
+    final now = DateTime.now().toUtc();
+    final task = Task(
+      uid: 'davdart-${now.microsecondsSinceEpoch}',
+      summary: t,
+      description: description ?? '',
+      status: 'NEEDS-ACTION',
+      due: due,
+      priority: priority,
+      parentUid: parentUid != null && findItem(parentUid) != null
+          ? parentUid
+          : null,
+      categories: _plainTags(tags),
+      created: now,
+      lastModified: now,
+    );
+    return await _taskEdit((src) => src.saveTask(task)) ? task.uid : null;
+  }
+
+  static List<String> _plainTags(Iterable<String> tags) => [
+    for (final c in tags)
+      if (c.trim().isNotEmpty &&
+          !c.startsWith('status-') &&
+          !c.startsWith('kind-'))
+        c.trim(),
+  ];
+
+  /// Changes a task. Only what is passed changes; [setParent], [setDue] and
+  /// [setPriority] say that a null value means "clear". A parent move that is
+  /// not valid (see [canMoveTask]) is dropped and the rest saves. Returns
+  /// false when nothing was saved.
+  Future<bool> updateTask(
+    String uid, {
+    String? title,
+    String? description,
+    List<String>? tags,
+    bool setParent = false,
+    String? parentUid,
+    bool setDue = false,
+    ICalDate? due,
+    bool setPriority = false,
+    int? priority,
+  }) async {
+    final t = _taskById(uid);
+    if (t == null) return false;
+    final sum = title?.trim();
+    if (sum != null && sum.isEmpty) return false;
+    final move = setParent && canMoveTask(uid, parentUid);
+    final copy = t.copyWith(
+      summary: sum,
+      description: description,
+      parentUid: move ? parentUid : null,
+      clearParent: move && parentUid == null,
+      due: setDue ? due : null,
+      clearDue: setDue && due == null,
+      priority: setPriority ? priority : null,
+      clearPriority: setPriority && priority == null,
+    );
+    if (tags != null) {
+      copy.categories = [
+        ...t.categories.where(
+          (c) => c.startsWith('status-') || c.startsWith('kind-'),
+        ),
+        ..._plainTags(tags),
+      ];
+    }
+    return _taskEdit((src) => src.saveTask(copy));
+  }
+
+  /// Completes ([done] true) or reopens task [uid]. A repeating task cannot
+  /// be completed yet ([taskCompletionBlockerFor] says why): this returns
+  /// false and changes nothing. Reopening is always allowed.
+  Future<bool> setTaskDone(String uid, bool done) async {
+    final t = _taskById(uid);
+    if (t == null) return false;
+    if (done && taskCompletionBlocker(t) != null) return false;
+    if (done == t.isCompleted) return false;
+    final copy = t.copyWith();
+    if (done) {
+      copy.complete(DateTime.now());
+    } else {
+      copy.reopen();
+    }
+    return _taskEdit((src) => src.saveTask(copy));
+  }
+
+  /// Flips completion: complete an open task, reopen a closed one.
+  Future<bool> toggleTask(String uid) async {
+    final t = _taskById(uid);
+    return t == null ? false : setTaskDone(uid, !t.isClosed);
+  }
+
+  /// Moves a task to a board status word (`todo`, `doing`, `done`, ...);
+  /// `done` follows the same repeating-task rule as [setTaskDone].
+  Future<bool> setTaskStatus(String uid, String word) async {
+    final t = _taskById(uid);
+    if (t == null) return false;
+    if (word == 'done' && taskCompletionBlocker(t) != null) return false;
+    final copy = t.copyWith()..setBoardStatus(word, DateTime.now());
+    return _taskEdit((src) => src.saveTask(copy));
+  }
+
+  /// Deletes a task; its sub-tasks and sub-notes move up to its parent so
+  /// none are lost.
+  Future<bool> deleteTask(String uid) async {
+    final t = _taskById(uid);
+    if (t == null) return false;
+    final parent = t.parentUid;
+    final kidTasks = [
+      for (final k in tasks)
+        if (k.parentUid == uid) k.copyWith(),
+    ];
+    final kidNotes = [
+      for (final n in notes)
+        if (n.parentUid == uid) n.copyWith(),
+    ];
+    final ok = await _taskEdit((src) async {
+      for (final k in kidTasks) {
+        await src.saveTask(
+          parent == null
+              ? k.copyWith(clearParent: true)
+              : k.copyWith(parentUid: parent),
+        );
+      }
+      for (final k in kidNotes) {
+        await src.save(
+          parent == null
+              ? k.copyWith(clearParent: true)
+              : k.copyWith(parentUid: parent),
+        );
+      }
+      await src.deleteTask(uid);
+    });
+    if (ok) {
+      _taskDrafts.remove(uid);
+      if (kidNotes.isNotEmpty && source is SpaceNoteSource) {
+        try {
+          _setNotes(await (source as SpaceNoteSource).load());
+        } catch (_) {}
+      }
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  // Task drafts: one per task being edited, like the note drafts.
+
+  final Map<String, TaskDraft> _taskDrafts = {};
+
+  List<TaskDraft> get taskDrafts => List.unmodifiable(_taskDrafts.values);
+  TaskDraft? taskDraftFor(String uid) => _taskDrafts[uid];
+  bool dirtyTaskFor(String uid) => _taskDrafts[uid]?.dirty ?? false;
+
+  /// Starts editing task [uid] (no-op if read-only, unknown or already open).
+  void startTaskEdit(String uid) {
+    final t = _taskById(uid);
+    if (t == null || !tasksEditable || _taskDrafts.containsKey(uid)) return;
+    _taskDrafts[uid] = TaskDraft(
+      uid: uid,
+      title: t.summary,
+      body: t.description,
+      tags: _plainTags(t.categories).join(', '),
+      originalParent: t.parentUid != null && findItem(t.parentUid!) != null
+          ? t.parentUid
+          : null,
+      originalDue: t.due,
+      originalPriority: t.priority,
+    );
+    notifyListeners();
+  }
+
+  void discardTaskDraft(String uid) {
+    _taskDrafts.remove(uid);
+    notifyListeners();
+  }
+
+  /// Saves the edit of task [uid]. Text typed while the save runs stays as
+  /// the draft, still dirty. False if nothing was saved.
+  Future<bool> saveTaskDraft(String uid) async {
+    final d = _taskDrafts[uid];
+    if (d == null || d.titleEmpty) return false;
+    final title = d.titleController.text;
+    final body = d.bodyController.text;
+    final tagText = d.tagsController.text;
+    final parent = d.parent;
+    final due = d.due;
+    final priority = d.priority;
+    final ok = await updateTask(
+      uid,
+      title: title,
+      description: body,
+      tags: d.tagList,
+      setParent: parent != d.originalParent,
+      parentUid: parent,
+      setDue: due != d.originalDue,
+      due: due,
+      setPriority: priority != d.originalPriority,
+      priority: priority,
+    );
+    if (!ok) return false;
+    if (_taskDrafts[uid] == d) {
+      d.markSaved(
+        title: title,
+        body: body,
+        tags: tagText,
+        parent: parent,
+        due: due,
+        priority: priority,
+      );
+      if (!d.dirty) _taskDrafts.remove(uid);
+    }
+    notifyListeners();
+    return true;
   }
 
   // --- Document tabs ---
@@ -1457,14 +2015,19 @@ class AppState extends ChangeNotifier {
   Future<bool> _settleDrafts(Iterable<String> uids) async {
     final g = leaveGuard;
     for (final u in uids) {
-      if (!dirtyFor(u) || g == null) continue;
+      final isTask = _taskDrafts.containsKey(u);
+      if (!(isTask ? dirtyTaskFor(u) : dirtyFor(u)) || g == null) continue;
       switch (await g()) {
         case DraftChoice.keep:
           return false;
         case DraftChoice.save:
-          if (!await saveDraft(u)) return false;
+          if (!await (isTask ? saveTaskDraft(u) : saveDraft(u))) return false;
         case DraftChoice.discard:
-          _drafts.remove(u);
+          if (isTask) {
+            _taskDrafts.remove(u);
+          } else {
+            _drafts.remove(u);
+          }
       }
     }
     return true;

@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'key_value_storage.dart';
 import 'note_source.dart';
 import 'persistent_store.dart';
+import 'persistent_task_store.dart';
 
 class SpaceInfo {
   const SpaceInfo(this.id, this.name, {this.collection});
@@ -139,6 +140,13 @@ class SpaceCatalog {
     'davdart.seeded.v1',
     'davdart.server.v1',
     'davdart.lastserver.v1',
+  ];
+
+  /// The legacy Planning Space's task keys (unprefixed, like its notes).
+  /// Not part of [legacyKeys]: tasks alone never make Planning appear.
+  static const legacyTaskKeys = [
+    'davdart.tasks.v1',
+    'davdart.tasks.v1.unreadable',
   ];
 
   /// Whether this device holds data of the legacy Planning Space.
@@ -398,7 +406,7 @@ class SpaceCatalog {
     if (at < 0) return false;
     _deleted.add(id);
     if (id == planningId) {
-      for (final k in legacyKeys) {
+      for (final k in [...legacyKeys, ...legacyTaskKeys]) {
         storage.remove(k);
       }
     } else {
@@ -447,6 +455,10 @@ class SpaceCatalog {
     return SpaceNoteSource(
       Space(SpaceConfig(id: id, name: info.name), PersistentNoteStore(scoped)),
       seed: id == planningId ? planningSeed : null,
+      taskStore: PersistentTaskStore(
+        scoped,
+        key: id == planningId ? 'davdart.tasks.v1' : 'tasks.v1',
+      ),
       account: info.onServer ? account : null,
       pendingPath: info.collection,
       flags: scoped,
