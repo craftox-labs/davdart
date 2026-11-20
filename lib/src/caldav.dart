@@ -29,17 +29,26 @@ class SyncTokenInvalid extends CalDavException {
 
 /// Result of [CalDavClient.sync].
 class SyncResult {
-  SyncResult(this.changed, this.deletedHrefs, this.syncToken);
+  SyncResult(this.changed, this.deletedHrefs, this.syncToken,
+      [this.unparsableHrefs = const []]);
   final List<Note> changed;
   final List<String> deletedHrefs;
+
+  /// Resources that are on the server but could not be parsed. They are not
+  /// in [changed], yet they must not count as deleted.
+  final List<String> unparsableHrefs;
   final String? syncToken;
 }
 
 /// Result of [CalDavClient.syncTasks].
 class TaskSyncResult {
-  TaskSyncResult(this.changed, this.deletedHrefs, this.syncToken);
+  TaskSyncResult(this.changed, this.deletedHrefs, this.syncToken,
+      [this.unparsableHrefs = const []]);
   final List<Task> changed;
   final List<String> deletedHrefs;
+
+  /// Resources on the server that could not be parsed; see [SyncResult].
+  final List<String> unparsableHrefs;
   final String? syncToken;
 }
 
@@ -274,7 +283,7 @@ class CalDavClient {
         setMeta: (n, href, etag) => n
           ..href = href
           ..etag = etag);
-    return SyncResult(r.$1, r.$2, r.$3);
+    return SyncResult(r.$1, r.$2, r.$3, r.$4);
   }
 
   /// Like [sync], for the VTODO resources of the collection. The server
@@ -288,10 +297,10 @@ class CalDavClient {
         setMeta: (t, href, etag) => t
           ..href = href
           ..etag = etag);
-    return TaskSyncResult(r.$1, r.$2, r.$3);
+    return TaskSyncResult(r.$1, r.$2, r.$3, r.$4);
   }
 
-  Future<(List<T>, List<String>, String?)> _syncGeneric<T>(
+  Future<(List<T>, List<String>, String?, List<String>)> _syncGeneric<T>(
     String? syncToken, {
     required T Function(String) parse,
     required String missing,
@@ -323,6 +332,7 @@ class CalDavClient {
     final doc = XmlDocument.parse(text);
     final changed = <T>[];
     final deleted = <String>[];
+    final unparsable = <String>[];
     String? newToken;
     for (final e in doc.descendantElements) {
       if (e.localName == 'sync-token' &&
@@ -368,12 +378,15 @@ class CalDavClient {
         }
         changed.add(n);
       } on ICalException catch (e) {
-        if (e.message != missing) onResourceError?.call(href, e);
+        if (e.message != missing) {
+          unparsable.add(href);
+          onResourceError?.call(href, e);
+        }
       }
       // A failed fetch (CalDavException, network error) is not caught: the
       // whole sync fails, so the caller keeps its old token and retries.
     }
-    return (changed, deleted, newToken);
+    return (changed, deleted, newToken, unparsable);
   }
 
   /// Fetches one note by href (absolute or relative to the collection).

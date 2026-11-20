@@ -1,4 +1,5 @@
 import 'caldav.dart';
+import 'ical.dart' show ICalException;
 import 'merge.dart';
 import 'note.dart';
 import 'store.dart';
@@ -85,6 +86,9 @@ class SyncEngine {
       token = null;
       res = await client.sync();
     }
+    for (final h in res.unparsableHrefs) {
+      report.errors.add('$h: cannot be read, left as is');
+    }
     for (final r in res.changed) {
       await _applyRemote(r, report);
     }
@@ -92,7 +96,11 @@ class SyncEngine {
     if (token == null || token.isEmpty) {
       // Full listing: anything synced before that the server no longer has
       // was deleted there.
-      final present = {for (final r in res.changed) _path(r.href ?? '')};
+      final present = {
+        for (final r in res.changed) _path(r.href ?? ''),
+        // Present but unreadable: never treated as deleted.
+        for (final h in res.unparsableHrefs) _path(h),
+      };
       for (final s in all) {
         final href = s.base?.href;
         if (href != null && !present.contains(_path(href))) {
@@ -228,7 +236,7 @@ class SyncEngine {
           }
           break;
         } on ConflictException {
-          await _refetch(s, report);
+          if (!await _refetch(s, report)) break;
         } on CalDavException catch (e) {
           report.errors.add('$uid: $e');
           break;
@@ -240,10 +248,17 @@ class SyncEngine {
 
   /// After a 412: pull the server copy of [s] and merge, so the next push
   /// carries the current etag.
-  Future<void> _refetch(StoredNote s, SyncReport report) async {
+  ///
+  /// Returns false when the server copy cannot be parsed: the local item stays
+  /// as it is (dirty) and the problem is reported, nothing is deleted.
+  Future<bool> _refetch(StoredNote s, SyncReport report) async {
     final href = s.base?.href ?? s.local.href ?? '${s.local.uid}.ics';
     try {
       await _applyRemote(await client.getNote(href), report);
+      return true;
+    } on ICalException catch (e) {
+      report.errors.add('${s.local.uid}: server copy cannot be read ($e)');
+      return false;
     } on CalDavException catch (e) {
       if (e.statusCode != 404) rethrow;
       // Gone from the server: a deletion is done, an edit is recreated.
@@ -255,5 +270,6 @@ class SyncEngine {
         await store.put(s.local.uid, s);
       }
     }
+    return true;
   }
 }

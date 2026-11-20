@@ -234,5 +234,61 @@ void main() {
       await e.sync();
       expect((await e.tasks()).length, 2);
     });
+
+    String bad(String uid) =>
+        'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VTODO\r\n'
+        'SUMMARY:no uid $uid\r\nEND:VTODO\r\nEND:VCALENDAR\r\n';
+
+    test('unparsable server copy: clean local task survives a full sync',
+        () async {
+      server.external('a.ics', tics('a', 'A'));
+      final e = tengine(MemoryTaskStore());
+      await e.sync();
+      server.external('a.ics', bad('a'));
+      server.rejectTokens = true;
+      final r = await e.sync();
+      expect((await e.tasks()).single.summary, 'A');
+      expect(r.errors.single, contains('a.ics'));
+      expect(server.ics['a.ics'], contains('no uid'));
+    });
+
+    test('unparsable server copy: 412 on create does not abort the push',
+        () async {
+      server.external('a.ics', bad('a'));
+      server.external('b.ics', tics('b', 'B'));
+      final e = tengine(MemoryTaskStore());
+      await e.save(Task(uid: 'a', summary: 'Mine'));
+      await e.save(Task(uid: 'c', summary: 'C'));
+      final r = await e.sync();
+      expect(r.errors.where((x) => x.startsWith('a:')), hasLength(1));
+      expect(server.ics['a.ics'], contains('no uid'));
+      expect(server.ics.containsKey('c.ics'), isTrue);
+      final got = {for (final t in await e.tasks()) t.uid: t.summary};
+      expect(got['a'], 'Mine');
+      expect(got['c'], 'C');
+    });
+
+    test('note engine: unparsable server copy survives full sync and 412',
+        () async {
+      String nj(String uid, String s) =>
+          'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VJOURNAL\r\nUID:$uid\r\n'
+          'DTSTAMP:20261101T080000Z\r\nSUMMARY:$s\r\nEND:VJOURNAL\r\n'
+          'END:VCALENDAR\r\n';
+      server.external('a.ics', nj('a', 'A'));
+      final e = nengine(MemoryNoteStore());
+      await e.sync();
+      server.external('a.ics',
+          'BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\nSUMMARY:x\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n');
+      server.rejectTokens = true;
+      final r = await e.sync();
+      expect((await e.notes()).single.summary, 'A');
+      expect(r.errors, isNotEmpty);
+      await e.save(Note(uid: 'z', summary: 'Z'));
+      server.external('z.ics',
+          'BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\nSUMMARY:x\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n');
+      final r2 = await e.sync();
+      expect(r2.errors.any((x) => x.startsWith('z:')), isTrue);
+      expect((await e.notes()).length, 2);
+    });
   });
 }
