@@ -5,11 +5,13 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/key_nav.dart';
 import '../theme/tokens.dart';
 import 'content_grid.dart';
 import 'event_menu.dart';
 import '../state/event_rules.dart';
 import 'events_panel.dart';
+import 'key_nav_ui.dart';
 import 'overflow_tip.dart';
 import 'parts.dart';
 import 'task_menu.dart';
@@ -42,6 +44,27 @@ class _HomeTodayState extends State<HomeToday> {
   Timer? _timer;
 
   AppState get state => widget.state;
+  final _rows = <NavEntry>[];
+
+  NavEntry _entry(String id, String uid) => NavEntry(
+    id,
+    uid: uid,
+    open: (mode) async {
+      await state.openNote(uid, mode: mode);
+    },
+  );
+
+  Widget _navRow(String id, String uid, Widget row) {
+    _rows.add(_entry(id, uid));
+    return NavRow(
+      key: ValueKey('nav-home-$id'),
+      nav: state.nav,
+      list: KeyNav.homeList,
+      id: id,
+      child: row,
+    );
+  }
+
   DateTime _now() => (widget.now ?? DateTime.now)();
 
   @override
@@ -85,11 +108,14 @@ class _HomeTodayState extends State<HomeToday> {
       listenable: state,
       builder: (context, _) {
         final clock = _now();
+        // The keyboard list of the rows below, filled by the cards.
+        _rows.clear();
         // The seam: add further cards (a calendar) to this list.
         final cards = <Widget>[
           _tasksCard(context, clock),
           _eventsCard(context, clock),
         ];
+        state.nav.publish(KeyNav.homeList, List.of(_rows));
         return ContentCap(
           child: Padding(
             key: const Key('home-today'),
@@ -154,11 +180,15 @@ class _HomeTodayState extends State<HomeToday> {
       onMore: state.openTasksPanel,
       rows: [
         for (final k in due.take(_maxRows))
-          TaskRow(
-            key: Key('home-today-tasks-${k.uid}'),
-            state: state,
-            task: k,
-            now: clock,
+          _navRow(
+            'task-${k.uid}',
+            k.uid,
+            TaskRow(
+              key: Key('home-today-tasks-${k.uid}'),
+              state: state,
+              task: k,
+              now: clock,
+            ),
           ),
       ],
     );
@@ -197,7 +227,11 @@ class _HomeTodayState extends State<HomeToday> {
       onMore: state.openEventsPanel,
       rows: [
         for (final o in sorted.take(_maxRows))
-          EventRow(key: eventRowKey(o), state: state, occurrence: o),
+          _navRow(
+            eventRowId(o),
+            o.event.uid,
+            EventRow(key: eventRowKey(o), state: state, occurrence: o),
+          ),
       ],
     );
   }

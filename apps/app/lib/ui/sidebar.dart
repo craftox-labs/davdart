@@ -3,7 +3,9 @@ import 'package:forui/forui.dart';
 
 import '../data/space_catalog.dart';
 import '../state/app_state.dart';
+import '../state/key_nav.dart';
 import 'drag_drop.dart';
+import 'key_nav_ui.dart';
 import 'events_panel.dart';
 import 'new_space_dialog.dart';
 import 'note_menu.dart';
@@ -83,7 +85,9 @@ class Sidebar extends StatelessWidget {
               ),
       ),
       header: inDrawer ? SectionBar(state: state, onPick: close) : null,
-      child: body,
+      child: inDrawer
+          ? body
+          : AreaMark(nav: state.nav, area: NavArea.panel, child: body),
     );
   }
 }

@@ -3,10 +3,12 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/key_nav.dart';
 import '../state/note_drag.dart';
 import 'account_dialog.dart';
 import 'connect_dialog.dart';
 import 'drag_drop.dart';
+import 'key_nav_ui.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
@@ -43,6 +45,7 @@ class _Panel extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final body = ListView(
+      scrollCacheExtent: navCacheExtent,
       padding: EdgeInsets.symmetric(horizontal: t.space.lg),
       children: children,
     );
@@ -119,6 +122,7 @@ class NotesSection extends _Section {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final tree = <Widget>[];
+    final rows = <NavEntry>[];
     void walk(List<NoteNode> nodes, int depth) {
       for (final n in nodes) {
         final kids = n.children.isNotEmpty;
@@ -201,12 +205,35 @@ class NotesSection extends _Section {
             child: entry,
           );
         }
-        tree.add(entry);
+        final uid = n.note.uid;
+        rows.add(
+          NavEntry(
+            uid,
+            uid: uid,
+            open: (mode) async {
+              if (AppState.isFolder(n.note)) {
+                await state.guarded(() => state.openFolder(uid));
+              } else {
+                await state.openNote(uid, mode: mode);
+              }
+            },
+          ),
+        );
+        tree.add(
+          NavRow(
+            key: ValueKey('nav-notes-$uid'),
+            nav: state.nav,
+            list: 'notes',
+            id: uid,
+            child: entry,
+          ),
+        );
         if (kids && open) walk(n.children, depth + 1);
       }
     }
 
     walk(state.tree.roots, 0);
+    state.nav.publish('notes', rows);
 
     final heading = _title('Notes');
 
@@ -367,13 +394,30 @@ class ViewsSection extends _Section {
   const ViewsSection({super.key, required super.state, required super.onPick});
 
   @override
-  Widget build(BuildContext context) => _Panel(
-    heading: _title('Views'),
-    children: [
-      if (state.savedViews.isEmpty && !state.hasFilter)
-        const _Muted('No saved views yet'),
+  Widget build(BuildContext context) {
+    state.nav.publish('views', [
       for (final v in state.savedViews)
-        ActionContextMenu(
+        NavEntry(
+          'view:${v.name}',
+          open: (_) async {
+            state.applyView(v);
+            onPick();
+          },
+        ),
+    ]);
+    return _Panel(heading: _title('Views'), children: _viewsChildren(context));
+  }
+
+  List<Widget> _viewsChildren(BuildContext context) => [
+    if (state.savedViews.isEmpty && !state.hasFilter)
+      const _Muted('No saved views yet'),
+    for (final v in state.savedViews)
+      NavRow(
+        key: ValueKey('nav-views-${v.name}'),
+        nav: state.nav,
+        list: 'views',
+        id: 'view:${v.name}',
+        child: ActionContextMenu(
           groups: [
             [
               NoteMenuItem('Open view', FLucideIcons.bookmark, () {
@@ -431,33 +475,33 @@ class ViewsSection extends _Section {
             ],
           ),
         ),
-      if (state.query.trim().isNotEmpty)
-        Row(
-          children: [
-            Expanded(child: _Muted('Search: ${state.query.trim()}')),
-            IconAction(
-              key: const Key('clear-query'),
-              tooltip: 'Clear search',
-              icon: FLucideIcons.x,
-              onPress: () {
-                state.searchController.clear();
-                state.setQuery('');
-              },
-            ),
-          ],
-        ),
-      if (state.hasFilter)
-        _item(
-          FLucideIcons.bookmarkPlus,
-          'Save this view',
-          () => showSaveViewDialog(context, state),
-        ),
-      if (state.tags.isNotEmpty) ...[
-        _label(context, 'FILTER BY TAG'),
-        _TagWrap(state: state),
-      ],
+      ),
+    if (state.query.trim().isNotEmpty)
+      Row(
+        children: [
+          Expanded(child: _Muted('Search: ${state.query.trim()}')),
+          IconAction(
+            key: const Key('clear-query'),
+            tooltip: 'Clear search',
+            icon: FLucideIcons.x,
+            onPress: () {
+              state.searchController.clear();
+              state.setQuery('');
+            },
+          ),
+        ],
+      ),
+    if (state.hasFilter)
+      _item(
+        FLucideIcons.bookmarkPlus,
+        'Save this view',
+        () => showSaveViewDialog(context, state),
+      ),
+    if (state.tags.isNotEmpty) ...[
+      _label(context, 'FILTER BY TAG'),
+      _TagWrap(state: state),
     ],
-  );
+  ];
 }
 
 /// Search: one field; matches from every Space listed here. Tapping a hit
@@ -497,6 +541,17 @@ class _SearchSectionState extends State<SearchSection> {
   Widget build(BuildContext context) {
     final hits = _hits;
     final t = tokensOf(context);
+    state.nav.publish('search', [
+      for (final h in hits ?? const <SpaceHit>[])
+        NavEntry(
+          'hit:${h.space.id}:${h.note.uid}',
+          uid: h.note.uid,
+          open: (mode) async {
+            widget.onPick();
+            await state.openHit(h, mode: mode);
+          },
+        ),
+    ]);
     return _Panel(
       heading: _title('Search'),
       children: [
@@ -504,6 +559,7 @@ class _SearchSectionState extends State<SearchSection> {
           padding: EdgeInsets.fromLTRB(t.space.xs, 0, t.space.xs, t.space.md),
           child: field(
             key: const Key('search-all-field'),
+            focusNode: state.nav.searchNode,
             controller: state.searchController,
             hint: 'Search all spaces',
             prefixIcon: FLucideIcons.search,
@@ -515,28 +571,34 @@ class _SearchSectionState extends State<SearchSection> {
         ),
         if (hits != null && hits.isEmpty) const _Muted('No matches'),
         for (final h in hits ?? const <SpaceHit>[])
-          NoteContextMenu(
-            state: state,
-            uid: h.note.uid,
-            hit: h,
-            onOpen: widget.onPick,
-            child: FItem(
-              key: Key('hit-${h.note.uid}'),
-              prefix: h.isTask || h.isEvent
-                  ? Icon(
-                      h.isTask
-                          ? FLucideIcons.listTodo
-                          : FLucideIcons.calendarDays,
-                      size: t.icons.md,
-                      color: t.muted,
-                    )
-                  : null,
-              title: OverflowTip(h.note.summary),
-              subtitle: Text(h.space.name),
-              onPress: () {
-                widget.onPick();
-                state.openHit(h);
-              },
+          NavRow(
+            key: ValueKey('nav-search-${h.space.id}-${h.note.uid}'),
+            nav: state.nav,
+            list: 'search',
+            id: 'hit:${h.space.id}:${h.note.uid}',
+            child: NoteContextMenu(
+              state: state,
+              uid: h.note.uid,
+              hit: h,
+              onOpen: widget.onPick,
+              child: FItem(
+                key: Key('hit-${h.note.uid}'),
+                prefix: h.isTask || h.isEvent
+                    ? Icon(
+                        h.isTask
+                            ? FLucideIcons.listTodo
+                            : FLucideIcons.calendarDays,
+                        size: t.icons.md,
+                        color: t.muted,
+                      )
+                    : null,
+                title: OverflowTip(h.note.summary),
+                subtitle: Text(h.space.name),
+                onPress: () {
+                  widget.onPick();
+                  state.openHit(h);
+                },
+              ),
             ),
           ),
       ],
@@ -672,6 +734,23 @@ class SettingsSection extends _Section {
               label: const Text('Main'),
             ),
           ],
+        ),
+      ),
+      _label(context, 'KEYBOARD'),
+      Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: tokensOf(context).space.md,
+          vertical: tokensOf(context).space.xs,
+        ),
+        child: FSwitch(
+          key: const Key('vim-keys'),
+          label: const Text('Vim keys'),
+          description: const Text(
+            'Letter keys move and open things (press ? for the list).',
+          ),
+          semanticsLabel: 'Vim keys',
+          value: state.vimKeys,
+          onChange: state.setVimKeys,
         ),
       ),
       _label(context, 'ABOUT'),

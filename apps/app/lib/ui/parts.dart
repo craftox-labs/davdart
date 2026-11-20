@@ -258,6 +258,7 @@ FTextField field({
   String? hint,
   String? error,
   bool autofocus = false,
+  FocusNode? focusNode,
   bool obscure = false,
   IconData? prefixIcon,
   int? minLines,
@@ -282,6 +283,7 @@ FTextField field({
     hint: hint,
     error: error == null ? null : Text(error),
     autofocus: autofocus,
+    focusNode: focusNode,
     obscureText: obscure,
     prefixBuilder: prefixIcon == null
         ? null

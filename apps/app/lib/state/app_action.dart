@@ -29,6 +29,7 @@ class AppAction {
     required this.run,
     this.keywords = const [],
     this.shortcuts = const [],
+    this.listed = true,
   });
 
   /// Stable, dotted id (`go.tasks`, `item.delete`); persisted in recents and
@@ -46,10 +47,16 @@ class AppAction {
   /// Labels only: binding happens where the action is wired.
   final List<String> shortcuts;
 
+  /// False for key-only actions (cursor moves) the palette does not list.
+  final bool listed;
+
   /// Whether the action applies now. Disabled actions are not listed.
   final bool Function(AppState state) enabled;
 
   final FutureOr<void> Function(ActionContext c) run;
+
+  /// What the help dialog calls it.
+  String get helpTitle => title;
 
   /// The label to show beside the title: the Cmd one on Apple platforms,
   /// else the first other one.
@@ -64,10 +71,36 @@ class AppAction {
   }
 }
 
-/// The shortcuts that work today, for the help dialog. Phase 2 adds to it.
+/// Shortcuts bound outside the registry (not actions), for the help dialog.
 const knownShortcuts = <(String, String)>[
-  ('Ctrl+K / Cmd+K', 'Command palette'),
-  ('Ctrl+W / Cmd+W', 'Close the current tab'),
   ('Ctrl+S / Cmd+S', 'Save the open edit'),
   ('Up / Down, Enter, Esc', 'Move, run and close in the palette'),
 ];
+
+/// The help dialog's groups, in order. An action sits in the group named by
+/// [helpGroupOf] its own group.
+const helpGroups = ['Navigation', 'Open', 'Edit', 'Go to', 'Panes', 'App'];
+
+String helpGroupOf(String group) => switch (group) {
+  'Navigation' || 'Open' || 'Edit' || 'Go to' || 'Panes' => group,
+  'Tabs' => 'Panes',
+  'Selected item' || 'Create' => 'Edit',
+  _ => 'App',
+};
+
+/// The help dialog's rows, from the registry (the single source of truth):
+/// per group, `(keys, what)` for every action that has shortcuts.
+List<(String, List<(String, String)>)> helpRows(List<AppAction> actions) {
+  final by = <String, List<(String, String)>>{
+    for (final g in helpGroups) g: [],
+  };
+  for (final a in actions) {
+    if (a.shortcuts.isEmpty) continue;
+    by[helpGroupOf(a.group)]!.add((a.shortcuts.join(' / '), a.helpTitle));
+  }
+  by['App']!.addAll(knownShortcuts);
+  return [
+    for (final g in helpGroups)
+      if (by[g]!.isNotEmpty) (g, by[g]!),
+  ];
+}

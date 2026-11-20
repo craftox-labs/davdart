@@ -3,9 +3,11 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/key_nav.dart';
 import '../state/note_drag.dart';
 import '../state/task_rules.dart';
 import 'collapsible_section.dart';
+import 'key_nav_ui.dart';
 import 'panel_tags_drawer.dart';
 import 'parts.dart';
 import 'side_panel.dart';
@@ -81,6 +83,21 @@ class TasksPanel extends StatelessWidget {
           if (f != TaskFilter.open) ('completed', 'Completed', closed),
         ];
         final shown = [for (final g in groups) ...g.$3];
+        state.nav.publish('tasks', [
+          for (final g in groups)
+            for (final k in g.$3)
+              NavEntry(
+                k.uid,
+                uid: k.uid,
+                hidden: () =>
+                    state.prefs?.read('davdart.tasks.${g.$1}.collapsed.v1') ==
+                    'true',
+                open: (mode) async {
+                  await state.openNote(k.uid, mode: mode);
+                  onPick?.call();
+                },
+              ),
+        ]);
         return SidePanelFrame(
           title: const SidePanelTitle('Tasks'),
           actions: state.tasksEditable
@@ -126,6 +143,7 @@ class TasksPanel extends StatelessWidget {
                 ),
                 Expanded(
                   child: ListView(
+                    scrollCacheExtent: navCacheExtent,
                     padding: EdgeInsets.fromLTRB(
                       t.space.lg,
                       0,
@@ -156,14 +174,20 @@ class TasksPanel extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   for (final k in g.$3)
-                                    TaskRow(
-                                      key: Key('task-row-${k.uid}'),
-                                      state: state,
-                                      task: k,
-                                      now: clock,
-                                      showTags: true,
-                                      source: NoteDragSource.list,
-                                      onOpen: onPick,
+                                    NavRow(
+                                      key: ValueKey('nav-tasks-${k.uid}'),
+                                      nav: state.nav,
+                                      list: 'tasks',
+                                      id: k.uid,
+                                      child: TaskRow(
+                                        key: Key('task-row-${k.uid}'),
+                                        state: state,
+                                        task: k,
+                                        now: clock,
+                                        showTags: true,
+                                        source: NoteDragSource.list,
+                                        onOpen: onPick,
+                                      ),
                                     ),
                                 ],
                               ),

@@ -55,7 +55,7 @@ List<PaletteEntry> paletteEntries(
   );
   final on = [
     for (final a in actions)
-      if (a.enabled(state)) a,
+      if (a.listed && a.enabled(state)) a,
   ];
   final q = query.trim();
   if (q.isEmpty) {

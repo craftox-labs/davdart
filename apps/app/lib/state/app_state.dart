@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart' show TextEditingController;
 import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
 import '../data/space_catalog.dart';
+import 'key_nav.dart';
 import 'note_draft.dart';
 import 'tab_state.dart';
 import 'event_draft.dart';
@@ -168,7 +169,29 @@ class AppState extends ChangeNotifier {
     openMode = prefs?.read(_openModeKey) == OpenMode.main.name
         ? OpenMode.main
         : OpenMode.peek;
+    vimKeys = prefs?.read(_vimKeysKey) != 'false';
   }
+
+  static const _vimKeysKey = 'davdart.vim.keys.v1';
+
+  /// The setting "Vim keys" (default on): bare-letter keyboard bindings. Off
+  /// leaves Ctrl/Cmd+K and the arrow keys and Enter in focused lists.
+  bool vimKeys = true;
+
+  void setVimKeys(bool v) {
+    if (vimKeys == v) return;
+    vimKeys = v;
+    if (v) {
+      prefs?.remove(_vimKeysKey);
+    } else {
+      prefs?.write(_vimKeysKey, 'false');
+    }
+    nav.clearPending();
+    notifyListeners();
+  }
+
+  /// Keyboard focus and cursors (see [KeyNav]).
+  final KeyNav nav = KeyNav();
 
   static const _openModeKey = 'davdart.open.mode.v1';
 
@@ -714,6 +737,7 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    nav.dispose();
     searchController.dispose();
     super.dispose();
   }

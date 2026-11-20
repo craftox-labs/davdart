@@ -15,6 +15,8 @@ import '../theme/tokens.dart';
 import 'board_view.dart';
 import 'collapsible_section.dart';
 import 'command_palette.dart';
+import 'key_nav_ui.dart';
+import '../state/key_nav.dart';
 import 'home_today.dart';
 import 'detail_header.dart';
 import 'detail_view.dart';
@@ -88,7 +90,10 @@ class DavdartApp extends StatelessWidget {
       },
       home: PaletteShortcuts(
         state: state,
-        child: Shell(state: state),
+        child: KeyNavHandler(
+          state: state,
+          child: Shell(state: state),
+        ),
       ),
     );
   }
@@ -238,8 +243,15 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     final peekUid = state.peekUid ?? _heldPeek;
     final mainNote = state.mainItemUid;
     final mirror = state.layoutSide == LayoutSide.end;
+    state.nav.setLayout(
+      rail: wide,
+      panel: wide && _dockOpen,
+      main: split || !hasDetail,
+      peek: hasDetail,
+      mirror: mirror,
+    );
 
-    Widget main() => state.noSpace
+    Widget mainBody() => state.noSpace
         ? FirstRunView(state: state)
         : mainNote != null
         ? DetailView(
@@ -287,12 +299,19 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
             ],
           );
 
-    Widget peekView({bool header = false}) => DetailView(
-      key: const Key('peek-view'),
-      state: state,
-      uid: peekUid!,
-      onClose: () => state.guarded(() => state.select(null)),
-      inHeader: header,
+    Widget main() =>
+        AreaMark(nav: state.nav, area: NavArea.main, child: mainBody());
+
+    Widget peekView({bool header = false}) => AreaMark(
+      nav: state.nav,
+      area: NavArea.peek,
+      child: DetailView(
+        key: const Key('peek-view'),
+        state: state,
+        uid: peekUid!,
+        onClose: () => state.guarded(() => state.select(null)),
+        inHeader: header,
+      ),
     );
 
     // A main note tab is a full page: no search or view switch.
@@ -505,6 +524,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
                 },
                 // Focus so the shortcuts work before anything is clicked.
                 child: Focus(
+                  focusNode: state.nav.node,
                   autofocus: true,
                   child: ShellFrame(
                     state: state,
@@ -516,6 +536,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
               )
             // Focus so Ctrl/Cmd+K works before anything is clicked.
             : Focus(
+                focusNode: state.nav.node,
                 autofocus: true,
                 child: ShellFrame(
                   state: state,

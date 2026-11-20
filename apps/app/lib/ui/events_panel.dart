@@ -4,9 +4,11 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../state/event_rules.dart';
+import '../state/key_nav.dart';
 import '../state/note_drag.dart';
 import 'collapsible_section.dart';
 import 'drag_drop.dart';
+import 'key_nav_ui.dart';
 import 'event_menu.dart';
 import 'panel_tags_drawer.dart';
 import 'parts.dart';
@@ -49,6 +51,21 @@ class EventsPanel extends StatelessWidget {
           ('past', 'Past', state.pastOccurrences(clock, pastDays)),
         ];
         final shown = sections.any((s) => s.$3.isNotEmpty);
+        state.nav.publish('events', [
+          for (final s in sections)
+            for (final o in s.$3)
+              NavEntry(
+                eventRowId(o),
+                uid: o.event.uid,
+                hidden: () =>
+                    state.prefs?.read('davdart.events.${s.$1}.collapsed.v1') ==
+                    'true',
+                open: (mode) async {
+                  await state.openNote(o.event.uid, mode: mode);
+                  onPick?.call();
+                },
+              ),
+        ]);
         return SidePanelFrame(
           key: const Key('events-panel'),
           title: const SidePanelTitle('Events'),
@@ -75,6 +92,7 @@ class EventsPanel extends StatelessWidget {
             onExpandedChange: state.setEventTagsOpen,
             body: ListView(
               key: const Key('events-view'),
+              scrollCacheExtent: navCacheExtent,
               padding: EdgeInsets.fromLTRB(
                 t.space.lg,
                 t.space.md,
@@ -102,12 +120,18 @@ class EventsPanel extends StatelessWidget {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             for (final o in s.$3)
-                              EventRow(
-                                key: eventRowKey(o),
-                                state: state,
-                                occurrence: o,
-                                showDay: s.$1 == 'upcoming' || s.$1 == 'past',
-                                onOpen: onPick,
+                              NavRow(
+                                key: ValueKey('nav-${eventRowId(o)}'),
+                                nav: state.nav,
+                                list: 'events',
+                                id: eventRowId(o),
+                                child: EventRow(
+                                  key: eventRowKey(o),
+                                  state: state,
+                                  occurrence: o,
+                                  showDay: s.$1 == 'upcoming' || s.$1 == 'past',
+                                  onOpen: onPick,
+                                ),
                               ),
                           ],
                         ),
@@ -127,13 +151,16 @@ class EventsPanel extends StatelessWidget {
 /// an override moved onto another instance's day still differs by time). An
 /// occurrence replaced by an override and the one it was moved onto cannot
 /// share a start, but an exact tie gets the original instance id added.
-Key eventRowKey(EventOccurrence o) {
-  if (!o.event.isRecurring) return Key('event-row-${o.event.uid}');
+Key eventRowKey(EventOccurrence o) => Key(eventRowId(o));
+
+/// The string inside [eventRowKey].
+String eventRowId(EventOccurrence o) {
+  if (!o.event.isRecurring) return 'event-row-${o.event.uid}';
   final s = o.start;
   String t(int n) => n.toString().padLeft(2, '0');
   final at = '${s.year}${t(s.month)}${t(s.day)}T${t(s.hour)}${t(s.minute)}';
   final id = o.isOverride ? '#${o.recurrenceId?.value ?? ''}' : '';
-  return Key('event-row-${o.event.uid}@$at$id');
+  return 'event-row-${o.event.uid}@$at$id';
 }
 
 /// One occurrence as a row: time (or "All day", with the day above it in the

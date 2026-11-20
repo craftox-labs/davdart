@@ -5,7 +5,10 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/key_nav.dart';
 import '../state/note_drag.dart';
+import 'app_actions.dart';
+import 'key_nav_ui.dart';
 import '../theme/tokens.dart';
 import 'logo.dart';
 import 'sidebar.dart';
@@ -133,7 +136,12 @@ class ShellFrame extends StatelessWidget {
             top: 0,
             bottom: 0,
             width: t.sizes.rail,
-            child: IconRail(state: state),
+            child: AreaMark(
+              nav: state.nav,
+              area: NavArea.rail,
+              bar: false,
+              child: IconRail(state: state),
+            ),
           ),
         ],
       ),
@@ -490,15 +498,32 @@ class IconRail extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final mirror = state.layoutSide == LayoutSide.end;
-    Widget button(Section s) => SectionButton(
-      key: Key('rail-${s.name}'),
-      section: s,
-      active: state.section == s,
-      tab: !state.sidebarCollapsed,
-      tabMargin: (t.sizes.rail - t.sizes.railItem) / 2,
-      tipRight: true,
-      mirror: mirror,
-      onPress: () => state.pressRail(s),
+    final sections = [...topSections(), ...bottomSections(state)];
+    state.nav.publish(KeyNav.railList, [
+      for (final s in sections)
+        NavEntry(
+          s.name,
+          open: (_) async {
+            state.setSection(s);
+            focusPanel(state);
+          },
+        ),
+    ]);
+    Widget button(Section s) => NavRow(
+      nav: state.nav,
+      list: KeyNav.railList,
+      id: s.name,
+      radius: t.radii.control,
+      child: SectionButton(
+        key: Key('rail-${s.name}'),
+        section: s,
+        active: state.section == s,
+        tab: !state.sidebarCollapsed,
+        tabMargin: (t.sizes.rail - t.sizes.railItem) / 2,
+        tipRight: true,
+        mirror: mirror,
+        onPress: () => state.pressRail(s),
+      ),
     );
     final gap = t.space.xs;
     final tabMid = math.max(0.0, t.sizes.frameInset + t.sizes.tabStrip / 2);
