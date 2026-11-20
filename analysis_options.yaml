@@ -4,3 +4,5 @@ analyzer:
   exclude:
     - dart-sdk/**
     - ref-timedart/**
+    - flutter-sdk/**
+    - apps/**
