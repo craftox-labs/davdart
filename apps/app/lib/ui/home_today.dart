@@ -12,6 +12,7 @@ import 'drag_drop.dart';
 import 'note_menu.dart';
 import 'task_parts.dart';
 import 'theme.dart';
+import 'overflow_tip.dart';
 
 // A small "Today" strip on Home: Doing (notes) and Tasks (overdue, due today,
 // next open). A pure view over AppState.filtered and AppState.tasks. To
@@ -266,13 +267,7 @@ class _Row extends StatelessWidget {
               children: [
                 StatusDot(p.status),
                 SizedBox(width: t.space.md),
-                Expanded(
-                  child: Text(
-                    p.itemId ?? note.summary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+                Expanded(child: OverflowTip(p.itemId ?? note.summary)),
               ],
             ),
           ),

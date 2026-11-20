@@ -10,6 +10,7 @@ import 'content_grid.dart';
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
 import 'theme.dart';
+import 'overflow_tip.dart';
 
 class BoardView extends StatelessWidget {
   const BoardView({
@@ -208,10 +209,9 @@ class _Card extends StatelessWidget {
                     Text(p.itemId ?? note.summary, style: t.type.semiboldStyle),
                     if (p.itemId != null) ...[
                       SizedBox(height: t.space.xxs),
-                      Text(
+                      OverflowTip(
                         note.summary,
                         maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
                         style: t.type.bodyStyle.copyWith(color: t.muted),
                       ),
                     ],

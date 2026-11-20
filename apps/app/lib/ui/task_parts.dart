@@ -9,6 +9,7 @@ import 'drag_drop.dart';
 import 'parts.dart';
 import 'task_menu.dart';
 import 'theme.dart';
+import 'overflow_tip.dart';
 
 const _weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const _months = [
@@ -176,10 +177,8 @@ class TaskRow extends StatelessWidget {
                 TaskCheckbox(state: state, task: task),
                 SizedBox(width: t.space.md),
                 Expanded(
-                  child: Text(
+                  child: OverflowTip(
                     task.summary,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: task.isClosed
                         ? TextStyle(
                             color: t.muted,
@@ -191,10 +190,8 @@ class TaskRow extends StatelessWidget {
                 for (final tag in tags.take(2)) ...[
                   SizedBox(width: t.space.sm),
                   Flexible(
-                    child: Text(
+                    child: OverflowTip(
                       '#$tag',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: t.type.captionStyle.copyWith(color: t.muted),
                     ),
                   ),

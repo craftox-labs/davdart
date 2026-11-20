@@ -143,11 +143,13 @@ void main() {
     s.select(uid);
     await t.pumpAndSettle();
     final peek = _k('peek-view');
-    final label = t.getRect(_k('breadcrumb')).left;
-    final title = t
-        .getRect(find.descendant(of: peek, matching: find.text('Scope note')))
+    final label = t.getRect(_k('pane-title')).left;
+    // The title sits in the header row, level with the body's left edge.
+    final body = t
+        .getRect(find.descendant(of: peek, matching: find.text('Status')))
         .left;
-    expect((label - title).abs(), lessThanOrEqualTo(1));
+    final title = label;
+    expect((label - body).abs(), lessThanOrEqualTo(1));
     // The page has the pane's ordinary padding, no tab-driven inset.
     final tk = tokensOf(t.element(peek));
     final pane = t.getRect(_k('detail-pane'));

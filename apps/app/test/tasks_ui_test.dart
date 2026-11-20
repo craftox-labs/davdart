@@ -391,13 +391,21 @@ void main() {
         expect(_k('task-detail'), findsOneWidget);
         Finder inDetail(Finder f) =>
             find.descendant(of: _k('task-detail'), matching: f);
-        expect(inDetail(find.text('Detail me')), findsOneWidget);
+        expect(
+          find.descendant(
+            of: _k('peek-toolbar'),
+            matching: find.text('Detail me'),
+          ),
+          findsOneWidget,
+        );
+        expect(inDetail(find.text('Detail me')), findsNothing);
         expect(inDetail(find.text('Some text')), findsOneWidget);
         expect(inDetail(find.text('x')), findsOneWidget);
         expect(_k('task-due'), findsOneWidget);
         expect(find.text('high'), findsOneWidget);
         expect(find.textContaining('FREQ=WEEKLY;BYDAY=MO'), findsOneWidget);
-        expect(find.text('Plans  /  Alpha'), findsOneWidget); // breadcrumb
+        // The parent trail is no longer a header breadcrumb; the parent row stays.
+        expect(find.text('Alpha'), findsWidgets);
       },
     );
 

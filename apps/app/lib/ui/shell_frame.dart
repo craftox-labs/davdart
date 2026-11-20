@@ -507,7 +507,7 @@ class IconRail extends StatelessWidget {
         t.sizes.frameInset +
         t.sizes.tabStrip +
         t.borders.hairline +
-        t.sizes.topBar / 2;
+        t.sizes.paneHeader / 2;
     final spacesTop = headerMid - t.sizes.railItem / 2;
     final oldSpacesTop = logoBand + 3 * gap;
     return SizedBox(

@@ -1,6 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import '../theme/tokens.dart';
+import 'overflow_tip.dart';
 import 'theme.dart';
 
 /// A small icon-only button with a hover tooltip.
@@ -33,7 +35,7 @@ class IconAction extends StatelessWidget {
 }
 
 /// The one header row every pane starts with (side panel section title, top
-/// bar, peek toolbar): [Sizes.topBar] tall with a hairline under it and
+/// bar, peek toolbar): [SizeTokens.paneHeader] tall with a hairline under it and
 /// children centred, so rows side by side share top, centreline and bottom.
 class PaneHeaderRow extends StatelessWidget {
   const PaneHeaderRow({
@@ -51,7 +53,7 @@ class PaneHeaderRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     return SizedBox(
-      height: t.sizes.topBar,
+      height: t.sizes.paneHeader,
       child: DecoratedBox(
         decoration: BoxDecoration(
           border: Border(
@@ -72,6 +74,109 @@ class PaneHeaderRow extends StatelessWidget {
     );
   }
 }
+
+/// The title of a pane header row: one line, paneTitleStyle, with an
+/// ellipsis and a full-text tooltip when it is cut off. Used for the side
+/// panel section name, the item title in the main and peek panes and (as a
+/// style) the Home breadcrumb, so they all read the same.
+class PaneTitle extends StatelessWidget {
+  const PaneTitle(
+    this.text, {
+    super.key,
+    this.textKey,
+    this.muted = false,
+    this.strike = false,
+  });
+  final String text;
+  final Key? textKey;
+  final bool muted;
+  final bool strike;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return OverflowTip(
+      text,
+      textKey: textKey,
+      style: paneTitleStyle(
+        t,
+        muted: muted,
+      ).copyWith(decoration: strike ? TextDecoration.lineThrough : null),
+    );
+  }
+}
+
+/// The header row of an item pane (note, task or event, in the main area or
+/// the peek): optional Back arrow, the item [title] on one line (or the
+/// [editor] field in its place while editing, so nothing jumps), then the
+/// [actions] at the end. Body content starts directly under it.
+class ItemHeader extends StatelessWidget {
+  const ItemHeader({
+    super.key,
+    required this.title,
+    required this.full,
+    required this.inHeader,
+    required this.onClose,
+    required this.actions,
+    this.editor,
+    this.leading,
+    this.strike = false,
+  });
+  final String title;
+  final bool full, inHeader, strike;
+  final VoidCallback onClose;
+  final List<Widget> actions;
+
+  /// The title field while the item is being edited.
+  final Widget? editor;
+
+  /// Shown before the title when not editing (a task's checkbox).
+  final Widget? leading;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final back = !full && !inHeader;
+    return PaneHeaderRow(
+      key: const Key('peek-toolbar'),
+      // Without a Back arrow the title lines up with the body's own padding.
+      startPad: back ? t.space.xs : t.space.xxl,
+      children: [
+        if (back)
+          IconAction(
+            tooltip: 'Close',
+            icon: FLucideIcons.arrowLeft,
+            onPress: onClose,
+          ),
+        if (back) SizedBox(width: t.space.sm),
+        if (leading != null && editor == null) ...[
+          leading!,
+          SizedBox(width: t.space.md),
+        ],
+        Expanded(
+          child:
+              editor ??
+              Align(
+                alignment: Alignment.centerLeft,
+                child: PaneTitle(
+                  title,
+                  textKey: const Key('pane-title'),
+                  muted: strike,
+                  strike: strike,
+                ),
+              ),
+        ),
+        SizedBox(width: t.space.md),
+        ...actions,
+      ],
+    );
+  }
+}
+
+/// The shared pane title text style (size and weight from the type tokens,
+/// colour [Tokens.paneTitleColor], or muted).
+TextStyle paneTitleStyle(Tokens t, {bool muted = false}) =>
+    t.type.paneTitleStyle.copyWith(color: muted ? t.muted : t.paneTitleColor);
 
 /// Opens a forui dialog with a title, content and a row of actions.
 Future<T?> showAppDialog<T>(

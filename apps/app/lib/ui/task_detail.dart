@@ -164,13 +164,11 @@ class TaskEditor extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           spacing: t.space.lg,
           children: [
-            field(
-              key: const Key('edit-title'),
-              controller: draft.titleController,
-              label: 'Title',
-              autofocus: true,
-              error: draft.titleEmpty ? 'A title is required' : null,
-            ),
+            if (draft.titleEmpty)
+              Text(
+                'A title is required',
+                style: t.type.captionStyle.copyWith(color: t.error),
+              ),
             FDateField.calendar(
               key: const Key('edit-due'),
               label: const Text('Due'),
@@ -311,20 +309,6 @@ class TaskDetail extends StatelessWidget {
     final task = state.taskById(uid);
     if (task == null) return const SizedBox.shrink();
     final now = DateTime.now();
-    final path = <String>[];
-    var cur = task.parentUid;
-    for (var i = 0; cur != null && i < 50; i++) {
-      final item = state.findItem(cur);
-      if (item is Note) {
-        path.insert(0, item.summary);
-        cur = item.parentUid;
-      } else if (item is Task) {
-        path.insert(0, item.summary);
-        cur = item.parentUid;
-      } else {
-        break;
-      }
-    }
     final draft = state.taskDraftFor(uid);
     final edit = state.tasksEditable;
     final status = task.boardStatus;
@@ -355,27 +339,22 @@ class TaskDetail extends StatelessWidget {
         : null;
     Widget page = Column(
       children: [
-        PaneHeaderRow(
-          key: const Key('peek-toolbar'),
-          startPad: inHeader ? t.space.xxl : t.space.xs,
-          children: [
-            if (!full && !inHeader)
-              IconAction(
-                tooltip: 'Close',
-                icon: FLucideIcons.arrowLeft,
-                onPress: onClose,
-              ),
-            Expanded(
-              child: full
-                  ? const SizedBox.shrink()
-                  : Text(
-                      key: const Key('breadcrumb'),
-                      path.join('  /  '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: t.type.captionStyle.copyWith(color: t.muted),
-                    ),
-            ),
+        ItemHeader(
+          title: task.summary,
+          strike: task.isClosed,
+          leading: TaskCheckbox(state: state, task: task),
+          full: full,
+          inHeader: inHeader,
+          onClose: onClose,
+          editor: draft == null
+              ? null
+              : field(
+                  key: const Key('edit-title'),
+                  controller: draft.titleController,
+                  hint: 'Title',
+                  autofocus: true,
+                ),
+          actions: [
             if (edit) ...[
               if (state.spaces.length > 1)
                 IconAction(
@@ -405,7 +384,7 @@ class TaskDetail extends StatelessWidget {
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               t.space.xxl,
-              t.space.xs,
+              t.space.md,
               t.space.xxl,
               t.space.huge,
             ),
@@ -423,30 +402,6 @@ class TaskDetail extends StatelessWidget {
                         draft: draft,
                         task: task,
                         full: full,
-                      )
-                    else
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.only(
-                              top: t.space.sm,
-                              right: t.space.md,
-                            ),
-                            child: TaskCheckbox(state: state, task: task),
-                          ),
-                          Expanded(
-                            child: Text(
-                              task.summary,
-                              style: task.isClosed
-                                  ? t.type.displayStyle.copyWith(
-                                      color: t.muted,
-                                      decoration: TextDecoration.lineThrough,
-                                    )
-                                  : t.type.displayStyle,
-                            ),
-                          ),
-                        ],
                       ),
                     SizedBox(height: t.space.md),
                     Row(

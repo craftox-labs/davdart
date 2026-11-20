@@ -3,11 +3,12 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
-import 'parts.dart';
 import '../theme/tokens.dart';
-import 'theme.dart';
 import 'edit_note_dialog.dart';
 import 'move_space_dialog.dart';
+import 'overflow_tip.dart';
+import 'parts.dart';
+import 'theme.dart';
 
 /// The breadcrumb in the Home top bar: "[house] Space" or, inside a folder,
 /// "[house] Space › folder". The Space is the root crumb, with the house icon,
@@ -40,7 +41,7 @@ class ScopeCrumbs extends StatelessWidget {
         (!scoped ? label : null) ??
         state.currentSpaceName ??
         (state.noSpace ? 'No space' : 'Notes');
-    final style = t.type.bodyStrong;
+    final style = paneTitleStyle(t);
     final sep = Padding(
       padding: EdgeInsets.symmetric(horizontal: t.space.sm),
       child: Text('›', style: style.copyWith(color: t.muted)),
@@ -56,18 +57,12 @@ class ScopeCrumbs extends StatelessWidget {
                   key: const Key('crumb-space'),
                   semanticsLabel: 'Show the whole space',
                   onPress: () => state.openFolder(null),
-                  builder: (_, _, _) => Text(
-                    space,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: style.copyWith(color: t.muted),
-                  ),
+                  builder: (_, _, _) =>
+                      OverflowTip(space, style: style.copyWith(color: t.muted)),
                 )
-              : Text(
+              : OverflowTip(
                   space,
-                  key: const Key('crumb-space'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  textKey: const Key('crumb-space'),
                   style: style,
                 ),
         ),
@@ -75,11 +70,9 @@ class ScopeCrumbs extends StatelessWidget {
           sep,
           Flexible(
             flex: 2,
-            child: Text(
+            child: OverflowTip(
               folders.join('  ›  '),
-              key: const Key('crumb-folder'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              textKey: const Key('crumb-folder'),
               style: style,
             ),
           ),
@@ -159,11 +152,10 @@ class ScopeText extends StatelessWidget {
       ),
       child: SizedBox(
         width: double.infinity,
-        child: Text(
+        child: OverflowTip(
           text,
-          key: const Key('scope-text'),
+          textKey: const Key('scope-text'),
           maxLines: 3,
-          overflow: TextOverflow.ellipsis,
           style: t.type.captionStyle.copyWith(color: t.muted),
         ),
       ),

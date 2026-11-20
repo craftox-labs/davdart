@@ -127,13 +127,11 @@ class NoteEditor extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         spacing: t.space.lg,
         children: [
-          field(
-            key: const Key('edit-title'),
-            controller: draft.titleController,
-            label: 'Title',
-            autofocus: true,
-            error: draft.titleEmpty ? 'A title is required' : null,
-          ),
+          if (draft.titleEmpty)
+            Text(
+              'A title is required',
+              style: t.type.captionStyle.copyWith(color: t.error),
+            ),
           if (!AppState.isFolder(note))
             FSelect<String>.rich(
               key: const Key('edit-status'),

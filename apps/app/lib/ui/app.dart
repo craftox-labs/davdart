@@ -635,21 +635,11 @@ class TopBar extends StatelessWidget {
     );
   }
 
-  /// Left side of the row: the breadcrumb on Home and view tabs, the note's
-  /// title where a note fills the main area (narrow layouts).
+  /// Left side of the row: the breadcrumb on Home and view tabs, nothing
+  /// where a note fills the main area (it has its own header).
   Widget _lead(Tokens t) {
-    final uid = state.mainItemUid;
-    if (uid != null) {
-      return Text(
-        state.tree.find(uid)?.note.summary ??
-            state.taskById(uid)?.summary ??
-            state.eventById(uid)?.summary ??
-            '',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: t.type.titleStyle,
-      );
-    }
+    // A note filling the main area carries its title in its own header.
+    if (state.mainItemUid != null) return const SizedBox.shrink();
     return Align(
       alignment: Alignment.centerLeft,
       child: ScopeCrumbs(state: state, label: state.activeViewName),

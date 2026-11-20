@@ -47,10 +47,12 @@ class TypeTokens {
     this.title = 16,
     this.heading = 17,
     this.display = 22,
+    this.paneTitle = 13,
     this.regular = FontWeight.w400,
     this.medium = FontWeight.w500,
     this.semibold = FontWeight.w600,
     this.bold = FontWeight.w700,
+    this.paneTitleWeight = FontWeight.w600,
     this.labelSpacing = .8,
     this.monoFamily = 'monospace',
   });
@@ -64,6 +66,12 @@ class TypeTokens {
 
   final double micro, caption, body, title, heading, display;
   final FontWeight regular, medium, semibold, bold;
+
+  /// Size and weight of every pane header title: the side panel section
+  /// name, the item title in the main and peek panes, and the Home
+  /// breadcrumb. The colour is [Tokens.paneTitleColor].
+  final double paneTitle;
+  final FontWeight paneTitleWeight;
 
   /// Letter spacing of small uppercase section labels.
   final double labelSpacing;
@@ -80,6 +88,10 @@ class TypeTokens {
   TextStyle get titleStyle => _s(title, semibold);
   TextStyle get headingStyle => _s(heading, bold);
   TextStyle get displayStyle => _s(display, bold);
+
+  /// The one title style of all pane header rows (colour comes from the
+  /// caller via [Tokens.paneTitleColor]).
+  TextStyle get paneTitleStyle => _s(paneTitle, paneTitleWeight);
 
   /// Small uppercase section label.
   TextStyle get labelStyle => TextStyle(
@@ -205,7 +217,7 @@ class SizeTokens {
     this.detailMin = 320,
     this.detailMax = 720,
     this.listMin = 280,
-    this.topBar = 44,
+    this.paneHeader = 44,
     this.sectionHeader = 32,
     this.detailTab = 280,
     this.boardColumn = 264,
@@ -237,7 +249,11 @@ class SizeTokens {
 
   /// Edge of the logo on the first-run screen (and other large uses).
   final double logoLarge;
-  final double rail, railItem, frameInset, sidebar, detail, topBar;
+  final double rail, railItem, frameInset, sidebar, detail;
+
+  /// Height of the one header row every pane starts with (side panel,
+  /// main pane, peek pane), so titles and actions line up across them.
+  final double paneHeader;
 
   /// Height of every side-panel section's title row, so titles never move
   /// when switching sections (trailing actions must fit inside it).
@@ -399,6 +415,9 @@ class Tokens {
   /// Tooltip bubble and its text (inverted against the theme).
   final Color tooltipBackground;
   final Color tooltipText;
+
+  /// Colour of pane header titles (the same as the main text).
+  Color get paneTitleColor => fg;
 
   final TypeTokens type;
   final SpaceTokens space;

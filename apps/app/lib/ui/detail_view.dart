@@ -61,36 +61,23 @@ class DetailView extends StatelessWidget {
       );
     }
     final p = PlanItem.fromNote(note);
-    final path = <Note>[];
-    for (var n = state.tree.find(note.uid)?.parent; n != null; n = n.parent) {
-      path.insert(0, n.note);
-    }
     final draft = state.draftFor(uid);
     Widget page = Column(
       children: [
-        PaneHeaderRow(
-          key: const Key('peek-toolbar'),
-          // In the peek pane the label lines up with the title below (the page's
-          // own padding).
-          startPad: inHeader ? t.space.xxl : t.space.xs,
-          children: [
-            if (!full && !inHeader)
-              IconAction(
-                tooltip: 'Close',
-                icon: FLucideIcons.arrowLeft,
-                onPress: onClose,
-              ),
-            Expanded(
-              child: full
-                  ? const SizedBox.shrink()
-                  : Text(
-                      key: const Key('breadcrumb'),
-                      path.map((n) => n.summary).join('  /  '),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: t.type.captionStyle.copyWith(color: t.muted),
-                    ),
-            ),
+        ItemHeader(
+          title: note.summary,
+          full: full,
+          inHeader: inHeader,
+          onClose: onClose,
+          editor: draft == null
+              ? null
+              : field(
+                  key: const Key('edit-title'),
+                  controller: draft.titleController,
+                  hint: 'Title',
+                  autofocus: true,
+                ),
+          actions: [
             if (state.editable) ...[
               if (state.spaces.length > 1)
                 IconAction(
@@ -120,7 +107,7 @@ class DetailView extends StatelessWidget {
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               t.space.xxl,
-              t.space.xs,
+              t.space.md,
               t.space.xxl,
               t.space.huge,
             ),
@@ -139,7 +126,6 @@ class DetailView extends StatelessWidget {
                         full: full,
                       )
                     else ...[
-                      Text(note.summary, style: t.type.displayStyle),
                       if (state.editable && !AppState.isFolder(note)) ...[
                         SizedBox(height: t.space.md),
                         Row(

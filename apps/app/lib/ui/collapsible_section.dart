@@ -3,6 +3,7 @@ import 'package:forui/forui.dart';
 
 import '../data/key_value_storage.dart';
 import 'theme.dart';
+import 'overflow_tip.dart';
 
 /// A section with a small heading row (chevron, muted label, optional count)
 /// that toggles its body. The collapsed state is kept in [prefs] under
@@ -84,10 +85,8 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
                   ),
                   SizedBox(width: t.space.sm),
                   Flexible(
-                    child: Text(
+                    child: OverflowTip(
                       title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                       style: t.type.labelStyle.copyWith(
                         fontSize: t.type.caption,
                         color: t.muted,

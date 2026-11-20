@@ -407,7 +407,14 @@ void main() {
         await t.pumpAndSettle();
         Finder inDetail(Finder f) =>
             find.descendant(of: _k('event-detail'), matching: f);
-        expect(inDetail(find.text('Detail me')), findsOneWidget);
+        expect(
+          find.descendant(
+            of: _k('peek-toolbar'),
+            matching: find.text('Detail me'),
+          ),
+          findsOneWidget,
+        );
+        expect(inDetail(find.text('Detail me')), findsNothing);
         expect(inDetail(find.text('Some text')), findsOneWidget);
         expect(inDetail(find.text('x')), findsOneWidget);
         expect(

@@ -14,6 +14,7 @@ import 'parts.dart';
 import 'save_view_dialog.dart';
 import 'side_panel.dart';
 import 'theme.dart';
+import 'overflow_tip.dart';
 
 /// The panels the side panel shows, one per rail section. Each takes
 /// [onPick], run after an action that should close the narrow sheet.
@@ -53,8 +54,7 @@ class _Title extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) =>
-      Text(text, style: tokensOf(context).type.headingStyle);
+  Widget build(BuildContext context) => PaneTitle(text);
 }
 
 Widget _title(String text) => _Title(text);
@@ -92,7 +92,7 @@ Widget _label(BuildContext context, String text) {
 Widget _item(IconData icon, String text, VoidCallback tap, {bool on = false}) =>
     FSidebarItem(
       icon: Icon(icon),
-      label: Text(text, overflow: TextOverflow.ellipsis),
+      label: OverflowTip(text),
       selected: on,
       onPress: tap,
     );
@@ -175,10 +175,8 @@ class NotesSection extends _Section {
                       SizedBox(width: t.space.sm),
                     ],
                     Expanded(
-                      child: Text(
+                      child: OverflowTip(
                         n.note.summary,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: t.type.bodyStyle,
                       ),
                     ),
@@ -264,11 +262,9 @@ class NotesSection extends _Section {
         if (state.currentSpaceName != null)
           Padding(
             padding: EdgeInsets.fromLTRB(t.space.md, 0, t.space.md, t.space.sm),
-            child: Text(
+            child: OverflowTip(
               state.currentSpaceName!,
-              key: const Key('space-name'),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              textKey: const Key('space-name'),
               style: t.type.bodyStyle.copyWith(color: t.muted),
             ),
           ),
@@ -521,7 +517,7 @@ class _SearchSectionState extends State<SearchSection> {
                       color: t.muted,
                     )
                   : null,
-              title: Text(h.note.summary, overflow: TextOverflow.ellipsis),
+              title: OverflowTip(h.note.summary),
               subtitle: Text(h.space.name),
               onPress: () {
                 widget.onPick();

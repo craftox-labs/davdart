@@ -11,6 +11,7 @@ import 'event_menu.dart';
 import 'parts.dart';
 import 'side_panel.dart';
 import 'theme.dart';
+import 'overflow_tip.dart';
 
 /// The Events side panel section: an agenda of the Space's events. Today and
 /// Tomorrow, Upcoming (the rest of the next 30 days, recurring events
@@ -179,18 +180,14 @@ class EventRow extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       if (showDay)
-                        Text(
+                        OverflowTip(
                           dayLabel(o.start).split(' ').take(2).join(' '),
-                          key: Key('event-day-$uid'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          textKey: Key('event-day-$uid'),
                           style: muted,
                         ),
-                      Text(
+                      OverflowTip(
                         o.allDay ? 'All day' : timeLabel(o.start),
-                        key: Key('event-time-$uid'),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        textKey: Key('event-time-$uid'),
                         style: muted,
                       ),
                     ],
@@ -201,10 +198,8 @@ class EventRow extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
+                      OverflowTip(
                         o.summary.isEmpty ? '(no title)' : o.summary,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: cancelled
                             ? TextStyle(
                                 color: t.muted,
@@ -213,11 +208,9 @@ class EventRow extends StatelessWidget {
                             : null,
                       ),
                       if (o.location.isNotEmpty)
-                        Text(
+                        OverflowTip(
                           o.location,
-                          key: Key('event-location-$uid'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          textKey: Key('event-location-$uid'),
                           style: muted,
                         ),
                     ],

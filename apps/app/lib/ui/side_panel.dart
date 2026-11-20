@@ -51,6 +51,5 @@ class SidePanelTitle extends StatelessWidget {
   final String text;
 
   @override
-  Widget build(BuildContext context) =>
-      Text(text, style: tokensOf(context).type.headingStyle);
+  Widget build(BuildContext context) => PaneTitle(text);
 }

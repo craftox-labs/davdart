@@ -120,13 +120,11 @@ class EventEditor extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         spacing: t.space.lg,
         children: [
-          field(
-            key: const Key('edit-title'),
-            controller: draft.titleController,
-            label: 'Title',
-            autofocus: true,
-            error: draft.titleEmpty ? 'A title is required' : null,
-          ),
+          if (draft.titleEmpty)
+            Text(
+              'A title is required',
+              style: t.type.captionStyle.copyWith(color: t.error),
+            ),
           EventWhenFields(
             keys: 'edit',
             allDay: draft.allDay,
@@ -228,27 +226,21 @@ class EventDetail extends StatelessWidget {
     );
     Widget page = Column(
       children: [
-        PaneHeaderRow(
-          key: const Key('peek-toolbar'),
-          startPad: inHeader ? t.space.xxl : t.space.xs,
-          children: [
-            if (!full && !inHeader)
-              IconAction(
-                tooltip: 'Close',
-                icon: FLucideIcons.arrowLeft,
-                onPress: onClose,
-              ),
-            Expanded(
-              child: full
-                  ? const SizedBox.shrink()
-                  : Text(
-                      key: const Key('breadcrumb'),
-                      event.location,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: t.type.captionStyle.copyWith(color: t.muted),
-                    ),
-            ),
+        ItemHeader(
+          title: event.summary.isEmpty ? '(no title)' : event.summary,
+          strike: event.isCancelled,
+          full: full,
+          inHeader: inHeader,
+          onClose: onClose,
+          editor: draft == null
+              ? null
+              : field(
+                  key: const Key('edit-title'),
+                  controller: draft.titleController,
+                  hint: 'Title',
+                  autofocus: true,
+                ),
+          actions: [
             if (edit) ...[
               if (state.spaces.length > 1)
                 IconAction(
@@ -278,7 +270,7 @@ class EventDetail extends StatelessWidget {
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(
               t.space.xxl,
-              t.space.xs,
+              t.space.md,
               t.space.xxl,
               t.space.huge,
             ),
@@ -298,17 +290,6 @@ class EventDetail extends StatelessWidget {
                         full: full,
                       )
                     else ...[
-                      Text(
-                        event.summary.isEmpty ? '(no title)' : event.summary,
-                        key: const Key('event-title'),
-                        style: event.isCancelled
-                            ? t.type.displayStyle.copyWith(
-                                color: t.muted,
-                                decoration: TextDecoration.lineThrough,
-                              )
-                            : t.type.displayStyle,
-                      ),
-                      SizedBox(height: t.space.lg),
                       Container(
                         width: double.infinity,
                         padding: EdgeInsets.all(t.space.lg),

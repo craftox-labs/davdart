@@ -8,6 +8,7 @@ import 'drag_drop.dart';
 import 'chips.dart';
 import 'note_menu.dart';
 import 'theme.dart';
+import 'overflow_tip.dart';
 
 /// Notes as an indented tree; a flat list of matches while searching.
 class NoteListView extends StatelessWidget {
@@ -91,13 +92,7 @@ class NoteListView extends StatelessWidget {
                     ),
                     StatusDot(p.status),
                     SizedBox(width: t.space.lg - t.space.xxs),
-                    Expanded(
-                      child: Text(
-                        n.summary,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+                    Expanded(child: OverflowTip(n.summary)),
                     if (p.owner != null)
                       Text(
                         p.owner!,

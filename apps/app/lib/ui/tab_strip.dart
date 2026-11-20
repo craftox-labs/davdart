@@ -15,6 +15,7 @@ import 'save_view_dialog.dart';
 import 'shell_frame.dart';
 import 'task_menu.dart';
 import 'theme.dart';
+import 'overflow_tip.dart';
 
 /// The document tab strip across the top of the content area: the pinned home
 /// tab (the Board or List), one closable tab per open note or applied saved
@@ -539,10 +540,8 @@ class TabItemState extends State<TabItem> {
                       color: widget.active ? t.fg : t.muted,
                     ),
                     Expanded(
-                      child: Text(
+                      child: OverflowTip(
                         widget.title.isEmpty ? 'Untitled' : widget.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                         style: t.type.captionStyle.copyWith(
                           color: widget.active ? t.fg : t.muted,
                         ),

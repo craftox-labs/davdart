@@ -13,6 +13,7 @@ import 'sections.dart';
 import 'shell_frame.dart';
 import 'tasks_panel.dart';
 import 'theme.dart';
+import 'overflow_tip.dart';
 
 /// The side panel: shows the section chosen on the icon rail ([AppState.section]).
 /// In the narrow sheet ([inDrawer]) a [SectionBar] on top picks the section,
@@ -179,7 +180,7 @@ List<FItemGroup> spaceMenuGroups(
   if (state.catalog == null) {
     return [
       FItemGroup(
-        children: [FItem(title: const Text('One fixed notes source'))],
+        children: [FItem(title: const OverflowTip('One fixed notes source'))],
       ),
     ];
   }
