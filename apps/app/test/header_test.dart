@@ -83,7 +83,7 @@ void main() {
     ) async {
       await _pump(t);
       final panel = t.getRect(_k('shell-panel'));
-      final bar = t.getRect(find.text('Board').first);
+      final bar = t.getRect(find.byKey(const Key('top-bar')));
       expect(bar.top, greaterThan(panel.top));
     });
 

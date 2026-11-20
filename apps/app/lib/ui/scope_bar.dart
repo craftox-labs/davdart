@@ -9,12 +9,16 @@ import 'theme.dart';
 import 'edit_note_dialog.dart';
 import 'move_space_dialog.dart';
 
-/// The breadcrumb above Board and List: "[house] Space" or, inside a folder,
+/// The breadcrumb in the Home top bar: "[house] Space" or, inside a folder,
 /// "[house] Space › folder". The Space is the root crumb, with the house icon,
-/// and a link back to the whole Space. A folder adds its text and actions.
-class ScopeBar extends StatelessWidget {
-  const ScopeBar({super.key, required this.state});
+/// and a link back to the whole Space. It sits plain on the header row, at a
+/// fixed left position: the folder actions live in [ScopeActions] on the
+/// right, so scoping never moves it. [label] replaces the Space name (a saved
+/// view's name) while no folder is open.
+class ScopeCrumbs extends StatelessWidget {
+  const ScopeCrumbs({super.key, required this.state, this.label});
   final AppState state;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -28,76 +32,11 @@ class ScopeBar extends StatelessWidget {
     ) {
       path.insert(0, n.note);
     }
-    return Container(
-      key: const Key('scope-bar'),
-      width: double.infinity,
-      padding: EdgeInsets.fromLTRB(
-        t.space.xl,
-        t.space.md,
-        t.space.md,
-        t.space.md,
-      ),
-      decoration: BoxDecoration(
-        color: t.card,
-        border: Border(
-          bottom: BorderSide(color: t.divider, width: t.borders.hairline),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(child: _crumbs(context, t, path, folder != null)),
-              if (folder != null && state.editable) ...[
-                if (state.spaces.length > 1)
-                  IconAction(
-                    key: const Key('scope-move'),
-                    tooltip: 'Move folder to another space',
-                    icon: FLucideIcons.folderInput,
-                    onPress: () => showMoveSpaceDialog(context, state, folder),
-                  ),
-                IconAction(
-                  key: const Key('scope-edit'),
-                  tooltip: 'Edit folder',
-                  icon: FLucideIcons.pencil,
-                  onPress: () => showEditNoteDialog(context, state, folder),
-                ),
-                IconAction(
-                  key: const Key('scope-delete'),
-                  tooltip: 'Delete folder',
-                  icon: FLucideIcons.trash2,
-                  onPress: () => confirmDeleteNote(context, state, folder),
-                ),
-              ],
-              if (folder != null)
-                IconAction(
-                  key: const Key('scope-close'),
-                  tooltip: 'Show the whole space',
-                  icon: FLucideIcons.x,
-                  onPress: () => state.openFolder(null),
-                ),
-            ],
-          ),
-          if (folder != null && folder.description.trim().isNotEmpty)
-            Padding(
-              padding: EdgeInsets.only(top: t.space.sm),
-              child: Text(
-                folder.description.trim(),
-                key: const Key('scope-text'),
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: t.type.captionStyle.copyWith(color: t.muted),
-              ),
-            ),
-        ],
-      ),
-    );
+    return _crumbs(context, t, path, folder != null);
   }
 
   Widget _crumbs(BuildContext context, Tokens t, List<Note> path, bool scoped) {
-    final space = state.currentSpaceName ?? 'Notes';
+    final space = (!scoped ? label : null) ?? state.currentSpaceName ?? 'Notes';
     final style = t.type.bodyStrong;
     final sep = Padding(
       padding: EdgeInsets.symmetric(horizontal: t.space.sm),
@@ -143,6 +82,88 @@ class ScopeBar extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Folder actions (move, edit, delete, close) for the right side of the top
+/// bar; empty when no folder is open.
+class ScopeActions extends StatelessWidget {
+  const ScopeActions({super.key, required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final folder = state.scope;
+    if (folder == null) return const SizedBox.shrink();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (state.editable) ...[
+          if (state.spaces.length > 1)
+            IconAction(
+              key: const Key('scope-move'),
+              compact: true,
+              tooltip: 'Move folder to another space',
+              icon: FLucideIcons.folderInput,
+              onPress: () => showMoveSpaceDialog(context, state, folder),
+            ),
+          IconAction(
+            key: const Key('scope-edit'),
+            compact: true,
+            tooltip: 'Edit folder',
+            icon: FLucideIcons.pencil,
+            onPress: () => showEditNoteDialog(context, state, folder),
+          ),
+          IconAction(
+            key: const Key('scope-delete'),
+            compact: true,
+            tooltip: 'Delete folder',
+            icon: FLucideIcons.trash2,
+            onPress: () => confirmDeleteNote(context, state, folder),
+          ),
+        ],
+        IconAction(
+          key: const Key('scope-close'),
+          compact: true,
+          tooltip: 'Show the whole space',
+          icon: FLucideIcons.x,
+          onPress: () => state.openFolder(null),
+        ),
+      ],
+    );
+  }
+}
+
+/// The open folder's description, plain and full width under the header row.
+/// Nothing when there is no folder or no text.
+class ScopeText extends StatelessWidget {
+  const ScopeText({super.key, required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final folder = state.scope;
+    final text = folder?.description.trim() ?? '';
+    if (text.isEmpty) return const SizedBox.shrink();
+    final t = tokensOf(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        t.space.md,
+        t.space.sm,
+        t.space.md,
+        t.space.sm,
+      ),
+      child: SizedBox(
+        width: double.infinity,
+        child: Text(
+          text,
+          key: const Key('scope-text'),
+          maxLines: 3,
+          overflow: TextOverflow.ellipsis,
+          style: t.type.captionStyle.copyWith(color: t.muted),
+        ),
+      ),
     );
   }
 }

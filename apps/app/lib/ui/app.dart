@@ -241,7 +241,7 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
           )
         : Column(
             children: [
-              ScopeBar(state: state),
+              ScopeText(state: state),
               Expanded(
                 child: state.view == ViewMode.board
                     ? BoardView(state: state)
@@ -602,7 +602,26 @@ class TopBar extends StatelessWidget {
     );
   }
 
+  /// Left side of the row: the breadcrumb on Home and view tabs, the note's
+  /// title where a note fills the main area (narrow layouts).
+  Widget _lead(Tokens t) {
+    final uid = state.mainNoteUid;
+    if (uid != null) {
+      return Text(
+        state.tree.find(uid)?.note.summary ?? '',
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: t.type.titleStyle,
+      );
+    }
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: ScopeCrumbs(state: state, label: state.activeViewName),
+    );
+  }
+
   Widget _bar(BuildContext context, Tokens t, bool narrow) {
+    final home = state.mainNoteUid == null;
     final board = state.view == ViewMode.board;
     Widget toggle(String label, ViewMode mode) => FButton(
       variant: state.view == mode
@@ -626,15 +645,18 @@ class TopBar extends StatelessWidget {
             onPress: () => openSidebarSheet(context, state),
           ),
         SizedBox(width: t.space.xs),
-        Text(board ? 'Board' : 'List', style: t.type.titleStyle),
-        SizedBox(width: t.space.lg),
+        Expanded(child: _lead(t)),
+        SizedBox(width: t.space.md),
         if (state.loading)
-          SizedBox(
-            width: t.sizes.spinner,
-            height: t.sizes.spinner,
-            child: const FCircularProgress(),
+          Padding(
+            padding: EdgeInsets.only(right: t.space.md),
+            child: SizedBox(
+              width: t.sizes.spinner,
+              height: t.sizes.spinner,
+              child: const FCircularProgress(),
+            ),
           ),
-        const Spacer(),
+        if (home) ScopeActions(state: state),
         if (!narrow) ...[
           toggle('Board', ViewMode.board),
           SizedBox(width: t.space.xs),

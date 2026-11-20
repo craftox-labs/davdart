@@ -53,7 +53,10 @@ void main() {
           t,
           find.descendant(of: _k('side-header'), matching: find.text('Files')),
           find
-              .descendant(of: _k('top-bar'), matching: find.text('Board'))
+              .descendant(
+                of: _k('top-bar'),
+                matching: find.byKey(const Key('crumb-space')),
+              )
               .first,
           box: false,
         );

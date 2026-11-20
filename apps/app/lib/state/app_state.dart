@@ -1130,6 +1130,12 @@ class AppState extends ChangeNotifier {
     return v != null && _tabs.contains(v) ? v : null;
   }
 
+  /// The name of the saved view the main pane shows, if its tab is one.
+  String? get activeViewName {
+    final t = activeTab;
+    return t != null && t.kind == TabKind.view ? _viewByUid(t.id)?.name : null;
+  }
+
   /// The note the main pane shows full page, when its tab is a note tab.
   String? get mainNoteUid {
     final t = activeTab;

@@ -115,7 +115,6 @@ void main() {
       // Size, type and radius.
       expect(t.getSize(find.byKey(const Key('icon-rail'))).width, 90);
       expect(t.getSize(find.byKey(const Key('logo-slot'))).width, 50);
-      expect(t.widget<Text>(find.text('Board').first).style?.fontSize, 31);
       final panel = t.widget<Container>(find.byKey(const Key('shell-panel')));
       expect(
         (panel.decoration as BoxDecoration).borderRadius,

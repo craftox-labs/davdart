@@ -10,7 +10,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   for (final w in [320.0, 480.0, 880.0]) {
-    testWidgets('scope bar does not overflow at $w', (t) async {
+    testWidgets('breadcrumb header does not overflow at $w', (t) async {
       t.view.physicalSize = Size(w, 800);
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
@@ -38,28 +38,27 @@ void main() {
         isNull,
         reason: ex is FlutterError ? ex.toStringDeep() : "$ex",
       );
-      final bar = t.getRect(find.byKey(const Key('scope-bar')));
-      expect(bar.width, greaterThan(0));
+      final bar = t.getRect(find.byKey(const Key('top-bar')));
       final text = t.getRect(find.byKey(const Key('scope-text')));
-      final icons = t.getRect(find.byKey(const Key('scope-close')));
-      expect(text.top, greaterThanOrEqualTo(icons.top));
+      expect(text.top, greaterThanOrEqualTo(bar.bottom));
       expect(text.width, greaterThan(bar.width / 2));
       expect(text.right, lessThanOrEqualTo(bar.right));
+      expect(find.byKey(const Key('scope-bar')), findsNothing);
       expect(find.byKey(const Key('crumb-space')), findsOneWidget);
-      final bar2 = find.byKey(const Key('scope-bar'));
+      final top = find.byKey(const Key('top-bar'));
       expect(
-        find.descendant(of: bar2, matching: find.text('Home')),
-        findsNothing,
+        find.descendant(of: top, matching: find.byIcon(FLucideIcons.house)),
+        findsOneWidget,
       );
       expect(
-        find.descendant(of: bar2, matching: find.byIcon(FLucideIcons.house)),
-        findsOneWidget,
+        t.getRect(find.byKey(const Key('crumb-space'))).right,
+        lessThanOrEqualTo(bar.right),
       );
     });
   }
 
   for (final w in [320.0, 880.0]) {
-    testWidgets('scope bar row is vertically centred at $w', (t) async {
+    testWidgets('breadcrumb row is vertically centred at $w', (t) async {
       t.view.physicalSize = Size(w, 800);
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
@@ -85,4 +84,70 @@ void main() {
       }
     });
   }
+
+  testWidgets('root crumb does not move when a folder opens or closes', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(880, 800);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final storage = MemoryStorage();
+    final s = AppState(
+      SpaceNoteSource(
+        Space(
+          SpaceConfig(id: 's', name: 'Space'),
+          PersistentNoteStore(storage),
+        ),
+        flags: storage,
+      ),
+    );
+    await s.load();
+    await s.addFolder('Folder', text: 'Some description');
+    final uid = s.notes.firstWhere((n) => n.summary == 'Folder').uid;
+    s.openFolder(null);
+    await t.pumpWidget(DavdartApp(state: s));
+    await t.pumpAndSettle();
+    final root = t.getRect(find.byKey(const Key('crumb-space')));
+    final bar = t.getRect(find.byKey(const Key('top-bar')));
+    s.openFolder(uid);
+    await t.pumpAndSettle();
+    final scoped = t.getRect(find.byKey(const Key('crumb-space')));
+    expect(scoped.left, root.left);
+    expect(scoped.center.dy, root.center.dy);
+    expect(t.getRect(find.byKey(const Key('top-bar'))), bar);
+    expect(find.byKey(const Key('scope-close')), findsOneWidget);
+    s.openFolder(null);
+    await t.pumpAndSettle();
+    expect(t.getRect(find.byKey(const Key('crumb-space'))).left, root.left);
+  });
+
+  testWidgets('top bar has no Board/List title, only the toggle', (t) async {
+    t.view.physicalSize = const Size(880, 800);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final storage = MemoryStorage();
+    final s = AppState(
+      SpaceNoteSource(
+        Space(
+          SpaceConfig(id: 's', name: 'Space'),
+          PersistentNoteStore(storage),
+        ),
+        flags: storage,
+      ),
+    );
+    await s.load();
+    await t.pumpWidget(DavdartApp(state: s));
+    await t.pumpAndSettle();
+    final top = find.byKey(const Key('top-bar'));
+    for (final w in ['Board', 'List']) {
+      expect(find.descendant(of: top, matching: find.text(w)), findsOneWidget);
+    }
+    final x = t.getRect(find.byKey(const Key('crumb-space'))).left;
+    for (final w in ['Board', 'List']) {
+      expect(
+        t.getRect(find.descendant(of: top, matching: find.text(w))).left,
+        greaterThan(x + 200),
+      );
+    }
+  });
 }

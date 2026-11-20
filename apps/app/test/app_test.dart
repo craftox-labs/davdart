@@ -891,7 +891,7 @@ void main() {
       );
       await t.tap(find.byKey(const Key('new-folder-add')));
       await t.pumpAndSettle();
-      expect(find.byKey(const Key('scope-bar')), findsOneWidget);
+      expect(find.byKey(const Key('scope-bar')), findsNothing);
       expect(find.byKey(const Key('scope-text')), findsOneWidget);
       // Breadcrumb: [house] Space > folder; the Space name clears the scope.
       expect(find.byKey(const Key('crumb-space')), findsOneWidget);
