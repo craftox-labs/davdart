@@ -22,6 +22,7 @@ import 'detail_header.dart';
 import 'detail_view.dart';
 import 'first_run_view.dart';
 import 'list_view.dart';
+import 'mobile_nav.dart';
 import 'parts.dart';
 import 'resize_handle.dart';
 import 'scope_bar.dart';
@@ -164,6 +165,9 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
   /// Whether the last build was wide, to tell a resize from a toggle.
   bool? _wasWide;
 
+  /// Narrow layout: a bottom tab's page is open (else Home, or a view's page).
+  bool _sectionOpen = false;
+
   bool get _dockOpen => !widget.state.sidebarCollapsed;
 
   @override
@@ -222,6 +226,54 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     );
   }
 
+  /// The narrow page: Home, a view or an item (the main area), or a bottom
+  /// tab's page, with the quick-add button over it and the peek as a sheet.
+  Widget _narrowBody(
+    BuildContext context,
+    Tokens t,
+    bool hasDetail,
+    bool narrowSection,
+    String? mainNote,
+    Widget Function() main,
+    Widget Function() peek,
+  ) {
+    final state = widget.state;
+    final Widget page = narrowSection
+        ? AreaMark(
+            nav: state.nav,
+            area: NavArea.panel,
+            child: tabOfSection(visibleSection(state)) == NavTab.more
+                ? MorePage(state: state)
+                : sectionBody(state, visibleSection(state), () {}),
+          )
+        : main();
+    final fab =
+        !state.noSpace &&
+        mainNote == null &&
+        !hasDetail &&
+        quickAddFor(state) != null;
+    return LayoutBuilder(
+      builder: (context, bc) => Stack(
+        children: [
+          Positioned.fill(child: page),
+          if (fab)
+            Positioned(
+              right: t.space.lg,
+              bottom: t.space.lg,
+              child: QuickAddButton(state: state),
+            ),
+          if (hasDetail)
+            PeekSheet(
+              key: const Key('detail-pane'),
+              state: state,
+              height: bc.maxHeight,
+              child: peek(),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _layout(
     BuildContext context,
     BoxConstraints c, {
@@ -242,11 +294,19 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
     if (!hasDetail && _peek.value == 0) _heldPeek = null;
     final peekUid = state.peekUid ?? _heldPeek;
     final mainNote = state.mainItemUid;
+    // Narrow: a bottom tab's page replaces Home while no view or item fills
+    // the main area.
+    final narrowSection =
+        !wide &&
+        _sectionOpen &&
+        !state.noSpace &&
+        mainNote == null &&
+        state.activeTab == null;
     final mirror = state.layoutSide == LayoutSide.end;
     state.nav.setLayout(
       rail: wide,
-      panel: wide && _dockOpen,
-      main: split || !hasDetail,
+      panel: (wide && _dockOpen) || narrowSection,
+      main: split || !hasDetail || !wide,
       peek: hasDetail,
       mirror: mirror,
     );
@@ -401,6 +461,18 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
           );
         },
       );
+    } else if (!wide) {
+      body = _narrowBody(
+        context,
+        t,
+        hasDetail,
+        narrowSection,
+        mainNote,
+        main,
+        () {
+          return peekView();
+        },
+      );
     } else if (hasDetail) {
       // Wide but not split: the peeked note replaces the main area;
       // Promote and Collapse are on the header's peek tab.
@@ -409,11 +481,32 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
       body = main();
     }
 
+    final narrowNav = !wide && !state.noSpace && mainNote == null;
     Widget content = FScaffold(
       childPad: false,
       header: split || !showTopBar
           ? null
-          : TopBar(state: state, showMenu: !wide),
+          : TopBar(
+              state: state,
+              showMenu: !wide,
+              onHome: !wide && (narrowSection || state.activeTab != null)
+                  ? () => setState(() {
+                      _sectionOpen = false;
+                      state.activateTab(null);
+                    })
+                  : null,
+            ),
+      footer: narrowNav
+          ? MobileBottomNav(
+              state: state,
+              open: narrowSection,
+              onOpen: (s) {
+                state.setSection(s);
+                state.activateTab(null);
+                setState(() => _sectionOpen = true);
+              },
+            )
+          : null,
       child: body,
     );
     if (showDock) {
@@ -621,51 +714,20 @@ class _LeaveGuardState extends State<_LeaveGuard> {
   Widget build(BuildContext context) => widget.child;
 }
 
-/// Opens the sidebar as a sheet from the left edge (the narrow-screen drawer).
-Future<void> openSidebarSheet(BuildContext context, AppState state) =>
-    showFSheet<void>(
-      context: context,
-      side: FLayout.ltr,
-      mainAxisMaxRatio: null,
-      constraints: BoxConstraints(maxWidth: tokensOf(context).sizes.sidebar),
-      useSafeArea: true,
-      builder: (_) => ListenableBuilder(
-        listenable: state,
-        builder: (_, _) =>
-            _CloseWhenWide(child: Sidebar(state: state, inDrawer: true)),
-      ),
-    );
-
-/// Pops the sheet it sits in once the window grows to the wide layout, where
-/// the sidebar is docked.
-class _CloseWhenWide extends StatefulWidget {
-  const _CloseWhenWide({required this.child});
-  final Widget child;
-
-  @override
-  State<_CloseWhenWide> createState() => _CloseWhenWideState();
-}
-
-class _CloseWhenWideState extends State<_CloseWhenWide> {
-  bool _closing = false;
-
-  @override
-  Widget build(BuildContext context) {
-    if (!_closing &&
-        MediaQuery.sizeOf(context).width >= Tokens.wideBreakpoint) {
-      _closing = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) Navigator.of(context).maybePop();
-      });
-    }
-    return widget.child;
-  }
-}
-
 class TopBar extends StatelessWidget {
-  const TopBar({super.key, required this.state, required this.showMenu});
+  const TopBar({
+    super.key,
+    required this.state,
+    required this.showMenu,
+    this.onHome,
+  });
   final AppState state;
+
+  /// The narrow layout: the Space chip leads the bar.
   final bool showMenu;
+
+  /// Narrow, away from Home: the button back to it.
+  final VoidCallback? onHome;
 
   @override
   Widget build(BuildContext context) {
@@ -680,6 +742,11 @@ class TopBar extends StatelessWidget {
   Widget _lead(Tokens t) {
     // A note filling the main area carries its title in its own header.
     if (state.mainItemUid != null) return const SizedBox.shrink();
+    // Narrow: the Space chip names the Space; the crumbs only add a folder or
+    // a view.
+    if (showMenu && state.scope == null && state.activeViewName == null) {
+      return const SizedBox.shrink();
+    }
     return Align(
       alignment: Alignment.centerLeft,
       child: ScopeCrumbs(state: state, label: state.activeViewName),
@@ -705,14 +772,15 @@ class TopBar extends StatelessWidget {
     return PaneHeaderRow(
       key: const Key('top-bar'),
       children: [
-        if (showMenu)
+        if (onHome != null)
           IconAction(
             compact: true,
-            key: const Key('menu'),
-            tooltip: 'Menu',
-            icon: FLucideIcons.menu,
-            onPress: () => openSidebarSheet(context, state),
+            key: const Key('nav-home'),
+            tooltip: 'Home',
+            icon: FLucideIcons.house,
+            onPress: onHome,
           ),
+        if (showMenu) SpaceChip(state: state),
         SizedBox(width: t.space.xs),
         Expanded(child: _lead(t)),
         SizedBox(width: t.space.md),

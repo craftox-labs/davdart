@@ -5,6 +5,7 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/note_drag.dart';
 import '../state/task_rules.dart';
+import '../theme/tokens.dart';
 import 'drag_drop.dart';
 import 'parts.dart';
 import 'task_menu.dart';
@@ -170,7 +171,7 @@ class TaskRow extends StatelessWidget {
     final t = tokensOf(context);
     final selected = state.peekUid == task.uid || state.mainTaskUid == task.uid;
     final tags = showTags ? state.taskTagsOf(task) : const <String>[];
-    return TaskContextMenu(
+    Widget row = TaskContextMenu(
       state: state,
       uid: task.uid,
       onOpen: onOpen,
@@ -230,6 +231,56 @@ class TaskRow extends StatelessWidget {
           ),
         ),
       ),
+    );
+    return swipeable(context, t, row);
+  }
+
+  /// Narrow: swiping an open task to the right completes it. The row stays
+  /// (it never leaves the list by the swipe), and a toast offers Undo. A
+  /// closed or blocked task (repeating, read-only Space) does not swipe: the
+  /// checkbox and the menu reopen it.
+  Widget swipeable(BuildContext context, Tokens t, Widget row) {
+    if (!narrowLayout(context) ||
+        task.isClosed ||
+        !state.tasksEditable ||
+        state.taskCompletionBlockerFor(task.uid) != null) {
+      return row;
+    }
+    return Dismissible(
+      key: ValueKey('swipe-${task.uid}'),
+      direction: DismissDirection.startToEnd,
+      dismissThresholds: const {DismissDirection.startToEnd: 0.4},
+      background: Container(
+        color: t.accent,
+        alignment: Alignment.centerLeft,
+        padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+        child: Icon(FLucideIcons.check, color: t.onAccent),
+      ),
+      confirmDismiss: (_) async {
+        // The row may leave the list (a filter) before the toast shows.
+        final host = Navigator.of(context, rootNavigator: true).context;
+        final ok = await state.toggleTask(task.uid);
+        if (ok && host.mounted) {
+          showFToast(
+            context: host,
+            title: Text('Completed "${task.summary}"'),
+            suffixBuilder: (_, entry) => FButton(
+              key: const Key('swipe-undo'),
+              variant: FButtonVariant.outline,
+              size: FButtonSizeVariant.xs,
+              mainAxisSize: MainAxisSize.min,
+              onPress: () {
+                state.setTaskDone(task.uid, false);
+                entry.dismiss();
+              },
+              child: const Text('Undo'),
+            ),
+          );
+        }
+        // The row stays; its state redraws it struck through.
+        return false;
+      },
+      child: row,
     );
   }
 }

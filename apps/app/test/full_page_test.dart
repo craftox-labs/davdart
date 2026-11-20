@@ -223,12 +223,14 @@ void main() {
       expect(s.peekUid, 'a');
     });
 
-    testWidgets('narrow layout has no Promote and no main tab page', (t) async {
+    testWidgets('narrow layout: Promote is in the sheet, a tab is a page', (
+      t,
+    ) async {
       final s = await _pump(t, size: const Size(500, 900));
-      expect(_k('peek-promote'), findsNothing);
+      expect(_k('peek-sheet'), findsOneWidget);
       s.openNoteTab('b');
       await _settle(t);
-      expect(_k('main-note'), findsNothing);
+      expect(_k('main-note'), findsOneWidget);
     });
 
     testWidgets('mirrored layout keeps the pane; Promote and Collapse work', (

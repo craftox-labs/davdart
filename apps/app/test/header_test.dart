@@ -500,13 +500,15 @@ void main() {
     });
   });
 
-  testWidgets('narrow layout is unchanged: no header row, no strip', (t) async {
+  testWidgets('narrow layout: no header row, no strip; the peek is a sheet', (
+    t,
+  ) async {
     final s = await _pump(t, size: const Size(500, 900));
     s.select('a');
     await t.pumpAndSettle();
     expect(_k('tab-strip'), findsNothing);
     expect(_k('detail-header'), findsNothing);
     expect(_k('shell-panel'), findsNothing);
-    expect(_k('peek-promote'), findsNothing);
+    expect(_k('peek-sheet'), findsOneWidget);
   });
 }

@@ -274,9 +274,7 @@ void main() {
         ],
       );
       expect(s.section, Section.notes);
-      await t.tap(_k('menu'));
-      await t.pumpAndSettle();
-      await t.tap(_k('bar-events'));
+      await t.tap(_k('bnav-events'));
       await t.pumpAndSettle();
       await t.tap(find.text('Tags (2)'));
       await t.pumpAndSettle();

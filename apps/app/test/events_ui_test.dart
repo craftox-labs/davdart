@@ -735,11 +735,9 @@ void main() {
           ],
           size: Size(w, 900),
         );
-        final narrow = _k('menu').evaluate().isNotEmpty;
+        final narrow = _k('bottom-nav').evaluate().isNotEmpty;
         if (narrow) {
-          await t.tap(_k('menu'));
-          await t.pumpAndSettle();
-          await t.tap(_k('bar-events'));
+          await t.tap(_k('bnav-events'));
         } else {
           await t.tap(_k('rail-events'));
         }
@@ -753,10 +751,6 @@ void main() {
         expect(t.takeException(), isNull, reason: 'dialog all day at $w');
         await t.tap(find.text('Cancel'));
         await t.pumpAndSettle();
-        if (narrow) {
-          await t.tapAt(Offset(w - 2, 400));
-          await t.pumpAndSettle();
-        }
         s.select('l1');
         await t.pumpAndSettle();
         expect(t.takeException(), isNull, reason: 'detail at $w');

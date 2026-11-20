@@ -57,6 +57,23 @@ List<FItemMixin> menuRows(
   List<NoteMenuItem> items,
 ) {
   final t = tokensOf(context);
+  // A sheet has no hover submenus: a submenu's rows follow as plain rows.
+  if (SheetMenuScope.of(context)) {
+    items = [
+      for (final i in items)
+        if (i.children.isNotEmpty)
+          for (final c in i.children)
+            NoteMenuItem(
+              '${i.label}: ${c.label}',
+              c.icon,
+              c.onPress,
+              key: c.key,
+              selected: c.selected,
+            )
+        else
+          i,
+    ];
+  }
   return [
     for (final i in items)
       if (i.children.isNotEmpty)
@@ -109,8 +126,69 @@ class ExclusiveContextMenu extends StatefulWidget {
 /// the event has been dispatched).
 final Set<int> _claimed = {};
 
+/// True inside [showMenuSheet]: menu rows are laid out for a sheet.
+class SheetMenuScope extends InheritedWidget {
+  const SheetMenuScope({super.key, required super.child});
+
+  static bool of(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<SheetMenuScope>() != null;
+
+  @override
+  bool updateShouldNotify(SheetMenuScope old) => false;
+}
+
+/// Stands in for the popup's controller in a sheet: hiding it closes the
+/// sheet, so the menu rows work unchanged.
+class SheetPopoverController extends FPopoverController {
+  SheetPopoverController({required super.vsync, required this.close});
+  final VoidCallback close;
+
+  @override
+  Future<void> hide({bool animated = true}) async => close();
+}
+
+/// Shows [groups] (built by [build] under the sheet's context) as a bottom
+/// sheet, the touch form of a context menu. Picking a row closes it.
+Future<void> showMenuSheet(
+  BuildContext context,
+  TickerProvider vsync,
+  List<FItemGroupMixin> Function(
+    BuildContext context,
+    FPopoverController controller,
+  )
+  build,
+) async {
+  var open = true;
+  late final SheetPopoverController c;
+  c = SheetPopoverController(
+    vsync: vsync,
+    close: () {
+      if (!open) return;
+      open = false;
+      Navigator.of(context).maybePop();
+    },
+  );
+  try {
+    await showFSheet<void>(
+      context: context,
+      side: FLayout.btt,
+      mainAxisMaxRatio: 0.8,
+      useSafeArea: true,
+      builder: (ctx) => SheetMenuScope(
+        child: SingleChildScrollView(
+          key: const Key('menu-sheet'),
+          child: FItemGroup.merge(children: build(ctx, c)),
+        ),
+      ),
+    );
+  } finally {
+    open = false;
+    c.dispose();
+  }
+}
+
 class _ExclusiveContextMenuState extends State<ExclusiveContextMenu>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late final FPopoverController _controller = FPopoverController(vsync: this);
 
   @override
@@ -129,16 +207,29 @@ class _ExclusiveContextMenuState extends State<ExclusiveContextMenu>
   }
 
   @override
-  Widget build(BuildContext context) => Listener(
-    onPointerDown: _down,
-    child: FContextMenu(
+  Widget build(BuildContext context) {
+    // Narrow (phone): a long press opens the actions as a bottom sheet; the
+    // right-click popup stays for a mouse.
+    final sheet = narrowLayout(context);
+    Widget menu = FContextMenu(
       control: FPopoverControl.managed(controller: _controller),
-      longPress: true,
+      longPress: !sheet,
       secondaryPress: true,
       menuBuilder: widget.menuBuilder,
       child: widget.child,
-    ),
-  );
+    );
+    if (sheet) {
+      menu = GestureDetector(
+        onLongPress: () => showMenuSheet(
+          context,
+          this,
+          (ctx, c) => widget.menuBuilder(ctx, c, null),
+        ),
+        child: menu,
+      );
+    }
+    return Listener(onPointerDown: _down, child: menu);
+  }
 }
 
 /// Right-click (or long-press) menu for a surface that is not a note: a

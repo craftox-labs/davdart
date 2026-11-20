@@ -43,23 +43,8 @@ class Sidebar extends StatelessWidget {
       if (inDrawer) Navigator.of(context).pop();
     }
 
-    var section = state.section;
-    if (section == Section.account && !state.canSignIn) section = Section.notes;
-    // A section the Space's collection cannot hold falls back to one it can.
-    if (!topSections(state).contains(section) &&
-        section != Section.account &&
-        section != Section.settings) {
-      section = topSections(state).first;
-    }
-    final body = switch (section) {
-      Section.notes => NotesSection(state: state, onPick: close),
-      Section.tasks => TasksPanel(state: state, onPick: close),
-      Section.events => EventsPanel(state: state, onPick: close),
-      Section.views => ViewsSection(state: state, onPick: close),
-      Section.search => SearchSection(state: state, onPick: close),
-      Section.account => AccountSection(state: state, onPick: close),
-      Section.settings => SettingsSection(state: state, onPick: close),
-    };
+    final section = visibleSection(state);
+    final body = sectionBody(state, section, close);
     final t = tokensOf(context);
     return FSidebar.raw(
       style: .delta(
@@ -97,6 +82,33 @@ class Sidebar extends StatelessWidget {
     );
   }
 }
+
+/// The section the panel shows: the chosen one, or the first the Space (and
+/// sign-in) allow.
+Section visibleSection(AppState state) {
+  var section = state.section;
+  if (section == Section.account && !state.canSignIn) section = Section.notes;
+  // A section the Space's collection cannot hold falls back to one it can.
+  if (!topSections(state).contains(section) &&
+      section != Section.account &&
+      section != Section.settings) {
+    section = topSections(state).first;
+  }
+  return section;
+}
+
+/// The panel of [section]; [onPick] runs after an action that should close
+/// the narrow sheet.
+Widget sectionBody(AppState state, Section section, VoidCallback onPick) =>
+    switch (section) {
+      Section.notes => NotesSection(state: state, onPick: onPick),
+      Section.tasks => TasksPanel(state: state, onPick: onPick),
+      Section.events => EventsPanel(state: state, onPick: onPick),
+      Section.views => ViewsSection(state: state, onPick: onPick),
+      Section.search => SearchSection(state: state, onPick: onPick),
+      Section.account => AccountSection(state: state, onPick: onPick),
+      Section.settings => SettingsSection(state: state, onPick: onPick),
+    };
 
 /// An item row of a menu group wrapped in other widgets (a drop target, a
 /// right-click menu). The group only accepts item widgets, so this stands in
