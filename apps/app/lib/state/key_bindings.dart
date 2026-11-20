@@ -74,20 +74,45 @@ String? keyToken(KeyEvent e, {required bool shift}) {
   };
   final n = named[k];
   if (n != null) return n;
-  var c = e.character;
-  if (c == null || c.length != 1 || c.codeUnitAt(0) < 0x20) {
-    final label = k.keyLabel;
-    c = label.length == 1 ? label : null;
+  // The character the keyboard layout produced already carries Shift, Caps
+  // Lock and AltGr: use it as is, never re-shift it (German Shift+7 is `/`).
+  // One exception: with Shift down, a character that is just the key's own
+  // unshifted label is a simulated or raw key (a real layout reports the
+  // shifted character), so the US shift map applies to it.
+  final label = k.keyLabel;
+  final typed = e.character;
+  final real = typed != null && typed.length == 1 && isPrintableCode(typed);
+  if (real && !(shift && typed.toLowerCase() == label.toLowerCase())) {
+    return typed;
   }
+  var c = real ? typed : (label.length == 1 ? label : null);
   if (c == null) return null;
   if (shift) {
-    // A simulated or raw key reports the unshifted character.
     const shifted = {'/': '?', ';': ':', '[': '{', ']': '}'};
     c = shifted[c] ?? c.toUpperCase();
   } else if (RegExp('[A-Z]').hasMatch(c) && !_capsOn()) {
     c = c.toLowerCase();
   }
   return c;
+}
+
+/// Whether the one-character string [c] is printable (not a control).
+bool isPrintableCode(String c) {
+  final u = c.codeUnitAt(0);
+  return u >= 0x20 && u != 0x7f;
+}
+
+/// AltGr: Ctrl+Alt (how Windows and Linux report it) with a key event that
+/// produced a printable character (German `[ ] { } @ \\`). Such a key is
+/// that character, not a Ctrl/Alt chord.
+bool isAltGrChar(KeyEvent e, HardwareKeyboard kb) {
+  final c = e.character;
+  return kb.isControlPressed &&
+      kb.isAltPressed &&
+      !kb.isMetaPressed &&
+      c != null &&
+      c.length == 1 &&
+      isPrintableCode(c);
 }
 
 bool _capsOn() => HardwareKeyboard.instance.lockModesEnabled.contains(

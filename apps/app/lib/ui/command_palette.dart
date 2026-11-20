@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart'
-    show KeyEvent, KeyUpEvent, LogicalKeyboardKey;
+    show HardwareKeyboard, KeyEvent, KeyUpEvent, LogicalKeyboardKey;
 import 'package:flutter/widgets.dart';
 
 import '../state/app_action.dart';
@@ -43,7 +43,11 @@ final _open = Expando<bool>('palette open');
 /// to what had it, then the chosen entry runs.
 Future<void> showCommandPalette(BuildContext context, AppState state) async {
   final nav = Navigator.of(context);
-  if (_open[nav] == true) return;
+  if (_open[nav] == true) {
+    // The palette chord again closes it.
+    nav.pop();
+    return;
+  }
   _open[nav] = true;
   final before = FocusManager.instance.primaryFocus;
   final recents = PaletteRecents(state.prefs);
@@ -143,6 +147,11 @@ class _CommandPaletteState extends State<CommandPalette> {
   KeyEventResult _onKey(FocusNode _, KeyEvent e) {
     if (e is KeyUpEvent) return KeyEventResult.ignored;
     final k = e.logicalKey;
+    if (widget.state.chords.idFor(e, HardwareKeyboard.instance) ==
+        'palette.open') {
+      Navigator.of(context).pop();
+      return KeyEventResult.handled;
+    }
     if (k == LogicalKeyboardKey.arrowDown) {
       _move(1);
     } else if (k == LogicalKeyboardKey.arrowUp) {

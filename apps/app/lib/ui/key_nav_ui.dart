@@ -167,6 +167,11 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
     if (id == null) return KeyEventResult.ignored;
     if (imeComposing()) return KeyEventResult.ignored;
     if (e is! KeyDownEvent) return KeyEventResult.handled;
+    // An open dropdown or date picker owns the keyboard: a chord would act
+    // behind it (only the palette chord goes through).
+    if (id != 'palette.open' && PopoverTracker.instance.active) {
+      return KeyEventResult.handled;
+    }
     final a = buildActions(state).where((a) => a.id == id).firstOrNull;
     if (a == null || !a.enabled(state)) return KeyEventResult.handled;
     if (navigatingAction(id)) {
@@ -188,7 +193,11 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
 
   KeyEventResult _key(FocusNode node, KeyEvent e) {
     final route = ModalRoute.of(context);
-    if (route != null && !route.isCurrent) return KeyEventResult.ignored;
+    final kb0 = HardwareKeyboard.instance;
+    final paletteChord = state.chords.idFor(e, kb0) == 'palette.open';
+    if (route != null && !route.isCurrent && !paletteChord) {
+      return KeyEventResult.ignored;
+    }
     if (e is! KeyUpEvent) {
       final r = _chord(e);
       if (r == KeyEventResult.handled) return r;
@@ -214,7 +223,8 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
       Future.sync(() => save.run(ActionContext(state, context)));
       return KeyEventResult.handled;
     }
-    if (kb.isControlPressed || kb.isMetaPressed || kb.isAltPressed) {
+    if ((kb.isControlPressed || kb.isMetaPressed || kb.isAltPressed) &&
+        !isAltGrChar(e, kb)) {
       return KeyEventResult.ignored;
     }
     final token = keyToken(e, shift: kb.isShiftPressed);

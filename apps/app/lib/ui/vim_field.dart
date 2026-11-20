@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
@@ -51,7 +52,9 @@ class VimField extends StatefulWidget {
 }
 
 class _VimFieldState extends State<VimField> {
-  late final VimEngine engine = VimEngine(
+  late VimEngine engine = _newEngine();
+
+  VimEngine _newEngine() => VimEngine(
     text: widget.controller.text,
     leader: _leader,
     onAction: _action,
@@ -69,10 +72,15 @@ class _VimFieldState extends State<VimField> {
   @override
   void didUpdateWidget(VimField old) {
     super.didUpdateWidget(old);
-    if (old.controller != widget.controller) {
+    if (old.controller != widget.controller || old.uid != widget.uid) {
+      // Another item (or its controller): a fresh engine, so no undo
+      // history, insert session, mode or pending keys leak across. The
+      // register stays, so yank in one item can be put in another.
       old.controller.removeListener(_ctl);
       widget.controller.addListener(_ctl);
-      engine.external(widget.controller.value);
+      final reg = engine.register;
+      engine.dispose();
+      engine = _newEngine()..carryRegister(reg);
     }
   }
 
@@ -103,14 +111,34 @@ class _VimFieldState extends State<VimField> {
     final u = widget.uid;
     switch (a) {
       case VimAction.write:
-        unawaited(s.saveEdit(u));
+        unawaited(_saved(s.saveEdit(u)));
       case VimAction.quit:
         unawaited(s.leaveEdit(u));
       case VimAction.forceQuit:
         s.discardEdit(u);
       case VimAction.writeQuit:
-        unawaited(s.saveAndLeave(u));
+        // saveAndLeave keeps edit mode when the save fails.
+        unawaited(_saved(s.saveAndLeave(u)));
     }
+  }
+
+  /// Shows why a `:w` / `:wq` did not save.
+  Future<void> _saved(Future<bool> result) async {
+    final ok = await result;
+    if (ok || !mounted) return;
+    final s = widget.state;
+    final u = widget.uid;
+    final task = s.taskDraftFor(u);
+    final event = s.eventDraftFor(u);
+    final note = s.draftFor(u);
+    final empty = task?.titleEmpty ?? event?.titleEmpty ?? note?.titleEmpty;
+    engine.fail(
+      empty == true
+          ? 'E: title is required'
+          : event?.endBeforeStart == true
+          ? 'E: end is before start'
+          : 'E: save failed',
+    );
   }
 
   /// `<Space>` then keys: the bare-key app layer (`g t`), `<Space>` or `:`
@@ -153,7 +181,10 @@ class _VimFieldState extends State<VimField> {
     // The stage 1 chords and Ctrl+Enter work in every mode: let them bubble.
     if (widget.state.chords.idFor(e, kb) != null) return KeyEventResult.ignored;
     final key = e.logicalKey;
-    final mod = kb.isControlPressed || kb.isMetaPressed;
+    // AltGr (Ctrl+Alt on Windows and Linux) typing a character is that
+    // character, not a modifier chord.
+    final altGr = isAltGrChar(e, kb);
+    final mod = !altGr && (kb.isControlPressed || kb.isMetaPressed);
     if (mod && !kb.isAltPressed) {
       if (key == LogicalKeyboardKey.keyZ) {
         kb.isShiftPressed ? engine.redo() : engine.undo();
@@ -174,7 +205,7 @@ class _VimFieldState extends State<VimField> {
       }
       return KeyEventResult.ignored;
     }
-    if (kb.isAltPressed) return KeyEventResult.ignored;
+    if (kb.isAltPressed && !altGr) return KeyEventResult.ignored;
     if (key == LogicalKeyboardKey.escape) return _feed('Esc');
     if (engine.mode == VimMode.insert && engine.lineText == null) {
       return KeyEventResult.ignored;
@@ -191,8 +222,20 @@ class _VimFieldState extends State<VimField> {
     return KeyEventResult.handled;
   }
 
-  /// A click into the field: INSERT at the click (or the dragged selection).
+  Offset? _down;
+
+  void _pointerDown(PointerDownEvent e) {
+    // Only a primary-button press can start a click.
+    _down = e.buttons == kPrimaryButton ? e.position : null;
+  }
+
+  /// A click into the field: INSERT at the click. A drag (selection handles,
+  /// the scrollbar, a text selection), a non-primary button does not
+  /// switch modes.
   void _pointerUp(PointerUpEvent e) {
+    final down = _down;
+    _down = null;
+    if (down == null || (e.position - down).distance > kTouchSlop) return;
     if (!_active || engine.mode == VimMode.insert) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || engine.mode == VimMode.insert) return;
@@ -231,7 +274,9 @@ class _VimFieldState extends State<VimField> {
             skipTraversal: true,
             onKeyEvent: _key,
             child: Listener(
+              onPointerDown: _pointerDown,
               onPointerUp: _pointerUp,
+              onPointerCancel: (_) => _down = null,
               child: ListenableBuilder(
                 listenable: engine,
                 builder: (context, _) => _plain(

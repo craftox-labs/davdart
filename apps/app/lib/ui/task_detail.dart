@@ -244,6 +244,7 @@ class TaskEditor extends StatelessWidget {
               ),
             ),
             VimField(
+              key: ValueKey('vim-${draft.uid}'),
               state: state,
               uid: draft.uid,
               controller: draft.bodyController,

@@ -1,10 +1,77 @@
 import 'dart:math' as math;
 
-/// Pure text helpers of the Vim editing engine: lines, word classes and
-/// text objects over a plain string (UTF-16 code units; surrogate pairs are
-/// not treated specially). No Flutter imports.
+import 'package:flutter/widgets.dart' show Characters;
 
-final _wordRe = RegExp(r'[\p{L}\p{N}_]', unicode: true);
+/// Pure text helpers of the Vim editing engine: lines, word classes and
+/// text objects over a plain string. Offsets are UTF-16 code units, but
+/// character steps ([snapDown], [snapUp], [nextChar], [prevChar]) move by
+/// grapheme clusters, so a caret never lands inside a surrogate pair or a
+/// combining sequence. A line ends at `\n` or `\r\n`.
+
+final _wordRe = RegExp(r'[\p{L}\p{N}\p{M}_]', unicode: true);
+
+/// The largest grapheme boundary at or before [i].
+int snapDown(String t, int i) => _snap(t, i, false);
+
+/// The smallest grapheme boundary at or after [i].
+int snapUp(String t, int i) => _snap(t, i, true);
+
+/// The boundary after the cluster that starts at [i].
+int nextChar(String t, int i) => i >= t.length ? t.length : snapUp(t, i + 1);
+
+/// The start of the cluster that ends at [i].
+int prevChar(String t, int i) => i <= 0 ? 0 : snapDown(t, i - 1);
+
+/// [i] moved [n] clusters forward, not past [limit].
+int stepFwd(String t, int i, int n, int limit) {
+  var p = i;
+  for (var k = 0; k < n && p < limit; k++) {
+    p = nextChar(t, p);
+  }
+  return math.min(p, limit);
+}
+
+/// [i] moved [n] clusters back, not before [limit].
+int stepBack(String t, int i, int n, int limit) {
+  var p = i;
+  for (var k = 0; k < n && p > limit; k++) {
+    p = prevChar(t, p);
+  }
+  return math.max(p, limit);
+}
+
+int _snap(String t, int i, bool up) {
+  if (i <= 0) return 0;
+  if (i >= t.length) return t.length;
+  final a = t.codeUnitAt(i - 1);
+  final b = t.codeUnitAt(i);
+  // Below U+0300 nothing combines, except the CR LF pair.
+  if (a < 0x300 && b < 0x300 && !(a == 13 && b == 10)) return i;
+  final s = math.max(lineStart(t, i), i - 4096);
+  final sub = t.substring(s, math.min(t.length, i + 4096));
+  var pos = s;
+  for (final g in Characters(sub)) {
+    final end = pos + g.length;
+    if (end > i) return pos == i ? i : (up ? end : pos);
+    pos = end;
+  }
+  return i;
+}
+
+/// Length of the line terminator at [le] (a line end): 2 for CRLF, 1 for LF,
+/// 0 at the text end.
+int nlLen(String t, int le) {
+  if (le >= t.length) return 0;
+  return t.codeUnitAt(le) == 13 &&
+          le + 1 < t.length &&
+          t.codeUnitAt(le + 1) == 10
+      ? 2
+      : 1;
+}
+
+/// Whether the line starting at [j] is empty (and not the text end).
+bool emptyLineAt(String t, int j) =>
+    j < t.length && lineStart(t, j) == j && lineEnd(t, j) == j;
 
 /// Start offset of the line containing offset [i].
 int lineStart(String t, int i) {
@@ -18,7 +85,8 @@ int lineEnd(String t, int i) {
   if (i < 0) i = 0;
   if (i >= t.length) return t.length;
   final k = t.indexOf('\n', i);
-  return k < 0 ? t.length : k;
+  if (k < 0) return t.length;
+  return k > i && t.codeUnitAt(k - 1) == 13 ? k - 1 : k;
 }
 
 /// Start offsets of every line (always at least one).
@@ -70,7 +138,7 @@ int nextWordStart(String t, int i, bool big) {
     }
   }
   while (j < len && charClass(t[j], big) == 0) {
-    if (t[j] == '\n' && j > i && (j == 0 || t[j - 1] == '\n')) break;
+    if (j > i && emptyLineAt(t, j)) break;
     j++;
   }
   return j;
@@ -81,7 +149,7 @@ int prevWordStart(String t, int i, bool big) {
   if (i <= 0) return 0;
   var j = math.min(i, t.length) - 1;
   while (j > 0 && charClass(t[j], big) == 0) {
-    if (t[j] == '\n' && t[j - 1] == '\n') return j;
+    if (emptyLineAt(t, j)) return j;
     j--;
   }
   if (charClass(t[j], big) == 0) return 0;
@@ -150,7 +218,7 @@ VimRange? textObject(String t, int c, bool inner, String obj) {
 }
 
 VimRange? _wordObject(String t, int c, bool inner, bool big) {
-  if (t.isEmpty || c >= t.length || t[c] == '\n') return null;
+  if (t.isEmpty || c >= lineEnd(t, c)) return null;
   final ls = lineStart(t, c);
   final le = lineEnd(t, c);
   final cl = charClass(t[c], big);
@@ -307,10 +375,11 @@ VimRange? _bracketObject(
   var s = o + 1;
   var e = cl;
   // `{` newline ... newline `}`: the inner part is the lines between.
-  if (s < e && t[s] == '\n') {
+  final nl = s < e ? nlLen(t, s) : 0;
+  if (nl > 0 && s == lineEnd(t, s)) {
     final cs = lineStart(t, cl);
     if (t.substring(cs, cl).trim().isEmpty && cs > s) {
-      s++;
+      s += nl;
       e = cs;
     }
   }

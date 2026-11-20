@@ -129,6 +129,10 @@ final _physical = <String, PhysicalKeyboardKey>{
 /// The letters come from the set browsers leave alone as Alt chords (J K L N
 /// P O G Q M R W X Y; no F E V S B T H D, no arrows or digits) minus U and Z
 /// (Ctrl+Shift+U is GTK unicode input, Shift+Z is redo in text fields).
+/// Letters are key positions: matching uses the physical key, so on a
+/// non-QWERTY layout the chord is where the QWERTY letter sits, while the
+/// label prints the QWERTY letter. Native macOS swaps Q for T (Tasks):
+/// Cmd+Shift+Q logs the user out.
 /// Ctrl/Cmd+K (palette), Ctrl/Cmd+Enter (save and leave), Ctrl/Cmd+W and
 /// Ctrl/Cmd+S are fixed and never overridden.
 ///
@@ -183,6 +187,17 @@ class ChordKeymap {
     'edit.leave': 'w',
   };
 
+  /// Letters that differ on native macOS: Cmd+Shift+Q is the system log-out
+  /// shortcut, so Tasks takes T there. (Web on macOS uses Ctrl+Alt, which
+  /// has no system meaning, and keeps the table above.) Q is not used on
+  /// native macOS at all.
+  static const macNativeLetters = <String, String>{'go.tasks': 't'};
+
+  /// The default letter of action [id] on this platform. Letters name key
+  /// positions as on a QWERTY keyboard (the match is on the physical key).
+  String? defaultLetter(String id) =>
+      (isMac && !isWeb ? macNativeLetters[id] : null) ?? letters[id];
+
   /// Chords that other code binds; no action may take them.
   static const reserved = {
     'ctrl+k',
@@ -209,7 +224,7 @@ class ChordKeymap {
   }
 
   Map<String, Chord> _defaults() => {
-    for (final e in letters.entries) e.key: defaultFor(e.value),
+    for (final id in letters.keys) id: defaultFor(defaultLetter(id)!),
   };
 
   final Map<String, Chord> _chords = {};

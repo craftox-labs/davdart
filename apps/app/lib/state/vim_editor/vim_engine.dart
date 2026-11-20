@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart' show StringCharacters;
 import 'package:flutter/services.dart' show TextEditingValue, TextSelection;
 
 import 'vim_text.dart';
@@ -80,6 +81,17 @@ class VimEngine extends ChangeNotifier {
   }
 
   static const _inf = 1 << 30;
+
+  /// Largest count taken from typed digits, and the limits of repeated
+  /// text (insert or put with a count).
+  static const maxCount = 9999999;
+  static const maxRepeat = 10000;
+  static const maxText = 1000000;
+
+  /// Search limits: text scanned, matches kept, a line run through a regex.
+  static const maxSearchText = 1000000;
+  static const maxMatches = 10000;
+  static const maxRegexLine = 10000;
   static const _alias = {
     'Left': 'h',
     'Right': 'l',
@@ -120,6 +132,7 @@ class VimEngine extends ChangeNotifier {
   String _insStartText = '';
   int _insCount = 1;
   bool _insNl = false;
+  String _insNlStr = '\n';
   bool _insDot = true;
 
   // Dot repeat
@@ -137,6 +150,9 @@ class VimEngine extends ChangeNotifier {
   String get text => _t;
   int get cursor => _c;
   VimRegister? get register => _reg;
+
+  /// Hands the unnamed register over (a fresh engine for another item).
+  void carryRegister(VimRegister? r) => _reg = r;
   bool get canUndo => _undo.isNotEmpty;
   bool get canRedo => _redo.isNotEmpty;
 
@@ -167,12 +183,12 @@ class VimEngine extends ChangeNotifier {
           extentOffset: _c.clamp(0, _t.length),
         );
       case VimMode.normal:
-        return _c < _t.length && _t[_c] != '\n'
-            ? TextSelection(baseOffset: _c, extentOffset: _c + 1)
+        return _c < lineEnd(_t, _c)
+            ? TextSelection(baseOffset: _c, extentOffset: nextChar(_t, _c))
             : TextSelection.collapsed(offset: _c);
       case VimMode.visual:
         final lo = math.min(_anchor, _c);
-        final hi = math.min(math.max(_anchor, _c) + 1, _t.length);
+        final hi = nextChar(_t, math.max(_anchor, _c));
         return _anchor <= _c
             ? TextSelection(baseOffset: lo, extentOffset: hi)
             : TextSelection(baseOffset: hi, extentOffset: lo);
@@ -197,7 +213,7 @@ class VimEngine extends ChangeNotifier {
       }
       _c = _c.clamp(0, _t.length);
     } else {
-      _anchor = _anchor.clamp(0, _t.length);
+      _anchor = snapDown(_t, _anchor.clamp(0, _t.length));
       _clamp();
     }
   }
@@ -211,8 +227,8 @@ class VimEngine extends ChangeNotifier {
     _lineKind = null;
     if (mode == VimMode.insert) return;
     mode = VimMode.insert;
-    _c = (extent ?? offset).clamp(0, _t.length);
-    _ia = offset.clamp(0, _t.length);
+    _c = snapDown(_t, (extent ?? offset).clamp(0, _t.length));
+    _ia = snapDown(_t, offset.clamp(0, _t.length));
     _insStartText = _t;
     _insCount = 1;
     _insNl = false;
@@ -239,6 +255,12 @@ class VimEngine extends ChangeNotifier {
     _feedNormal(k);
     notifyListeners();
     return true;
+  }
+
+  /// Shows [m] in the footer (the host reports a failed `:w`).
+  void fail(String m) {
+    message = m;
+    notifyListeners();
   }
 
   /// Undo (also Ctrl+Z in any mode). False when there is nothing to undo.
@@ -284,11 +306,22 @@ class VimEngine extends ChangeNotifier {
   int _col() => _c - lineStart(_t, _c);
 
   void _clamp() {
-    _c = _c.clamp(0, _t.length);
+    _c = snapDown(_t, _c.clamp(0, _t.length));
     if (mode == VimMode.insert) return;
     final ls = lineStart(_t, _c);
     final le = lineEnd(_t, _c);
-    if (le > ls && _c >= le) _c = le - 1;
+    if (le > ls && _c >= le) _c = prevChar(_t, le);
+  }
+
+  /// The line break of the text: CRLF when it has any, else LF.
+  String get _nl => _t.contains('\r\n') ? '\r\n' : '\n';
+
+  /// [unit] repeated [n] times, capped (count and total size).
+  String _rep(String unit, int n, [String sep = '']) {
+    if (unit.isEmpty && sep.isEmpty) return '';
+    final per = unit.length + sep.length;
+    final times = math.min(n, math.min(maxRepeat, math.max(1, maxText ~/ per)));
+    return List.filled(times, unit).join(sep);
   }
 
   void _goto(int p, {bool keepWant = false}) {
@@ -353,7 +386,7 @@ class VimEngine extends ChangeNotifier {
 
   void _beginInsert(int pos) {
     mode = VimMode.insert;
-    _c = pos.clamp(0, _t.length);
+    _c = snapDown(_t, pos.clamp(0, _t.length));
     _ia = _c;
     _insStartText = _t;
     _insCount = 1;
@@ -383,8 +416,8 @@ class VimEngine extends ChangeNotifier {
     final inserted = _insertedText();
     if (_insCount > 1 && inserted.isNotEmpty) {
       final extra = _insNl
-          ? List.filled(_insCount - 1, '\n$inserted').join()
-          : inserted * (_insCount - 1);
+          ? _rep('$_insNlStr$inserted', _insCount - 1)
+          : _rep(inserted, _insCount - 1);
       final at = _c.clamp(0, _t.length);
       _t = _t.replaceRange(at, at, extra);
       _c = at + extra.length;
@@ -394,7 +427,7 @@ class VimEngine extends ChangeNotifier {
     _insCount = 1;
     _insNl = false;
     final ls = lineStart(_t, _c);
-    if (_c > ls) _c--;
+    if (_c > ls) _c = prevChar(_t, _c);
     _clamp();
     _want = _col();
     final s = _session;
@@ -453,7 +486,7 @@ class VimEngine extends ChangeNotifier {
     if (i < _keys.length && RegExp(r'^[1-9]$').hasMatch(_keys[i])) {
       var n = 0;
       while (i < _keys.length && RegExp(r'^[0-9]$').hasMatch(_keys[i])) {
-        n = n * 10 + int.parse(_keys[i]);
+        n = math.min(n * 10 + int.parse(_keys[i]), maxCount);
         i++;
       }
       return (n, i);
@@ -484,13 +517,13 @@ class VimEngine extends ChangeNotifier {
         return _P.done;
       case 'x':
         _change(() {
-          final e = math.min(_c + n, lineEnd(_t, _c));
+          final e = stepFwd(_t, _c, n, lineEnd(_t, _c));
           if (e > _c) _delChars(_c, e);
         });
         return _P.done;
       case 'X':
         _change(() {
-          final s = math.max(lineStart(_t, _c), _c - n);
+          final s = stepBack(_t, _c, n, lineStart(_t, _c));
           if (_c > s) _delChars(s, _c);
         });
         return _P.done;
@@ -510,7 +543,7 @@ class VimEngine extends ChangeNotifier {
         return _P.done;
       case 's':
         _change(() {
-          final e = math.min(_c + n, lineEnd(_t, _c));
+          final e = stepFwd(_t, _c, n, lineEnd(_t, _c));
           _regSet(_t.substring(_c, e), false);
           _t = _t.replaceRange(_c, e, '');
           _beginInsert(_c);
@@ -527,9 +560,9 @@ class VimEngine extends ChangeNotifier {
         return _P.done;
       case '~':
         _change(() {
-          final e = math.min(_c + n, lineEnd(_t, _c));
+          final e = stepFwd(_t, _c, n, lineEnd(_t, _c));
           if (e <= _c) return;
-          final s = _t.substring(_c, e).split('').map(swapCase).join();
+          final s = _t.substring(_c, e).characters.map(swapCase).join();
           _t = _t.replaceRange(_c, e, s);
           _goto(e);
         });
@@ -539,13 +572,20 @@ class VimEngine extends ChangeNotifier {
         final ch = _keys[i + 1];
         if (ch.length != 1 && ch != 'Enter') return _P.bad;
         _change(() {
-          if (_c + n > lineEnd(_t, _c)) return;
+          final le = lineEnd(_t, _c);
+          var e = _c;
+          for (var k = 0; k < n; k++) {
+            if (e >= le) return;
+            e = nextChar(_t, e);
+          }
           if (ch == 'Enter') {
-            _t = _t.replaceRange(_c, _c + n, '\n');
-            _goto(_c + 1);
+            final nl = _nl;
+            _t = _t.replaceRange(_c, e, nl);
+            _goto(_c + nl.length);
           } else {
-            _t = _t.replaceRange(_c, _c + n, ch * n);
-            _goto(_c + n - 1);
+            final rep = ch * n;
+            _t = _t.replaceRange(_c, e, rep);
+            _goto(_c + rep.length - 1);
           }
         });
         return _P.done;
@@ -558,21 +598,25 @@ class VimEngine extends ChangeNotifier {
             case 'i':
               _beginInsert(_c);
             case 'a':
-              _beginInsert(_c < _t.length && _t[_c] != '\n' ? _c + 1 : _c);
+              _beginInsert(_c < lineEnd(_t, _c) ? nextChar(_t, _c) : _c);
             case 'I':
               _beginInsert(firstNonBlank(_t, lineStart(_t, _c)));
             case 'A':
               _beginInsert(lineEnd(_t, _c));
             case 'o':
               final le = lineEnd(_t, _c);
-              _t = _t.replaceRange(le, le, '\n');
-              _beginInsert(le + 1);
+              final nl = _nl;
+              _t = _t.replaceRange(le, le, nl);
+              _beginInsert(le + nl.length);
               _insNl = true;
+              _insNlStr = nl;
             default:
               final ls = lineStart(_t, _c);
-              _t = _t.replaceRange(ls, ls, '\n');
+              final nl = _nl;
+              _t = _t.replaceRange(ls, ls, nl);
               _beginInsert(ls);
               _insNl = true;
+              _insNlStr = nl;
           }
           _insCount = n;
         });
@@ -611,7 +655,7 @@ class VimEngine extends ChangeNotifier {
     final (n2, j) = _count(i);
     if (j >= _keys.length) return _P.more;
     final k = _keys[j];
-    final total = (n1 ?? 1) * (n2 ?? 1);
+    final total = math.min((n1 ?? 1) * (n2 ?? 1), maxCount);
     if (k == op) {
       _linesOp(op, total);
       return _P.done;
@@ -649,7 +693,7 @@ class VimEngine extends ChangeNotifier {
     final s = math.min(_c, m.pos);
     var e = math.max(_c, m.pos);
     if (m.incl) {
-      if (e < _t.length && _t[e] != '\n') e++;
+      if (e < lineEnd(_t, e)) e = nextChar(_t, e);
     } else if (e > s &&
         e == lineStart(_t, e) &&
         lineNoOf(starts, e) > lineNoOf(starts, s)) {
@@ -676,6 +720,9 @@ class VimEngine extends ChangeNotifier {
   }
 
   void _apply(String op, VimRange r) {
+    if (!r.linewise) {
+      r = VimRange(snapDown(_t, r.s), snapUp(_t, r.e));
+    }
     switch (op) {
       case 'y':
         _regSet(_rangeText(r), r.linewise);
@@ -709,7 +756,9 @@ class VimEngine extends ChangeNotifier {
     _regSet(_t.substring(s0, lineEnd(_t, starts[el])), true);
     var s = s0;
     final e = el + 1 < starts.length ? starts[el + 1] : _t.length;
-    if (el + 1 >= starts.length && sl > 0) s--;
+    if (el + 1 >= starts.length && sl > 0) {
+      s -= s >= 2 && _t.startsWith('\r\n', s - 2) ? 2 : 1;
+    }
     _t = _t.replaceRange(s, e, '');
     final ns = lineStarts(_t);
     final ln = math.min(sl, ns.length - 1);
@@ -739,7 +788,7 @@ class VimEngine extends ChangeNotifier {
     for (var i = sl; i <= el && i < lines.length; i++) {
       final l = lines[i];
       if (right) {
-        if (l.isNotEmpty) lines[i] = '  $l';
+        if (l.isNotEmpty && l != '\r') lines[i] = '  $l';
       } else if (l.startsWith('\t')) {
         lines[i] = l.substring(1);
       } else if (l.startsWith('  ')) {
@@ -758,21 +807,22 @@ class VimEngine extends ChangeNotifier {
     final r = _reg;
     if (r == null) return;
     if (r.linewise) {
-      final txt = List.filled(n, r.text).join('\n');
+      final nl = _nl;
+      final txt = _rep(r.text, n, nl);
       if (after) {
         final le = lineEnd(_t, _c);
-        _t = _t.replaceRange(le, le, '\n$txt');
-        _c = firstNonBlank(_t, le + 1);
+        _t = _t.replaceRange(le, le, '$nl$txt');
+        _c = firstNonBlank(_t, le + nl.length);
       } else {
         final ls = lineStart(_t, _c);
-        _t = _t.replaceRange(ls, ls, '$txt\n');
+        _t = _t.replaceRange(ls, ls, '$txt$nl');
         _c = firstNonBlank(_t, ls);
       }
     } else {
-      final txt = r.text * n;
+      final txt = _rep(r.text, n);
       if (txt.isEmpty) return;
       var at = _c;
-      if (after && _c < _t.length && _t[_c] != '\n') at = _c + 1;
+      if (after && _c < lineEnd(_t, _c)) at = nextChar(_t, _c);
       _t = _t.replaceRange(at, at, txt);
       _c = txt.contains('\n') ? at : at + txt.length - 1;
     }
@@ -786,7 +836,7 @@ class VimEngine extends ChangeNotifier {
     for (var k = 1; k < count; k++) {
       final le = lineEnd(_t, pos);
       if (le >= _t.length) break;
-      final ns = le + 1;
+      final ns = le + nlLen(_t, le);
       final ne = lineEnd(_t, ns);
       var ws = ns;
       while (ws < ne && (_t[ws] == ' ' || _t[ws] == '\t')) {
@@ -814,10 +864,10 @@ class VimEngine extends ChangeNotifier {
     final le = lineEnd(t, c);
     switch (k) {
       case 'h':
-        return (_P.done, _Mot(math.max(ls, c - n)));
+        return (_P.done, _Mot(stepBack(t, c, n, ls)));
       case 'l':
-        final lim = op != null ? le : math.max(ls, le - 1);
-        return (_P.done, _Mot(math.min(c + n, lim)));
+        final lim = op != null ? le : (le > ls ? prevChar(t, le) : ls);
+        return (_P.done, _Mot(math.min(stepFwd(t, c, n, le), lim)));
       case 'j' || 'k':
         final starts = lineStarts(t);
         final ln = lineNoOf(starts, c);
@@ -827,8 +877,14 @@ class VimEngine extends ChangeNotifier {
         if (target == ln && op != null) return (_P.done, null);
         final ts = starts[target];
         final len = lineEnd(t, ts) - ts;
-        final col = math.max(0, math.min(_want, len - 1));
-        return (_P.done, _Mot(ts + col, lw: true, vert: true));
+        final end = ts + len;
+        final int pos = ts + math.min<int>(_want, len);
+        final int at = len == 0
+            ? ts
+            : pos >= end
+            ? prevChar(t, end)
+            : snapDown(t, pos);
+        return (_P.done, _Mot(at, lw: true, vert: true));
       case 'w' || 'W':
         final big = k == 'W';
         if (op == 'c' && c < t.length && charClass(t[c], big) != 0) {
@@ -872,7 +928,11 @@ class VimEngine extends ChangeNotifier {
         final ts = starts[ln];
         return (
           _P.done,
-          _Mot(math.max(ts, lineEnd(t, ts) - 1), incl: true, wantInf: true),
+          _Mot(
+            math.max(ts, prevChar(t, lineEnd(t, ts))),
+            incl: true,
+            wantInf: true,
+          ),
         );
       case 'G':
         final starts = lineStarts(t);
@@ -950,7 +1010,7 @@ class VimEngine extends ChangeNotifier {
       if (kind == 't' && repeat && from < le && _t[from] == ch) from++;
       for (var j = from; j < le; j++) {
         if (_t[j] == ch && ++cnt == n) {
-          return _Mot(kind == 't' ? j - 1 : j, incl: true);
+          return _Mot(kind == 't' ? prevChar(_t, j) : j, incl: true);
         }
       }
     } else {
@@ -958,7 +1018,7 @@ class VimEngine extends ChangeNotifier {
       if (kind == 'T' && repeat && from >= ls && _t[from] == ch) from--;
       for (var j = from; j >= ls; j--) {
         if (_t[j] == ch && ++cnt == n) {
-          return _Mot(kind == 'T' ? j + 1 : j);
+          return _Mot(kind == 'T' ? nextChar(_t, j) : j);
         }
       }
     }
@@ -967,20 +1027,57 @@ class VimEngine extends ChangeNotifier {
 
   // ------------------------------------------------------------ search
 
+  /// A pattern is run as a regex only when it is simple: no groups,
+  /// alternation, counted repeats or back references, at most one `*` or
+  /// `+`, and short. Anything else (and a bad pattern) searches literally,
+  /// so a hostile pattern cannot stall the editor.
+  static bool simplePattern(String pat) =>
+      pat.length <= 100 &&
+      !RegExp(r'[(|{]|\\[1-9k]').hasMatch(pat) &&
+      RegExp(r'[*+]').allMatches(pat).length <= 1;
+
   RegExp _regex(String pat) {
-    try {
-      return RegExp(pat, multiLine: true);
-    } on FormatException {
-      return RegExp(RegExp.escape(pat), multiLine: true);
+    if (simplePattern(pat)) {
+      try {
+        return RegExp(pat, multiLine: true);
+      } on FormatException {
+        // falls through to the literal
+      }
     }
+    return RegExp(RegExp.escape(pat), multiLine: true);
+  }
+
+  /// Start offsets of the matches of [pat] (at most [maxMatches], in the
+  /// first [maxSearchText] characters). A regex runs per line, and lines
+  /// over [maxRegexLine] characters are searched literally.
+  List<int> _matchStarts(String pat) {
+    final t = _t.length > maxSearchText ? _t.substring(0, maxSearchText) : _t;
+    final re = _regex(pat);
+    final lit = RegExp(RegExp.escape(pat));
+    final out = <int>[];
+    var ls = 0;
+    while (ls <= t.length && out.length < maxMatches) {
+      final le = lineEnd(t, ls);
+      final line = t.substring(ls, le);
+      final r = line.length > maxRegexLine ? lit : re;
+      for (final m in r.allMatches(line)) {
+        out.add(ls + m.start);
+        if (out.length >= maxMatches) break;
+      }
+      final nl = nlLen(t, le);
+      if (nl == 0) break;
+      ls = le + nl;
+    }
+    return out;
   }
 
   /// The start of the [n]th match of [pat] from the cursor, wrapping.
   int? _searchPos(String pat, bool fwd, int n) {
-    final starts = [for (final m in _regex(pat).allMatches(_t)) m.start];
+    final starts = _matchStarts(pat);
     if (starts.isEmpty) return null;
     var pos = _c;
-    for (var s = 0; s < n; s++) {
+    final reps = math.min(n, starts.length * 2);
+    for (var s = 0; s < reps; s++) {
       if (fwd) {
         pos = starts.firstWhere((x) => x > pos, orElse: () => starts.first);
       } else {
@@ -1031,7 +1128,7 @@ class VimEngine extends ChangeNotifier {
         linewise: true,
       );
     }
-    return VimRange(lo, math.min(hi + 1, _t.length));
+    return VimRange(lo, nextChar(_t, hi));
   }
 
   _P _parseVisual() {
@@ -1081,7 +1178,11 @@ class VimEngine extends ChangeNotifier {
           final starts = lineStarts(_t);
           final s = r.linewise ? starts[r.s] : r.s;
           final e = r.linewise ? lineEnd(_t, starts[r.e]) : r.e;
-          final body = _t.substring(s, e).replaceAll(RegExp('[^\n]'), ch);
+          final body = _t
+              .substring(s, e)
+              .characters
+              .map((g) => g == '\n' || g == '\r\n' || g == '\r' ? g : ch)
+              .join();
           _t = _t.replaceRange(s, e, body);
           mode = VimMode.normal;
           _goto(s);
@@ -1162,7 +1263,7 @@ class VimEngine extends ChangeNotifier {
           final out = switch (k) {
             'u' => body.toLowerCase(),
             'U' => body.toUpperCase(),
-            _ => body.split('').map(swapCase).join(),
+            _ => body.characters.map(swapCase).join(),
           };
           _t = _t.replaceRange(s, e, out);
           _goto(s);
@@ -1185,9 +1286,9 @@ class VimEngine extends ChangeNotifier {
     final e = lw ? lineEnd(_t, starts[sel.e]) : sel.e;
     _regSet(_t.substring(s, e), lw);
     var ins = reg.text;
-    if (reg.linewise && !lw) ins = '\n$ins\n';
+    if (reg.linewise && !lw) ins = '$_nl$ins$_nl';
     _t = _t.replaceRange(s, e, ins);
-    _goto(reg.linewise && !lw ? s + 1 : s);
+    _goto(reg.linewise && !lw ? s + _nl.length : s);
   }
 
   // ------------------------------------------------------------ line mode
@@ -1236,7 +1337,8 @@ class VimEngine extends ChangeNotifier {
     if (c.isEmpty) return;
     final starts = lineStarts(_t);
     if (RegExp(r'^\d+$').hasMatch(c)) {
-      final ln = (int.parse(c) - 1).clamp(0, starts.length - 1);
+      final n = c.length > 9 ? maxCount : int.tryParse(c) ?? maxCount;
+      final ln = (n - 1).clamp(0, starts.length - 1);
       _goto(firstNonBlank(_t, starts[ln]));
       return;
     }

@@ -111,7 +111,8 @@ const editShortcuts = <(String, String)>[
 
 /// The help dialog's groups, in order. An action sits in the group named by
 /// [helpGroupOf] its own group.
-const chordGroup = 'Chords (work while typing)';
+const chordGroup =
+    'Chords (work while typing; letters are key positions on a QWERTY keyboard)';
 const helpGroups = [
   'Navigation',
   'Open',

@@ -23,6 +23,7 @@ const _letterKeys = {
   'k': LogicalKeyboardKey.keyK,
   'g': LogicalKeyboardKey.keyG,
   'm': LogicalKeyboardKey.keyM,
+  't': LogicalKeyboardKey.keyT,
 };
 
 /// Presses [c] and returns whether the key event was handled.
@@ -68,7 +69,7 @@ void main() {
       );
     });
     test('native macOS: Cmd+Shift+letter', () {
-      expect(label(TargetPlatform.macOS, false, 'go.tasks'), 'Cmd+Shift+Q');
+      expect(label(TargetPlatform.macOS, false, 'go.tasks'), 'Cmd+Shift+T');
     });
     test('web on Linux and Windows: Alt+letter', () {
       expect(label(TargetPlatform.linux, true, 'go.tasks'), 'Alt+Q');
@@ -206,7 +207,10 @@ void main() {
       debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
       final s = await pumpTasksApp(t);
       expect(await _chord(t, _c('ctrl+shift+q')), isFalse);
-      expect(await _chord(t, _c('meta+shift+q')), isTrue);
+      // Cmd+Shift+Q is the system log-out: Tasks takes T on native macOS.
+      expect(await _chord(t, _c('meta+shift+q')), isFalse);
+      expect(s.section, Section.notes);
+      expect(await _chord(t, _c('meta+shift+t')), isTrue);
       expect(s.section, Section.tasks);
       debugDefaultTargetPlatformOverride = null;
     });
@@ -326,6 +330,64 @@ void main() {
       await editing(t);
       expect(await _chord(t, _c('ctrl+shift+k')), isTrue);
       expect(find.text('Type a command or search'), findsWidgets);
+    });
+  });
+
+  group('chords and popovers', () {
+    Future<AppState> openSelect(WidgetTester t) async {
+      final s = await pumpTasksApp(
+        t,
+        notes: [Note(uid: 'n1', summary: 'Note one', description: 'body')],
+      );
+      s.select('n1');
+      await t.pumpAndSettle();
+      s.startEdit('n1');
+      await t.pumpAndSettle();
+      final focus = find
+          .descendant(of: _k('edit-status'), matching: find.byType(Focus))
+          .evaluate()
+          .map((e) => (e.widget as Focus).focusNode)
+          .firstWhere((n) => n?.debugLabel == 'FSelect')!;
+      focus.requestFocus();
+      await t.pump();
+      await t.tap(_k('edit-status'));
+      await t.pumpAndSettle();
+      expect(find.text('backlog'), findsWidgets);
+      return s;
+    }
+
+    testWidgets('a chord does nothing while an FSelect is open', (t) async {
+      final s = await openSelect(t);
+      expect(await _chord(t, _c('ctrl+shift+q')), isTrue);
+      expect(s.section, Section.notes);
+      expect(find.text('backlog'), findsWidgets);
+      expect(s.isEditing('n1'), isTrue);
+    });
+
+    testWidgets('after the popover closes the chord works again', (t) async {
+      final s = await openSelect(t);
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pumpAndSettle();
+      expect(find.text('backlog'), findsNothing);
+      expect(await _chord(t, _c('ctrl+shift+q')), isTrue);
+      expect(s.section, Section.tasks);
+    });
+
+    testWidgets('the palette chord closes an open palette', (t) async {
+      await pumpTasksApp(t);
+      expect(await _chord(t, _c('ctrl+shift+k')), isTrue);
+      expect(find.text('Type a command or search'), findsWidgets);
+      expect(await _chord(t, _c('ctrl+shift+k')), isTrue);
+      expect(find.text('Type a command or search'), findsNothing);
+    });
+
+    test('native macOS never uses Q; the help names key positions', () {
+      final mac = ChordKeymap(platform: TargetPlatform.macOS, isWeb: false);
+      for (final id in mac.ids) {
+        expect(mac.chordFor(id)!.letter, isNot('q'), reason: id);
+      }
+      expect(mac.labelFor('go.tasks'), 'Cmd+Shift+T');
+      expect(chordGroup, contains('key positions on a QWERTY keyboard'));
     });
   });
 }

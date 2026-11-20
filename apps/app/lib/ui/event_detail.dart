@@ -179,6 +179,7 @@ class EventEditor extends StatelessWidget {
             label: 'Tags (comma separated)',
           ),
           VimField(
+            key: ValueKey('vim-${draft.uid}'),
             state: state,
             uid: draft.uid,
             controller: draft.bodyController,
