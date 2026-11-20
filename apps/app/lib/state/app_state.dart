@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart' show TextEditingController;
 import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
 import '../data/space_catalog.dart';
+import 'chord_keymap.dart';
 import 'key_nav.dart';
 import 'note_draft.dart';
 import 'tab_state.dart';
@@ -173,6 +174,22 @@ class AppState extends ChangeNotifier {
   }
 
   static const _vimKeysKey = 'davdart.vim.keys.v1';
+
+  ChordKeymap? _chords;
+  String? _chordsSig;
+
+  /// The global chord keymap for the platform and the stored overrides
+  /// (read once per platform change; see [ChordKeymap]).
+  ChordKeymap get chords {
+    final raw = prefs?.read(ChordKeymap.prefKey);
+    final sig =
+        '$defaultTargetPlatform|${ChordKeymap.debugIsWeb ?? kIsWeb}|$raw';
+    if (_chords == null || _chordsSig != sig) {
+      _chords = ChordKeymap.fromPref(raw);
+      _chordsSig = sig;
+    }
+    return _chords!;
+  }
 
   /// The setting "Vim keys" (default on): bare-letter keyboard bindings. Off
   /// leaves Ctrl/Cmd+K and the arrow keys and Enter in focused lists.

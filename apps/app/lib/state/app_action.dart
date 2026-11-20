@@ -30,6 +30,7 @@ class AppAction {
     this.keywords = const [],
     this.shortcuts = const [],
     this.listed = true,
+    this.chords = const [],
   });
 
   /// Stable, dotted id (`go.tasks`, `item.delete`); persisted in recents and
@@ -47,6 +48,24 @@ class AppAction {
   /// Labels only: binding happens where the action is wired.
   final List<String> shortcuts;
 
+  /// Labels of the global chords (they work while typing) for the active
+  /// platform: `Alt+J`, `Ctrl+Shift+J`. Set by `buildActions` from the
+  /// chord keymap.
+  final List<String> chords;
+
+  /// A copy with [chords] set.
+  AppAction withChords(List<String> chords) => AppAction(
+    id: id,
+    title: title,
+    group: group,
+    enabled: enabled,
+    run: run,
+    keywords: keywords,
+    shortcuts: shortcuts,
+    listed: listed,
+    chords: chords,
+  );
+
   /// False for key-only actions (cursor moves) the palette does not list.
   final bool listed;
 
@@ -61,6 +80,9 @@ class AppAction {
   /// The label to show beside the title: the Cmd one on Apple platforms,
   /// else the first other one.
   String? shortcutHint({required bool apple}) {
+    if (chords.isNotEmpty && !shortcuts.any((s) => s.contains('+'))) {
+      return apple ? chords.first.replaceAll('Cmd+', '⌘') : chords.first;
+    }
     if (shortcuts.isEmpty) return null;
     for (final s in shortcuts) {
       if (s.startsWith('Cmd') == apple) {
@@ -85,7 +107,16 @@ const editShortcuts = <(String, String)>[
 
 /// The help dialog's groups, in order. An action sits in the group named by
 /// [helpGroupOf] its own group.
-const helpGroups = ['Navigation', 'Open', 'Edit', 'Go to', 'Panes', 'App'];
+const chordGroup = 'Chords (work while typing)';
+const helpGroups = [
+  'Navigation',
+  'Open',
+  'Edit',
+  'Go to',
+  'Panes',
+  'App',
+  chordGroup,
+];
 
 String helpGroupOf(String group) => switch (group) {
   'Navigation' || 'Open' || 'Edit' || 'Go to' || 'Panes' => group,
@@ -101,6 +132,9 @@ List<(String, List<(String, String)>)> helpRows(List<AppAction> actions) {
     for (final g in helpGroups) g: [],
   };
   for (final a in actions) {
+    if (a.chords.isNotEmpty) {
+      by[chordGroup]!.add((a.chords.join(' / '), a.helpTitle));
+    }
     if (a.shortcuts.isEmpty) continue;
     by[helpGroupOf(a.group)]!.add((a.shortcuts.join(' / '), a.helpTitle));
   }

@@ -8,6 +8,7 @@ import '../state/key_bindings.dart';
 import '../state/key_nav.dart';
 import 'app_actions.dart';
 import 'command_palette.dart';
+import 'note_editor.dart' show imeComposing;
 import 'popover_track.dart';
 import 'theme.dart';
 
@@ -147,10 +148,52 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
     super.dispose();
   }
 
+  /// Actions whose chord moves the keyboard's area or view: a text field
+  /// gives up the focus for them.
+  static bool _navigating(String id) =>
+      id.startsWith('focus.') ||
+      id.startsWith('go.') ||
+      id.startsWith('tab.') ||
+      id == 'panel.toggle' ||
+      id == 'peek.toggle';
+
+  /// The global chord layer: runs the action bound to [e], also while a text
+  /// field has focus. A chord is always handled (also repeats, and when the
+  /// action is not enabled) so it never reaches the field or the browser;
+  /// an IME that is composing keeps its keys.
+  KeyEventResult _chord(KeyEvent e) {
+    final kb = HardwareKeyboard.instance;
+    final id = state.chords.idFor(e, kb);
+    if (id == null) return KeyEventResult.ignored;
+    if (imeComposing()) return KeyEventResult.ignored;
+    if (e is! KeyDownEvent) return KeyEventResult.handled;
+    final a = buildActions(state).where((a) => a.id == id).firstOrNull;
+    if (a == null || !a.enabled(state)) return KeyEventResult.handled;
+    if (_navigating(id)) {
+      if (_typing) nav.node.requestFocus();
+      nav.markShown();
+    }
+    nav.clearPending();
+    Future.sync(
+      () => a.run(
+        ActionContext(
+          state,
+          context,
+          openPalette: () => showCommandPalette(context, state),
+        ),
+      ),
+    );
+    return KeyEventResult.handled;
+  }
+
   KeyEventResult _key(FocusNode node, KeyEvent e) {
-    if (e is KeyUpEvent) return KeyEventResult.ignored;
     final route = ModalRoute.of(context);
     if (route != null && !route.isCurrent) return KeyEventResult.ignored;
+    if (e is! KeyUpEvent) {
+      final r = _chord(e);
+      if (r == KeyEventResult.handled) return r;
+    }
+    if (e is KeyUpEvent) return KeyEventResult.ignored;
     if (_typing) {
       if (e is KeyDownEvent && e.logicalKey == LogicalKeyboardKey.escape) {
         nav.node.requestFocus();

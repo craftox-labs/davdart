@@ -196,7 +196,7 @@ List<AppAction> buildActions(AppState state) {
 
   bool itemIs<T>(AppState s) => targetItem(s) is T;
 
-  return [
+  final actions = [
     AppAction(
       id: 'palette.open',
       title: 'Command palette',
@@ -498,7 +498,6 @@ List<AppAction> buildActions(AppState state) {
       title: 'New note, task or event for this section',
       group: 'Create',
       shortcuts: const ['n'],
-      listed: false,
       enabled: (s) => switch (s.section) {
         Section.notes => s.editable,
         Section.tasks => s.tasksEditable,
@@ -586,18 +585,33 @@ List<AppAction> buildActions(AppState state) {
         s.nav.homeSection(1);
       }
     }),
-    key('focus.left', 'Focus the area on the left', 'Navigation', const ['H'], (
-      c,
-    ) {
-      c.state.nav.moveArea(-1, (a) => navListId(c.state, a));
-    }),
-    key(
-      'focus.right',
-      'Focus the area on the right',
-      'Navigation',
-      const ['L'],
-      (c) {
-        c.state.nav.moveArea(1, (a) => navListId(c.state, a));
+    AppAction(
+      id: 'focus.left',
+      title: 'Focus the area on the left',
+      group: 'Navigation',
+      keywords: const ['move', 'pane', 'rail', 'panel'],
+      shortcuts: const ['H'],
+      enabled: yes,
+      run: (c) => c.state.nav.moveArea(-1, (a) => navListId(c.state, a)),
+    ),
+    AppAction(
+      id: 'focus.right',
+      title: 'Focus the area on the right',
+      group: 'Navigation',
+      keywords: const ['move', 'pane', 'main', 'peek'],
+      shortcuts: const ['L'],
+      enabled: yes,
+      run: (c) => c.state.nav.moveArea(1, (a) => navListId(c.state, a)),
+    ),
+    AppAction(
+      id: 'edit.leave',
+      title: 'Leave edit mode without saving',
+      group: 'Edit',
+      keywords: const ['cancel', 'discard', 'close', 'escape'],
+      enabled: (s) => editingUid(s) != null,
+      run: (c) {
+        final u = editingUid(c.state);
+        if (u != null) c.state.leaveEdit(u);
       },
     ),
     key(
@@ -639,6 +653,16 @@ List<AppAction> buildActions(AppState state) {
     key('nav.open-main', 'Open in main', 'Open', const [
       'O',
     ], (c) => _openCursor(c, OpenMode.main)),
+  ];
+  final km = state.chords;
+  final cmd = km.isMac ? 'Cmd' : 'Ctrl';
+  return [
+    for (final a in actions)
+      switch (a.id) {
+        'palette.open' => a.withChords(['$cmd+K', ?km.labelFor(a.id)]),
+        'edit.save-exit' => a.withChords(['$cmd+Enter']),
+        _ => km.labelFor(a.id) == null ? a : a.withChords([km.labelFor(a.id)!]),
+      },
   ];
 }
 
