@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
@@ -275,6 +276,76 @@ void main() {
       await t.pumpAndSettle();
       expect(_k('tab-strip'), findsNothing);
       expect(t.takeException(), isNull);
+    });
+  });
+
+  group('tab drag to the end', () {
+    Future<AppState> three(WidgetTester t) async {
+      final s = await _pump(t);
+      s.openNoteTab('f');
+      s.openNoteTab('a');
+      s.openNoteTab('b');
+      await t.pumpAndSettle();
+      expect(s.tabs.map((e) => e.id), ['f', 'a', 'b']);
+      return s;
+    }
+
+    Future<void> drag(WidgetTester t, Offset from, Offset to) async {
+      final g = await t.startGesture(from, kind: PointerDeviceKind.mouse);
+      await t.pump();
+      await g.moveBy(const Offset(12, 0));
+      await t.pump();
+      await g.moveTo(to);
+      await t.pump();
+      await g.moveBy(const Offset(1, 0));
+      await t.pump();
+      await g.up();
+      await t.pumpAndSettle();
+    }
+
+    testWidgets('first tab dropped on the last tab right half goes last', (
+      t,
+    ) async {
+      final s = await three(t);
+      final r = t.getRect(_k('tab-n:b'));
+      await drag(
+        t,
+        t.getCenter(_k('tab-n:f')),
+        Offset(r.right - 8, r.center.dy),
+      );
+      expect(s.tabs.map((e) => e.id), ['a', 'b', 'f']);
+    });
+
+    testWidgets('dropped on empty strip space goes last', (t) async {
+      final s = await three(t);
+      final r = t.getRect(_k('tab-end-drop'));
+      await drag(t, t.getCenter(_k('tab-n:f')), r.center);
+      expect(s.tabs.map((e) => e.id), ['a', 'b', 'f']);
+    });
+
+    testWidgets('middle tab dropped on empty space goes last', (t) async {
+      final s = await three(t);
+      final r = t.getRect(_k('tab-end-drop'));
+      await drag(t, t.getCenter(_k('tab-n:a')), r.center);
+      expect(s.tabs.map((e) => e.id), ['f', 'b', 'a']);
+    });
+
+    testWidgets('left half inserts before, right half after', (t) async {
+      final s = await three(t);
+      var r = t.getRect(_k('tab-n:a'));
+      await drag(
+        t,
+        t.getCenter(_k('tab-n:b')),
+        Offset(r.left + 8, r.center.dy),
+      );
+      expect(s.tabs.map((e) => e.id), ['f', 'b', 'a']);
+      r = t.getRect(_k('tab-n:f'));
+      await drag(
+        t,
+        t.getCenter(_k('tab-n:a')),
+        Offset(r.right - 8, r.center.dy),
+      );
+      expect(s.tabs.map((e) => e.id), ['f', 'a', 'b']);
     });
   });
 }

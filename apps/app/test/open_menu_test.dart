@@ -445,7 +445,7 @@ void main() {
       await t.pump();
       await g.moveTo(t.getCenter(_k('tab-n:c')) + const Offset(4, 0));
       await t.pump();
-      await g.moveTo(t.getCenter(_k('tab-n:c')));
+      await g.moveTo(t.getCenter(_k('tab-n:c')) + const Offset(8, 0));
       await t.pump();
       await g.up();
       await t.pumpAndSettle();
@@ -466,7 +466,7 @@ void main() {
       await t.pump();
       await g.moveTo(t.getCenter(_k('tab-v:${v.uid}')) + const Offset(4, 0));
       await t.pump();
-      await g.moveTo(t.getCenter(_k('tab-v:${v.uid}')));
+      await g.moveTo(t.getCenter(_k('tab-v:${v.uid}')) + const Offset(8, 0));
       await t.pump();
       await g.up();
       await t.pumpAndSettle();

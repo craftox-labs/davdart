@@ -108,21 +108,41 @@ class TabStrip extends StatelessWidget {
                       ),
                     ),
                     Expanded(
-                      child: SingleChildScrollView(
-                        key: const Key('tab-scroll'),
-                        scrollDirection: Axis.horizontal,
-                        // Room for the active tab's concave corners.
-                        padding: EdgeInsets.symmetric(horizontal: flare),
-                        child: Row(
+                      child: LayoutBuilder(
+                        builder: (context, sc) => Row(
                           children: [
-                            for (var i = 0; i < tabs.length; i++)
-                              _ReorderableTab(
-                                state: state,
-                                tab: tabs[i],
-                                index: i,
-                                width: math.min(per, t.sizes.tabMax),
-                                active: active == tabs[i],
+                            // The tabs' own width, capped at the room there is;
+                            // the end drop zone gets what is left.
+                            SizedBox(
+                              width: math.min(
+                                sc.maxWidth,
+                                tabs.length * math.min(per, t.sizes.tabMax) +
+                                    2 * flare,
                               ),
+                              child: SingleChildScrollView(
+                                key: const Key('tab-scroll'),
+                                scrollDirection: Axis.horizontal,
+                                // Room for the active tab's concave corners.
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: flare,
+                                ),
+                                child: Row(
+                                  children: [
+                                    for (var i = 0; i < tabs.length; i++)
+                                      _ReorderableTab(
+                                        state: state,
+                                        tab: tabs[i],
+                                        index: i,
+                                        width: math.min(per, t.sizes.tabMax),
+                                        active: active == tabs[i],
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            // Empty strip space after the last tab: a drop here
+                            // moves the tab to the end.
+                            Expanded(child: _EndDropZone(state: state)),
                           ],
                         ),
                       ),
@@ -248,6 +268,9 @@ class _ReorderableTab extends StatelessWidget {
       key: Key('tab-drag-${tab.code}'),
       data: TabDrag(tab.code),
       axis: Axis.horizontal,
+      // The feedback's offset is then the pointer, which the drop targets
+      // read to tell a tab's left half from its right.
+      dragAnchorStrategy: pointerDragAnchorStrategy,
       feedback: DefaultTextStyle(
         style: t.type.captionStyle.copyWith(color: t.fg),
         child: Container(
@@ -270,24 +293,108 @@ class _ReorderableTab extends StatelessWidget {
       onPointerDown: (e) {
         if (e.buttons == kMiddleMouseButton) state.closeTab(tab);
       },
-      child: DragTarget<TabDrag>(
-        onWillAcceptWithDetails: (d) =>
-            d.data.code != tab.code && DocTab.parse(d.data.code) != null,
-        onAcceptWithDetails: (d) {
-          final moved = DocTab.parse(d.data.code);
-          if (moved != null) state.moveTab(moved, index);
-        },
-        builder: (context, candidates, _) => DecoratedBox(
+      child: _TabDropTarget(state: state, tab: tab, index: index, child: drag),
+    );
+  }
+}
+
+/// Moves [moved] to the insertion slot [slot] (0..n, before the tab now at
+/// that index; n is the end), allowing for its own removal.
+void _dropTab(AppState state, DocTab moved, int slot) {
+  final from = state.tabs.indexOf(moved);
+  if (from < 0) return;
+  state.moveTab(moved, slot > from ? slot - 1 : slot);
+}
+
+/// A tab's drop target: the left half inserts before it, the right half after
+/// it. The accent edge shows on the side the tab will land.
+class _TabDropTarget extends StatefulWidget {
+  const _TabDropTarget({
+    required this.state,
+    required this.tab,
+    required this.index,
+    required this.child,
+  });
+  final AppState state;
+  final DocTab tab;
+  final int index;
+  final Widget child;
+
+  @override
+  State<_TabDropTarget> createState() => _TabDropTargetState();
+}
+
+class _TabDropTargetState extends State<_TabDropTarget> {
+  bool _after = false;
+
+  bool _isAfter(Offset global) {
+    final box = context.findRenderObject() as RenderBox;
+    return box.globalToLocal(global).dx > box.size.width / 2;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return DragTarget<TabDrag>(
+      onWillAcceptWithDetails: (d) =>
+          d.data.code != widget.tab.code && DocTab.parse(d.data.code) != null,
+      onMove: (d) {
+        final after = _isAfter(d.offset);
+        if (after != _after) setState(() => _after = after);
+      },
+      onAcceptWithDetails: (d) {
+        final moved = DocTab.parse(d.data.code);
+        if (moved != null) {
+          _dropTab(
+            widget.state,
+            moved,
+            widget.index + (_isAfter(d.offset) ? 1 : 0),
+          );
+        }
+      },
+      builder: (context, candidates, _) {
+        final side = BorderSide(color: t.accent, width: t.borders.focus);
+        return DecoratedBox(
           position: DecorationPosition.foreground,
           decoration: BoxDecoration(
             border: candidates.isEmpty
                 ? null
-                : Border(
-                    left: BorderSide(color: t.accent, width: t.borders.focus),
-                  ),
+                : _after
+                ? Border(right: side)
+                : Border(left: side),
           ),
-          child: drag,
+          child: widget.child,
+        );
+      },
+    );
+  }
+}
+
+/// The empty strip space after the last tab; dropping a tab moves it last.
+class _EndDropZone extends StatelessWidget {
+  const _EndDropZone({required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return DragTarget<TabDrag>(
+      key: const Key('tab-end-drop'),
+      hitTestBehavior: HitTestBehavior.opaque,
+      onWillAcceptWithDetails: (d) => DocTab.parse(d.data.code) != null,
+      onAcceptWithDetails: (d) {
+        final moved = DocTab.parse(d.data.code);
+        if (moved != null) _dropTab(state, moved, state.tabs.length);
+      },
+      builder: (context, candidates, _) => DecoratedBox(
+        decoration: BoxDecoration(
+          border: candidates.isEmpty
+              ? null
+              : Border(
+                  left: BorderSide(color: t.accent, width: t.borders.focus),
+                ),
         ),
+        child: const SizedBox.expand(),
       ),
     );
   }
