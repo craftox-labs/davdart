@@ -8,9 +8,16 @@ import 'package:test/test.dart';
 void main() {
   final env = Platform.environment;
   final url = env['DAVDART_TEST_URL'];
+  // Writes only into the scratch collection named davdart-test.
+  final segments = url == null || url.isEmpty
+      ? const <String>[]
+      : Uri.parse(url).pathSegments.where((x) => x.isNotEmpty).toList();
   final skipReason = (url == null || url.isEmpty)
       ? 'DAVDART_TEST_URL not set (live CalDAV integration test)'
-      : null;
+      : (segments.isEmpty || segments.last != 'davdart-test')
+          ? 'DAVDART_TEST_URL must end with the davdart-test collection; '
+              'refusing to write anywhere else'
+          : null;
 
   test('live: tasks next to notes in one collection', skip: skipReason,
       () async {
