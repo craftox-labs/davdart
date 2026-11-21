@@ -1,3 +1,5 @@
+<p align="center"><img src="assets/logo/davdart.svg" alt="davdart" width="96"></p>
+
 # davdart
 
 Notes, tasks and events over CalDAV, local-first with sync. Notes are stored as iCalendar `VJOURNAL` resources, tasks as `VTODO` and events as `VEVENT`, so any CalDAV server (for example Radicale) holds them and any client can read them. The app is Flutter with forui; the core is a UI-free Dart library.
@@ -7,7 +9,7 @@ Status: v0, in development. APIs, note formats and the UI will still change.
 ## What works today
 
 - A UI-free Dart core: notes, tasks, events, plan items, folders, saved views, a CalDAV client and sync engines for each type.
-- A Flutter web app (built on forui 0.28.0): icon rail with Notes, Tasks, Events, Views, Search, Spaces, Account and Settings; a tab strip; a full-page item view with in-place editing; board and list views; a Home page with Today cards for tasks and events; an optional mirrored layout; a token-driven theme.
+- A Flutter web app (built on forui 0.28.0): icon rail with Notes, Tasks, Events, Views, Search, Spaces, Account and Settings; a tab strip; a full-page item view with in-place editing; board and list views; a Home page with a Day focus (month calendar with event and task dots, and cards for the selected day's events and tasks, undated tasks listed last) and a Board focus, remembered per Space; an optional mirrored layout; a token-driven theme.
 - A small board server that serves the app and proxies CalDAV to the upstream server.
 - A CLI for listing, creating, moving and exporting notes.
 
@@ -22,8 +24,8 @@ Spaces are discovered at sign-in or with Account > Refresh spaces; collections a
 ## Layout
 
 - Desktop (880 px and wider): icon rail, a left panel listing notes, tasks or events for the rail section, and tabs in the main area. Items open in a peek pane or a main tab, depending on the open setting. Right-click menus and drag to move work in the tree, boards and Spaces.
-- Narrow and mobile: a top bar, a side menu with the Space chip and a Notes/Tasks/Events/Views filter, a bottom bar, and a grid of open items. Items always open full screen. Swipe right completes a task, with undo; long press opens actions.
-- Between 440 and 880 px the board turns into status accordions below 600 px, and Home stacks its Today cards.
+- Narrow and mobile: a top bar with the Space tab, a side menu with the Space chip and a Notes/Tasks/Events/Views filter, a bottom bar, and a grid of open items. Items always open full screen. Swipe right completes a task, with undo; long press opens actions. Open items have an edit/preview toggle and a top-sliding actions sheet, and edits autosave.
+- Between 440 and 880 px the board turns into status accordions below 600 px, and Home's calendar collapses to a one-line day stepper.
 
 ## Keyboard
 
@@ -31,9 +33,13 @@ Spaces are discovered at sign-in or with Account > Refresh spaces; collections a
 - Vim-style navigation across the rail, panels and main pane, a help overlay (`?`) and global chords. Settings > Keyboard turns Vim keys off.
 - An optional modal Vim editor (Normal, Insert, Visual) in the note, task and event body fields. It is off on touch devices.
 
+## Dates and timezones
+
+All-day events and date-only due dates are floating dates. Timed values in UTC or with a `TZID` are converted to the viewer's timezone using a bundled timezone database, and recurring events (and tasks) expand in their own zone so daylight saving stays correct. New timed events are written as UTC.
+
 ## Planned
 
-Real colours, tables, and desktop and phone builds. The planning collection is the source of truth for the roadmap; this list is only a summary.
+Real colours, tables, calendar day cells that show item titles on wide screens, and desktop and phone builds. The planning collection is the source of truth for the roadmap; this list is only a summary.
 
 ## Architecture
 
