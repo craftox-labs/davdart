@@ -149,7 +149,7 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
           _month = _monthOf(sel);
         }
         final month = _month ?? _monthOf(sel);
-        Widget calendarFor(bool bleed, {bool square = false}) => MonthCalendar(
+        Widget calendarFor(bool bleed, {double? availHeight}) => MonthCalendar(
           state: state,
           month: month,
           selected: sel,
@@ -162,7 +162,7 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
           },
           clock: clock,
           bleed: bleed,
-          square: square,
+          availHeight: availHeight,
           onToday: bleed ? null : state.resetHomeDay,
         );
         final list = HomeToday(state: state, now: widget.now, stack: true);
@@ -176,12 +176,17 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: Padding(
-                      padding: EdgeInsets.all(t.space.lg).copyWith(right: 0),
-                      // Scrolls when the grid is taller than the window.
-                      child: SingleChildScrollView(
-                        key: const Key('home-calendar-scroll'),
-                        child: calendarFor(false, square: true),
+                    child: LayoutBuilder(
+                      builder: (context, lc) => Padding(
+                        padding: EdgeInsets.all(t.space.lg).copyWith(right: 0),
+                        // Fits the window where it can; scrolls when not.
+                        child: SingleChildScrollView(
+                          key: const Key('home-calendar-scroll'),
+                          child: calendarFor(
+                            false,
+                            availHeight: lc.maxHeight - 2 * t.space.lg,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -436,12 +441,13 @@ class MonthCalendar extends StatelessWidget {
     required this.clock,
     this.bleed = false,
     this.onToday,
-    this.square = false,
+    this.availHeight,
   });
   final AppState state;
 
-  /// Wide: day cells are square (side = grid width / 7).
-  final bool square;
+  /// Wide: the height the card may use; the day cell height fits it, between
+  /// the phone cell and sizes.calendarCellMax.
+  final double? availHeight;
 
   /// Phone: no side padding or border, so seven cells of 44dp fit 320dp.
   final bool bleed;
@@ -474,6 +480,17 @@ class MonthCalendar extends StatelessWidget {
         ? t.sizes.touchTarget
         : t.sizes.calendarCell;
     final muted = t.type.captionStyle.copyWith(color: t.muted);
+    var cellHeight = cell;
+    if (availHeight != null && !bleed) {
+      // Padding, header row, weekday row and its gap are fixed; the week rows
+      // share what is left.
+      final fixed = 2 * t.space.md + 2 * t.sizes.calendarCell + t.space.md;
+      cellHeight = ((availHeight! - fixed) / weeks).clamp(
+        t.sizes.touchTarget,
+        t.sizes.calendarCellMax,
+      );
+    }
+
     Widget day(DateTime d) {
       final inMonth = d.month == month.month;
       final b = buckets[d];
@@ -485,8 +502,7 @@ class MonthCalendar extends StatelessWidget {
         semanticsLabel: dayLabel(d, clock),
         onPress: () => onSelect(d),
         child: _Cell(
-          square: square,
-          height: cell,
+          height: cellHeight,
           child: Center(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -580,18 +596,22 @@ class MonthCalendar extends StatelessWidget {
               showToday: selected != today,
               onToday: onToday,
             ),
-          Row(
-            children: [
-              for (var i = 0; i < 7; i++)
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      _weekdayNames[(first - 1 + i) % 7].substring(0, 2),
-                      style: muted,
+          if (!bleed) SizedBox(height: t.space.md),
+          SizedBox(
+            height: t.sizes.calendarCell,
+            child: Row(
+              children: [
+                for (var i = 0; i < 7; i++)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        _weekdayNames[(first - 1 + i) % 7].substring(0, 2),
+                        style: muted,
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
           for (var w = 0; w < weeks; w++)
             Row(
@@ -619,18 +639,11 @@ class _Dot extends StatelessWidget {
   }
 }
 
-/// A calendar day's hit box: square (wide) or a fixed [height] (phone).
+/// A calendar day's hit box of a fixed [height].
 class _Cell extends StatelessWidget {
-  const _Cell({
-    required this.square,
-    required this.height,
-    required this.child,
-  });
-  final bool square;
+  const _Cell({required this.height, required this.child});
   final double height;
   final Widget child;
   @override
-  Widget build(BuildContext context) => square
-      ? AspectRatio(aspectRatio: 1, child: child)
-      : SizedBox(height: height, child: child);
+  Widget build(BuildContext context) => SizedBox(height: height, child: child);
 }
