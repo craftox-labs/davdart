@@ -185,7 +185,7 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
           _month = _monthOf(sel);
         }
         final month = _month ?? _monthOf(sel);
-        final calendar = MonthCalendar(
+        Widget calendarFor(bool bleed) => MonthCalendar(
           state: state,
           month: month,
           selected: sel,
@@ -197,19 +197,25 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
             state.selectHomeDay(d);
           },
           clock: clock,
+          bleed: bleed,
         );
         final list = HomeToday(state: state, now: widget.now);
         return LayoutBuilder(
           builder: (context, c) {
+            final calendar = calendarFor(c.maxWidth < Tokens.stackBreakpoint);
             if (c.maxWidth >= Tokens.stackBreakpoint) {
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
                     padding: EdgeInsets.fromLTRB(t.space.lg, t.space.md, 0, 0),
-                    child: SizedBox(
-                      width: t.sizes.calendarWidth,
-                      child: calendar,
+                    // Scrolls when the window is shorter than the grid.
+                    child: SingleChildScrollView(
+                      key: const Key('home-calendar-scroll'),
+                      child: SizedBox(
+                        width: t.sizes.calendarWidth,
+                        child: calendar,
+                      ),
                     ),
                   ),
                   Expanded(child: SingleChildScrollView(child: list)),
@@ -222,12 +228,7 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      t.space.lg,
-                      t.space.md,
-                      t.space.lg,
-                      0,
-                    ),
+                    padding: EdgeInsets.only(top: t.space.md),
                     child: CollapsedCalendar(
                       state: state,
                       selected: sel,
@@ -286,50 +287,55 @@ class CollapsedCalendar extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            arrow(
-              'home-cal-prev-day',
-              FLucideIcons.chevronLeft,
-              'Previous day',
-              -1,
-            ),
-            Expanded(
-              child: FTappable(
-                key: const Key('home-cal-toggle'),
-                behavior: HitTestBehavior.opaque,
-                semanticsLabel: open ? 'Collapse calendar' : 'Expand calendar',
-                onPress: () => state.setHomeCalOpen(!open),
-                child: SizedBox(
-                  height: t.sizes.touchTarget,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        dayLabel(selected, clock),
-                        key: const Key('home-cal-label'),
-                        style: t.type.labelStyle.copyWith(color: t.fg),
-                      ),
-                      SizedBox(width: t.space.sm),
-                      Icon(
-                        open
-                            ? FLucideIcons.chevronUp
-                            : FLucideIcons.chevronDown,
-                        size: t.icons.md,
-                        color: t.muted,
-                      ),
-                    ],
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+          child: Row(
+            children: [
+              arrow(
+                'home-cal-prev-day',
+                FLucideIcons.chevronLeft,
+                'Previous day',
+                -1,
+              ),
+              Expanded(
+                child: FTappable(
+                  key: const Key('home-cal-toggle'),
+                  behavior: HitTestBehavior.opaque,
+                  semanticsLabel: open
+                      ? 'Collapse calendar'
+                      : 'Expand calendar',
+                  onPress: () => state.setHomeCalOpen(!open),
+                  child: SizedBox(
+                    height: t.sizes.touchTarget,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          dayLabel(selected, clock),
+                          key: const Key('home-cal-label'),
+                          style: t.type.labelStyle.copyWith(color: t.fg),
+                        ),
+                        SizedBox(width: t.space.sm),
+                        Icon(
+                          open
+                              ? FLucideIcons.chevronUp
+                              : FLucideIcons.chevronDown,
+                          size: t.icons.md,
+                          color: t.muted,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-            arrow(
-              'home-cal-next-day',
-              FLucideIcons.chevronRight,
-              'Next day',
-              1,
-            ),
-          ],
+              arrow(
+                'home-cal-next-day',
+                FLucideIcons.chevronRight,
+                'Next day',
+                1,
+              ),
+            ],
+          ),
         ),
         if (open) grid,
       ],
@@ -350,8 +356,12 @@ class MonthCalendar extends StatelessWidget {
     required this.onMonth,
     required this.onSelect,
     required this.clock,
+    this.bleed = false,
   });
   final AppState state;
+
+  /// Phone: no side padding or border, so seven cells of 44dp fit 320dp.
+  final bool bleed;
   final DateTime month;
   final DateTime selected;
   final DateTime today;
@@ -463,11 +473,15 @@ class MonthCalendar extends StatelessWidget {
 
     return Container(
       key: const Key('home-calendar'),
-      padding: EdgeInsets.all(t.space.sm),
+      padding: bleed
+          ? EdgeInsets.symmetric(vertical: t.space.sm)
+          : EdgeInsets.all(t.space.sm),
       decoration: BoxDecoration(
         color: t.card,
-        borderRadius: BorderRadius.circular(t.radii.card),
-        border: Border.all(color: t.cardBorder),
+        borderRadius: bleed ? null : BorderRadius.circular(t.radii.card),
+        border: bleed
+            ? Border.symmetric(horizontal: BorderSide(color: t.cardBorder))
+            : Border.all(color: t.cardBorder),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,

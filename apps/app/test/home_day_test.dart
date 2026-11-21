@@ -205,4 +205,59 @@ void main() {
     expect(find.text('Late UTC'), findsNothing);
     await t.pumpWidget(const SizedBox());
   });
+
+  testWidgets('resume resets only a stale selection, quietly otherwise', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(t);
+    var n = 0;
+    s.addListener(() => n++);
+    s.resetHomeDayIfStale(); // nothing selected
+    expect(n, 0);
+    s.selectHomeDay(_tomorrow());
+    expect(n, 1);
+    s.resetHomeDayIfStale(); // chosen today: kept
+    expect(s.homeDay, _tomorrow());
+    expect(n, 1);
+    s.resetHomeDayIfStale(DateTime.now().add(const Duration(days: 1)));
+    expect(s.homeDay, isNull);
+    expect(n, 2);
+    s.resetHomeDay(); // already null: no notification
+    expect(n, 2);
+  });
+
+  testWidgets('phone: day cells are 44dp wide at 320', (t) async {
+    await pumpTasksApp(t, size: const Size(320, 568));
+    await t.tap(_k('home-cal-toggle'));
+    await t.pumpAndSettle();
+    final r = t.getRect(_k(_dayKey(_tomorrow())));
+    expect(r.width, greaterThanOrEqualTo(44));
+    expect(r.height, greaterThanOrEqualTo(44));
+    expect(t.takeException(), isNull);
+  });
+
+  testWidgets(
+    'wide and short: the calendar sits in a scroll view, no overflow',
+    (t) async {
+      await pumpTasksApp(t, size: const Size(1280, 350));
+      expect(_k('home-calendar-scroll'), findsOneWidget);
+      expect(t.takeException(), isNull);
+    },
+  );
+
+  testWidgets('a repeating overdue task also shows its occurrence today', (
+    t,
+  ) async {
+    await pumpTasksApp(
+      t,
+      tasks: [
+        mkTask('rep', days: -3, rrule: 'FREQ=DAILY'),
+        mkTask('once', days: -3),
+      ],
+    );
+    expect(_k('home-today-tasks-rep'), findsOneWidget); // overdue row
+    expect(_k('home-today-tasks-rep-occ'), findsOneWidget); // today's one
+    expect(_k('home-today-tasks-once'), findsOneWidget);
+    expect(_k('home-today-tasks-once-occ'), findsNothing);
+  });
 }

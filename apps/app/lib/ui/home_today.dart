@@ -30,18 +30,8 @@ const _maxRows = 6;
 // filter, the Board folder scope): it shows literally today's items.
 
 class HomeToday extends StatefulWidget {
-  const HomeToday({
-    super.key,
-    required this.state,
-    this.now,
-    this.capStacked = false,
-  });
+  const HomeToday({super.key, required this.state, this.now});
   final AppState state;
-
-  /// The split Home (600 to 880): stacked cards are capped to 40% of the
-  /// screen height and scroll inside, so the board below keeps room. Off on
-  /// the phone Home, where everything scrolls as one.
-  final bool capStacked;
 
   /// Clock override for tests (a function so the time can advance).
   final DateTime Function()? now;
@@ -109,7 +99,7 @@ class _HomeTodayState extends State<HomeToday> {
     if (wait < const Duration(seconds: 1)) wait = const Duration(seconds: 1);
     _timer = Timer(wait, () {
       if (!mounted) return;
-      state.resetHomeDay();
+      state.rollHomeDay();
       _arm();
     });
   }
@@ -166,15 +156,6 @@ class _HomeTodayState extends State<HomeToday> {
                     ],
                   ],
                 );
-                if (widget.capStacked) {
-                  body = ConstrainedBox(
-                    key: const Key('home-today-cap'),
-                    constraints: BoxConstraints(
-                      maxHeight: MediaQuery.sizeOf(context).height * 0.4,
-                    ),
-                    child: SingleChildScrollView(child: body),
-                  );
-                }
               } else {
                 body = IntrinsicHeight(
                   child: Row(
@@ -260,7 +241,13 @@ class _HomeTodayState extends State<HomeToday> {
     // Overdue first (only on today), then due that day (recurring tasks
     // expanded); each in compareTasks order.
     final overdue = isToday ? state.overdueTasks(clock) : <Task>[];
-    final skip = {for (final k in overdue) k.uid};
+    // A one-off overdue task is listed once; a repeating one also shows its
+    // occurrence on this day (second row, `-occ` keys).
+    final skip = {
+      for (final k in overdue)
+        if (!k.isRecurring) k.uid,
+    };
+    final overdueIds = {for (final k in overdue) k.uid};
     final onDay =
         (bucketByDay(
                   tasks: state.openTasks(clock),
@@ -272,6 +259,7 @@ class _HomeTodayState extends State<HomeToday> {
             .where((k) => !skip.contains(k.uid))
             .toList();
     final due = [...overdue, ...onDay];
+    bool occ(int i) => i >= overdue.length && overdueIds.contains(due[i].uid);
     return TodayCard(
       slug: 'tasks',
       title: 'Tasks',
@@ -292,15 +280,19 @@ class _HomeTodayState extends State<HomeToday> {
       total: due.length,
       onMore: state.openTasksPanel,
       rows: [
-        for (final k in due.take(_maxRows))
+        for (var i = 0; i < due.length && i < _maxRows; i++)
           _navRow(
             'tasks',
-            'task-${k.uid}',
-            k.uid,
+            occ(i) ? 'task-${due[i].uid}-occ' : 'task-${due[i].uid}',
+            due[i].uid,
             TaskRow(
-              key: Key('home-today-tasks-${k.uid}'),
+              key: Key(
+                occ(i)
+                    ? 'home-today-tasks-${due[i].uid}-occ'
+                    : 'home-today-tasks-${due[i].uid}',
+              ),
               state: state,
-              task: k,
+              task: due[i],
               now: clock,
             ),
           ),

@@ -3301,17 +3301,37 @@ class AppState extends ChangeNotifier {
   DateTime homeSelectedDay([DateTime? now]) =>
       homeDay ?? wallDay(wallNow(now ?? DateTime.now()));
 
+  DateTime? _homeDayMadeOn;
+
   void selectHomeDay(DateTime? d) {
     final n = d == null ? null : DateTime.utc(d.year, d.month, d.day);
     if (n == homeDay) return;
     homeDay = n;
+    _homeDayMadeOn = n == null ? null : wallDay(wallNow(DateTime.now()));
     notifyListeners();
   }
 
-  /// Back to today (at local midnight and when the app resumes).
-  void resetHomeDay() {
+  /// A new local day began: back to today and redraw Home.
+  void rollHomeDay() {
     homeDay = null;
+    _homeDayMadeOn = null;
     notifyListeners();
+  }
+
+  /// Back to today. Quiet when nothing is selected.
+  void resetHomeDay() {
+    if (homeDay == null) return;
+    homeDay = null;
+    _homeDayMadeOn = null;
+    notifyListeners();
+  }
+
+  /// On app resume: back to today only when the selection was made on an
+  /// earlier day (a new day has begun since).
+  void resetHomeDayIfStale([DateTime? now]) {
+    final made = _homeDayMadeOn;
+    if (homeDay == null || made == null) return;
+    if (made != wallDay(wallNow(now ?? DateTime.now()))) resetHomeDay();
   }
 
   void setTaskTagsOpen(bool v) {

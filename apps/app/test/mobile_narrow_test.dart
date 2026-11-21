@@ -232,6 +232,19 @@ void main() {
       expect(s.nav.homeStacked, isTrue);
       expect(find.byKey(const Key('home-calendar')), findsOneWidget);
       expect(find.byKey(const Key('home-today')), findsOneWidget);
+      final cal = t.getRect(find.byKey(const Key('home-calendar')));
+      final list = t.getRect(find.byKey(const Key('home-today')));
+      expect(cal.right, lessThanOrEqualTo(list.left));
+      expect(list.right, lessThanOrEqualTo(620));
+      expect(t.takeException(), isNull);
+      // The list scrolls under the calendar.
+      final before = t.getTopLeft(find.byKey(const Key('home-today-tasks'))).dy;
+      await t.drag(find.byKey(const Key('home-today')), const Offset(0, -300));
+      await t.pumpAndSettle();
+      expect(
+        t.getTopLeft(find.byKey(const Key('home-today-tasks'))).dy,
+        lessThan(before),
+      );
       expect(t.takeException(), isNull);
     },
   );

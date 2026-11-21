@@ -190,7 +190,7 @@ class _ShellState extends State<Shell>
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
     // A new day may have started while the app was away: back to today.
-    if (s == AppLifecycleState.resumed) widget.state.resetHomeDay();
+    if (s == AppLifecycleState.resumed) widget.state.resetHomeDayIfStale();
     // Narrow: an edit pending its typing pause is saved before the app may
     // be stopped.
     if (s != AppLifecycleState.resumed && widget.state.narrow) {
