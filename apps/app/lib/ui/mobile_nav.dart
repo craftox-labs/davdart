@@ -362,9 +362,9 @@ class _SideMenuPageState extends State<SideMenuPage>
               onPress: () {
                 c.hide();
                 showMenuSheet(
-                  this.context,
+                  context,
                   this,
-                  (ctx, c) => spaceMenuGroups(this.context, state, c),
+                  (ctx, c) => spaceMenuGroups(context, state, c),
                 );
               },
             ),
