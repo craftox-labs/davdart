@@ -48,15 +48,24 @@ class PaneHeaderRow extends StatelessWidget {
     required this.children,
     this.startPad,
     this.endPad,
+    this.maxContentWidth,
   });
   final List<Widget> children;
 
   /// Horizontal insets; both default to the standard medium space.
   final double? startPad, endPad;
 
+  /// The row's content is centred in a column this wide (the item page's
+  /// content column), so its edges line up with the page below.
+  final double? maxContentWidth;
+
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
+    final row = Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: children,
+    );
     return SizedBox(
       height: t.sizes.paneHeader,
       child: DecoratedBox(
@@ -70,10 +79,14 @@ class PaneHeaderRow extends StatelessWidget {
             left: startPad ?? t.space.md,
             right: endPad ?? t.space.md,
           ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: children,
-          ),
+          child: maxContentWidth == null
+              ? row
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: maxContentWidth!),
+                    child: row,
+                  ),
+                ),
         ),
       ),
     );
@@ -213,6 +226,10 @@ class ItemHeader extends StatelessWidget {
       key: const Key('peek-toolbar'),
       // Without a Back arrow the title lines up with the body's own padding.
       startPad: back ? t.space.xs : t.space.xxl,
+      // Wide: the title starts where the content column starts and the
+      // actions end where it ends (the page below is centred and capped).
+      endPad: back || narrowLayout(context) ? null : t.space.xxl,
+      maxContentWidth: back || narrowLayout(context) ? null : t.sizes.pageMax,
       children: [
         if (back)
           IconAction(

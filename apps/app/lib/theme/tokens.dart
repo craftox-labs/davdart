@@ -242,7 +242,7 @@ class SizeTokens {
     this.helpColumn = 320,
     this.helpRow = 28,
     this.narrowBar = 440,
-    this.pageMax = 860,
+    this.pageMax = 1160,
     this.editorLines = 10,
     this.editorLinesFull = 26,
     this.tabStrip = 34,
