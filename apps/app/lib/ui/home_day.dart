@@ -172,15 +172,12 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
           builder: (context, c) {
             final calendar = calendarFor(c.maxWidth < Tokens.stackBreakpoint);
             if (c.maxWidth >= Tokens.stackBreakpoint) {
-              // Two columns on one top edge: the calendar card (2/3 from
-              // sizes.calendarWide, else 1/2) and the day list (scrolls on
+              // Two columns on one top edge: the calendar card (1/2) and the day list (scrolls on
               // its own). Page margins and the gap are space.lg.
-              final twoThirds = c.maxWidth >= t.sizes.calendarWide;
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    flex: twoThirds ? 2 : 1,
                     child: LayoutBuilder(
                       builder: (context, lc) {
                         final h = lc.maxHeight - 2 * t.space.lg;
@@ -490,6 +487,9 @@ class MonthCalendar extends StatelessWidget {
     // and the week rows.
     final natural = 2 * t.space.md + 2 * cell + weeks * cell;
     final fill = fillHeight != null && fillHeight! > natural && !bleed;
+    // Cells grow with the column but never past sizes.calendarCellMax.
+    final maxHeight =
+        2 * t.space.md + 2 * cell + weeks * t.sizes.calendarCellMax;
 
     Widget day(DateTime d) {
       final inMonth = d.month == month.month;
@@ -514,9 +514,8 @@ class MonthCalendar extends StatelessWidget {
               ),
               child: LayoutBuilder(
                 builder: (context, c) {
-                  final side =
-                      (fill ? math.min(c.maxWidth, c.maxHeight) : cell) -
-                      t.space.sm;
+                  // A fixed marker size, whatever the cell grows to.
+                  final side = cell - t.space.sm;
                   return SizedBox(
                     width: side,
                     height: side,
@@ -571,7 +570,7 @@ class MonthCalendar extends StatelessWidget {
 
     return Container(
       key: const Key('home-calendar'),
-      height: fill ? fillHeight : null,
+      height: fill ? math.min(fillHeight!, maxHeight) : null,
       padding: bleed
           ? EdgeInsets.fromLTRB(t.space.md, 0, t.space.md, t.space.md)
           : EdgeInsets.all(t.space.md),

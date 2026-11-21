@@ -254,7 +254,7 @@ class SizeTokens {
     this.edgeSwipe = 32,
     this.fabClearance = 84,
     this.calendarWidth = 320,
-    this.calendarWide = 1300,
+    this.calendarCellMax = 72,
     this.calendarCell = 36,
     this.segmentMin = 72,
     this.segmentHeight = 28,
@@ -325,7 +325,7 @@ class SizeTokens {
   /// Home calendar: grid width, wide day cell, dot, today ring; the Day|Board
   /// switch segment minimum width and height.
   final double calendarWidth,
-      calendarWide,
+      calendarCellMax,
       calendarCell,
       segmentMin,
       segmentHeight;
