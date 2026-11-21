@@ -1,3 +1,4 @@
+import 'popover_track.dart';
 import 'key_nav_ui.dart';
 
 import 'dart:async';
@@ -198,7 +199,9 @@ List<AppAction> buildActions(AppState state) {
       n.move(l, by);
     } else {
       // An open item page scrolls instead of moving a cursor.
-      n.scrollPageBy(n.area, by * _pageStep);
+      if (!PopoverTracker.instance.active) {
+        n.scrollPageBy(n.area, by * _pageStep);
+      }
     }
   }
 
@@ -721,7 +724,7 @@ Future<void> showKeyboardHelp(BuildContext context, AppState state) {
   // platform: `Alt+`, `Ctrl+Shift+`, `Cmd+Shift+`.
   final label = actions
       .expand((a) => a.chords)
-      .where((c) => c.contains('Shift+') || c.startsWith('Alt+'))
+      .where((c) => c.contains('Shift+') || c.contains('Alt+'))
       .firstOrNull;
   final chordHint = label?.replaceFirst(RegExp(r'[^+]+$'), '');
   return showAppDialog(
