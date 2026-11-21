@@ -6,6 +6,8 @@ Notes, tasks and events over CalDAV, local-first with sync. Notes are stored as 
 
 <p align="center"><img src="assets/screenshots/home.png" alt="davdart Home: month calendar with the selected day's events and tasks, notes panel and an open item"></p>
 
+<p align="center"><img src="assets/screenshots/board.png" alt="davdart Home, Board focus: status columns with items, notes panel and an open item"></p>
+
 <p align="center"><sub>Work in progress: the layout is still changing.</sub></p>
 
 Status: v0, in development. APIs, note formats and the UI will still change.
