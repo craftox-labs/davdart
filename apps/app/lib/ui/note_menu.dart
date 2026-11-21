@@ -147,8 +147,8 @@ class SheetPopoverController extends FPopoverController {
   Future<void> hide({bool animated = true}) async => close();
 }
 
-/// Shows [groups] (built by [build] under the sheet's context) as a bottom
-/// sheet, the touch form of a context menu. Picking a row closes it.
+/// Shows [groups] (built by [build] under the sheet's context) as a sheet
+/// from the bottom (or [side]), the touch form of a context menu. Picking a row closes it.
 Future<void> showMenuSheet(
   BuildContext context,
   TickerProvider vsync,
@@ -156,8 +156,9 @@ Future<void> showMenuSheet(
     BuildContext context,
     FPopoverController controller,
   )
-  build,
-) async {
+  build, {
+  FLayout side = FLayout.btt,
+}) async {
   var open = true;
   late final SheetPopoverController c;
   c = SheetPopoverController(
@@ -171,7 +172,7 @@ Future<void> showMenuSheet(
   try {
     await showFSheet<void>(
       context: context,
-      side: FLayout.btt,
+      side: side,
       mainAxisMaxRatio: 0.8,
       useSafeArea: true,
       builder: (ctx) => SheetMenuScope(
@@ -296,11 +297,20 @@ class NoteContextMenu extends StatelessWidget {
 
   /// [context] is the surface's own (it outlives the popup, so dialogs and
   /// flows launched from a row use it); [menuContext] only themes the rows.
-  List<FItemGroup> _groups(
+  /// The actions of the open item's own page (the narrow header's ⋯ sheet):
+  /// everything but the open, edit and close rows.
+  List<FItemGroup> pageGroups(
     BuildContext context,
     BuildContext menuContext,
     FPopoverController c,
-  ) {
+  ) => _groups(context, menuContext, c, page: true);
+
+  List<FItemGroup> _groups(
+    BuildContext context,
+    BuildContext menuContext,
+    FPopoverController c, {
+    bool page = false,
+  }) {
     final t = tokensOf(menuContext);
     FItem row(
       String label,
@@ -321,29 +331,30 @@ class NoteContextMenu extends StatelessWidget {
 
     final note = hit != null ? null : state.tree.find(uid)?.note;
     final groups = <FItemGroup>[
-      FItemGroup(
-        children: [
-          if (!state.narrow)
+      if (!page)
+        FItemGroup(
+          children: [
+            if (!state.narrow)
+              row(
+                'Open in peek',
+                FLucideIcons.panelRight,
+                () => hit != null
+                    ? state.openHit(hit!, mode: OpenMode.peek)
+                    : state.openNote(uid, mode: OpenMode.peek),
+                key: const Key('menu-open-peek'),
+                afterOpen: true,
+              ),
             row(
-              'Open in peek',
-              FLucideIcons.panelRight,
+              'Open in main',
+              FLucideIcons.squareArrowOutUpRight,
               () => hit != null
-                  ? state.openHit(hit!, mode: OpenMode.peek)
-                  : state.openNote(uid, mode: OpenMode.peek),
-              key: const Key('menu-open-peek'),
+                  ? state.openHit(hit!, mode: OpenMode.main)
+                  : state.openNote(uid, mode: OpenMode.main),
+              key: const Key('menu-open-main'),
               afterOpen: true,
             ),
-          row(
-            'Open in main',
-            FLucideIcons.squareArrowOutUpRight,
-            () => hit != null
-                ? state.openHit(hit!, mode: OpenMode.main)
-                : state.openNote(uid, mode: OpenMode.main),
-            key: const Key('menu-open-main'),
-            afterOpen: true,
-          ),
-        ],
-      ),
+          ],
+        ),
     ];
     final manage = note == null ? <NoteMenuItem>[] : _manage(context, note);
     final all = [...manage, ...items];
@@ -352,7 +363,7 @@ class NoteContextMenu extends StatelessWidget {
     }
     final tab = DocTab.note(uid);
     final own = <FItem>[
-      if (state.editable && note != null)
+      if (!page && state.editable && note != null)
         row(
           'Edit',
           FLucideIcons.pencil,

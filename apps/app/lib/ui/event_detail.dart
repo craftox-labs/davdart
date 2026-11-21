@@ -13,6 +13,7 @@ import 'event_menu.dart';
 import 'event_when.dart';
 import 'markdown_lite.dart';
 import 'parts.dart';
+import 'mobile_item.dart';
 import 'note_editor.dart';
 import 'theme.dart';
 import 'vim_field.dart';
@@ -217,6 +218,8 @@ class EventDetail extends StatelessWidget {
     if (event == null) return const SizedBox.shrink();
     final draft = state.eventDraftFor(uid);
     final edit = state.eventsEditable;
+    // Narrow: edit/preview toggle and ⋯ in the header; edits autosave.
+    final mobile = narrowLayout(context);
     Widget meta(String label, Widget value) => Padding(
       padding: EdgeInsets.symmetric(vertical: t.space.xxs),
       child: Row(
@@ -247,35 +250,51 @@ class EventDetail extends StatelessWidget {
                   key: const Key('edit-title'),
                   controller: draft.titleController,
                   hint: 'Title',
-                  autofocus: true,
+                  autofocus: !mobile,
                 ),
           actions: [
-            if (draft != null) ...editIcons(state, uid),
-            if (edit) ...[
-              if (state.spaces.length > 1)
+            if (mobile)
+              MobileItemActions(
+                state: state,
+                uid: uid,
+                editing: draft != null,
+                canEdit: edit,
+                onEdit: () => state.startEventEdit(uid),
+                draft: draft,
+                groups: EventContextMenu(
+                  state: state,
+                  uid: uid,
+                  child: const SizedBox.shrink(),
+                ).pageGroups,
+              )
+            else ...[
+              if (draft != null) ...editIcons(state, uid),
+              if (edit) ...[
+                if (state.spaces.length > 1)
+                  IconAction(
+                    key: const Key('move-note'),
+                    tooltip: 'Move to another space',
+                    icon: FLucideIcons.folderInput,
+                    onPress: () => showMoveEventDialog(context, state, event),
+                  ),
+                if (draft == null)
+                  IconAction(
+                    key: const Key('edit-note'),
+                    tooltip: 'Edit',
+                    icon: FLucideIcons.pencil,
+                    onPress: () => state.startEventEdit(uid),
+                  ),
                 IconAction(
-                  key: const Key('move-note'),
-                  tooltip: 'Move to another space',
-                  icon: FLucideIcons.folderInput,
-                  onPress: () => showMoveEventDialog(context, state, event),
+                  key: const Key('delete-note'),
+                  tooltip: 'Delete',
+                  icon: FLucideIcons.trash2,
+                  onPress: () => confirmDeleteEvent(context, state, event),
                 ),
-              if (draft == null)
-                IconAction(
-                  key: const Key('edit-note'),
-                  tooltip: 'Edit',
-                  icon: FLucideIcons.pencil,
-                  onPress: () => state.startEventEdit(uid),
-                ),
-              IconAction(
-                key: const Key('delete-note'),
-                tooltip: 'Delete',
-                icon: FLucideIcons.trash2,
-                onPress: () => confirmDeleteEvent(context, state, event),
-              ),
+              ],
             ],
           ],
         ),
-        if (draft != null) EventEditBar(state: state, draft: draft),
+        if (draft != null && !mobile) EventEditBar(state: state, draft: draft),
         Expanded(
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(

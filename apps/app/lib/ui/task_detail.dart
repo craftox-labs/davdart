@@ -13,6 +13,7 @@ import 'parts.dart';
 import 'chips.dart';
 import 'task_menu.dart';
 import 'task_parts.dart';
+import 'mobile_item.dart';
 import 'note_editor.dart';
 import 'theme.dart';
 import 'vim_field.dart';
@@ -326,6 +327,8 @@ class TaskDetail extends StatelessWidget {
     final now = DateTime.now();
     final draft = state.taskDraftFor(uid);
     final edit = state.tasksEditable;
+    // Narrow: edit/preview toggle and ⋯ in the header; edits autosave.
+    final mobile = narrowLayout(context);
     final status = task.boardStatus;
     final blocked = state.taskCompletionBlockerFor(uid) != null;
     Widget meta(String label, Widget value) => Padding(
@@ -367,35 +370,51 @@ class TaskDetail extends StatelessWidget {
                   key: const Key('edit-title'),
                   controller: draft.titleController,
                   hint: 'Title',
-                  autofocus: true,
+                  autofocus: !mobile,
                 ),
           actions: [
-            if (draft != null) ...editIcons(state, uid),
-            if (edit) ...[
-              if (state.spaces.length > 1)
+            if (mobile)
+              MobileItemActions(
+                state: state,
+                uid: uid,
+                editing: draft != null,
+                canEdit: edit,
+                onEdit: () => state.startTaskEdit(uid),
+                draft: draft,
+                groups: TaskContextMenu(
+                  state: state,
+                  uid: uid,
+                  child: const SizedBox.shrink(),
+                ).pageGroups,
+              )
+            else ...[
+              if (draft != null) ...editIcons(state, uid),
+              if (edit) ...[
+                if (state.spaces.length > 1)
+                  IconAction(
+                    key: const Key('move-note'),
+                    tooltip: 'Move to another space',
+                    icon: FLucideIcons.folderInput,
+                    onPress: () => showMoveTaskDialog(context, state, task),
+                  ),
+                if (draft == null)
+                  IconAction(
+                    key: const Key('edit-note'),
+                    tooltip: 'Edit',
+                    icon: FLucideIcons.pencil,
+                    onPress: () => state.startTaskEdit(uid),
+                  ),
                 IconAction(
-                  key: const Key('move-note'),
-                  tooltip: 'Move to another space',
-                  icon: FLucideIcons.folderInput,
-                  onPress: () => showMoveTaskDialog(context, state, task),
+                  key: const Key('delete-note'),
+                  tooltip: 'Delete',
+                  icon: FLucideIcons.trash2,
+                  onPress: () => confirmDeleteTask(context, state, task),
                 ),
-              if (draft == null)
-                IconAction(
-                  key: const Key('edit-note'),
-                  tooltip: 'Edit',
-                  icon: FLucideIcons.pencil,
-                  onPress: () => state.startTaskEdit(uid),
-                ),
-              IconAction(
-                key: const Key('delete-note'),
-                tooltip: 'Delete',
-                icon: FLucideIcons.trash2,
-                onPress: () => confirmDeleteTask(context, state, task),
-              ),
+              ],
             ],
           ],
         ),
-        if (draft != null) TaskEditBar(state: state, draft: draft),
+        if (draft != null && !mobile) TaskEditBar(state: state, draft: draft),
         Expanded(
           child: SingleChildScrollView(
             padding: EdgeInsets.fromLTRB(

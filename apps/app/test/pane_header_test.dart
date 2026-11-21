@@ -136,7 +136,8 @@ void main() {
       final s = await _pump(t, size: const Size(360, 700));
       s.select('l');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
+      // Narrow: the header's edit/preview toggle.
+      await t.tap(_k('item-mode'));
       await t.pumpAndSettle();
       expect(t.takeException(), isNull);
       // Narrow has no peek: the item opens full screen.

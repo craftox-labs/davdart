@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:davdart/davdart.dart';
@@ -799,6 +800,9 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    for (final t in _autosaveTimers.values) {
+      t.cancel();
+    }
     nav.dispose();
     searchController.dispose();
     super.dispose();
@@ -1420,6 +1424,7 @@ class AppState extends ChangeNotifier {
       final loaded = supportsNotes ? await s.load() : <Note>[];
       if (s != _space) return;
       _setNotes(loaded);
+      _rebaseDrafts();
     } catch (e) {
       if (s != _space) return;
       message = 'Sync failed: $e';
@@ -2042,6 +2047,8 @@ class AppState extends ChangeNotifier {
       originalDue: t.due,
       originalPriority: t.priority,
     );
+    final d = _taskDrafts[uid]!;
+    _watchDraft(uid, d, () => (d.parent, d.due, d.priority));
     _focusEditor(uid);
     notifyListeners();
   }
@@ -2402,6 +2409,8 @@ class AppState extends ChangeNotifier {
       end: end,
       status: e.status,
     );
+    final d = _eventDrafts[uid]!;
+    _watchDraft(uid, d, () => (d.allDay, d.start, d.end, d.status));
     _focusEditor(uid);
     notifyListeners();
   }
@@ -2574,8 +2583,17 @@ class AppState extends ChangeNotifier {
   }
 
   /// Shows the Tasks list in the side panel (opens the panel if folded).
-  void openTasksPanel() => setSection(Section.tasks);
-  void openEventsPanel() => setSection(Section.events);
+  void openTasksPanel() => _openPanel(Section.tasks);
+  void openEventsPanel() => _openPanel(Section.events);
+
+  /// Narrow: opens the side menu (set by the shell), the only place the
+  /// panels show there.
+  VoidCallback? openMenu;
+
+  void _openPanel(Section s) {
+    setSection(s);
+    if (narrow) openMenu?.call();
+  }
 
   /// Opens (or focuses) the main tab of note [uid]. A peek of the same note
   /// closes (one place per note). The "+" button's new note opens this way.
@@ -2632,6 +2650,11 @@ class AppState extends ChangeNotifier {
 
   /// Shows [t] (null: home) in the main pane without asking about edits.
   void _show(DocTab? t) {
+    // Narrow: leaving an item saves its pending edit.
+    final leaving = activeTab;
+    if (narrow && leaving != null && leaving != t && isEditing(leaving.id)) {
+      unawaited(flushEdit(leaving.id));
+    }
     if (t == null) {
       _activeViewTab = null;
       notifyListeners();
@@ -2760,6 +2783,8 @@ class AppState extends ChangeNotifier {
       originalParent: tree.find(n.uid)?.parent?.note.uid,
       originalStatus: boardOrder.contains(p.status) ? p.status : null,
     );
+    final d = _drafts[uid]!;
+    _watchDraft(uid, d, () => (d.parent, d.status));
     _focusEditor(uid);
     notifyListeners();
   }
@@ -2810,6 +2835,95 @@ class AppState extends ChangeNotifier {
     }
     notifyListeners();
     return true;
+  }
+
+  // --- Autosave (narrow) ---
+  //
+  // On the narrow layout an open edit saves itself: a pause in typing saves
+  // after [autosaveDelay], a change of a selector at once, and leaving the
+  // item, closing it, toggling to preview or pausing the app flush what is
+  // pending. Saves go through the same path as the Save button (a local save,
+  // then a sync that merges with the server and keeps overlapping text in the
+  // history), one at a time per item. The wide layout keeps explicit Save.
+
+  /// How long typing must pause before the edit saves itself.
+  Duration autosaveDelay = const Duration(milliseconds: 1500);
+
+  final Map<String, Timer> _autosaveTimers = {};
+  final Map<String, Future<bool>> _flushing = {};
+
+  /// Whether the open edit of item [uid] (note, task or event) has unsaved
+  /// changes.
+  bool dirtyItem(String uid) => _taskDrafts.containsKey(uid)
+      ? dirtyTaskFor(uid)
+      : _eventDrafts.containsKey(uid)
+      ? dirtyEventFor(uid)
+      : dirtyFor(uid);
+
+  /// Saves [uid] when [draft] changes (narrow only): at once when [choices]
+  /// (the selector values) changed, else after the typing pause.
+  void _watchDraft(String uid, Listenable draft, Object Function() choices) {
+    var last = choices();
+    draft.addListener(() {
+      if (!narrow || !isEditing(uid)) return;
+      final now = choices();
+      final picked = now != last;
+      last = now;
+      _autosaveTimers.remove(uid)?.cancel();
+      if (!dirtyItem(uid)) return;
+      if (picked) {
+        unawaited(flushEdit(uid));
+      } else {
+        _autosaveTimers[uid] = Timer(autosaveDelay, () {
+          _autosaveTimers.remove(uid);
+          unawaited(flushEdit(uid));
+        });
+      }
+    });
+  }
+
+  /// Saves the edit of [uid] now if anything is pending, staying in edit
+  /// mode. Runs after a save already in flight. False when nothing was saved
+  /// (empty title, failure).
+  Future<bool> flushEdit(String uid) {
+    _autosaveTimers.remove(uid)?.cancel();
+    final running = _flushing[uid];
+    if (running != null) return running.then((_) => flushEdit(uid));
+    final f = saveEdit(uid).whenComplete(() {
+      _flushing.remove(uid);
+      notifyListeners();
+    });
+    _flushing[uid] = f;
+    // Shows "Saving" while the save runs.
+    if (dirtyItem(uid)) notifyListeners();
+    return f;
+  }
+
+  /// Flushes every pending edit (the app is going to the background).
+  Future<void> flushAllEdits() => Future.wait([
+    for (final u in _allDraftUids())
+      if (dirtyItem(u)) flushEdit(u),
+  ]);
+
+  /// Whether a save of [uid] is waiting for its typing pause or running.
+  bool autosavePending(String uid) =>
+      _autosaveTimers.containsKey(uid) || _flushing.containsKey(uid);
+
+  /// After a sync: an edit with nothing typed takes the merged text, so the
+  /// next autosave does not send back a stale copy over a remote change.
+  void _rebaseDrafts() {
+    if (!narrow) return;
+    for (final d in _drafts.values) {
+      final n = tree.find(d.uid)?.note;
+      if (n == null || d.dirty) continue;
+      final p = PlanItem.fromNote(n);
+      // Ignore trailing whitespace: the store may normalise it.
+      if (n.summary.trim() == d.originalTitle.trim() &&
+          p.text.trimRight() == d.originalBody.trimRight()) {
+        continue;
+      }
+      d.rebase(title: n.summary, body: p.text);
+    }
   }
 
   /// Whether item [uid] (note, task or event) is open in edit mode.
@@ -2895,7 +3009,11 @@ class AppState extends ChangeNotifier {
           : isEvent
           ? dirtyEventFor(u)
           : dirtyFor(u);
-      if (!dirty || g == null) continue;
+      if (!dirty) continue;
+      // Narrow: edits save themselves; the dialog is the fallback when the
+      // save cannot go through (empty title, error).
+      if (narrow && await flushEdit(u)) continue;
+      if (g == null) continue;
       switch (await g()) {
         case DraftChoice.keep:
           return false;

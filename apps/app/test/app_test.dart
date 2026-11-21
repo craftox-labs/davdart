@@ -1504,7 +1504,9 @@ void main() {
       expect(find.byKey(const Key('side-menu')), findsNothing);
       expect(find.text('Body text'), findsOneWidget);
       expect(find.text('BACKLOG'), findsNothing);
-      await t.tap(byAction('Close'));
+      // No arrow in the item header on narrow: the bottom bar's Back.
+      expect(byAction('Close'), findsNothing);
+      await t.tap(find.byKey(const Key('bar-back')));
       await t.pumpAndSettle();
       expect(find.text('Body text'), findsNothing);
     });

@@ -151,7 +151,8 @@ class _Slide extends StatelessWidget {
   }
 }
 
-class _ShellState extends State<Shell> with TickerProviderStateMixin {
+class _ShellState extends State<Shell>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _dock = AnimationController(
     vsync: this,
     value: _dockOpen ? 1 : 0,
@@ -170,6 +171,25 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
   /// Narrow layout: the full-screen side menu and the open-items grid.
   bool _menuOpen = false, _gridOpen = false;
   double _edgeDx = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    widget.state.openMenu = () => setState(() {
+      _gridOpen = false;
+      _menuOpen = true;
+    });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState s) {
+    // Narrow: an edit pending its typing pause is saved before the app may
+    // be stopped.
+    if (s != AppLifecycleState.resumed && widget.state.narrow) {
+      widget.state.flushAllEdits();
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -203,6 +223,8 @@ class _ShellState extends State<Shell> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.state.openMenu = null;
     _dock.dispose();
     _peek.dispose();
     super.dispose();
@@ -818,14 +840,9 @@ class TopBar extends StatelessWidget {
     );
   }
 
-  /// Narrow title, centred: the item's or view's name, a folder's crumbs, or
-  /// on Home the Space chip.
+  /// Narrow title, centred: a folder's or view's crumbs, else the Space chip
+  /// (Home, lists and open items alike).
   Widget _title(Tokens t) {
-    final tab = state.activeTab;
-    // An open item carries its title in its own header.
-    if (state.mainItemUid != null && tab != null) {
-      return const SizedBox.shrink();
-    }
     if (state.scope != null || state.activeViewName != null) {
       return Center(
         child: ScopeCrumbs(state: state, label: state.activeViewName),

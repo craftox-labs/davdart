@@ -34,11 +34,20 @@ class TaskContextMenu extends StatelessWidget {
     child: child,
   );
 
-  List<FItemGroup> _groups(
+  /// The actions of the open item's own page (the narrow header's ⋯
+  /// sheet): everything but the open and close rows.
+  List<FItemGroup> pageGroups(
     BuildContext context,
     BuildContext menuContext,
     FPopoverController c,
-  ) {
+  ) => _groups(context, menuContext, c, page: true);
+
+  List<FItemGroup> _groups(
+    BuildContext context,
+    BuildContext menuContext,
+    FPopoverController c, {
+    bool page = false,
+  }) {
     final task = state.taskById(uid);
     if (task == null) return const [];
     final t = tokensOf(menuContext);
@@ -132,25 +141,26 @@ class TaskContextMenu extends StatelessWidget {
     ];
     final tab = DocTab.task(uid);
     return [
-      FItemGroup(
-        children: [
-          if (!state.narrow)
+      if (!page)
+        FItemGroup(
+          children: [
+            if (!state.narrow)
+              row(
+                'Open in peek',
+                FLucideIcons.panelRight,
+                () => state.openTask(uid, mode: OpenMode.peek),
+                key: const Key('menu-open-peek'),
+                afterOpen: true,
+              ),
             row(
-              'Open in peek',
-              FLucideIcons.panelRight,
-              () => state.openTask(uid, mode: OpenMode.peek),
-              key: const Key('menu-open-peek'),
+              'Open in main',
+              FLucideIcons.squareArrowOutUpRight,
+              () => state.openTask(uid, mode: OpenMode.main),
+              key: const Key('menu-open-main'),
               afterOpen: true,
             ),
-          row(
-            'Open in main',
-            FLucideIcons.squareArrowOutUpRight,
-            () => state.openTask(uid, mode: OpenMode.main),
-            key: const Key('menu-open-main'),
-            afterOpen: true,
-          ),
-        ],
-      ),
+          ],
+        ),
       FItemGroup(children: menuRows(menuContext, c, manage)),
       FItemGroup(
         children: [

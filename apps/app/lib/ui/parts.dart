@@ -140,7 +140,8 @@ class ItemHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final back = !full && !inHeader;
+    // The narrow layout has the bottom bar's Back, so no arrow here.
+    final back = !full && !inHeader && !narrowLayout(context);
     return PaneHeaderRow(
       key: const Key('peek-toolbar'),
       // Without a Back arrow the title lines up with the body's own padding.

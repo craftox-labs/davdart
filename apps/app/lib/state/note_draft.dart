@@ -62,6 +62,29 @@ class NoteDraft extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Takes new saved [title] and [body] (merged from the server) as both the
+  /// text and the originals. Only for a draft with nothing typed.
+  void rebase({required String title, required String body}) {
+    originalTitle = title;
+    originalBody = body;
+    titleController.value = TextEditingValue(
+      text: title,
+      selection: _keep(titleController.selection, title),
+    );
+    bodyController.value = TextEditingValue(
+      text: body,
+      selection: _keep(bodyController.selection, body),
+    );
+    notifyListeners();
+  }
+
+  static TextSelection _keep(TextSelection s, String text) => s.isValid
+      ? TextSelection(
+          baseOffset: s.baseOffset.clamp(0, text.length),
+          extentOffset: s.extentOffset.clamp(0, text.length),
+        )
+      : TextSelection.collapsed(offset: text.length);
+
   bool get titleEmpty => titleController.text.trim().isEmpty;
 
   bool get dirty =>
