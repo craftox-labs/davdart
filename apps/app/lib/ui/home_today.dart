@@ -27,8 +27,16 @@ import 'theme.dart';
 // filter, the Board folder scope): it shows literally today's items.
 
 class HomeToday extends StatefulWidget {
-  const HomeToday({super.key, required this.state, this.now});
+  const HomeToday({
+    super.key,
+    required this.state,
+    this.now,
+    this.stack = false,
+  });
   final AppState state;
+
+  /// Always stack Events above Tasks (the Home Day grid's right column).
+  final bool stack;
 
   /// Clock override for tests (a function so the time can advance).
   final DateTime Function()? now;
@@ -123,6 +131,7 @@ class _HomeTodayState extends State<HomeToday> {
             builder: (context, outer) {
               // Known even while the section is collapsed.
               final stacked =
+                  widget.stack ||
                   outer.maxWidth - 2 * t.space.lg < Tokens.stackBreakpoint;
               state.nav.homeStacked = stacked;
               final gap = t.space.lg;

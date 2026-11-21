@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:davdart/davdart.dart';
 
 import 'dart:ui' show PlatformDispatcher;
@@ -149,7 +151,7 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
           _month = _monthOf(sel);
         }
         final month = _month ?? _monthOf(sel);
-        Widget calendarFor(bool bleed) => MonthCalendar(
+        Widget calendarFor(bool bleed, {double? fillHeight}) => MonthCalendar(
           state: state,
           month: month,
           selected: sel,
@@ -162,30 +164,36 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
           },
           clock: clock,
           bleed: bleed,
+          fillHeight: fillHeight,
           onToday: bleed ? null : state.resetHomeDay,
         );
-        final list = HomeToday(state: state, now: widget.now);
+        final list = HomeToday(state: state, now: widget.now, stack: true);
         return LayoutBuilder(
           builder: (context, c) {
             final calendar = calendarFor(c.maxWidth < Tokens.stackBreakpoint);
             if (c.maxWidth >= Tokens.stackBreakpoint) {
+              // Two columns on one top edge: the calendar card (2/3 from
+              // sizes.calendarWide, else 1/2) and the day list (scrolls on
+              // its own). Page margins and the gap are space.lg.
+              final twoThirds = c.maxWidth >= t.sizes.calendarWide;
               return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      t.space.lg,
-                      t.space.lg,
-                      0,
-                      t.space.lg,
-                    ),
-                    // Scrolls when the window is shorter than the grid.
-                    child: SingleChildScrollView(
-                      key: const Key('home-calendar-scroll'),
-                      child: SizedBox(
-                        width: t.sizes.calendarWidth,
-                        child: calendar,
-                      ),
+                  Expanded(
+                    flex: twoThirds ? 2 : 1,
+                    child: LayoutBuilder(
+                      builder: (context, lc) {
+                        final h = lc.maxHeight - 2 * t.space.lg;
+                        return Padding(
+                          padding: EdgeInsets.all(t.space.lg)
+                              .copyWith(right: 0),
+                          // Scrolls when the window is shorter than the grid.
+                          child: SingleChildScrollView(
+                            key: const Key('home-calendar-scroll'),
+                            child: calendarFor(false, fillHeight: h),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   Expanded(child: SingleChildScrollView(child: list)),
@@ -439,8 +447,13 @@ class MonthCalendar extends StatelessWidget {
     required this.clock,
     this.bleed = false,
     this.onToday,
+    this.fillHeight,
   });
   final AppState state;
+
+  /// Wide: the height of the column the card may fill; day cells then grow
+  /// to use it (when it is more than the grid needs).
+  final double? fillHeight;
 
   /// Phone: no side padding or border, so seven cells of 44dp fit 320dp.
   final bool bleed;
@@ -473,6 +486,10 @@ class MonthCalendar extends StatelessWidget {
         ? t.sizes.touchTarget
         : t.sizes.calendarCell;
     final muted = t.type.captionStyle.copyWith(color: t.muted);
+    // Room the grid needs at its natural size: padding, header, weekday row
+    // and the week rows.
+    final natural = 2 * t.space.md + 2 * cell + weeks * cell;
+    final fill = fillHeight != null && fillHeight! > natural && !bleed;
 
     Widget day(DateTime d) {
       final inMonth = d.month == month.month;
@@ -485,7 +502,7 @@ class MonthCalendar extends StatelessWidget {
         semanticsLabel: dayLabel(d, clock),
         onPress: () => onSelect(d),
         child: SizedBox(
-          height: cell,
+          height: fill ? null : cell,
           child: Center(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -495,46 +512,56 @@ class MonthCalendar extends StatelessWidget {
                     ? Border.all(color: t.accent, width: t.sizes.ring)
                     : null,
               ),
-              child: SizedBox(
-                width: cell - t.space.sm,
-                height: cell - t.space.sm,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      '${d.day}',
-                      style: t.type.captionStyle.copyWith(
-                        color: isSel
-                            ? t.onAccent
-                            : inMonth
-                            ? t.fg
-                            : t.muted.withValues(alpha: 0.5),
-                      ),
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final side =
+                      (fill ? math.min(c.maxWidth, c.maxHeight) : cell) -
+                      t.space.sm;
+                  return SizedBox(
+                    width: side,
+                    height: side,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${d.day}',
+                          style: t.type.captionStyle.copyWith(
+                            color: isSel
+                                ? t.onAccent
+                                : inMonth
+                                ? t.fg
+                                : t.muted.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        SizedBox(
+                          height: t.sizes.calendarDot,
+                          child: b == null
+                              ? null
+                              : Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (b.events.isNotEmpty)
+                                      _Dot(
+                                        key: Key('cal-dot-event-${d.day}'),
+                                        color: isSel ? t.onAccent : t.accent,
+                                      ),
+                                    if (b.events.isNotEmpty &&
+                                        b.tasks.isNotEmpty)
+                                      SizedBox(width: t.space.xxs),
+                                    if (b.tasks.isNotEmpty)
+                                      _Dot(
+                                        key: Key('cal-dot-task-${d.day}'),
+                                        color: isSel
+                                            ? t.onAccent
+                                            : t.statusTodo,
+                                      ),
+                                  ],
+                                ),
+                        ),
+                      ],
                     ),
-                    SizedBox(
-                      height: t.sizes.calendarDot,
-                      child: b == null
-                          ? null
-                          : Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (b.events.isNotEmpty)
-                                  _Dot(
-                                    key: Key('cal-dot-event-${d.day}'),
-                                    color: isSel ? t.onAccent : t.accent,
-                                  ),
-                                if (b.events.isNotEmpty && b.tasks.isNotEmpty)
-                                  SizedBox(width: t.space.xxs),
-                                if (b.tasks.isNotEmpty)
-                                  _Dot(
-                                    key: Key('cal-dot-task-${d.day}'),
-                                    color: isSel ? t.onAccent : t.statusTodo,
-                                  ),
-                              ],
-                            ),
-                    ),
-                  ],
-                ),
+                  );
+                },
               ),
             ),
           ),
@@ -544,6 +571,7 @@ class MonthCalendar extends StatelessWidget {
 
     return Container(
       key: const Key('home-calendar'),
+      height: fill ? fillHeight : null,
       padding: bleed
           ? EdgeInsets.fromLTRB(t.space.md, 0, t.space.md, t.space.md)
           : EdgeInsets.all(t.space.md),
@@ -555,7 +583,7 @@ class MonthCalendar extends StatelessWidget {
               border: Border.all(color: t.cardBorder),
             ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
         children: [
           if (!bleed)
             CalendarHeader(
@@ -584,12 +612,15 @@ class MonthCalendar extends StatelessWidget {
             ],
           ),
           for (var w = 0; w < weeks; w++)
-            Row(
-              children: [
-                for (var i = 0; i < 7; i++)
-                  Expanded(child: day(start.add(Duration(days: w * 7 + i)))),
-              ],
-            ),
+            () {
+              final row = Row(
+                children: [
+                  for (var i = 0; i < 7; i++)
+                    Expanded(child: day(start.add(Duration(days: w * 7 + i)))),
+                ],
+              );
+              return fill ? Expanded(child: row) : row;
+            }(),
         ],
       ),
     );
