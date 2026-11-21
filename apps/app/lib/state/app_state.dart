@@ -3303,6 +3303,23 @@ class AppState extends ChangeNotifier {
 
   DateTime? _homeDayMadeOn;
 
+  String _homeCardKey(String slug) =>
+      'davdart.home.card.collapsed.v1.$slug.$_spaceKey';
+
+  /// A Home day card (`tasks`, `events`) is collapsed (per Space).
+  bool homeCardCollapsed(String slug) =>
+      prefs?.read(_homeCardKey(slug)) == 'true';
+
+  void setHomeCardCollapsed(String slug, bool c) {
+    if (c == homeCardCollapsed(slug)) return;
+    if (c) {
+      prefs?.write(_homeCardKey(slug), 'true');
+    } else {
+      prefs?.remove(_homeCardKey(slug));
+    }
+    notifyListeners();
+  }
+
   void selectHomeDay(DateTime? d) {
     final n = d == null ? null : DateTime.utc(d.year, d.month, d.day);
     if (n == homeDay) return;

@@ -10,6 +10,7 @@ import '../state/event_rules.dart';
 import '../theme/tokens.dart';
 import 'content_grid.dart';
 import 'home_today.dart';
+import 'segmented.dart';
 import 'theme.dart';
 
 // Home's Day focus: a month calendar that picks a day, and the day section
@@ -90,60 +91,23 @@ class HomeSwitch extends StatelessWidget {
   }
 
   Widget _build(BuildContext context, Tokens t) {
-    final focus = state.homeFocus;
-    Widget seg(HomeFocus f, String label) {
-      final on = focus == f;
-      return FTappable(
-        key: Key('home-focus-${f.name}'),
-        behavior: HitTestBehavior.opaque,
-        semanticsLabel: label,
-        onPress: () => state.setHomeFocus(f),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            minHeight: narrowLayout(context)
-                ? t.sizes.touchTarget
-                : t.sizes.segmentHeight,
-            minWidth: t.sizes.segmentMin,
-          ),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: on ? t.selected : null,
-              borderRadius: BorderRadius.circular(t.radii.card),
-            ),
-            child: Center(
-              child: Text(
-                label,
-                style: t.type.captionStyle.copyWith(
-                  color: on ? t.fg : t.muted,
-                  fontWeight: on ? FontWeight.w600 : FontWeight.w400,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
+    final full = narrowLayout(context);
+    final control = Segmented<HomeFocus>(
+      key: const Key('home-focus'),
+      fullWidth: full,
+      value: state.homeFocus,
+      onChanged: state.setHomeFocus,
+      segments: const [
+        Segment(HomeFocus.day, 'Day', 'home-focus-day'),
+        Segment(HomeFocus.board, 'Board', 'home-focus-board'),
+      ],
+    );
     return ContentCap(
       child: Padding(
         padding: EdgeInsets.fromLTRB(t.space.lg, t.space.md, t.space.lg, 0),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: DecoratedBox(
-            key: const Key('home-focus'),
-            decoration: BoxDecoration(
-              border: Border.all(color: t.cardBorder),
-              borderRadius: BorderRadius.circular(t.radii.card),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                seg(HomeFocus.day, 'Day'),
-                seg(HomeFocus.board, 'Board'),
-              ],
-            ),
-          ),
-        ),
+        child: full
+            ? control
+            : Align(alignment: Alignment.centerLeft, child: control),
       ),
     );
   }
@@ -198,6 +162,7 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
           },
           clock: clock,
           bleed: bleed,
+          onToday: bleed ? null : state.resetHomeDay,
         );
         final list = HomeToday(state: state, now: widget.now);
         return LayoutBuilder(
@@ -228,7 +193,12 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: EdgeInsets.only(top: t.space.md),
+                    padding: EdgeInsets.fromLTRB(
+                      t.space.lg,
+                      t.space.md,
+                      t.space.lg,
+                      0,
+                    ),
                     child: CollapsedCalendar(
                       state: state,
                       selected: sel,
@@ -284,61 +254,89 @@ class CollapsedCalendar extends StatelessWidget {
         ),
       ),
     );
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: t.space.lg),
-          child: Row(
-            children: [
-              arrow(
-                'home-cal-prev-day',
-                FLucideIcons.chevronLeft,
-                'Previous day',
-                -1,
-              ),
-              Expanded(
-                child: FTappable(
-                  key: const Key('home-cal-toggle'),
-                  behavior: HitTestBehavior.opaque,
-                  semanticsLabel: open
-                      ? 'Collapse calendar'
-                      : 'Expand calendar',
-                  onPress: () => state.setHomeCalOpen(!open),
-                  child: SizedBox(
-                    height: t.sizes.touchTarget,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          dayLabel(selected, clock),
-                          key: const Key('home-cal-label'),
-                          style: t.type.labelStyle.copyWith(color: t.fg),
-                        ),
-                        SizedBox(width: t.space.sm),
-                        Icon(
-                          open
-                              ? FLucideIcons.chevronUp
-                              : FLucideIcons.chevronDown,
-                          size: t.icons.md,
-                          color: t.muted,
-                        ),
-                      ],
+    return DecoratedBox(
+      key: const Key('home-calendar-card'),
+      decoration: BoxDecoration(
+        color: t.card,
+        borderRadius: BorderRadius.circular(t.radii.card),
+        border: Border.all(color: t.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: EdgeInsets.zero,
+            child: Row(
+              children: [
+                arrow(
+                  'home-cal-prev-day',
+                  FLucideIcons.chevronLeft,
+                  'Previous day',
+                  -1,
+                ),
+                Expanded(
+                  child: FTappable(
+                    key: const Key('home-cal-toggle'),
+                    behavior: HitTestBehavior.opaque,
+                    semanticsLabel: open
+                        ? 'Collapse calendar'
+                        : 'Expand calendar',
+                    onPress: () => state.setHomeCalOpen(!open),
+                    child: SizedBox(
+                      height: t.sizes.touchTarget,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            dayLabel(selected, clock),
+                            key: const Key('home-cal-label'),
+                            style: t.type.labelStyle.copyWith(color: t.fg),
+                          ),
+                          SizedBox(width: t.space.sm),
+                          Icon(
+                            open
+                                ? FLucideIcons.chevronUp
+                                : FLucideIcons.chevronDown,
+                            size: t.icons.md,
+                            color: t.muted,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              arrow(
-                'home-cal-next-day',
-                FLucideIcons.chevronRight,
-                'Next day',
-                1,
-              ),
-            ],
+                if (selected != today)
+                  FTappable(
+                    key: const Key('home-day-reset'),
+                    behavior: HitTestBehavior.opaque,
+                    onPress: state.resetHomeDay,
+                    child: SizedBox(
+                      height: t.sizes.touchTarget,
+                      child: Center(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: t.space.sm),
+                          child: Text(
+                            'Today',
+                            style: t.type.captionStyle.copyWith(
+                              color: t.accent,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                arrow(
+                  'home-cal-next-day',
+                  FLucideIcons.chevronRight,
+                  'Next day',
+                  1,
+                ),
+              ],
+            ),
           ),
-        ),
-        if (open) grid,
-      ],
+          if (open) grid,
+        ],
+      ),
     );
   }
 }
@@ -357,11 +355,15 @@ class MonthCalendar extends StatelessWidget {
     required this.onSelect,
     required this.clock,
     this.bleed = false,
+    this.onToday,
   });
   final AppState state;
 
   /// Phone: no side padding or border, so seven cells of 44dp fit 320dp.
   final bool bleed;
+
+  /// Wide: a `Today` button above the grid while another day is selected.
+  final VoidCallback? onToday;
   final DateTime month;
   final DateTime selected;
   final DateTime today;
@@ -473,16 +475,14 @@ class MonthCalendar extends StatelessWidget {
 
     return Container(
       key: const Key('home-calendar'),
-      padding: bleed
-          ? EdgeInsets.symmetric(vertical: t.space.sm)
-          : EdgeInsets.all(t.space.sm),
-      decoration: BoxDecoration(
-        color: t.card,
-        borderRadius: bleed ? null : BorderRadius.circular(t.radii.card),
-        border: bleed
-            ? Border.symmetric(horizontal: BorderSide(color: t.cardBorder))
-            : Border.all(color: t.cardBorder),
-      ),
+      padding: bleed ? EdgeInsets.zero : EdgeInsets.all(t.space.sm),
+      decoration: bleed
+          ? null
+          : BoxDecoration(
+              color: t.card,
+              borderRadius: BorderRadius.circular(t.radii.card),
+              border: Border.all(color: t.cardBorder),
+            ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -497,6 +497,19 @@ class MonthCalendar extends StatelessWidget {
                   style: t.type.labelStyle.copyWith(color: t.fg),
                 ),
               ),
+              if (onToday != null && selected != today)
+                FTappable(
+                  key: const Key('home-day-reset'),
+                  behavior: HitTestBehavior.opaque,
+                  onPress: onToday,
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: t.space.sm),
+                    child: Text(
+                      'Today',
+                      style: t.type.captionStyle.copyWith(color: t.accent),
+                    ),
+                  ),
+                ),
               nav('cal-next', FLucideIcons.chevronRight, 'Next month', 1),
             ],
           ),

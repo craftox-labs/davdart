@@ -7,7 +7,6 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/key_nav.dart';
 import '../theme/tokens.dart';
-import 'collapsible_section.dart';
 import 'content_grid.dart';
 import 'event_menu.dart';
 import '../state/event_rules.dart';
@@ -23,8 +22,6 @@ import 'theme.dart';
 // on the selected day (`AppState.homeSelectedDay`, today by default). A view
 // over AppState. The cards are a plain list in [HomeToday]; the calendar that
 // picks the day is in home_day.dart.
-
-const _maxRows = 6;
 
 // Home ignores the panel filters (Tasks and Events tags, the Tasks folder
 // filter, the Board folder scope): it shows literally today's items.
@@ -45,25 +42,11 @@ class _HomeTodayState extends State<HomeToday> {
 
   AppState get state => widget.state;
   final _rows = <NavEntry>[];
-  static const _prefKey = 'davdart.home.today.collapsed.v1';
-  // The one source of truth for the collapsed state; the section is
-  // controlled by it.
-  late bool _collapsed = state.prefs?.read(_prefKey) == 'true';
-
-  void _setCollapsed(bool c) {
-    setState(() => _collapsed = c);
-    if (c) {
-      state.prefs?.write(_prefKey, 'true');
-    } else {
-      state.prefs?.remove(_prefKey);
-    }
-  }
-
   NavEntry _entry(String id, String uid, String block) => NavEntry(
     id,
     uid: uid,
     block: block,
-    hidden: () => _collapsed,
+    hidden: () => state.homeCardCollapsed(block),
     open: (mode) async {
       await state.openNote(uid, mode: mode);
     },
@@ -131,8 +114,8 @@ class _HomeTodayState extends State<HomeToday> {
         _rows.clear();
         // The seam: add further cards (a calendar) to this list.
         final cards = <Widget>[
-          _tasksCard(context, clock, day, isToday),
           _eventsCard(context, clock, day, isToday),
+          _tasksCard(context, clock, day, isToday),
         ];
         state.nav.publishHome('today', List.of(_rows));
         return ContentCap(
@@ -169,60 +152,31 @@ class _HomeTodayState extends State<HomeToday> {
                   ),
                 );
               }
-              return CollapsibleSection(
-                id: 'today-section',
-                title: isToday ? 'Today' : dayLabel(day, clock),
-                collapsed: _collapsed,
-                onChanged: _setCollapsed,
-                headerPadding: EdgeInsets.fromLTRB(
+              return Padding(
+                key: const Key('home-today'),
+                padding: EdgeInsets.fromLTRB(
                   t.space.lg,
                   t.space.md,
                   t.space.lg,
                   0,
                 ),
-                child: Padding(
-                  key: const Key('home-today'),
-                  padding: EdgeInsets.fromLTRB(
-                    t.space.lg,
-                    t.space.sm,
-                    t.space.lg,
-                    0,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (!isToday)
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: FTappable(
-                            key: const Key('home-day-reset'),
-                            onPress: state.resetHomeDay,
-                            child: ConstrainedBox(
-                              constraints: BoxConstraints(
-                                minHeight: narrowLayout(context)
-                                    ? t.sizes.touchTarget
-                                    : 0,
-                              ),
-                              child: Center(
-                                widthFactor: 1,
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: t.space.xs,
-                                  ),
-                                  child: Text(
-                                    'Today',
-                                    style: t.type.captionStyle.copyWith(
-                                      color: t.accent,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Wide: a small date label over the cards (on a phone
+                    // the calendar card shows the date).
+                    if (MediaQuery.sizeOf(context).width >=
+                        Tokens.stackBreakpoint)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: t.space.sm),
+                        child: Text(
+                          isToday ? 'Today' : dayLabel(day, clock),
+                          key: const Key('home-day-label'),
+                          style: t.type.labelStyle.copyWith(color: t.muted),
                         ),
-                      body,
-                    ],
-                  ),
+                      ),
+                    body,
+                  ],
                 ),
               );
             },
@@ -259,11 +213,22 @@ class _HomeTodayState extends State<HomeToday> {
             .where((k) => !skip.contains(k.uid))
             .toList();
     final due = [...overdue, ...onDay];
+    // Open tasks without a due date are listed last, on every day.
+    final undated = [
+      for (final k in state.openTasks(clock))
+        if (k.due == null &&
+            k.boardStatus != 'done' &&
+            k.boardStatus != 'cancelled')
+          k,
+    ];
+    final all = due.length + undated.length;
     bool occ(int i) => i >= overdue.length && overdueIds.contains(due[i].uid);
     return TodayCard(
       slug: 'tasks',
       title: 'Tasks',
-      count: due.length,
+      count: all,
+      collapsed: state.homeCardCollapsed('tasks'),
+      onToggle: (c) => state.setHomeCardCollapsed('tasks', c),
       link: 'All tasks',
       onLink: state.openTasksPanel,
       add: state.tasksEditable
@@ -277,10 +242,9 @@ class _HomeTodayState extends State<HomeToday> {
             )
           : null,
       emptyText: isToday ? 'Nothing due today' : 'Nothing due',
-      total: due.length,
-      onMore: state.openTasksPanel,
+      total: all,
       rows: [
-        for (var i = 0; i < due.length && i < _maxRows; i++)
+        for (var i = 0; i < due.length; i++)
           _navRow(
             'tasks',
             occ(i) ? 'task-${due[i].uid}-occ' : 'task-${due[i].uid}',
@@ -296,6 +260,25 @@ class _HomeTodayState extends State<HomeToday> {
               now: clock,
             ),
           ),
+        if (undated.isNotEmpty) ...[
+          _GroupLabel(
+            key: const Key('home-today-tasks-nodate'),
+            label: 'No date',
+            count: undated.length,
+          ),
+          for (final k in undated)
+            _navRow(
+              'tasks',
+              'task-${k.uid}',
+              k.uid,
+              TaskRow(
+                key: Key('home-today-tasks-${k.uid}'),
+                state: state,
+                task: k,
+                now: clock,
+              ),
+            ),
+        ],
       ],
     );
   }
@@ -339,9 +322,10 @@ class _HomeTodayState extends State<HomeToday> {
           : null,
       emptyText: isToday ? 'No events today' : 'No events',
       total: sorted.length,
-      onMore: state.openEventsPanel,
+      collapsed: state.homeCardCollapsed('events'),
+      onToggle: (c) => state.setHomeCardCollapsed('events', c),
       rows: [
-        for (final o in sorted.take(_maxRows))
+        for (final o in sorted)
           _navRow(
             'events',
             eventRowId(o),
@@ -367,7 +351,8 @@ class TodayCard extends StatelessWidget {
     required this.emptyText,
     this.link,
     this.onLink,
-    this.onMore,
+    this.collapsed = false,
+    this.onToggle,
     this.add,
   });
   final String slug;
@@ -378,14 +363,14 @@ class TodayCard extends StatelessWidget {
   final String emptyText;
   final String? link;
   final VoidCallback? onLink;
-  final VoidCallback? onMore;
+  final bool collapsed;
+  final ValueChanged<bool>? onToggle;
   final Widget? add;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final muted = t.type.captionStyle.copyWith(color: t.muted);
-    final hidden = total - rows.length;
     return DecoratedBox(
       key: Key('home-today-$slug'),
       decoration: BoxDecoration(
@@ -405,24 +390,46 @@ class TodayCard extends StatelessWidget {
                   // Title and count take the free width, so the link and
                   // the add button end at the card's right edge.
                   Expanded(
-                    child: Row(
-                      children: [
-                        Flexible(
-                          child: OverflowTip(
-                            title,
-                            style: t.type.labelStyle.copyWith(
-                              fontSize: t.type.caption,
+                    child: FTappable(
+                      key: Key('home-today-$slug-toggle'),
+                      behavior: HitTestBehavior.opaque,
+                      onPress: onToggle == null
+                          ? null
+                          : () => onToggle!(!collapsed),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: narrowLayout(context)
+                              ? t.sizes.touchTarget
+                              : 0,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              collapsed
+                                  ? FLucideIcons.chevronRight
+                                  : FLucideIcons.chevronDown,
+                              size: t.icons.sm,
                               color: t.muted,
                             ),
-                          ),
+                            SizedBox(width: t.space.xs),
+                            Flexible(
+                              child: OverflowTip(
+                                title,
+                                style: t.type.labelStyle.copyWith(
+                                  fontSize: t.type.caption,
+                                  color: t.muted,
+                                ),
+                              ),
+                            ),
+                            SizedBox(width: t.space.sm),
+                            Text(
+                              '$count',
+                              key: Key('home-today-$slug-count'),
+                              style: muted,
+                            ),
+                          ],
                         ),
-                        SizedBox(width: t.space.sm),
-                        Text(
-                          '$count',
-                          key: Key('home-today-$slug-count'),
-                          style: muted,
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                   if (link != null)
@@ -451,7 +458,9 @@ class TodayCard extends StatelessWidget {
                 ],
               ),
             ),
-            if (total == 0)
+            if (collapsed)
+              const SizedBox.shrink()
+            else if (total == 0)
               Padding(
                 padding: EdgeInsets.all(t.space.xs),
                 child: Text(
@@ -462,20 +471,32 @@ class TodayCard extends StatelessWidget {
               )
             else
               ...rows,
-            if (hidden > 0)
-              FTappable(
-                key: Key('home-today-$slug-more'),
-                onPress: onMore,
-                child: Padding(
-                  padding: EdgeInsets.all(t.space.xs),
-                  child: Text(
-                    'and $hidden more',
-                    style: muted.copyWith(color: t.accent),
-                  ),
-                ),
-              ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// A small label with a count between groups of rows in a card.
+class _GroupLabel extends StatelessWidget {
+  const _GroupLabel({super.key, required this.label, required this.count});
+  final String label;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        t.space.xs,
+        t.space.md,
+        t.space.xs,
+        t.space.xs,
+      ),
+      child: Text(
+        '$label  $count',
+        style: t.type.captionStyle.copyWith(color: t.muted),
       ),
     );
   }
