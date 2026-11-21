@@ -28,6 +28,7 @@ export 'src/space.dart';
 export 'src/store.dart';
 export 'src/sync_engine.dart';
 export 'src/task.dart';
+export 'src/zone.dart' show LocalZone;
 export 'src/task_store.dart';
 export 'src/task_sync_engine.dart';
 export 'src/plan_item.dart';

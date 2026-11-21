@@ -238,7 +238,7 @@ void main() {
       await s.load();
     });
 
-    test('overdue and today, in the zone of the machine running the test', () {
+    test('overdue and today, by real instants', () {
       // _now is noon UTC; local day may differ in a far zone, so pin the
       // checks that cannot flip: ordering and the conservative rules.
       final o = s.overdueTasks(_now).map((t) => t.uid).toSet();
@@ -246,11 +246,13 @@ void main() {
       expect(o, isNot(contains('future')));
       expect(o, isNot(contains('later-utc')));
       expect(o, isNot(contains('none')));
-      // 08:00 wall, now 12:00 UTC: real instant could be 20:00 UTC (UTC-12),
-      // so it is not overdue yet.
-      expect(o, isNot(contains('zoned-recent')));
-      final late = DateTime.utc(2026, 11, 20, 20, 1);
-      expect(s.overdueTasks(late).map((t) => t.uid), contains('zoned-recent'));
+      // 08:00 Berlin is 07:00Z: overdue at noon UTC, not at 06:59Z.
+      expect(o, contains('zoned-recent'));
+      final early = DateTime.utc(2026, 11, 20, 6, 59);
+      expect(
+        s.overdueTasks(early).map((t) => t.uid),
+        isNot(contains('zoned-recent')),
+      );
     });
 
     test('open list puts overdue first, undated last', () {

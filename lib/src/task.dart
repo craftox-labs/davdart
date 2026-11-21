@@ -1,3 +1,7 @@
+import 'package:timezone/timezone.dart' as tz;
+
+import 'zone.dart';
+
 /// A date or date-time property value of a task (DUE, DTSTART), kept as the
 /// raw iCalendar text plus its raw parameters, so a round trip never shifts
 /// it: `20261125`, `20261125T090000Z`, or `20261125T090000` with
@@ -33,10 +37,8 @@ class ICalDate {
       .firstMatch(params)
       ?.group(1);
 
-  /// The wall-clock fields as a UTC-flagged [DateTime]. Exact for a UTC value
-  /// and for an all-day date (midnight). For a floating or TZID value the zone
-  /// is not applied (the core carries no time zone database): the wall time
-  /// is returned as if it were UTC. Null if the value does not parse.
+  /// The wall-clock fields as written, as a UTC-flagged [DateTime]: no zone
+  /// is applied. Null if the value does not parse.
   DateTime? get wall {
     final m = RegExp(r'^(\d{4})(\d{2})(\d{2})(?:T(\d{2})(\d{2})(\d{2})Z?)?$')
         .firstMatch(value.trim());
@@ -45,21 +47,60 @@ class ICalDate {
     return DateTime.utc(p[0], p[1], p[2], p[3], p[4], p[5]);
   }
 
-  /// The wall-clock fields in the user's local zone (UTC-flagged
-  /// [DateTime]). A UTC timed value (`...Z`) is an instant, so it is
-  /// converted with `toLocal()`; floating, TZID and all-day values are
-  /// returned as [wall] (no time zone database, so zones stay unapplied).
+  /// The zone of a timed TZID value, or null when there is no TZID, the value
+  /// is UTC or all-day, or the TZID is not in the time zone database (such a
+  /// value is then treated as floating).
+  tz.Location? get _zone {
+    if (allDay || isUtc) return null;
+    final id = tzid;
+    return id == null ? null : LocalZone.location(id);
+  }
+
+  /// True for a timed value without a zone: no TZID, or an unknown one.
+  bool get isFloating => !allDay && !isUtc && _zone == null;
+
+  /// The exact moment (UTC) of a timed value, or null for an all-day date or
+  /// an unparseable value. `Z` is exact, a known TZID is resolved through the
+  /// time zone database, floating (and unknown-TZID) times are read in the
+  /// viewer's zone ([LocalZone]).
+  DateTime? toInstant() {
+    final w = wall;
+    if (w == null || allDay) return null;
+    if (isUtc) return w;
+    final z = _zone;
+    return z == null ? LocalZone.instantOf(w) : LocalZone.instantIn(z, w);
+  }
+
+  /// The wall-clock fields in the viewer's zone (UTC-flagged [DateTime]).
+  /// `Z` and known-TZID values are converted from their instant; floating,
+  /// unknown-TZID and all-day values stay at their written wall time.
   /// Events use this for expansion, grouping and display.
   DateTime? get localWall {
     final w = wall;
-    if (w == null || !isUtc || allDay) return w;
-    final l = w.toLocal();
-    return DateTime.utc(l.year, l.month, l.day, l.hour, l.minute, l.second);
+    if (w == null || allDay) return w;
+    return localWallOf(w);
   }
 
-  /// The value for local wall-clock [w] in the flavour of [like]: a UTC
-  /// timed [like] converts back with `toUtc()` and keeps its `Z`; anything
-  /// else is written as the same wall fields. Inverse of [localWall].
+  /// [w], wall fields in this value's own flavour (UTC for `Z`, the TZID zone,
+  /// or floating), as viewer-zone wall fields.
+  DateTime localWallOf(DateTime w) {
+    if (allDay) return w;
+    if (isUtc) return LocalZone.wallOf(w);
+    final z = _zone;
+    return z == null ? w : LocalZone.wallOf(LocalZone.instantIn(z, w));
+  }
+
+  /// The viewer-zone calendar day (UTC midnight) of this value: the written
+  /// date for an all-day or floating value, the converted date for a timed
+  /// `Z` or TZID value. Null if it does not parse.
+  DateTime? get localDay {
+    final l = localWall;
+    return l == null ? null : DateTime.utc(l.year, l.month, l.day);
+  }
+
+  /// The value for viewer-zone wall [w] in the flavour of [like]: UTC keeps
+  /// its `Z`, a known TZID is converted back into that zone and kept, floating
+  /// and all-day are written as the same fields. Inverse of [localWall].
   static ICalDate fromLocalWall(DateTime w, ICalDate like) {
     String t(int n, [int l = 2]) => n.toString().padLeft(l, '0');
     if (like.allDay) {
@@ -67,7 +108,10 @@ class ICalDate {
     }
     var x = w;
     if (like.isUtc) {
-      x = DateTime(w.year, w.month, w.day, w.hour, w.minute, w.second).toUtc();
+      x = LocalZone.instantOf(w);
+    } else {
+      final z = like._zone;
+      if (z != null) x = LocalZone.wallIn(z, LocalZone.instantOf(w));
     }
     return ICalDate(
         '${t(x.year, 4)}${t(x.month)}${t(x.day)}T${t(x.hour)}${t(x.minute)}'

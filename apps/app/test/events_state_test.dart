@@ -186,6 +186,8 @@ void main() {
     });
 
     test('edit: text, tags keep markers, status, when keeps zone', () async {
+      LocalZone.use('Europe/Berlin'); // local wall equals the TZID wall
+      addTearDown(() => LocalZone.use(null));
       final s = await _open(MemoryStorage(), seed: _Seed());
       final src = s.source as SpaceNoteSource;
       await src.saveEvent(

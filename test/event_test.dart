@@ -298,6 +298,8 @@ void main() {
     });
 
     test('overrides: edited, moved in, moved out and cancelled', () {
+      LocalZone.use('Europe/Berlin'); // the fixture's own zone: wall as written
+      addTearDown(() => LocalZone.use(null));
       final v = parseEvent(google);
       final o = occurrencesBetween(
           v, DateTime.utc(2026, 11, 23), DateTime.utc(2026, 12, 8));
@@ -404,6 +406,8 @@ void main() {
       const z = ICalDate('20261120T090000Z');
       expect(ICalDate.fromLocalWall(z.localWall!, z).value, z.value);
       const t = ICalDate('20261120T090000', ';TZID=Europe/Berlin');
+      LocalZone.use('Europe/Berlin');
+      addTearDown(() => LocalZone.use(null));
       expect(t.localWall, t.wall);
       expect(ICalDate.fromLocalWall(t.wall!, t).value, t.value);
       const d = ICalDate('20261120', ';VALUE=DATE');

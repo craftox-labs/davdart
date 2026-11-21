@@ -94,15 +94,28 @@ class Event {
       (rrule != null && rrule!.isNotEmpty) || rdates.isNotEmpty;
 
   /// Start as wall-clock fields in the local zone (UTC-flagged [DateTime];
-  /// a `...Z` value is converted to local time, floating and TZID values are
-  /// taken as written, see [ICalDate.localWall]), or null.
+  /// a `...Z` or TZID value is converted to local time through the time zone
+  /// database, floating values stay as written, see [ICalDate.localWall]), or
+  /// null.
   DateTime? get startWall => dtstart?.localWall;
 
   /// Length of one occurrence: [dtend] minus [dtstart] (as written), else
   /// [duration], else one day for an all-day event and zero otherwise.
   Duration get length {
-    final s = dtstart?.wall, e = dtend?.wall;
-    if (s != null && e != null && !e.isBefore(s)) return e.difference(s);
+    final ds = dtstart, de = dtend;
+    final s = ds?.wall, e = de?.wall;
+    if (s != null && e != null && ds != null && de != null) {
+      // Same flavour: the written clock difference. Mixed flavours (Z with a
+      // TZID, a zone with floating, ...): the difference of the real instants.
+      final same = ds.allDay == de.allDay &&
+          ds.isUtc == de.isUtc &&
+          ds.tzid == de.tzid;
+      final i = ds.toInstant(), j = de.toInstant();
+      final len = same || i == null || j == null
+          ? e.difference(s)
+          : j.difference(i);
+      if (!len.isNegative) return len;
+    }
     final d = duration == null ? null : parseIcalDuration(duration!);
     if (d != null) return d;
     return allDay ? const Duration(days: 1) : Duration.zero;

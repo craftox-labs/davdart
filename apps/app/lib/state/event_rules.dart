@@ -1,16 +1,12 @@
 import 'package:davdart/davdart.dart';
 
-/// The current moment as local wall-clock fields (UTC-flagged).
+/// The current moment as wall-clock fields in the viewer's zone (UTC-flagged).
 ///
-/// Time policy for events: everything is compared as local wall time. A UTC
-/// value (`...Z`) is converted to the local zone (`ICalDate.localWall`, so
-/// 09:00Z is 16:00 at UTC+7 and groups into that local day); floating and TZID
-/// values are taken as written (the core has no time zone database). Editing
-/// a UTC event converts the local input back with `toUtc` and keeps the Z.
-DateTime wallNow(DateTime now) {
-  final l = now.toLocal();
-  return DateTime.utc(l.year, l.month, l.day, l.hour, l.minute, l.second);
-}
+/// Time policy: timed values are compared in the viewer's zone. `Z` and TZID
+/// values are converted to it (`ICalDate.localWall`, so 09:00Z is 16:00 at
+/// UTC+7 and groups into that local day); floating times and all-day dates
+/// stay as written. New and edited UTC events convert the local input back.
+DateTime wallNow(DateTime now) => LocalZone.wallOf(now);
 
 /// Midnight (UTC-flagged) of the wall day of [d].
 DateTime wallDay(DateTime d) => DateTime.utc(d.year, d.month, d.day);
