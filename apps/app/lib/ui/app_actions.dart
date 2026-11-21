@@ -59,6 +59,9 @@ Object? targetItem(AppState s) {
   return u == null ? null : s.findItem(u);
 }
 
+/// How far j and k scroll an open item page, per press (px).
+const _pageStep = 64.0;
+
 /// The item in edit mode that Esc or Ctrl+Enter act on: the editor of the
 /// area holding the primary focus, else the focused area (peek or main page). Null when that area has no editor
 /// open, even if another area has one: Esc then keeps its area-level meaning.
@@ -191,7 +194,12 @@ List<AppAction> buildActions(AppState state) {
     final n = c.state.nav;
     final by = n.takeCount() * sign;
     final l = navListId(c.state, n.area);
-    if (l != null) n.move(l, by);
+    if (l != null) {
+      n.move(l, by);
+    } else {
+      // An open item page scrolls instead of moving a cursor.
+      n.scrollPageBy(n.area, by * _pageStep);
+    }
   }
 
   bool itemIs<T>(AppState s) => targetItem(s) is T;
@@ -551,11 +559,19 @@ List<AppAction> buildActions(AppState state) {
     }),
     key('nav.first', 'First item', 'Navigation', const ['g g', 'Home'], (c) {
       final l = navListId(c.state, c.state.nav.area);
-      if (l != null) c.state.nav.jump(l, last: false);
+      if (l != null) {
+        c.state.nav.jump(l, last: false);
+      } else {
+        c.state.nav.scrollPageTo(c.state.nav.area, end: false);
+      }
     }),
     key('nav.last', 'Last item', 'Navigation', const ['G', 'End'], (c) {
       final l = navListId(c.state, c.state.nav.area);
-      if (l != null) c.state.nav.jump(l, last: true);
+      if (l != null) {
+        c.state.nav.jump(l, last: true);
+      } else {
+        c.state.nav.scrollPageTo(c.state.nav.area, end: true);
+      }
     }),
     key(
       'nav.left',

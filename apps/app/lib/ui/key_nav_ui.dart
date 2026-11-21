@@ -284,9 +284,12 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
     if (a != null &&
         token.length > 1 &&
         token != 'Esc' &&
-        navListId(state, nav.area) == null) {
+        navListId(state, nav.area) == null &&
+        !(const {'Down', 'Up', 'Home', 'End'}.contains(token) &&
+            nav.hasPage(nav.area))) {
       // Arrows, Enter, Home and End belong to the widgets where there is no
-      // list under the cursor.
+      // list under the cursor (but an open item page takes Down, Up, Home and
+      // End: it scrolls).
       return KeyEventResult.ignored;
     }
     if (a == null) {

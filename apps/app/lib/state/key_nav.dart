@@ -428,8 +428,53 @@ class KeyNav extends ChangeNotifier {
     return n;
   }
 
+  // --- Scrolling an open item page (peek or main) ---
+
+  final Map<NavArea, ScrollController> _pages = {};
+
+  /// The scroll controller of the item page shown in [a] (peek or main); the
+  /// page's scroll view uses it so the keyboard can scroll it.
+  ScrollController pageScroll(NavArea a) =>
+      _pages.putIfAbsent(a, ScrollController.new);
+
+  /// Whether an item page is shown in [a] and has something to scroll.
+  bool hasPage(NavArea a) {
+    final c = _pages[a];
+    if (c == null || c.positions.isEmpty) return false;
+    final p = c.positions.last;
+    return p.maxScrollExtent > p.minScrollExtent;
+  }
+
+  /// Scrolls the item page of [a] by [dy] px (negative: up), short animation.
+  /// False when no page is shown there or its content fits.
+  bool scrollPageBy(NavArea a, double dy) =>
+      _scrollPage(a, (p) => p.pixels + dy);
+
+  /// Scrolls the item page of [a] to its top or bottom.
+  bool scrollPageTo(NavArea a, {required bool end}) =>
+      _scrollPage(a, (p) => end ? p.maxScrollExtent : p.minScrollExtent);
+
+  bool _scrollPage(NavArea a, double Function(ScrollPosition) target) {
+    final c = _pages[a];
+    if (c == null || c.positions.isEmpty) return false;
+    final p = c.positions.last;
+    if (p.maxScrollExtent <= p.minScrollExtent) return false;
+    final to = target(p).clamp(p.minScrollExtent, p.maxScrollExtent);
+    if (to != p.pixels) {
+      p.animateTo(
+        to,
+        duration: const Duration(milliseconds: 80),
+        curve: Curves.easeOut,
+      );
+    }
+    return true;
+  }
+
   @override
   void dispose() {
+    for (final c in _pages.values) {
+      c.dispose();
+    }
     _timer?.cancel();
     searchNode.dispose();
     node.dispose();

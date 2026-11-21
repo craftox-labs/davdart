@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/key_nav.dart';
 import 'chips.dart';
 import 'edit_note_dialog.dart' show confirmDeleteNote;
 import 'markdown_lite.dart';
@@ -26,6 +27,7 @@ class DetailView extends StatelessWidget {
     required this.onClose,
     this.full = false,
     this.inHeader = false,
+    this.area = NavArea.main,
   });
   final AppState state;
 
@@ -41,6 +43,9 @@ class DetailView extends StatelessWidget {
   /// pane leaves Back out.
   final bool inHeader;
 
+  /// The pane showing this page: its keyboard scrolling goes to it.
+  final NavArea area;
+
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
@@ -53,6 +58,7 @@ class DetailView extends StatelessWidget {
           onClose: onClose,
           full: full,
           inHeader: inHeader,
+          area: area,
         );
       }
       if (state.taskById(uid) == null) return const SizedBox.shrink();
@@ -62,6 +68,7 @@ class DetailView extends StatelessWidget {
         onClose: onClose,
         full: full,
         inHeader: inHeader,
+        area: area,
       );
     }
     final p = PlanItem.fromNote(note);
@@ -123,6 +130,7 @@ class DetailView extends StatelessWidget {
         if (draft != null && !mobile) EditBar(state: state, draft: draft),
         Expanded(
           child: SingleChildScrollView(
+            controller: state.nav.pageScroll(area),
             padding: EdgeInsets.fromLTRB(
               t.space.xxl,
               t.space.md,

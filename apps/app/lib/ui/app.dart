@@ -412,6 +412,7 @@ class _ShellState extends State<Shell>
         uid: peekUid!,
         onClose: () => state.guarded(() => state.select(null)),
         inHeader: header,
+        area: NavArea.peek,
       ),
     );
 

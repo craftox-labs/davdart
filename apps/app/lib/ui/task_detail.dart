@@ -6,6 +6,7 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/key_nav.dart';
 import '../state/task_draft.dart';
 import '../state/task_rules.dart';
 import 'markdown_lite.dart';
@@ -312,12 +313,16 @@ class TaskDetail extends StatelessWidget {
     required this.onClose,
     this.full = false,
     this.inHeader = false,
+    this.area = NavArea.main,
   });
   final AppState state;
   final String uid;
   final VoidCallback onClose;
   final bool full;
   final bool inHeader;
+
+  /// The pane showing this page: its keyboard scrolling goes to it.
+  final NavArea area;
 
   @override
   Widget build(BuildContext context) {
@@ -412,6 +417,7 @@ class TaskDetail extends StatelessWidget {
         if (draft != null && !mobile) TaskEditBar(state: state, draft: draft),
         Expanded(
           child: SingleChildScrollView(
+            controller: state.nav.pageScroll(area),
             padding: EdgeInsets.fromLTRB(
               t.space.xxl,
               t.space.md,
