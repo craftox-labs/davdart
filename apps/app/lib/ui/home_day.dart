@@ -104,7 +104,7 @@ class HomeSwitch extends StatelessWidget {
     );
     return ContentCap(
       child: Padding(
-        padding: EdgeInsets.fromLTRB(t.space.lg, t.space.md, t.space.lg, 0),
+        padding: EdgeInsets.fromLTRB(t.space.lg, t.space.lg, t.space.lg, 0),
         child: full
             ? control
             : Align(alignment: Alignment.centerLeft, child: control),
@@ -173,7 +173,12 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: EdgeInsets.fromLTRB(t.space.lg, t.space.md, 0, 0),
+                    padding: EdgeInsets.fromLTRB(
+                      t.space.lg,
+                      t.space.lg,
+                      0,
+                      t.space.lg,
+                    ),
                     // Scrolls when the window is shorter than the grid.
                     child: SingleChildScrollView(
                       key: const Key('home-calendar-scroll'),
@@ -195,7 +200,7 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
                   Padding(
                     padding: EdgeInsets.fromLTRB(
                       t.space.lg,
-                      t.space.md,
+                      t.space.lg,
                       t.space.lg,
                       0,
                     ),
@@ -275,56 +280,68 @@ class CollapsedCalendar extends StatelessWidget {
                   -1,
                 ),
                 Expanded(
-                  child: FTappable(
-                    key: const Key('home-cal-toggle'),
-                    behavior: HitTestBehavior.opaque,
-                    semanticsLabel: open
-                        ? 'Collapse calendar'
-                        : 'Expand calendar',
-                    onPress: () => state.setHomeCalOpen(!open),
-                    child: SizedBox(
-                      height: t.sizes.touchTarget,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            dayLabel(selected, clock),
-                            key: const Key('home-cal-label'),
-                            style: t.type.labelStyle.copyWith(color: t.fg),
-                          ),
-                          SizedBox(width: t.space.sm),
-                          Icon(
-                            open
-                                ? FLucideIcons.chevronUp
-                                : FLucideIcons.chevronDown,
-                            size: t.icons.md,
-                            color: t.muted,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                if (selected != today)
-                  FTappable(
-                    key: const Key('home-day-reset'),
-                    behavior: HitTestBehavior.opaque,
-                    onPress: state.resetHomeDay,
-                    child: SizedBox(
-                      height: t.sizes.touchTarget,
-                      child: Center(
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: t.space.sm),
-                          child: Text(
-                            'Today',
-                            style: t.type.captionStyle.copyWith(
-                              color: t.accent,
-                            ),
+                  // The date stays centred between the two arrows; Today sits
+                  // in the free space at the right, over the toggle, so it
+                  // never shifts the date.
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      FTappable(
+                        key: const Key('home-cal-toggle'),
+                        behavior: HitTestBehavior.opaque,
+                        semanticsLabel: open
+                            ? 'Collapse calendar'
+                            : 'Expand calendar',
+                        onPress: () => state.setHomeCalOpen(!open),
+                        child: SizedBox(
+                          height: t.sizes.touchTarget,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                dayLabel(selected, clock),
+                                key: const Key('home-cal-label'),
+                                style: t.type.labelStyle.copyWith(color: t.fg),
+                              ),
+                              SizedBox(width: t.space.sm),
+                              Icon(
+                                open
+                                    ? FLucideIcons.chevronUp
+                                    : FLucideIcons.chevronDown,
+                                size: t.icons.md,
+                                color: t.muted,
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ),
+                      if (selected != today)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          bottom: 0,
+                          child: FTappable(
+                            key: const Key('home-day-reset'),
+                            behavior: HitTestBehavior.opaque,
+                            onPress: state.resetHomeDay,
+                            child: Center(
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: t.space.sm,
+                                ),
+                                child: Text(
+                                  'Today',
+                                  style: t.type.captionStyle.copyWith(
+                                    color: t.accent,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
+                ),
                 arrow(
                   'home-cal-next-day',
                   FLucideIcons.chevronRight,
@@ -475,7 +492,9 @@ class MonthCalendar extends StatelessWidget {
 
     return Container(
       key: const Key('home-calendar'),
-      padding: bleed ? EdgeInsets.zero : EdgeInsets.all(t.space.sm),
+      padding: bleed
+          ? EdgeInsets.fromLTRB(t.space.md, 0, t.space.md, t.space.md)
+          : EdgeInsets.all(t.space.md),
       decoration: bleed
           ? null
           : BoxDecoration(

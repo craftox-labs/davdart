@@ -154,12 +154,7 @@ class _HomeTodayState extends State<HomeToday> {
               }
               return Padding(
                 key: const Key('home-today'),
-                padding: EdgeInsets.fromLTRB(
-                  t.space.lg,
-                  t.space.md,
-                  t.space.lg,
-                  0,
-                ),
+                padding: EdgeInsets.all(t.space.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -471,6 +466,8 @@ class TodayCard extends StatelessWidget {
               )
             else
               ...rows,
+            // Bottom inner padding matches the header's top (xs).
+            SizedBox(height: t.space.xs),
           ],
         ),
       ),
