@@ -137,17 +137,14 @@ void main() {
         throwsA(isA<ICalException>()));
   });
 
-  test('complete, reopen, board status and overdue', () {
+  test('complete, reopen and board status', () {
     final now = DateTime.utc(2026, 11, 26, 8);
     final t = parseTask(nextcloud);
-    expect(t.isOverdue(DateTime.utc(2026, 11, 25, 23)), isFalse);
-    expect(t.isOverdue(now), isTrue);
     t.complete(now);
     expect(t.status, 'COMPLETED');
     expect(t.percentComplete, 100);
     expect(t.completed, now);
     expect(t.boardStatus, 'done');
-    expect(t.isOverdue(now), isFalse);
     t.reopen();
     expect(t.status, 'NEEDS-ACTION');
     expect(t.completed, isNull);

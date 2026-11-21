@@ -228,16 +228,6 @@ class Task {
   bool get isClosed => isCompleted || isCancelled;
   bool get isRecurring => rrule != null && rrule!.isNotEmpty;
 
-  /// Open and past its due date at [now]. An all-day due date is overdue from
-  /// the day after. Zones are not applied (see [ICalDate.wall]).
-  bool isOverdue(DateTime now) {
-    final d = due;
-    final w = d?.wall;
-    if (isClosed || d == null || w == null) return false;
-    final end = d.allDay ? w.add(const Duration(days: 1)) : w;
-    return now.toUtc().isAfter(end);
-  }
-
   /// The board status word (`backlog`, `todo`, `doing`, `blocked`, `done`,
   /// `cancelled`): a `status-*` tag wins, else derived from [status].
   String get boardStatus {

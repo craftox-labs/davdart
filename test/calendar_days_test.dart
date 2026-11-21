@@ -98,6 +98,19 @@ void main() {
     });
   });
 
+  test('date-only EXDATE matches the series day, not the viewer day', () {
+    // 23:00 New York on 20, 21, 22 = 11:00 on 21, 22, 23 in Bangkok.
+    final e = Event(
+      uid: 'x',
+      dtstart: const ICalDate('20261120T230000', ';TZID=America/New_York'),
+      rrule: 'FREQ=DAILY;COUNT=3',
+      exdates: ['EXDATE;VALUE=DATE:20261121'],
+    );
+    LocalZone.use('Asia/Bangkok');
+    final o = occurrencesBetween(e, u(2026, 11, 20), u(2026, 11, 30));
+    expect([for (final x in o) hm(x.start)], ['11-21 11:00', '11-23 11:00']);
+  });
+
   group('day buckets', () {
     test('events and tasks per viewer day, recurring tasks expanded', () {
       final events = [

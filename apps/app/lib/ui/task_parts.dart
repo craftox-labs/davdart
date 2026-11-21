@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../state/note_drag.dart';
+import '../state/event_rules.dart';
 import '../state/task_rules.dart';
 import '../theme/tokens.dart';
 import 'drag_drop.dart';
@@ -34,8 +35,7 @@ const _months = [
 String dueLabel(Task t, DateTime now) {
   final d = taskDueDay(t);
   if (d == null) return '';
-  final local = now.toLocal();
-  final today = DateTime.utc(local.year, local.month, local.day);
+  final today = wallDay(wallNow(now));
   final diff = d.difference(today).inDays;
   if (diff == 0) return 'Today';
   if (diff == 1) return 'Tomorrow';
@@ -65,7 +65,7 @@ ICalDate dueOfDay(DateTime d, [ICalDate? existing]) {
 
 /// The local calendar day [days] from today, as a UTC-flagged date.
 DateTime dayFromToday(int days, [DateTime? now]) {
-  final n = (now ?? DateTime.now()).toLocal();
+  final n = wallNow(now ?? DateTime.now());
   return DateTime.utc(n.year, n.month, n.day + days);
 }
 

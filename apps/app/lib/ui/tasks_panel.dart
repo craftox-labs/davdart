@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/key_nav.dart';
 import '../state/note_drag.dart';
+import '../state/event_rules.dart';
 import '../state/task_rules.dart';
 import 'collapsible_section.dart';
 import 'key_nav_ui.dart';
@@ -42,11 +43,7 @@ class TasksPanel extends StatelessWidget {
             if (keep.contains(k.uid)) k,
         ];
         final open = pick(state.openTasks(clock));
-        final today = DateTime.utc(
-          clock.toLocal().year,
-          clock.toLocal().month,
-          clock.toLocal().day,
-        );
+        final today = wallDay(wallNow(clock));
         final overdue = [
           for (final k in open)
             if (isTaskOverdue(k, clock)) k,

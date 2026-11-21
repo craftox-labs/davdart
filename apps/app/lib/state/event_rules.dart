@@ -105,7 +105,7 @@ const _months = [
 /// `Fri 21 Nov`, with the year when it is not [now]'s year.
 String dayLabel(DateTime d, [DateTime? now]) {
   final base = '${_weekdays[d.weekday - 1]} ${d.day} ${_months[d.month - 1]}';
-  final year = (now ?? DateTime.now()).toLocal().year;
+  final year = wallNow(now ?? DateTime.now()).year;
   return d.year == year ? base : '$base ${d.year}';
 }
 

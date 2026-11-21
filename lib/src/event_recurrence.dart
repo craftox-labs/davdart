@@ -142,10 +142,12 @@ List<EventOccurrence> occurrencesBetween(
   final slackTo = to.add(const Duration(days: 2));
   final lastDay = DateTime.utc(slackTo.year, slackTo.month, slackTo.day);
 
-  void emitLocal(DateTime s) {
+  // [seriesDay] is the instance's date on the series' own clock: a date-only
+  // EXDATE names that day, not the viewer's.
+  void emitLocal(DateTime s, [DateTime? seriesDay]) {
     if (!starts.add(s)) return;
-    if (ex.contains(_Key(s, false)) ||
-        ex.contains(_Key(DateTime.utc(s.year, s.month, s.day), true))) {
+    final sd = seriesDay ?? DateTime.utc(s.year, s.month, s.day);
+    if (ex.contains(_Key(s, false)) || ex.contains(_Key(sd, true))) {
       return;
     }
     if (overrideIds.contains(_Key(s, false)) ||
@@ -165,7 +167,8 @@ List<EventOccurrence> occurrencesBetween(
     }
   }
 
-  void emit(DateTime base) => emitLocal(first.localWallOf(base));
+  void emit(DateTime base) => emitLocal(
+      first.localWallOf(base), DateTime.utc(base.year, base.month, base.day));
 
   final rule = plan.rule;
   if (rule != null) {
