@@ -375,11 +375,23 @@ class TodayCard extends StatelessWidget {
                   if (link != null)
                     FTappable(
                       key: Key('home-today-$slug-all'),
+                      behavior: HitTestBehavior.opaque,
                       onPress: onLink,
-                      child: Text(
-                        link!,
-                        maxLines: 1,
-                        style: muted.copyWith(color: t.accent),
+                      // A touch-sized target on the narrow layout.
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: narrowLayout(context)
+                              ? t.sizes.touchTarget
+                              : 0,
+                        ),
+                        child: Center(
+                          widthFactor: 1,
+                          child: Text(
+                            link!,
+                            maxLines: 1,
+                            style: muted.copyWith(color: t.accent),
+                          ),
+                        ),
                       ),
                     ),
                   if (add != null) ...[SizedBox(width: t.space.sm), add!],

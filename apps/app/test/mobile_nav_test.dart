@@ -2,7 +2,9 @@ import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
+import 'package:davdart_app/theme/tokens.dart';
 import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'tasks_helper.dart';
@@ -159,9 +161,15 @@ void main() {
           expect(_k('tasks-view'), findsOneWidget);
           await _filter(t, 'events');
           expect(_k('events-panel'), findsOneWidget);
+          // Account and Settings are in the Space chip's sheet now.
+          expect(_k('menu-settings'), findsNothing);
+          expect(_k('menu-account'), findsNothing);
+          await t.tap(_k('space-chip'));
+          await t.pumpAndSettle();
           await t.tap(_k('menu-settings'));
           await t.pumpAndSettle();
           expect(s.section, Section.settings);
+          expect(_k('side-menu'), findsOneWidget);
           // The bar stays; its Menu toggle is still there and closes the
           // menu; the top bar keeps the plain logo throughout.
           expect(_k('mobile-bar'), findsOneWidget);
@@ -277,12 +285,143 @@ void main() {
         final bar = t.getRect(_k('top-bar'));
         expect(t.getRect(chip).bottom, closeTo(bar.bottom + 1, 1.5));
         expect(t.getRect(_k('top-logo')).right, lessThan(t.getRect(chip).left));
-        // The hit box is 44dp tall: a tap above the painted 34dp tab works.
+        // The tab takes the full header height and is its own hit box.
         final box = t.getRect(_k('space-chip'));
-        expect(box.height, greaterThanOrEqualTo(44));
+        expect(box.height, closeTo(bar.height, 1.5));
         await t.tapAt(Offset(box.center.dx, box.top + 3));
         await t.pumpAndSettle();
         expect(_k('menu-sheet'), findsOneWidget);
+        _noError(t);
+      });
+
+      testWidgets('the chip content is on the logo centre line, logo-sized', (
+        t,
+      ) async {
+        await pumpTasksApp(t, size: size);
+        final logo = t.getRect(_k('top-logo'));
+        final icon = find.descendant(
+          of: _k('space-chip'),
+          matching: find.byType(Icon),
+        );
+        expect(t.getRect(icon).center.dy, closeTo(logo.center.dy, 1.5));
+        expect(t.getSize(icon).height, Tokens.light.icons.lg);
+        final label = find.descendant(
+          of: _k('space-chip'),
+          matching: find.byType(Text),
+        );
+        expect(t.getRect(label).center.dy, closeTo(logo.center.dy, 1.5));
+        // The sync button stays on the right.
+        expect(
+          t.getRect(find.byIcon(FLucideIcons.refreshCw)).left,
+          greaterThan(t.getRect(_k('space-chip')).right),
+        );
+        _noError(t);
+      });
+
+      testWidgets('the top bar, chip and sync show on an open item too', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(
+          t,
+          notes: [_note('n1', 'Alpha')],
+          tasks: [mkTask('k1', summary: 'Pay rent')],
+          size: size,
+        );
+        for (final uid in ['n1', 'k1']) {
+          await s.openNote(uid);
+          await t.pumpAndSettle();
+          expect(s.activeTab, isNotNull);
+          expect(_k('top-bar'), findsOneWidget, reason: uid);
+          expect(_k('space-chip'), findsOneWidget, reason: uid);
+          expect(find.byIcon(FLucideIcons.refreshCw), findsOneWidget);
+          // Tapping the chip still opens the Space sheet.
+          await t.tap(_k('space-chip'));
+          await t.pumpAndSettle();
+          expect(_k('menu-sheet'), findsOneWidget);
+          await t.tapAt(Offset(5, size.height - 5));
+          await t.pumpAndSettle();
+        }
+        _noError(t);
+      });
+
+      testWidgets('the chip sheet holds the Spaces and Settings (rail)', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(t, size: size);
+        await t.tap(_k('space-chip'));
+        await t.pumpAndSettle();
+        // The same Space rows as the desktop rail's popup, then its bottom
+        // entries.
+        expect(find.text('One fixed notes source'), findsOneWidget);
+        expect(_k('menu-settings'), findsOneWidget);
+        await t.tap(_k('menu-settings'));
+        await t.pumpAndSettle();
+        expect(s.section, Section.settings);
+        expect(_k('side-menu'), findsOneWidget);
+        _noError(t);
+      });
+
+      testWidgets('Search keeps its field pinned when the list scrolls', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(
+          t,
+          notes: [for (var i = 0; i < 30; i++) _note('n$i', 'Alpha $i')],
+          size: size,
+        );
+        await t.tap(_k('bar-search'));
+        await t.pumpAndSettle();
+        expect(s.section, Section.search);
+        final top = t.getRect(_k('search-all-field')).top;
+        await t.enterText(_k('search-all-field'), 'Alpha');
+        await t.pumpAndSettle();
+        await t.drag(find.byType(ListView).last, const Offset(0, -400));
+        await t.pumpAndSettle();
+        expect(t.getRect(_k('search-all-field')).top, top);
+        // With the keyboard up (shorter body) the field is still on screen.
+        t.view.viewInsets = FakeViewPadding(bottom: size.height * 0.4);
+        addTearDown(t.view.resetViewInsets);
+        await t.pumpAndSettle();
+        expect(t.getRect(_k('search-all-field')).top, greaterThanOrEqualTo(0));
+        // ... above the keyboard, with the results list taking what is left.
+        final field = t.getRect(_k('search-all-field'));
+        expect(field.bottom, lessThan(size.height * 0.6));
+        expect(t.getRect(find.byType(ListView).last).height, greaterThan(40));
+        _noError(t);
+      });
+
+      testWidgets('Home "All tasks" and "All events" open the side menu', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(
+          t,
+          tasks: [mkTask('k1', summary: 'Pay rent', days: 0)],
+          events: [mkEvent('e1', summary: 'Standup')],
+          size: size,
+        );
+        expect(_k('side-menu'), findsNothing);
+        await t.ensureVisible(_k('home-today-tasks-all'));
+        await t.tap(_k('home-today-tasks-all'));
+        await t.pumpAndSettle();
+        expect(s.section, Section.tasks);
+        expect(_k('side-menu'), findsOneWidget);
+        expect(_k('tasks-view'), findsOneWidget);
+        await t.tap(_k('menu'));
+        await t.pumpAndSettle();
+        expect(_k('side-menu'), findsNothing);
+        await t.ensureVisible(_k('home-today-events-all'));
+        await t.tap(_k('home-today-events-all'));
+        await t.pumpAndSettle();
+        expect(s.section, Section.events);
+        expect(_k('side-menu'), findsOneWidget);
+        expect(_k('events-panel'), findsOneWidget);
+        // The link is a touch-sized target.
+        await t.tap(_k('menu'));
+        await t.pumpAndSettle();
+        expect(
+          t.getRect(_k('home-today-tasks-all')).height,
+          greaterThanOrEqualTo(44),
+        );
         _noError(t);
       });
 

@@ -599,7 +599,11 @@ class JoinedTab extends StatelessWidget {
     this.hovered = false,
     this.flushStart = false,
     this.flushEnd = false,
+    this.height,
   });
+
+  /// The tab's height; [Sizes.tabStrip] by default.
+  final double? height;
 
   /// The tab starts or ends at a divider: see [RailTabPainter.squareStart].
   final bool flushStart, flushEnd;
@@ -610,7 +614,7 @@ class JoinedTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final box = SizedBox(height: t.sizes.tabStrip, child: child);
+    final box = SizedBox(height: height ?? t.sizes.tabStrip, child: child);
     if (active) {
       return CustomPaint(
         key: const Key('joined-tab'),

@@ -180,19 +180,38 @@ Future<void> _dropOnSpace(
 /// The Spaces popup's groups: every Space (the current one first, marked)
 /// with its sync state, then the manage actions (new, rename, delete).
 /// Picking a Space switches to it and keeps Tasks or Events, else shows Notes; [onPick] runs only before a
-/// manage action opens a dialog.
+/// manage action opens a dialog. With [rail] the rail's bottom entries
+/// (Account, Settings) follow, as in the desktop rail; they show their
+/// panel in the side menu (narrow).
 List<FItemGroup> spaceMenuGroups(
   BuildContext context,
   AppState state,
   FPopoverController controller, {
   VoidCallback? onPick,
+  bool rail = false,
 }) {
   final t = tokensOf(context);
+  final railGroup = FItemGroup(
+    children: [
+      for (final s in bottomSections(state))
+        FItem(
+          key: Key('menu-${s.name}'),
+          prefix: Icon(sectionMeta(s).$1, size: t.icons.md, color: t.muted),
+          title: Text(sectionMeta(s).$2),
+          onPress: () {
+            controller.hide();
+            state.setSection(s);
+            state.openMenu?.call();
+          },
+        ),
+    ],
+  );
   if (state.catalog == null) {
     return [
       FItemGroup(
         children: [FItem(title: const OverflowTip('One fixed notes source'))],
       ),
+      if (rail) railGroup,
     ];
   }
   void pick(VoidCallback act) {
@@ -291,6 +310,7 @@ List<FItemGroup> spaceMenuGroups(
         ],
       ],
     ),
+    if (rail) railGroup,
   ];
 }
 

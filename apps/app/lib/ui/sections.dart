@@ -30,8 +30,12 @@ class _Panel extends StatelessWidget {
     this.trailing,
     this.wrapBody,
     this.drawer,
+    this.pinned,
   });
   final Widget heading;
+
+  /// Stays above the scrolling body (a search field must not scroll away).
+  final Widget? pinned;
   final List<Widget> children;
   final Widget? trailing;
 
@@ -44,11 +48,19 @@ class _Panel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final body = ListView(
+    final list = ListView(
       scrollCacheExtent: navCacheExtent,
       padding: EdgeInsets.symmetric(horizontal: t.space.lg),
       children: children,
     );
+    final body = pinned == null
+        ? list
+        : Column(
+            children: [
+              pinned!,
+              Expanded(child: list),
+            ],
+          );
     return SidePanelFrame(
       title: heading,
       actions: trailing,
@@ -563,21 +575,26 @@ class _SearchSectionState extends State<SearchSection> {
     ]);
     return _Panel(
       heading: _title('Search'),
-      children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(t.space.xs, 0, t.space.xs, t.space.md),
-          child: field(
-            key: const Key('search-all-field'),
-            focusNode: state.nav.searchNode,
-            controller: state.searchController,
-            hint: 'Search all spaces',
-            prefixIcon: FLucideIcons.search,
-            onChange: (v) {
-              state.setQuery(v);
-              _search(v);
-            },
-          ),
+      pinned: Padding(
+        padding: EdgeInsets.fromLTRB(
+          t.space.lg + t.space.xs,
+          0,
+          t.space.lg + t.space.xs,
+          t.space.md,
         ),
+        child: field(
+          key: const Key('search-all-field'),
+          focusNode: state.nav.searchNode,
+          controller: state.searchController,
+          hint: 'Search all spaces',
+          prefixIcon: FLucideIcons.search,
+          onChange: (v) {
+            state.setQuery(v);
+            _search(v);
+          },
+        ),
+      ),
+      children: [
         if (hits != null && hits.isEmpty) const _Muted('No matches'),
         for (final h in hits ?? const <SpaceHit>[])
           NavRow(

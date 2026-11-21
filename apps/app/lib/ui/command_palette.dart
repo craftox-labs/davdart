@@ -249,7 +249,11 @@ class _CommandPaletteState extends State<CommandPalette> {
                     Flexible(
                       child: ConstrainedBox(
                         constraints: BoxConstraints(
-                          maxHeight: MediaQuery.sizeOf(context).height * 0.6,
+                          // Keyboard up: the list stays above it.
+                          maxHeight:
+                              (MediaQuery.sizeOf(context).height -
+                                  MediaQuery.viewInsetsOf(context).bottom) *
+                              0.6,
                         ),
                         child: _entries.isEmpty
                             ? Padding(

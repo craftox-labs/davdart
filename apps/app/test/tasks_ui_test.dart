@@ -353,13 +353,9 @@ void main() {
       testWidgets('no overflow at $w', (t) async {
         final s = await _tab(t, size: Size(w, 900));
         if (_k('menu').evaluate().isNotEmpty) {
-          // Narrow: the panel is in the side menu.
-          await t.tap(_k('menu'));
-          await t.pumpAndSettle();
-          await t.tap(_k('menu-filter'));
-          await t.pumpAndSettle();
-          await t.tap(_k('filter-tasks'));
-          await t.pumpAndSettle();
+          // Narrow: the panel is in the side menu, which openTasksPanel
+          // (the Home "All tasks" link) opened.
+          expect(_k('side-menu'), findsOneWidget);
         }
         await t.tap(_k('tasks-filter-all'));
         await t.pumpAndSettle();
