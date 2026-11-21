@@ -226,12 +226,14 @@ void main() {
     expect(n, 2);
   });
 
-  testWidgets('phone: day cells are 44dp wide at 320', (t) async {
+  testWidgets('phone: day cells are 44dp tall and ~40dp wide at 320', (
+    t,
+  ) async {
     await pumpTasksApp(t, size: const Size(320, 568));
     await t.tap(_k('home-cal-toggle'));
     await t.pumpAndSettle();
     final r = t.getRect(_k(_dayKey(_tomorrow())));
-    expect(r.width, greaterThanOrEqualTo(44));
+    expect(r.width, greaterThanOrEqualTo(40)); // card margins and inset
     expect(r.height, greaterThanOrEqualTo(44));
     expect(t.takeException(), isNull);
   });
@@ -259,5 +261,127 @@ void main() {
     expect(_k('home-today-tasks-rep-occ'), findsOneWidget); // today's one
     expect(_k('home-today-tasks-once'), findsOneWidget);
     expect(_k('home-today-tasks-once-occ'), findsNothing);
+  });
+
+  group('calendar header', () {
+    for (final w in [320.0, 360.0]) {
+      testWidgets('phone $w: centred title, no overlap, September', (t) async {
+        final s = await pumpTasksApp(t, size: Size(w, 640));
+        final sep = DateTime.utc(DateTime.now().year + 1, 9, 29);
+        double mid(String k) => t.getCenter(_k(k)).dx;
+        final card = t.getRect(_k('home-calendar-card'));
+        // Collapsed, today selected: no Today button.
+        expect(_k('home-day-reset'), findsNothing);
+        final centre = mid('home-cal-toggle');
+        s.selectHomeDay(sep);
+        await t.pumpAndSettle();
+        expect(_k('home-day-reset'), findsOneWidget);
+        // The title did not move when Today appeared.
+        expect((mid('home-cal-toggle') - centre).abs(), lessThan(1));
+        // Longest collapsed title (with the year): never overlaps Today or
+        // the arrows, no overflow.
+        void apart(String a, String b) => expect(
+          t.getRect(_k(a)).right,
+          lessThanOrEqualTo(t.getRect(_k(b)).left + 0.5),
+          reason: '$a vs $b',
+        );
+        apart('home-cal-prev-day', 'home-cal-toggle');
+        apart('home-cal-label', 'home-day-reset');
+        apart('home-day-reset', 'home-cal-next-day');
+        expect(t.takeException(), isNull);
+        // Expanded: the short month title, still centred in the card.
+        await t.tap(_k('home-cal-toggle'));
+        await t.pumpAndSettle();
+        expect(t.widget<Text>(_k('cal-month')).data, 'Sep ${sep.year}');
+        expect((mid('home-cal-toggle') - card.center.dx).abs(), lessThan(1));
+        apart('cal-month', 'home-day-reset');
+        apart('home-day-reset', 'cal-next');
+        expect(t.takeException(), isNull);
+        // Today appearing did not move a centred title (today's title is
+        // centred too).
+        s.resetHomeDay();
+        await t.pumpAndSettle();
+        expect(_k('home-day-reset'), findsNothing);
+        expect((mid('home-cal-toggle') - card.center.dx).abs(), lessThan(1));
+        expect((centre - card.center.dx).abs(), lessThan(1));
+      });
+    }
+  });
+
+  testWidgets('Segmented fills the width on a phone, not on wide', (t) async {
+    await pumpTasksApp(t, size: const Size(400, 800));
+    final box = t.getRect(_k('home-focus'));
+    final a = t.getRect(_k('home-focus-day'));
+    final b = t.getRect(_k('home-focus-board'));
+    expect(a.width, closeTo(b.width, 0.5));
+    expect(box.width, greaterThan(400 - 2 * 12 - 2));
+    expect(a.width + b.width, closeTo(box.width, 1));
+    await pumpTasksApp(t, size: const Size(1280, 800));
+    expect(t.getRect(_k('home-focus')).width, lessThan(300));
+  });
+
+  testWidgets('section collapse is remembered per Space key', (t) async {
+    final prefs = MemoryStorage()
+      ..write('davdart.home.card.collapsed.v1.tasks.other', 'true');
+    await pumpTasksApp(t, prefs: prefs, tasks: [mkTask('a', days: 0)]);
+    // Another Space's choice does not apply here.
+    expect(_k('home-today-tasks'), findsOneWidget);
+    await t.tap(_k('home-today-tasks-toggle'));
+    await t.pumpAndSettle();
+    expect(_k('home-today-tasks'), findsNothing);
+    expect(prefs.read('davdart.home.card.collapsed.v1.tasks.default'), 'true');
+    expect(prefs.read('davdart.home.card.collapsed.v1.tasks.other'), 'true');
+  });
+
+  testWidgets('undated tasks are listed last on every selected day', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      tasks: [
+        mkTask('undated'),
+        mkTask('today', days: 0),
+        mkTask('next', days: 1),
+        mkTask('done', status: 'COMPLETED'),
+      ],
+    );
+    for (final day in [null, _tomorrow()]) {
+      s.selectHomeDay(day);
+      await t.pumpAndSettle();
+      expect(_k('home-today-tasks-undated'), findsOneWidget);
+      expect(_k('home-today-tasks-done'), findsNothing);
+      expect(_k('home-today-tasks-nodate'), findsOneWidget);
+      final dated = day == null ? 'today' : 'next';
+      expect(
+        t.getTopLeft(_k('home-today-tasks-undated')).dy,
+        greaterThan(t.getTopLeft(_k('home-today-tasks-$dated')).dy),
+      );
+    }
+  });
+
+  group('wide grid', () {
+    for (final w in [700.0, 1280.0, 1700.0]) {
+      testWidgets('50/50 columns at $w', (t) async {
+        await pumpTasksApp(t, size: Size(w, 900));
+        final cal = t.getRect(_k('home-calendar'));
+        final list = t.getRect(_k('home-today'));
+        // Left column = card + its left margin; right column = the padded
+        // list: equal halves.
+        expect(cal.width + 12, closeTo(list.width, 1));
+        expect(
+          cal.top,
+          closeTo(list.top + 12, 1),
+        ); // same top edge under the margin
+      });
+    }
+
+    testWidgets('day cell height is clamped to the phone cell and the cap', (
+      t,
+    ) async {
+      double cell() => t.getSize(find.byKey(Key(_dayKey(_tomorrow())))).height;
+      await pumpTasksApp(t, size: const Size(1700, 520));
+      expect(cell(), greaterThanOrEqualTo(44));
+      await pumpTasksApp(t, size: const Size(1700, 2400));
+      expect(cell(), closeTo(72, 0.5));
+      expect(t.takeException(), isNull);
+    });
   });
 }

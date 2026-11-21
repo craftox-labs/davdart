@@ -44,7 +44,7 @@ class KeyNav extends ChangeNotifier {
   /// press or Esc. The key handler itself stays alive either way.
   bool shown = false;
 
-  /// Home Today cards are stacked (narrow), set by the cards each build.
+  /// The Home day sections are one stacked column (true while they show).
   bool homeStacked = false;
 
   /// The Home board is a status accordion (narrow); set by the board each
@@ -352,8 +352,8 @@ class KeyNav extends ChangeNotifier {
     return true;
   }
 
-  /// `{` and `}`: the first row of the previous or next section (Tasks card,
-  /// Events card, Board), skipping empty ones. False at either end.
+  /// `{` and `}`: the first row of the previous or next section (Events section,
+  /// Tasks section, Board), skipping empty ones. False at either end.
   bool homeSection(int dir) {
     final blocks = _homeBlocks();
     final (b, _) = _homePos(blocks);

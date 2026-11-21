@@ -79,14 +79,16 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
-  testWidgets('Today cards share the width beside the calendar', (t) async {
+  testWidgets('Events above Tasks, same width, beside the calendar', (t) async {
     await _pump(t, _four, w: 1700, board: false);
     final cal = _r(t, 'home-calendar');
     final tasks = _r(t, 'home-today-tasks');
     final events = _r(t, 'home-today-events');
     expect(tasks.left, greaterThan(cal.right));
+    expect(tasks.left, closeTo(events.left, 0.5));
     expect(tasks.width, closeTo(events.width, 0.5));
-    expect(events.left - tasks.right, closeTo(_t.space.lg, 0.5));
+    // Events above Tasks, a space.lg gap between the sections' blocks.
+    expect(tasks.top, greaterThan(events.bottom));
   });
 
   testWidgets('falls back to scrolling below the minimum width', (t) async {
@@ -111,21 +113,17 @@ void main() {
     expect(cap.right < main, isTrue);
   });
 
-  testWidgets('Board collapses, keeps heading, persists', (t) async {
-    final prefs = MemoryStorage();
+  testWidgets('Board has no overall header; a stale collapse pref is cleared', (
+    t,
+  ) async {
+    final prefs = MemoryStorage()
+      ..write('davdart.home.board.collapsed.v1', 'true')
+      ..write('davdart.home.today.collapsed.v1', 'true');
     await _pump(t, _four, prefs: prefs);
-    expect(_k('board-drop-todo'), findsOneWidget);
-    await t.tap(_k('home-board-toggle'));
-    await t.pumpAndSettle();
-    expect(_k('board-drop-todo'), findsNothing);
-    expect(_k('home-board-toggle'), findsOneWidget);
-    expect(prefs.read('davdart.home.board.collapsed.v1'), 'true');
-    await _pump(t, _four, prefs: prefs);
-    expect(_k('board-drop-todo'), findsNothing);
-    await t.tap(_k('home-board-toggle'));
-    await t.pumpAndSettle();
+    expect(_k('home-board-toggle'), findsNothing);
     expect(_k('board-drop-todo'), findsOneWidget);
     expect(prefs.read('davdart.home.board.collapsed.v1'), isNull);
+    expect(prefs.read('davdart.home.today.collapsed.v1'), isNull);
   });
 
   for (final w in [320.0, 480.0, 880.0, 1280.0, 1911.0]) {

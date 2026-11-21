@@ -369,11 +369,11 @@ void main() {
       await t.pumpAndSettle();
       s.nav.focusArea(NavArea.main, list: KeyNav.homeList);
       await t.pump();
-      expect(s.nav.cursorId(KeyNav.homeList), 'task-a');
-      await _press(t, LogicalKeyboardKey.keyL);
       expect(s.nav.cursorId(KeyNav.homeList), 'event-row-e1');
       await _press(t, LogicalKeyboardKey.enter);
       expect(s.peekUid, 'e1');
+      await _press(t, LogicalKeyboardKey.keyJ);
+      expect(s.nav.cursorId(KeyNav.homeList), 'task-a');
     });
 
     testWidgets('rail: j k move over sections, Enter picks one', (t) async {

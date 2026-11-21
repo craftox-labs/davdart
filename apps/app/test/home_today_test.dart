@@ -13,6 +13,17 @@ import 'tasks_helper.dart';
 
 Finder _k(String k) => find.byKey(Key(k));
 
+/// The count shown in a section's accordion header.
+String _count(WidgetTester t, String slug) => t
+    .widgetList<Text>(
+      find.descendant(
+        of: _k('home-today-$slug-toggle'),
+        matching: find.byType(Text),
+      ),
+    )
+    .last
+    .data!;
+
 void main() {
   setUp(() => LocalZone.use('Asia/Bangkok'));
   tearDown(() => LocalZone.use(null));
@@ -87,18 +98,20 @@ void main() {
     expect(r.localDay, DateTime.utc(2026, 12, 10));
   });
 
-  testWidgets('two cards, equal width and height, empty states', (t) async {
+  testWidgets('Events above Tasks, one card each, empty states', (t) async {
     await pumpTasksApp(t, size: const Size(1700, 900));
     expect(_k('home-today-doing'), findsNothing);
     expect(find.text('Nothing due today'), findsOneWidget);
     expect(find.text('No events today'), findsOneWidget);
-    final a = t.getRect(_k('home-today-tasks'));
-    final b = t.getRect(_k('home-today-events'));
-    expect(a.width, closeTo(b.width, 0.5));
-    expect(a.height, closeTo(b.height, 0.5));
-    expect(a.top, b.top);
-    expect(b.left, greaterThan(a.right));
-    expect(_k('home-today-tasks-toggle'), findsNothing);
+    final e = t.getRect(_k('home-today-events'));
+    final k = t.getRect(_k('home-today-tasks'));
+    expect(e.width, closeTo(k.width, 0.5));
+    expect(k.top, greaterThanOrEqualTo(e.bottom));
+    // Accordion headers sit outside the cards, above them.
+    expect(
+      t.getRect(_k('home-today-events-toggle')).bottom,
+      lessThanOrEqualTo(e.top + 0.5),
+    );
   });
 
   testWidgets('Tasks card: overdue then today only, overdue marked', (t) async {
@@ -106,7 +119,7 @@ void main() {
       t,
       tasks: [
         mkTask('later', days: 9),
-        mkTask('nodate'),
+        mkTask('undated'),
         mkTask('tomorrow', days: 1),
         mkTask('late', days: -2),
         mkTask('today', days: 0),
@@ -115,14 +128,20 @@ void main() {
     );
     expect(_k('home-today-tasks-late'), findsOneWidget);
     expect(_k('home-today-tasks-today'), findsOneWidget);
-    for (final n in ['later', 'nodate', 'tomorrow', 'done']) {
+    for (final n in ['later', 'tomorrow', 'done']) {
       expect(_k('home-today-tasks-$n'), findsNothing);
     }
     expect(
       t.getTopLeft(_k('home-today-tasks-late')).dy,
       lessThan(t.getTopLeft(_k('home-today-tasks-today')).dy),
     );
-    expect(t.widget<Text>(_k('home-today-tasks-count')).data, '2');
+    // Undated open tasks come last, under their own label.
+    expect(_k('home-today-tasks-nodate'), findsOneWidget);
+    expect(
+      t.getTopLeft(_k('home-today-tasks-undated')).dy,
+      greaterThan(t.getTopLeft(_k('home-today-tasks-today')).dy),
+    );
+    expect(_count(t, 'tasks'), '3');
     Color chipColor(String uid) => t
         .widget<Text>(
           find.descendant(of: _k('due-$uid'), matching: find.byType(Text)),
@@ -134,16 +153,18 @@ void main() {
     expect(find.text('Nothing due today'), findsNothing);
   });
 
-  testWidgets('Tasks card caps at 6 rows with "and N more"', (t) async {
-    final s = await pumpTasksApp(
+  testWidgets('Tasks card lists every task, no cap and no "more" link', (
+    t,
+  ) async {
+    await pumpTasksApp(
       t,
       tasks: [for (var i = 0; i < 8; i++) mkTask('k$i', days: 0)],
     );
-    expect(_k('home-today-tasks-more'), findsOneWidget);
-    expect(find.text('and 2 more'), findsOneWidget);
-    await t.tap(_k('home-today-tasks-more'));
-    await t.pumpAndSettle();
-    expect(s.section, Section.tasks);
+    for (var i = 0; i < 8; i++) {
+      expect(_k('home-today-tasks-k$i'), findsOneWidget);
+    }
+    expect(_k('home-today-tasks-more'), findsNothing);
+    expect(_count(t, 'tasks'), '8');
   });
 
   testWidgets('checkbox completes a task and it leaves the card', (t) async {
@@ -201,8 +222,7 @@ void main() {
     await t.pumpAndSettle();
     expect(_k('home-today-tasks-in'), findsOneWidget);
     expect(_k('home-today-tasks-out'), findsOneWidget);
-    expect(_k('home-today-events-count'), findsOneWidget);
-    expect(t.widget<Text>(_k('home-today-events-count')).data, '2');
+    expect(_count(t, 'events'), '2');
   });
 
   testWidgets('rolls over at local midnight (fake clock)', (t) async {
@@ -272,7 +292,7 @@ void main() {
     expect(find.text('All day'), findsOneWidget);
     expect(_k('event-location-early'), findsOneWidget);
     expect(_k('event-repeat-daily'), findsOneWidget);
-    expect(t.widget<Text>(_k('home-today-events-count')).data, '5');
+    expect(_count(t, 'events'), '5');
     expect(find.text('No events today'), findsNothing);
   });
 
@@ -308,12 +328,12 @@ void main() {
     expect(_k('home-today'), findsNothing);
   });
 
-  testWidgets('narrow width stacks the cards, same width', (t) async {
+  testWidgets('narrow width: Events above Tasks, same width', (t) async {
     await pumpTasksApp(t, size: const Size(400, 900));
-    final a = t.getRect(_k('home-today-tasks'));
-    final b = t.getRect(_k('home-today-events'));
-    expect(b.top, greaterThanOrEqualTo(a.bottom));
-    expect(a.width, closeTo(b.width, 0.5));
+    final e = t.getRect(_k('home-today-events'));
+    final k = t.getRect(_k('home-today-tasks'));
+    expect(k.top, greaterThanOrEqualTo(e.bottom));
+    expect(e.width, closeTo(k.width, 0.5));
     expect(t.takeException(), isNull);
   });
 
@@ -340,36 +360,33 @@ void main() {
     });
   }
 
-  testWidgets('the Today header chevron collapses and expands it (desktop)', (
+  testWidgets('each section collapses on its header and remembers it', (
     t,
   ) async {
-    await pumpTasksApp(t, size: const Size(1280, 900));
-    expect(_k('home-today'), findsOneWidget);
-    await t.tap(_k('today-section-toggle'));
+    final s = await pumpTasksApp(
+      t,
+      size: const Size(1280, 900),
+      tasks: [mkTask('a', days: 0)],
+      events: [mkEvent('e1')],
+    );
+    expect(_k('home-today-tasks'), findsOneWidget);
+    await t.tap(_k('home-today-tasks-toggle'));
     await t.pumpAndSettle();
-    expect(_k('home-today'), findsNothing);
-    await t.tap(_k('today-section-toggle'));
-    await t.pumpAndSettle();
-    expect(_k('home-today'), findsOneWidget);
-  });
-
-  testWidgets('homeStacked is kept while Today is collapsed; one state', (
-    t,
-  ) async {
-    final s = await pumpTasksApp(t, size: const Size(400, 800));
-    await t.tap(_k('today-section-toggle'));
-    await t.pumpAndSettle();
-    expect(_k('home-today'), findsNothing);
+    expect(_k('home-today-tasks'), findsNothing);
+    expect(_k('home-today-events'), findsOneWidget); // independent
+    expect(
+      s.prefs?.read('davdart.home.card.collapsed.v1.tasks.default'),
+      'true',
+    );
+    expect(s.homeCardCollapsed('events'), isFalse);
+    // Its keyboard rows are skipped while collapsed.
     expect(s.nav.homeStacked, isTrue);
-    // The pref is written once, by the owner, and read back on a rebuild.
-    expect(s.prefs?.read('davdart.home.today.collapsed.v1'), 'true');
-    t.view.physicalSize = const Size(1700, 900);
+    await t.tap(_k('home-today-tasks-toggle'));
     await t.pumpAndSettle();
-    expect(s.nav.homeStacked, isFalse);
-    expect(_k('home-today'), findsNothing);
-    await t.tap(_k('today-section-toggle'));
-    await t.pumpAndSettle();
-    expect(_k('home-today'), findsOneWidget);
-    expect(s.prefs?.read('davdart.home.today.collapsed.v1'), isNull);
+    expect(_k('home-today-tasks'), findsOneWidget);
+    expect(
+      s.prefs?.read('davdart.home.card.collapsed.v1.tasks.default'),
+      isNull,
+    );
   });
 }

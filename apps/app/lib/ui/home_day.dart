@@ -165,7 +165,7 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
           availHeight: availHeight,
           onToday: bleed ? null : state.resetHomeDay,
         );
-        final list = HomeToday(state: state, now: widget.now, stack: true);
+        final list = HomeToday(state: state, now: widget.now);
         return LayoutBuilder(
           builder: (context, c) {
             final calendar = calendarFor(c.maxWidth < Tokens.stackBreakpoint);
@@ -482,9 +482,10 @@ class MonthCalendar extends StatelessWidget {
     final muted = t.type.captionStyle.copyWith(color: t.muted);
     var cellHeight = cell;
     if (availHeight != null && !bleed) {
-      // Padding, header row, weekday row and its gap are fixed; the week rows
+      // Padding, the header row (`cell` tall: 44 on narrow layouts), the
+      // weekday row and its gap are fixed; the week rows
       // share what is left.
-      final fixed = 2 * t.space.md + 2 * t.sizes.calendarCell + t.space.md;
+      final fixed = 2 * t.space.md + cell + t.sizes.calendarCell + t.space.md;
       cellHeight = ((availHeight! - fixed) / weeks).clamp(
         t.sizes.touchTarget,
         t.sizes.calendarCellMax,
@@ -512,8 +513,8 @@ class MonthCalendar extends StatelessWidget {
                     ? Border.all(color: t.accent, width: t.sizes.ring)
                     : null,
               ),
-              child: LayoutBuilder(
-                builder: (context, c) {
+              child: Builder(
+                builder: (context) {
                   // A fixed marker size, whatever the cell grows to.
                   final side = cell - t.space.sm;
                   return SizedBox(

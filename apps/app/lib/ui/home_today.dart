@@ -18,25 +18,17 @@ import 'task_menu.dart';
 import 'task_parts.dart';
 import 'theme.dart';
 
-// The day section on Home: equal-width cards (Tasks, Events) for what falls
-// on the selected day (`AppState.homeSelectedDay`, today by default). A view
-// over AppState. The cards are a plain list in [HomeToday]; the calendar that
-// picks the day is in home_day.dart.
+// The day section on Home: Events and Tasks sections (accordion header
+// outside, one card of rows each) for the selected day
+// (`AppState.homeSelectedDay`, today by default), stacked in one column. A
+// view over AppState; the calendar that picks the day is in home_day.dart.
 
 // Home ignores the panel filters (Tasks and Events tags, the Tasks folder
 // filter, the Board folder scope): it shows literally today's items.
 
 class HomeToday extends StatefulWidget {
-  const HomeToday({
-    super.key,
-    required this.state,
-    this.now,
-    this.stack = false,
-  });
+  const HomeToday({super.key, required this.state, this.now});
   final AppState state;
-
-  /// Always stack Events above Tasks (the Home Day grid's right column).
-  final bool stack;
 
   /// Clock override for tests (a function so the time can advance).
   final DateTime Function()? now;
@@ -120,7 +112,7 @@ class _HomeTodayState extends State<HomeToday> {
         final isToday = day == wallDay(wallNow(clock));
         // The keyboard list of the rows below, filled by the cards.
         _rows.clear();
-        // The seam: add further cards (a calendar) to this list.
+        // Events above Tasks, in this order for the keyboard too.
         final cards = <Widget>[
           _eventsCard(context, clock, day, isToday),
           _tasksCard(context, clock, day, isToday),
@@ -129,36 +121,18 @@ class _HomeTodayState extends State<HomeToday> {
         return ContentCap(
           child: LayoutBuilder(
             builder: (context, outer) {
-              // Known even while the section is collapsed.
-              final stacked =
-                  widget.stack ||
-                  outer.maxWidth - 2 * t.space.lg < Tokens.stackBreakpoint;
-              state.nav.homeStacked = stacked;
+              // The sections are always one stacked column.
+              state.nav.homeStacked = true;
               final gap = t.space.lg;
-              Widget body;
-              if (stacked) {
-                // Stacked cards; on a phone Home they scroll with the
-                // board in one scroll view (see app.dart).
-                body = Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var i = 0; i < cards.length; i++) ...[
-                      if (i > 0) SizedBox(height: gap),
-                      cards[i],
-                    ],
+              final body = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  for (var i = 0; i < cards.length; i++) ...[
+                    if (i > 0) SizedBox(height: gap),
+                    cards[i],
                   ],
-                );
-              } else {
-                body = Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var i = 0; i < cards.length; i++) ...[
-                      if (i > 0) SizedBox(width: gap),
-                      Expanded(child: cards[i]),
-                    ],
-                  ],
-                );
-              }
+                ],
+              );
               return Padding(
                 key: const Key('home-today'),
                 padding: EdgeInsets.all(t.space.lg),

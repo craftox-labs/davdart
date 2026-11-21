@@ -158,6 +158,9 @@ enum HomeFocus { day, board }
 
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
+    // Home collapse prefs of headers that no longer exist.
+    prefs?.remove('davdart.home.board.collapsed.v1');
+    prefs?.remove('davdart.home.today.collapsed.v1');
     final saved = prefs?.read(_sectionKey);
     section = Section.values.firstWhere(
       (v) => v.name == saved,

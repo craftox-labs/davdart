@@ -73,10 +73,10 @@ void main() {
         ),
         findsOneWidget,
       );
-      // The Today section collapses from its header chevron.
-      await t.tap(find.byKey(const Key('today-section-toggle')));
+      // A day section collapses from its accordion header.
+      await t.tap(find.byKey(const Key('home-today-events-toggle')));
       await t.pumpAndSettle();
-      expect(find.byKey(const Key('home-today')), findsNothing);
+      expect(find.byKey(const Key('home-today-events')), findsNothing);
       final ex = t.takeException();
       expect(
         ex,

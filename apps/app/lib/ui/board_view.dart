@@ -39,9 +39,8 @@ void publishBoardNav(AppState state) {
             await state.openNote(n.uid, mode: mode);
           },
           hidden: () =>
-              state.prefs?.read('davdart.home.board.collapsed.v1') == 'true' ||
-              (state.nav.boardAccordion &&
-                  !(state.nav.boardOpen[name] ?? name == open)),
+              state.nav.boardAccordion &&
+              !(state.nav.boardOpen[name] ?? name == open),
         ),
   ]);
 }

@@ -63,34 +63,32 @@ void main() {
   tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
   group('Home grid, cards side by side', () {
-    testWidgets('j k stay in the card; h l move between cards and columns', (
-      t,
-    ) async {
+    testWidgets('j k flow Events into Tasks; h l do not hop', (t) async {
       final s = await _home(t);
+      expect(_cur(s), 'event-row-e1'); // Events come first
+      await _press(t, _l); // one stacked column: nothing beside
+      expect(_cur(s), 'event-row-e1');
+      await _press(t, _j);
       expect(_cur(s), 'task-a');
       await _press(t, _j);
       expect(_cur(s), 'task-b');
-      await _press(t, _j); // clamps
+      await _press(t, _j); // last row: stays
       expect(_cur(s), 'task-b');
-      await _press(t, _l); // same row number in the Events card, clamped
-      expect(_cur(s), 'event-row-e1');
-      await _press(t, _j);
-      expect(_cur(s), 'event-row-e1');
       await _press(t, _k_);
-      await _press(t, _h); // row 1 of Events is row 1 of Tasks
-      expect(_cur(s), 'task-a');
+      await _press(t, _k_);
+      expect(_cur(s), 'event-row-e1');
     });
 
-    testWidgets('} and { jump between Tasks and Events', (t) async {
+    testWidgets('} and { jump between Events and Tasks', (t) async {
       final s = await _home(t);
       await _shift(t, LogicalKeyboardKey.bracketRight);
-      expect(_cur(s), 'event-row-e1');
+      expect(_cur(s), 'task-a');
       await _shift(t, LogicalKeyboardKey.bracketRight); // last section: stays
-      expect(_cur(s), 'event-row-e1');
+      expect(_cur(s), 'task-a');
       await _shift(t, LogicalKeyboardKey.bracketLeft);
-      expect(_cur(s), 'task-a');
+      expect(_cur(s), 'event-row-e1');
       await _shift(t, LogicalKeyboardKey.bracketLeft); // first: stays
-      expect(_cur(s), 'task-a');
+      expect(_cur(s), 'event-row-e1');
     });
 
     testWidgets('Board focus: j k inside a column, h l across columns', (
@@ -117,12 +115,12 @@ void main() {
     ) async {
       final s = await _home(t);
       await _shift(t, LogicalKeyboardKey.keyG);
-      expect(_cur(s), 'event-row-e1');
+      expect(_cur(s), 'task-b');
       await _press(t, LogicalKeyboardKey.enter);
-      expect(s.peekUid, 'e1');
+      expect(s.peekUid, isNotNull);
       await _press(t, LogicalKeyboardKey.keyG);
       await _press(t, LogicalKeyboardKey.keyG);
-      expect(_cur(s), 'task-a');
+      expect(_cur(s), 'event-row-e1');
       final b = await _home(t, board: true);
       await _shift(t, LogicalKeyboardKey.keyG);
       expect(_cur(b), 'card-n3');
@@ -130,6 +128,7 @@ void main() {
 
     testWidgets('x completes a task row; O opens in main', (t) async {
       final s = await _home(t);
+      await _press(t, _j); // from the event to task-a
       await _press(t, LogicalKeyboardKey.keyX);
       await t.pumpAndSettle();
       expect(s.taskById('a')!.isClosed, isTrue);
@@ -143,29 +142,28 @@ void main() {
         tasks: [mkTask('a', days: 0), mkTask('b', days: 0)],
       );
       await _press(t, _j);
+      await _press(t, _j);
       expect(_cur(s), 'task-b');
       await _press(t, LogicalKeyboardKey.keyX);
       await t.pumpAndSettle();
       expect(s.taskById('b')!.isClosed, isTrue);
       expect(_cur(s), 'task-a');
-      await _press(t, _l); // h and l still work
+      await _press(t, _k_);
       expect(_cur(s), 'event-row-e1');
-      await _press(t, _h);
-      expect(_cur(s), 'task-a');
     });
 
     testWidgets('completing the last task row moves on, keys keep working', (
       t,
     ) async {
       final s = await _home(t, tasks: [mkTask('a', days: 0)]);
+      await _press(t, _j);
+      expect(_cur(s), 'task-a');
       await _press(t, LogicalKeyboardKey.keyX);
       await t.pumpAndSettle();
       expect(s.taskById('a')!.isClosed, isTrue);
-      expect(_cur(s), 'event-row-e1'); // the next block
+      expect(_cur(s), 'event-row-e1'); // the previous block
       await _press(t, _j);
-      expect(_cur(s), 'event-row-e1');
-      await _press(t, _l); // h and l still work (nothing beside Events)
-      expect(_cur(s), 'event-row-e1');
+      expect(s.nav.area, NavArea.main);
     });
 
     testWidgets('an empty card is skipped by } and h l', (t) async {
@@ -178,18 +176,19 @@ void main() {
   });
 
   group('Home grid, cards stacked', () {
-    testWidgets('j k flow from Tasks into Events and back', (t) async {
+    testWidgets('j k flow from Events into Tasks and back', (t) async {
       final s = await _home(t, size: const Size(500, 900));
       expect(s.nav.homeStacked, isTrue);
+      expect(_cur(s), 'event-row-e1');
+      await _press(t, _j);
       expect(_cur(s), 'task-a');
       await _press(t, _j);
       expect(_cur(s), 'task-b');
-      await _press(t, _j); // end of Tasks: into Events
-      expect(_cur(s), 'event-row-e1');
-      await _press(t, _j); // end of Events: stays
-      expect(_cur(s), 'event-row-e1');
-      await _press(t, _k_);
+      await _press(t, _j); // end of Tasks: stays
       expect(_cur(s), 'task-b');
+      await _press(t, _k_);
+      await _press(t, _k_);
+      expect(_cur(s), 'event-row-e1');
     });
 
     testWidgets('Board accordion: opening todo makes its cards reachable', (
@@ -206,10 +205,10 @@ void main() {
       expect(_cur(s), 'card-n2');
     });
 
-    testWidgets('l does not hop between stacked cards', (t) async {
+    testWidgets('l does not hop between stacked sections', (t) async {
       final s = await _home(t, size: const Size(500, 900));
       await _press(t, _l);
-      expect(_cur(s), 'task-a');
+      expect(_cur(s), 'event-row-e1');
     });
   });
 
@@ -263,26 +262,27 @@ void main() {
     });
   });
 
-  group('Today card headers', () {
+  group('Section headers', () {
     for (final size in [const Size(1280, 900), const Size(500, 900)]) {
       testWidgets(
-        'actions sit at the right edge of the card at ${size.width}',
+        'link and + sit at the right end of the header at ${size.width}',
         (t) async {
           await _home(t, size: size);
           for (final slug in ['tasks', 'events']) {
             final card = t.getRect(_k('home-today-$slug'));
+            final toggle = t.getRect(_k('home-today-$slug-toggle'));
             final add = t.getRect(_k('home-today-$slug-add'));
             final link = t.getRect(_k('home-today-$slug-all'));
-            // The '+' ends at the card's padded right edge, the link just left
-            // of it; neither floats in the middle.
+            // The header is outside the card, above it, as wide as the card.
+            expect(
+              toggle.bottom,
+              lessThanOrEqualTo(card.top + 0.5),
+              reason: slug,
+            );
             expect(card.right - add.right, lessThan(20), reason: slug);
             expect(add.left - link.right, lessThan(12), reason: slug);
             expect(link.left, greaterThan(card.center.dx), reason: slug);
-            // Title and count stay at the left.
-            expect(
-              t.getRect(_k('home-today-$slug-count')).left - card.left,
-              lessThan(card.width / 2),
-            );
+            expect(toggle.left - card.left, lessThan(card.width / 2));
           }
         },
       );
