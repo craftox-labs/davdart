@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart' show TextInputAction;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -106,6 +107,70 @@ class PaneTitle extends StatelessWidget {
         t,
         muted: muted,
       ).copyWith(decoration: strike ? TextDecoration.lineThrough : null),
+    );
+  }
+}
+
+/// The title field of an item header while editing. Wide: the form field.
+/// Narrow: plain text in the exact style of [PaneTitle], no box or border, so
+/// the title looks the same in edit and preview and the row does not shift.
+Widget itemTitleField(
+  BuildContext context, {
+  required TextEditingController controller,
+}) => narrowLayout(context)
+    ? _PlainTitleField(key: const Key('edit-title'), controller: controller)
+    : field(
+        key: const Key('edit-title'),
+        controller: controller,
+        hint: 'Title',
+        autofocus: true,
+      );
+
+class _PlainTitleField extends StatefulWidget {
+  const _PlainTitleField({super.key, required this.controller});
+  final TextEditingController controller;
+
+  @override
+  State<_PlainTitleField> createState() => _PlainTitleFieldState();
+}
+
+class _PlainTitleFieldState extends State<_PlainTitleField> {
+  final _focus = FocusNode();
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final style = paneTitleStyle(t);
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Stack(
+        alignment: Alignment.centerLeft,
+        children: [
+          // The hint, only while empty.
+          ListenableBuilder(
+            listenable: widget.controller,
+            builder: (context, _) => widget.controller.text.isEmpty
+                ? Text('Title', style: style.copyWith(color: t.muted))
+                : const SizedBox.shrink(),
+          ),
+          EditableText(
+            controller: widget.controller,
+            focusNode: _focus,
+            style: style,
+            cursorColor: t.accent,
+            backgroundCursorColor: t.muted,
+            selectionColor: t.accent.withValues(alpha: 0.3),
+            maxLines: 1,
+            textInputAction: TextInputAction.done,
+          ),
+        ],
+      ),
     );
   }
 }

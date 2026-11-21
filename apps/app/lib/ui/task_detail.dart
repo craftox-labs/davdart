@@ -366,12 +366,7 @@ class TaskDetail extends StatelessWidget {
           onClose: onClose,
           editor: draft == null
               ? null
-              : field(
-                  key: const Key('edit-title'),
-                  controller: draft.titleController,
-                  hint: 'Title',
-                  autofocus: !mobile,
-                ),
+              : itemTitleField(context, controller: draft.titleController),
           actions: [
             if (mobile)
               MobileItemActions(

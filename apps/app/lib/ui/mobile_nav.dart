@@ -229,8 +229,7 @@ class _AddFabState extends State<AddFab> with TickerProviderStateMixin {
 }
 
 /// The Space chip: the current Space's name, opening a bottom sheet with the
-/// Space popup's actions and, as the desktop rail has them, Account and
-/// Settings.
+/// Space popup's actions.
 class SpaceChip extends StatefulWidget {
   const SpaceChip({super.key, required this.state});
   final AppState state;
@@ -263,7 +262,7 @@ class _SpaceChipState extends State<SpaceChip> with TickerProviderStateMixin {
               onPress: () => showMenuSheet(
                 context,
                 this,
-                (ctx, c) => spaceMenuGroups(context, state, c, rail: true),
+                (ctx, c) => spaceMenuGroups(context, state, c),
               ),
               // The tab takes the whole header height (it is its own hit box)
               // and its content sits on the logo's centre line.
@@ -321,7 +320,7 @@ List<Section> filterSections(AppState state) => topSections(state);
 
 /// The full-screen side menu: a filter pill choosing the panel (bound to
 /// [AppState.section]) and that panel (with its toolbar and tags drawer).
-/// Account and Settings are in the Space chip's sheet. [onClose] closes it;
+/// Account and Settings are in the filter pill's list. [onClose] closes it;
 /// picking an item runs it too.
 class SideMenuPage extends StatefulWidget {
   const SideMenuPage({super.key, required this.state, required this.onClose});
@@ -354,6 +353,21 @@ class _SideMenuPageState extends State<SideMenuPage>
       return [
         FItemGroup(
           children: [
+            // As on the desktop rail, Spaces comes first and opens the Space
+            // switcher (the top chip's sheet).
+            FItem(
+              key: const Key('filter-spaces'),
+              prefix: Icon(spacesIcon, size: t.icons.md, color: t.muted),
+              title: Text(spacesLabel),
+              onPress: () {
+                c.hide();
+                showMenuSheet(
+                  this.context,
+                  this,
+                  (ctx, c) => spaceMenuGroups(this.context, state, c),
+                );
+              },
+            ),
             for (final s in filterSections(state))
               FItem(
                 key: Key('filter-${s.name}'),
@@ -363,6 +377,33 @@ class _SideMenuPageState extends State<SideMenuPage>
                   color: t.muted,
                 ),
                 title: Text(_label(s)),
+                suffix: visibleSection(state) == s
+                    ? Icon(
+                        FLucideIcons.check,
+                        size: t.icons.md,
+                        color: t.accent,
+                      )
+                    : null,
+                onPress: () {
+                  c.hide();
+                  state.setSection(s);
+                },
+              ),
+          ],
+        ),
+        // As at the foot of the desktop rail, below Spaces and the sections: Account (when signing in is
+        // possible) and Settings, set apart by the group divider.
+        FItemGroup(
+          children: [
+            for (final s in bottomSections(state))
+              FItem(
+                key: Key('menu-${s.name}'),
+                prefix: Icon(
+                  sectionMeta(s).$1,
+                  size: t.icons.md,
+                  color: t.muted,
+                ),
+                title: Text(sectionMeta(s).$2),
                 suffix: visibleSection(state) == s
                     ? Icon(
                         FLucideIcons.check,

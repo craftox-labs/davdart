@@ -10,9 +10,9 @@ import 'theme.dart';
 /// small saved/saving note while editing, the edit/preview toggle and a ⋯
 /// button opening a sheet from the top with the item's other actions.
 ///
-/// The toggle's icon shows the current mode: a pencil while editing, an open
-/// book while previewing. Pressing it flips the mode; leaving edit mode saves
-/// first (edits autosave, there is no cancel).
+/// The toggle's icon shows the action a press does: a pencil while previewing
+/// (edit), an open book while editing (back to the preview). Leaving edit mode
+/// saves first (edits autosave, there is no cancel).
 class MobileItemActions extends StatefulWidget {
   const MobileItemActions({
     super.key,
@@ -64,8 +64,8 @@ class _MobileItemActionsState extends State<MobileItemActions>
         if (widget.canEdit)
           IconAction(
             key: const Key('item-mode'),
-            tooltip: widget.editing ? 'Editing: show preview' : 'Edit',
-            icon: widget.editing ? FLucideIcons.pencil : FLucideIcons.bookOpen,
+            tooltip: widget.editing ? 'Show preview' : 'Edit',
+            icon: widget.editing ? FLucideIcons.bookOpen : FLucideIcons.pencil,
             onPress: widget.editing
                 ? () => state.saveAndLeave(widget.uid)
                 : widget.onEdit,

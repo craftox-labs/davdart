@@ -66,15 +66,15 @@ void main() {
       t,
     ) async {
       final s = await _openNote(t);
-      // Previewing: an open book.
-      expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
-      expect(_icon(FLucideIcons.pencil), findsNothing);
+      // Previewing: the button offers Edit, a pencil.
+      expect(_icon(FLucideIcons.pencil), findsOneWidget);
+      expect(_icon(FLucideIcons.bookOpen), findsNothing);
       await t.tap(_k('item-mode'));
       await t.pumpAndSettle();
       expect(s.isEditing('n1'), isTrue);
-      // Editing: a pencil.
-      expect(_icon(FLucideIcons.pencil), findsOneWidget);
-      expect(_icon(FLucideIcons.bookOpen), findsNothing);
+      // Editing: the button offers the preview, an open book.
+      expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
+      expect(_icon(FLucideIcons.pencil), findsNothing);
       for (final k in [
         'edit-save',
         'edit-discard',
@@ -88,7 +88,47 @@ void main() {
       await t.tap(_k('item-mode'));
       await t.pumpAndSettle();
       expect(s.isEditing('n1'), isFalse);
-      expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
+      expect(_icon(FLucideIcons.pencil), findsOneWidget);
+      _noError(t);
+    });
+
+    testWidgets('the title looks the same in edit and preview', (t) async {
+      final s = await _openNote(t);
+      final title = find.descendant(
+        of: _k('peek-toolbar'),
+        matching: find.text('Alpha'),
+      );
+      final before = t.getRect(title);
+      final style = t.widget<Text>(title).style!;
+      await t.tap(_k('item-mode'));
+      await t.pumpAndSettle();
+      expect(s.isEditing('n1'), isTrue);
+      final field = find.descendant(
+        of: _k('edit-title'),
+        matching: find.byType(EditableText),
+      );
+      final editable = t.widget<EditableText>(field);
+      // Same type, no box: no decoration around the field, same place.
+      expect(editable.style.fontSize, style.fontSize);
+      expect(editable.style.fontWeight, style.fontWeight);
+      expect(editable.style.color, style.color);
+      expect(
+        find.descendant(
+          of: _k('peek-toolbar'),
+          matching: find.byType(FTextField),
+        ),
+        findsNothing,
+      );
+      expect(t.getRect(field).left, closeTo(before.left, 0.5));
+      expect(t.getRect(field).center.dy, closeTo(before.center.dy, 0.5));
+      expect(t.getRect(_k('peek-toolbar')).height, 44);
+      // Still editable in place.
+      await t.enterText(_k('edit-title'), 'Beta');
+      expect(s.draftFor('n1')!.titleController.text, 'Beta');
+      // Let the autosave run.
+      await t.pump(const Duration(seconds: 2));
+      await t.pumpAndSettle();
+      expect(s.tree.find('n1')!.note.summary, 'Beta');
       _noError(t);
     });
 
@@ -294,10 +334,10 @@ void main() {
       await s.openNote('k1');
       await t.pumpAndSettle();
       expect(_k('item-more'), findsOneWidget);
-      expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
+      expect(_icon(FLucideIcons.pencil), findsOneWidget);
       await t.tap(_k('item-mode'));
       await t.pumpAndSettle();
-      expect(_icon(FLucideIcons.pencil), findsOneWidget);
+      expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
       expect(_k('edit-save'), findsNothing);
       await t.enterText(_k('edit-body'), 'Details');
       await t.pump(const Duration(milliseconds: 1600));
@@ -322,10 +362,10 @@ void main() {
       );
       await s.openNote('e1');
       await t.pumpAndSettle();
-      expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
+      expect(_icon(FLucideIcons.pencil), findsOneWidget);
       await t.tap(_k('item-mode'));
       await t.pumpAndSettle();
-      expect(_icon(FLucideIcons.pencil), findsOneWidget);
+      expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
       expect(_k('edit-save'), findsNothing);
       await t.enterText(_k('edit-body'), 'Agenda');
       await t.pump(const Duration(milliseconds: 1600));

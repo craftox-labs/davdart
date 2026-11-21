@@ -161,10 +161,11 @@ void main() {
           expect(_k('tasks-view'), findsOneWidget);
           await _filter(t, 'events');
           expect(_k('events-panel'), findsOneWidget);
-          // Account and Settings are in the Space chip's sheet now.
+          // Account and Settings are in the filter pill's list, not at the
+          // bottom of the menu.
           expect(_k('menu-settings'), findsNothing);
           expect(_k('menu-account'), findsNothing);
-          await t.tap(_k('space-chip'));
+          await t.tap(_k('menu-filter'));
           await t.pumpAndSettle();
           await t.tap(_k('menu-settings'));
           await t.pumpAndSettle();
@@ -338,26 +339,53 @@ void main() {
           await t.tap(_k('space-chip'));
           await t.pumpAndSettle();
           expect(_k('menu-sheet'), findsOneWidget);
-          await t.tapAt(Offset(5, size.height - 5));
+          expect(await t.binding.handlePopRoute(), isTrue);
           await t.pumpAndSettle();
         }
         _noError(t);
       });
 
-      testWidgets('the chip sheet holds the Spaces and Settings (rail)', (
+      testWidgets('the filter list ends with Settings below a divider', (
         t,
       ) async {
         final s = await pumpTasksApp(t, size: size);
-        await t.tap(_k('space-chip'));
+        await _openMenu(t);
+        await t.tap(_k('menu-filter'));
         await t.pumpAndSettle();
-        // The same Space rows as the desktop rail's popup, then its bottom
-        // entries.
+        // The sections in rail order, then Settings (no sign-in here).
+        final ys = [
+          for (final k in [
+            'filter-spaces',
+            'filter-notes',
+            'filter-tasks',
+            'filter-events',
+            'filter-views',
+            'filter-search',
+            'menu-settings',
+          ])
+            t.getRect(_k(k)).top,
+        ];
+        expect(ys, [...ys]..sort());
+        // Set apart: a bigger gap before Settings than between sections.
+        final gap = ys.last - ys[ys.length - 2];
+        final step = ys[2] - ys[1];
+        expect(gap, greaterThan(step));
+        // Spaces opens the Space switcher, as the top chip does.
+        await t.tap(_k('filter-spaces'));
+        await t.pumpAndSettle();
         expect(find.text('One fixed notes source'), findsOneWidget);
-        expect(_k('menu-settings'), findsOneWidget);
+        expect(await t.binding.handlePopRoute(), isTrue);
+        await t.pumpAndSettle();
+        await t.tap(_k('menu-filter'));
+        await t.pumpAndSettle();
         await t.tap(_k('menu-settings'));
         await t.pumpAndSettle();
         expect(s.section, Section.settings);
         expect(_k('side-menu'), findsOneWidget);
+        // The Space chip sheet has none of it.
+        await t.tap(_k('space-chip'));
+        await t.pumpAndSettle();
+        expect(_k('menu-settings'), findsNothing);
         _noError(t);
       });
 
