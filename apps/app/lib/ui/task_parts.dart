@@ -49,16 +49,17 @@ String dueLabel(Task t, DateTime now) {
 /// A task's due day as a date for the pickers (UTC midnight), or null.
 DateTime? dueDate(Task t) => t.due == null ? null : taskDueDay(t);
 
-/// The due value for a picked day. With a timed [existing] value only the
-/// date part changes: time of day, Z and TZID/params stay. Otherwise all-day.
+/// The due value for a picked viewer-zone day. With a timed [existing] value
+/// the local time of day stays and the flavour is kept (Z stays Z, a TZID
+/// stays in its zone, floating stays floating). Otherwise all-day.
 ICalDate dueOfDay(DateTime d, [ICalDate? existing]) {
   final day = ICalDate.date(d.year, d.month, d.day);
   if (existing == null || existing.allDay) return day;
-  final t = existing.value.indexOf('T');
-  if (t != 8) return day;
-  return ICalDate(
-    '${day.value}${existing.value.substring(t)}',
-    existing.params,
+  final l = existing.localWall;
+  if (l == null) return day;
+  return ICalDate.fromLocalWall(
+    DateTime.utc(d.year, d.month, d.day, l.hour, l.minute, l.second),
+    existing,
   );
 }
 

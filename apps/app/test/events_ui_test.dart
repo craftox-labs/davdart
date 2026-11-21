@@ -60,6 +60,8 @@ Future<AppState> _panel(
 }
 
 void main() {
+  setUp(() => LocalZone.use('Asia/Bangkok'));
+  tearDown(() => LocalZone.use(null));
   group('Events panel', () {
     testWidgets('the rail Events item lists the agenda', (t) async {
       final s = await pumpTasksApp(t, events: _events());
@@ -251,8 +253,8 @@ void main() {
       expect(e.summary, 'Coffee');
       expect(e.location, 'Cafe');
       expect(e.allDay, isFalse);
-      expect(e.dtstart!.value, endsWith('T090000'));
-      expect(e.dtend!.value, endsWith('T100000'));
+      expect(e.dtstart!.value, endsWith('T020000Z'));
+      expect(e.dtend!.value, endsWith('T030000Z'));
       expect(s.peekUid, e.uid);
       expect(_k('new-event-title'), findsNothing);
       expect(_p('event-row-${e.uid}'), findsOneWidget);

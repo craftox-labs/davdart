@@ -64,19 +64,16 @@ void main() {
         '10-27 10:00'
       ]);
       LocalZone.use('Asia/Bangkok');
-      expect(
-          [
-            for (final x
-                in occurrencesBetween(z, u(2026, 10, 1), u(2026, 12, 1)))
-              hm(x.start)
-          ],
-          [
-            '10-23 16:00',
-            '10-24 16:00',
-            '10-25 16:00',
-            '10-26 16:00',
-            '10-27 16:00'
-          ]);
+      expect([
+        for (final x in occurrencesBetween(z, u(2026, 10, 1), u(2026, 12, 1)))
+          hm(x.start)
+      ], [
+        '10-23 16:00',
+        '10-24 16:00',
+        '10-25 16:00',
+        '10-26 16:00',
+        '10-27 16:00'
+      ]);
     });
 
     test('window is the viewer day: late zoned instance moves a day', () {

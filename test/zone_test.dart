@@ -29,6 +29,12 @@ void main() {
       expect(d.localWall, u(2026, 11, 25, 15));
     });
 
+    test('platform zone (no override): TZID goes through toLocal', () {
+      const d = ICalDate('20261125T090000', ';TZID=Europe/Berlin');
+      final l = d.toInstant()!.toLocal();
+      expect(d.localWall, u(l.year, l.month, l.day, l.hour, l.minute));
+    });
+
     test('event near midnight lands on a different day per viewer', () {
       const d = ICalDate('20261125T230000', ';TZID=America/New_York');
       // 04:00Z on the 26th.

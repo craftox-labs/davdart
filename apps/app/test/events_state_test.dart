@@ -75,6 +75,8 @@ const _recurringWithOverride =
     'END:VCALENDAR\r\n';
 
 void main() {
+  setUp(() => LocalZone.use('Asia/Bangkok'));
+  tearDown(() => LocalZone.use(null));
   group('empty', () {
     test('no events: nothing changes and nothing is written', () async {
       final m = MemoryStorage();
@@ -118,8 +120,8 @@ void main() {
       expect(e.summary, 'Dentist');
       expect(e.location, 'Main St');
       expect(e.categories, ['health']);
-      expect(e.dtstart!.value, '20261201T143000');
-      expect(e.dtend!.value, '20261201T151500');
+      expect(e.dtstart!.value, '20261201T073000Z');
+      expect(e.dtend!.value, '20261201T081500Z');
       expect(m.read('davdart.events.v1'), contains('Dentist'));
       expect(m.keys.any((k) => k.contains('tasks')), isFalse);
       await s.createSpace('Other');
@@ -132,7 +134,7 @@ void main() {
       expect(s.events.map((e) => e.summary), ['Dentist']);
       final again = await _open(m);
       expect(again.events.map((e) => e.summary), ['Dentist']);
-      expect(again.events.single.dtstart!.value, '20261201T143000');
+      expect(again.events.single.dtstart!.value, '20261201T073000Z');
     });
 
     test('a damaged event store is kept aside; notes still load', () async {
@@ -187,7 +189,6 @@ void main() {
 
     test('edit: text, tags keep markers, status, when keeps zone', () async {
       LocalZone.use('Europe/Berlin'); // local wall equals the TZID wall
-      addTearDown(() => LocalZone.use(null));
       final s = await _open(MemoryStorage(), seed: _Seed());
       final src = s.source as SpaceNoteSource;
       await src.saveEvent(
@@ -247,7 +248,10 @@ void main() {
         end: DateTime.utc(2026, 12, 2, 9),
       );
       e = s.eventById('z')!;
-      expect(e.dtstart!.value, '20261202T090000');
+      expect(
+        e.dtstart!.value,
+        '20261202T080000Z',
+      ); // timed again: written as UTC
       expect(e.dtend, isNull);
     });
 
@@ -447,8 +451,8 @@ void main() {
       expect(s.eventDraftFor(uid), isNull);
       final e = s.eventById(uid)!;
       expect(e.summary, 'Plan B');
-      expect(e.dtstart!.value, '20261201T110000');
-      expect(e.dtend!.value, '20261201T130000');
+      expect(e.dtstart!.value, '20261201T040000Z');
+      expect(e.dtend!.value, '20261201T060000Z');
       s.startEventEdit(uid);
       s.eventDraftFor(uid)!.setAllDay(true);
       expect(s.eventDraftFor(uid)!.dirty, isTrue);
@@ -727,8 +731,8 @@ void main() {
       expect(moved.summary, 'Mover');
       expect(moved.location, 'Here');
       expect(moved.categories, ['x']);
-      expect(moved.dtstart!.value, '20261201T090000');
-      expect(moved.dtend!.value, '20261201T100000');
+      expect(moved.dtstart!.value, '20261201T020000Z');
+      expect(moved.dtend!.value, '20261201T030000Z');
       expect(s.tasks.single.parentUid, moved.uid);
       expect(await s.moveToSpace(moved.uid, other), isNull); // same Space
       expect(await s.moveToSpace('nope', from), isNull);

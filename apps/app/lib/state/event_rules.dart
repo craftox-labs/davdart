@@ -134,22 +134,28 @@ String eventWhen(Event e, [DateTime? now]) {
       '${dayLabel(end, now)} ${timeLabel(end)}';
 }
 
-/// The date-time value for local [wall]. With a timed [like] its flavour
-/// carries over (a UTC [like] converts [wall] back to UTC and keeps the Z, the
-/// TZID parameter of a zoned time is kept); otherwise it is a floating time.
-/// With [allDay] the result is a date.
+/// The date-time value for viewer-zone [wall]. With a timed [like] its flavour
+/// carries over (UTC keeps its Z, a known TZID zone is kept and the wall is
+/// converted into it, floating stays floating). Without [like] a timed value is
+/// written as UTC (`...Z`, the CalDAV convention). With [allDay] the result is
+/// a date (`VALUE=DATE`).
 ICalDate eventDate(DateTime wall, {bool allDay = false, ICalDate? like}) {
   String t(int n, [int w = 2]) => n.toString().padLeft(w, '0');
-  final date = '${t(wall.year, 4)}${t(wall.month)}${t(wall.day)}';
-  if (allDay) return ICalDate(date, ';VALUE=DATE');
-  final stamp = '${date}T${t(wall.hour)}${t(wall.minute)}00';
-  if (like != null && !like.allDay) {
-    return ICalDate.fromLocalWall(
-      DateTime.utc(wall.year, wall.month, wall.day, wall.hour, wall.minute),
-      like,
+  if (allDay) {
+    return ICalDate(
+      '${t(wall.year, 4)}${t(wall.month)}${t(wall.day)}',
+      ';VALUE=DATE',
     );
   }
-  return ICalDate(stamp);
+  final w = DateTime.utc(
+    wall.year,
+    wall.month,
+    wall.day,
+    wall.hour,
+    wall.minute,
+  );
+  if (like != null && !like.allDay) return ICalDate.fromLocalWall(w, like);
+  return ICalDate.fromLocalWall(w, const ICalDate('20000101T000000Z'));
 }
 
 /// [line] (an EXDATE or RDATE property line) with every value moved by

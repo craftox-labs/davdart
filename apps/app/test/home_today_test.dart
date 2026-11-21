@@ -1,4 +1,5 @@
 import 'package:davdart/davdart.dart';
+import 'package:davdart_app/state/event_rules.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/home_today.dart';
@@ -13,6 +14,8 @@ import 'tasks_helper.dart';
 Finder _k(String k) => find.byKey(Key(k));
 
 void main() {
+  setUp(() => LocalZone.use('Asia/Bangkok'));
+  tearDown(() => LocalZone.use(null));
   test('dueLabel', () {
     final now = DateTime(2026, 11, 20, 10);
     String l(int d) {
@@ -49,6 +52,39 @@ void main() {
       ICalDate.date(2026, 12, 5),
     );
     expect(dueOfDay(day), ICalDate.date(2026, 12, 5));
+  });
+
+  test(
+    'eventDate: new timed values are UTC, all-day a date, like keeps flavour',
+    () {
+      final w = DateTime.utc(2026, 12, 5, 9, 30);
+      expect(eventDate(w).value, '20261205T023000Z'); // Bangkok -> UTC
+      expect(eventDate(w, allDay: true), ICalDate.date(2026, 12, 5));
+      final z = eventDate(w, like: const ICalDate('20261101T000000Z'));
+      expect(z.value, '20261205T023000Z');
+      final tz = eventDate(
+        w,
+        like: const ICalDate('20261101T090000', ';TZID=Europe/Berlin'),
+      );
+      expect(tz.value, '20261205T033000'); // 02:30Z is 03:30 in Berlin
+      expect(tz.params, ';TZID=Europe/Berlin');
+      final fl = eventDate(w, like: const ICalDate('20261101T090000'));
+      expect(fl.value, '20261205T093000');
+      expect(fl.params, '');
+      // round trip: the local wall comes back
+      expect(tz.localWall, w);
+      expect(z.localWall, w);
+    },
+  );
+
+  test('dueOfDay near midnight keeps the local time of day', () {
+    // 20:00Z is 03:00 next day in Bangkok; picking the 10th keeps 03:00 local.
+    final r = dueOfDay(
+      DateTime.utc(2026, 12, 10),
+      const ICalDate('20261201T200000Z'),
+    );
+    expect(r.value, '20261209T200000Z');
+    expect(r.localDay, DateTime.utc(2026, 12, 10));
   });
 
   testWidgets('two cards, equal width and height, empty states', (t) async {
