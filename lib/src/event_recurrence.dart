@@ -3,9 +3,10 @@ import 'ical.dart';
 import 'task.dart' show ICalDate;
 
 /// One occurrence of an [Event] (the event itself, or one instance of its
-/// recurrence). Times are local wall-clock fields as UTC-flagged [DateTime]s:
-/// a `...Z` value is converted to the local zone, floating and TZID values are
-/// taken as written (see [ICalDate.localWall]). [end] is exclusive.
+/// recurrence). Times are viewer-zone wall-clock fields as UTC-flagged
+/// [DateTime]s: `Z` and TZID values are converted to the viewer's zone,
+/// floating values are taken as written (see [ICalDate.localWall]). [end] is
+/// exclusive.
 class EventOccurrence {
   EventOccurrence({
     required this.event,
@@ -82,10 +83,12 @@ const _maxOccurrences = 100000;
 /// list with [EventOccurrence.isCancelled]; RANGE=THISANDFUTURE is applied to
 /// the one instance only). Anything else (BYSETPOS, BYWEEKNO, BYYEARDAY,
 /// BYHOUR, ..., SECONDLY..HOURLY, RDATE periods) returns just the base
-/// occurrence with [EventOccurrence.unsupported] set. Time zones are not
-/// applied: floating and TZID values expand on their wall time; UTC values on
-/// their local wall time (a daily UTC series therefore keeps its local time
-/// across a daylight saving change).
+/// occurrence with [EventOccurrence.unsupported] set.
+///
+/// Time zones: a series runs on the written clock of DTSTART (a TZID series
+/// keeps its wall time across daylight saving in its own zone, a `Z` series
+/// keeps its UTC time), and each instance is then converted to the viewer's
+/// zone ([LocalZone]); floating series stay on their wall time.
 List<EventOccurrence> occurrencesBetween(
     Event event, DateTime from, DateTime to) {
   final startWall = event.startWall;
@@ -131,9 +134,15 @@ List<EventOccurrence> occurrencesBetween(
 
   final starts = <DateTime>{};
   final ex = _excluded(event);
-  final lastDay = DateTime.utc(to.year, to.month, to.day);
+  // The rule runs on the written wall clock of DTSTART (UTC for `Z`, the
+  // TZID zone, or floating), so a zoned series keeps its local time across a
+  // daylight saving change; each instance is then converted to the viewer's
+  // zone. Break tests allow two days of slack for the zone difference.
+  final first = event.dtstart!;
+  final slackTo = to.add(const Duration(days: 2));
+  final lastDay = DateTime.utc(slackTo.year, slackTo.month, slackTo.day);
 
-  void emit(DateTime s) {
+  void emitLocal(DateTime s) {
     if (!starts.add(s)) return;
     if (ex.contains(_Key(s, false)) ||
         ex.contains(_Key(DateTime.utc(s.year, s.month, s.day), true))) {
@@ -156,23 +165,24 @@ List<EventOccurrence> occurrencesBetween(
     }
   }
 
+  void emit(DateTime base) => emitLocal(first.localWallOf(base));
+
   final rule = plan.rule;
   if (rule != null) {
     final until = rule.until;
     var count = 0;
     var produced = 0;
+    final baseStart = first.wall!;
     final startDate =
-        DateTime.utc(startWall.year, startWall.month, startWall.day);
-    final tod = startWall.difference(startDate);
+        DateTime.utc(baseStart.year, baseStart.month, baseStart.day);
+    final tod = baseStart.difference(startDate);
     // RFC 5545 3.8.5.3: DTSTART is always the first instance, even when it
     // does not match BYDAY or BYMONTHDAY (weekly and monthly rules).
     if (rule.startsOffPattern(startDate)) {
       count++;
       if (rule.count == null || count <= rule.count!) {
         final s = startDate.add(tod);
-        if (until == null || !_afterUntil(s, until, allDay)) {
-          if (s.isBefore(to)) emit(s);
-        }
+        if (until == null || !_afterUntil(s, until, first)) emit(s);
       }
     }
     outer:
@@ -184,17 +194,17 @@ List<EventOccurrence> occurrencesBetween(
         count++;
         if (rule.count != null && count > rule.count!) break outer;
         final s = d.add(tod);
-        if (until != null && _afterUntil(s, until, allDay)) break outer;
-        if (!s.isBefore(to)) break outer;
+        if (until != null && _afterUntil(s, until, first)) break outer;
+        if (s.isAfter(slackTo)) break outer;
         emit(s);
         if (++produced > _maxOccurrences) break outer;
       }
     }
   } else {
-    emit(startWall);
+    emitLocal(startWall);
   }
   for (final r in plan.rdates) {
-    if (r.isBefore(to)) emit(r);
+    if (r.isBefore(to)) emitLocal(r);
   }
   _addOverrides(out, event, overrides, overlaps, false,
       skipBase: true, baseId: null);
@@ -248,14 +258,18 @@ ICalDate _idFor(ICalDate first, DateTime s) {
   return ICalDate.fromLocalWall(s, first);
 }
 
-bool _afterUntil(DateTime s, ICalDate until, bool allDay) {
-  final u = until.localWall;
+/// True when base-clock instance [s] (in the flavour of [first]) is after
+/// UNTIL: by date for all-day values, otherwise by real instant.
+bool _afterUntil(DateTime s, ICalDate until, ICalDate first) {
+  final u = until.wall;
   if (u == null) return false;
-  if (until.allDay || allDay) {
+  if (until.allDay || first.allDay) {
     return DateTime.utc(s.year, s.month, s.day)
         .isAfter(DateTime.utc(u.year, u.month, u.day));
   }
-  return s.isAfter(u);
+  final ui = until.toInstant();
+  final si = ICalDate.fromLocalWall(first.localWallOf(s), first).toInstant();
+  return ui != null && si != null && si.isAfter(ui);
 }
 
 // ---- keys: an instance is named by its wall time, or by day if date-only ----

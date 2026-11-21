@@ -17,6 +17,7 @@ export 'src/ical.dart'
         serializeNotes,
         serializeTask,
         serializeTasks;
+export 'src/calendar_days.dart';
 export 'src/event.dart';
 export 'src/event_recurrence.dart';
 export 'src/event_store.dart';

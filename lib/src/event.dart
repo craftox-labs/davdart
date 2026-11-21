@@ -107,13 +107,11 @@ class Event {
     if (s != null && e != null && ds != null && de != null) {
       // Same flavour: the written clock difference. Mixed flavours (Z with a
       // TZID, a zone with floating, ...): the difference of the real instants.
-      final same = ds.allDay == de.allDay &&
-          ds.isUtc == de.isUtc &&
-          ds.tzid == de.tzid;
+      final same =
+          ds.allDay == de.allDay && ds.isUtc == de.isUtc && ds.tzid == de.tzid;
       final i = ds.toInstant(), j = de.toInstant();
-      final len = same || i == null || j == null
-          ? e.difference(s)
-          : j.difference(i);
+      final len =
+          same || i == null || j == null ? e.difference(s) : j.difference(i);
       if (!len.isNegative) return len;
     }
     final d = duration == null ? null : parseIcalDuration(duration!);
