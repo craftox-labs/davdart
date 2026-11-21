@@ -13,6 +13,7 @@ import 'tasks_helper.dart';
 const _phones = [Size(320, 568), Size(360, 640)];
 
 void main() {
+  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
   for (final size in _phones) {
     testWidgets('scoped folder bar has no overflow at $size', (t) async {
       t.view.physicalSize = size;
@@ -89,6 +90,7 @@ void main() {
     testWidgets('board is a status accordion with title-only cards at $size', (
       t,
     ) async {
+      AppState.debugDefaultFocus = HomeFocus.board;
       await pumpTasksApp(
         t,
         notes: [
@@ -186,6 +188,7 @@ void main() {
   testWidgets('accordion state survives crossing the 600px breakpoint', (
     t,
   ) async {
+    AppState.debugDefaultFocus = HomeFocus.board;
     final s = await pumpTasksApp(
       t,
       notes: [
@@ -211,29 +214,27 @@ void main() {
     expect(s.nav.boardOpen, {'todo': true, 'doing': false});
   });
 
-  testWidgets('split Home (700 wide) caps stacked Today and scrolls inside', (
-    t,
-  ) async {
-    final s = await pumpTasksApp(
-      t,
-      tasks: [
-        for (var i = 0; i < 6; i++)
-          mkTask('late$i', summary: 'Task $i', days: -2),
-      ],
-      events: [
-        for (var i = 0; i < 6; i++)
-          mkEvent('e$i', summary: 'Event $i', rrule: 'FREQ=DAILY'),
-      ],
-      size: const Size(620, 640),
-    );
-    expect(s.nav.homeStacked, isTrue);
-    expect(find.byKey(const Key('home-today-cap')), findsOneWidget);
-    expect(
-      t.getRect(find.byKey(const Key('home-today-cap'))).height,
-      lessThanOrEqualTo(640 * 0.4 + 0.5),
-    );
-    expect(t.takeException(), isNull);
-  });
+  testWidgets(
+    'split Home (620 wide) puts the calendar beside a scrolling list',
+    (t) async {
+      final s = await pumpTasksApp(
+        t,
+        tasks: [
+          for (var i = 0; i < 6; i++)
+            mkTask('late$i', summary: 'Task $i', days: -2),
+        ],
+        events: [
+          for (var i = 0; i < 6; i++)
+            mkEvent('e$i', summary: 'Event $i', rrule: 'FREQ=DAILY'),
+        ],
+        size: const Size(620, 640),
+      );
+      expect(s.nav.homeStacked, isTrue);
+      expect(find.byKey(const Key('home-calendar')), findsOneWidget);
+      expect(find.byKey(const Key('home-today')), findsOneWidget);
+      expect(t.takeException(), isNull);
+    },
+  );
 
   testWidgets('wide window with a narrow main pane keeps Today uncapped', (
     t,

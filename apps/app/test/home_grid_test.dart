@@ -36,7 +36,9 @@ Future<AppState> _pump(
   List<String> statuses, {
   double w = 1280,
   MemoryStorage? prefs,
+  bool board = true,
 }) async {
+  AppState.debugDefaultFocus = board ? HomeFocus.board : HomeFocus.day;
   t.view.physicalSize = Size(w, 900);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
@@ -58,6 +60,7 @@ List<Rect> _cols(WidgetTester t, [List<String> names = _four]) => [
 ];
 
 void main() {
+  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
   testWidgets('board columns fill the content width at 1280', (t) async {
     const three = ['backlog', 'todo', 'doing'];
     await _pump(t, three);
@@ -76,15 +79,12 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
-  testWidgets('Today cards share the width and stay inside the grid', (
-    t,
-  ) async {
-    await _pump(t, _four, w: 1700);
-    final cols = _cols(t);
+  testWidgets('Today cards share the width beside the calendar', (t) async {
+    await _pump(t, _four, w: 1700, board: false);
+    final cal = _r(t, 'home-calendar');
     final tasks = _r(t, 'home-today-tasks');
     final events = _r(t, 'home-today-events');
-    expect(tasks.left, closeTo(cols[0].left, 0.5));
-    expect(events.right, closeTo(cols[3].right, 0.5));
+    expect(tasks.left, greaterThan(cal.right));
     expect(tasks.width, closeTo(events.width, 0.5));
     expect(events.left - tasks.right, closeTo(_t.space.lg, 0.5));
   });

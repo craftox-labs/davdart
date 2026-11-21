@@ -104,6 +104,8 @@ String textOfKey(WidgetTester t, String key) =>
     t.widget<Text>(find.byKey(Key(key))).data!;
 
 void main() {
+  setUp(() => AppState.debugDefaultFocus = HomeFocus.board);
+  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
   group('AppState', () {
     test('groups the board by status and filters by query and tag', () async {
       final s = AppState(FakeSource(sample));

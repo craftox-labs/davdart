@@ -65,6 +65,8 @@ Future<List<String>> _titles() async => [
 ];
 
 void main() {
+  setUp(() => AppState.debugDefaultFocus = HomeFocus.board);
+  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
   group('peek and main area', () {
     testWidgets('Promote moves the peek note to a main tab, peek empties', (
       t,

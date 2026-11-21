@@ -40,8 +40,10 @@ Future<AppState> _home(
   WidgetTester t, {
   List<Task>? tasks,
   List<Event>? events,
-  Size size = const Size(1280, 900),
+  Size size = const Size(1700, 900),
+  bool board = false,
 }) async {
+  AppState.debugDefaultFocus = board ? HomeFocus.board : HomeFocus.day;
   final s = await pumpTasksApp(
     t,
     size: size,
@@ -58,6 +60,7 @@ Future<AppState> _home(
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
   group('Home grid, cards side by side', () {
     testWidgets('j k stay in the card; h l move between cards and columns', (
@@ -78,15 +81,11 @@ void main() {
       expect(_cur(s), 'task-a');
     });
 
-    testWidgets('} and { jump between Tasks, Events and Board', (t) async {
+    testWidgets('} and { jump between Tasks and Events', (t) async {
       final s = await _home(t);
       await _shift(t, LogicalKeyboardKey.bracketRight);
       expect(_cur(s), 'event-row-e1');
-      await _shift(t, LogicalKeyboardKey.bracketRight);
-      expect(_cur(s), 'card-n1'); // first card of the first column
       await _shift(t, LogicalKeyboardKey.bracketRight); // last section: stays
-      expect(_cur(s), 'card-n1');
-      await _shift(t, LogicalKeyboardKey.bracketLeft);
       expect(_cur(s), 'event-row-e1');
       await _shift(t, LogicalKeyboardKey.bracketLeft);
       expect(_cur(s), 'task-a');
@@ -94,10 +93,10 @@ void main() {
       expect(_cur(s), 'task-a');
     });
 
-    testWidgets('board: j k inside a column, h l across columns', (t) async {
-      final s = await _home(t);
-      await _shift(t, LogicalKeyboardKey.bracketRight);
-      await _shift(t, LogicalKeyboardKey.bracketRight);
+    testWidgets('Board focus: j k inside a column, h l across columns', (
+      t,
+    ) async {
+      final s = await _home(t, board: true);
       expect(_cur(s), 'card-n1');
       await _press(t, _j);
       expect(_cur(s), 'card-n2');
@@ -113,15 +112,20 @@ void main() {
       expect(s.nav.area, NavArea.panel);
     });
 
-    testWidgets('gg and G cover the whole Home; Enter and o open', (t) async {
+    testWidgets('gg and G cover the Day rows and the Board; Enter opens', (
+      t,
+    ) async {
       final s = await _home(t);
       await _shift(t, LogicalKeyboardKey.keyG);
-      expect(_cur(s), 'card-n3');
+      expect(_cur(s), 'event-row-e1');
       await _press(t, LogicalKeyboardKey.enter);
-      expect(s.peekUid, 'n3');
+      expect(s.peekUid, 'e1');
       await _press(t, LogicalKeyboardKey.keyG);
       await _press(t, LogicalKeyboardKey.keyG);
       expect(_cur(s), 'task-a');
+      final b = await _home(t, board: true);
+      await _shift(t, LogicalKeyboardKey.keyG);
+      expect(_cur(b), 'card-n3');
     });
 
     testWidgets('x completes a task row; O opens in main', (t) async {
@@ -160,33 +164,21 @@ void main() {
       expect(_cur(s), 'event-row-e1'); // the next block
       await _press(t, _j);
       expect(_cur(s), 'event-row-e1');
-      await _shift(t, LogicalKeyboardKey.bracketRight);
-      expect(_cur(s), 'card-n1');
-      await _press(t, _l); // h and l work on the board
-      expect(_cur(s), 'card-n3');
+      await _press(t, _l); // h and l still work (nothing beside Events)
+      expect(_cur(s), 'event-row-e1');
     });
 
     testWidgets('an empty card is skipped by } and h l', (t) async {
       final s = await _home(t, events: const []);
       await _shift(t, LogicalKeyboardKey.bracketRight);
-      expect(_cur(s), 'card-n1');
-      await _shift(t, LogicalKeyboardKey.bracketLeft);
+      expect(_cur(s), 'task-a'); // no Events rows: stays
+      await _press(t, _l); // nothing to the right
       expect(_cur(s), 'task-a');
-      await _press(t, _l); // no Events rows: nothing to the right
-      expect(_cur(s), 'task-a');
-    });
-
-    testWidgets('no tasks and no events: } lands on the board', (t) async {
-      final s = await _home(t, tasks: const [], events: const []);
-      await _shift(t, LogicalKeyboardKey.bracketRight);
-      expect(_cur(s), 'card-n1');
     });
   });
 
   group('Home grid, cards stacked', () {
-    testWidgets('j k flow from Tasks into Events and the board and back', (
-      t,
-    ) async {
+    testWidgets('j k flow from Tasks into Events and back', (t) async {
       final s = await _home(t, size: const Size(500, 900));
       expect(s.nav.homeStacked, isTrue);
       expect(_cur(s), 'task-a');
@@ -194,25 +186,21 @@ void main() {
       expect(_cur(s), 'task-b');
       await _press(t, _j); // end of Tasks: into Events
       expect(_cur(s), 'event-row-e1');
-      // End of Events: into the board. On the accordion only the open
-      // (doing) section has reachable cards; todo is closed.
-      await _press(t, _j);
-      expect(_cur(s), 'card-n3');
-      await _press(t, _k_);
+      await _press(t, _j); // end of Events: stays
       expect(_cur(s), 'event-row-e1');
       await _press(t, _k_);
       expect(_cur(s), 'task-b');
     });
 
-    testWidgets('opening the todo section makes its cards reachable', (
+    testWidgets('Board accordion: opening todo makes its cards reachable', (
       t,
     ) async {
-      final s = await _home(t, size: const Size(500, 900));
+      final s = await _home(t, size: const Size(500, 900), board: true);
+      expect(_cur(s), 'card-n3'); // only the open (doing) section
       await t.tap(find.byKey(const Key('board-acc-todo-toggle')));
       await t.pumpAndSettle();
-      await _press(t, _j);
-      await _press(t, _j);
-      await _press(t, _j);
+      await _press(t, LogicalKeyboardKey.keyG);
+      await _press(t, LogicalKeyboardKey.keyG);
       expect(_cur(s), 'card-n1');
       await _press(t, _j);
       expect(_cur(s), 'card-n2');

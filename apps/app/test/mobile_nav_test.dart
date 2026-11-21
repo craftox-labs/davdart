@@ -75,6 +75,7 @@ Color _border(WidgetTester t, String key) {
 }
 
 void main() {
+  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
   for (final size in _phones) {
     group('narrow at $size', () {
       testWidgets(
@@ -232,6 +233,7 @@ void main() {
       });
 
       testWidgets('Home leaves room under its last row for the +', (t) async {
+        AppState.debugDefaultFocus = HomeFocus.board;
         await pumpTasksApp(
           t,
           notes: [

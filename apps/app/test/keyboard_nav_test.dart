@@ -363,6 +363,7 @@ void main() {
         t,
         tasks: [mkTask('a', days: 0)],
         events: [mkEvent('e1', days: 0)],
+        size: const Size(1700, 900),
       );
       await s.activateTab(null);
       await t.pumpAndSettle();

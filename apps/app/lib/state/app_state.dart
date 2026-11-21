@@ -153,6 +153,9 @@ enum OpenMode { peek, main }
 /// Which tasks the Tasks view lists.
 enum TaskFilter { open, all, completed }
 
+/// The two halves of Home.
+enum HomeFocus { day, board }
+
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
     final saved = prefs?.read(_sectionKey);
@@ -3250,6 +3253,66 @@ class AppState extends ChangeNotifier {
   bool get eventTagsExpanded => _eventTagsOpen || eventTagFilter != null;
   String get _taskTagsOpenKey => 'davdart.tasktags.open.v1.$_spaceKey';
   String get _eventTagsOpenKey => 'davdart.eventtags.open.v1.$_spaceKey';
+
+  // ---- Home focus (Day | Board) and the selected day ----
+
+  String get _homeFocusKey => 'davdart.home.focus.v1.$_spaceKey';
+  String get _homeCalKey => 'davdart.home.cal.open.v1.$_spaceKey';
+
+  /// Which half of Home shows, remembered per Space; Day by default.
+  HomeFocus get homeFocus => switch (prefs?.read(_homeFocusKey)) {
+    'board' => HomeFocus.board,
+    'day' => HomeFocus.day,
+    _ => debugDefaultFocus,
+  };
+
+  /// The focus of a Space with no saved choice (Day; tests may change it).
+  @visibleForTesting
+  static HomeFocus debugDefaultFocus = HomeFocus.day;
+
+  void setHomeFocus(HomeFocus f) {
+    if (f == homeFocus) return;
+    if (f == debugDefaultFocus) {
+      prefs?.remove(_homeFocusKey);
+    } else {
+      prefs?.write(_homeFocusKey, f.name);
+    }
+    notifyListeners();
+  }
+
+  /// The narrow Home calendar is expanded to the month grid (per Space).
+  bool get homeCalOpen => prefs?.read(_homeCalKey) == 'true';
+
+  void setHomeCalOpen(bool open) {
+    if (open == homeCalOpen) return;
+    if (open) {
+      prefs?.write(_homeCalKey, 'true');
+    } else {
+      prefs?.remove(_homeCalKey);
+    }
+    notifyListeners();
+  }
+
+  /// The day picked on Home: a plain date (UTC-flagged y-m-d, never an
+  /// instant), or null for today.
+  DateTime? homeDay;
+
+  /// The selected Home day as a plain date; [now] decides "today".
+  DateTime homeSelectedDay([DateTime? now]) =>
+      homeDay ?? wallDay(wallNow(now ?? DateTime.now()));
+
+  void selectHomeDay(DateTime? d) {
+    final n = d == null ? null : DateTime.utc(d.year, d.month, d.day);
+    if (n == homeDay) return;
+    homeDay = n;
+    notifyListeners();
+  }
+
+  /// Back to today (at local midnight and when the app resumes).
+  void resetHomeDay() {
+    homeDay = null;
+    notifyListeners();
+  }
 
   void setTaskTagsOpen(bool v) {
     _taskTagsOpen = v;

@@ -17,7 +17,7 @@ import 'collapsible_section.dart';
 import 'command_palette.dart';
 import 'key_nav_ui.dart';
 import '../state/key_nav.dart';
-import 'home_today.dart';
+import 'home_day.dart';
 import 'detail_header.dart';
 import 'detail_view.dart';
 import 'first_run_view.dart';
@@ -189,6 +189,8 @@ class _ShellState extends State<Shell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
+    // A new day may have started while the app was away: back to today.
+    if (s == AppLifecycleState.resumed) widget.state.resetHomeDay();
     // Narrow: an edit pending its typing pause is saved before the app may
     // be stopped.
     if (s != AppLifecycleState.resumed && widget.state.narrow) {
@@ -333,6 +335,7 @@ class _ShellState extends State<Shell>
       listenable: state,
       builder: (context, _) {
         publishBoardNav(state);
+        state.nav.homeStacked = false;
         return CollapsibleSection(
           id: 'home-board',
           title: 'Board',
@@ -372,25 +375,27 @@ class _ShellState extends State<Shell>
         : Column(
             children: [
               ScopeText(state: state),
-              if (state.activeTab == null &&
-                  MediaQuery.sizeOf(context).width < Tokens.stackBreakpoint)
-                // Phone Home: Today and the board scroll as one.
-                Expanded(
-                  child: SingleChildScrollView(
-                    key: const Key('home-scroll'),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        HomeToday(state: state),
-                        homeBoard(embedded: true),
-                        SizedBox(height: fabInset(context)),
-                      ],
+              if (state.activeTab == null) ...[
+                HomeSwitch(state: state),
+                if (state.homeFocus == HomeFocus.day)
+                  Expanded(child: HomeDayFocus(state: state))
+                else if (MediaQuery.sizeOf(context).width <
+                    Tokens.stackBreakpoint)
+                  // Phone: the board accordions in one scroll view.
+                  Expanded(
+                    child: SingleChildScrollView(
+                      key: const Key('home-scroll'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          homeBoard(embedded: true),
+                          SizedBox(height: fabInset(context)),
+                        ],
+                      ),
                     ),
-                  ),
-                )
-              else if (state.activeTab == null) ...[
-                HomeToday(state: state, capStacked: narrowLayout(context)),
-                Flexible(child: homeBoard()),
+                  )
+                else
+                  Expanded(child: homeBoard()),
               ] else
                 Expanded(
                   child: state.view == ViewMode.board

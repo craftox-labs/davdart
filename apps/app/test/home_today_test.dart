@@ -88,7 +88,7 @@ void main() {
   });
 
   testWidgets('two cards, equal width and height, empty states', (t) async {
-    await pumpTasksApp(t);
+    await pumpTasksApp(t, size: const Size(1700, 900));
     expect(_k('home-today-doing'), findsNothing);
     expect(find.text('Nothing due today'), findsOneWidget);
     expect(find.text('No events today'), findsOneWidget);
@@ -363,7 +363,7 @@ void main() {
     expect(s.nav.homeStacked, isTrue);
     // The pref is written once, by the owner, and read back on a rebuild.
     expect(s.prefs?.read('davdart.home.today.collapsed.v1'), 'true');
-    t.view.physicalSize = const Size(1280, 900);
+    t.view.physicalSize = const Size(1700, 900);
     await t.pumpAndSettle();
     expect(s.nav.homeStacked, isFalse);
     expect(_k('home-today'), findsNothing);

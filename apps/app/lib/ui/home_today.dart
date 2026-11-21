@@ -19,11 +19,10 @@ import 'task_menu.dart';
 import 'task_parts.dart';
 import 'theme.dart';
 
-// The "Today" section on Home: equal-width cards (Tasks, Events) for what
-// falls on today. A pure view over AppState. The cards are a plain list in
-// [HomeToday]; a later calendar card is one more [TodayCard] in that list. To
-// remove: delete this file, its tests and the one `HomeToday(...)` line in
-// app.dart.
+// The day section on Home: equal-width cards (Tasks, Events) for what falls
+// on the selected day (`AppState.homeSelectedDay`, today by default). A view
+// over AppState. The cards are a plain list in [HomeToday]; the calendar that
+// picks the day is in home_day.dart.
 
 const _maxRows = 6;
 
@@ -110,7 +109,7 @@ class _HomeTodayState extends State<HomeToday> {
     if (wait < const Duration(seconds: 1)) wait = const Duration(seconds: 1);
     _timer = Timer(wait, () {
       if (!mounted) return;
-      setState(() {});
+      state.resetHomeDay();
       _arm();
     });
   }
@@ -124,6 +123,8 @@ class _HomeTodayState extends State<HomeToday> {
   @override
   void dispose() {
     _timer?.cancel();
+    // Its keyboard rows go with it (the Board focus has none from here).
+    state.nav.publishHome('today', const []);
     super.dispose();
   }
 
@@ -134,12 +135,14 @@ class _HomeTodayState extends State<HomeToday> {
       listenable: state,
       builder: (context, _) {
         final clock = _now();
+        final day = state.homeSelectedDay(clock);
+        final isToday = day == wallDay(wallNow(clock));
         // The keyboard list of the rows below, filled by the cards.
         _rows.clear();
         // The seam: add further cards (a calendar) to this list.
         final cards = <Widget>[
-          _tasksCard(context, clock),
-          _eventsCard(context, clock),
+          _tasksCard(context, clock, day, isToday),
+          _eventsCard(context, clock, day, isToday),
         ];
         state.nav.publishHome('today', List.of(_rows));
         return ContentCap(
@@ -187,7 +190,7 @@ class _HomeTodayState extends State<HomeToday> {
               }
               return CollapsibleSection(
                 id: 'today-section',
-                title: 'Today',
+                title: isToday ? 'Today' : dayLabel(day, clock),
                 collapsed: _collapsed,
                 onChanged: _setCollapsed,
                 headerPadding: EdgeInsets.fromLTRB(
@@ -204,7 +207,41 @@ class _HomeTodayState extends State<HomeToday> {
                     t.space.lg,
                     0,
                   ),
-                  child: body,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (!isToday)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FTappable(
+                            key: const Key('home-day-reset'),
+                            onPress: state.resetHomeDay,
+                            child: ConstrainedBox(
+                              constraints: BoxConstraints(
+                                minHeight: narrowLayout(context)
+                                    ? t.sizes.touchTarget
+                                    : 0,
+                              ),
+                              child: Center(
+                                widthFactor: 1,
+                                child: Padding(
+                                  padding: EdgeInsets.symmetric(
+                                    vertical: t.space.xs,
+                                  ),
+                                  child: Text(
+                                    'Today',
+                                    style: t.type.captionStyle.copyWith(
+                                      color: t.accent,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      body,
+                    ],
+                  ),
                 ),
               );
             },
@@ -214,9 +251,27 @@ class _HomeTodayState extends State<HomeToday> {
     );
   }
 
-  Widget _tasksCard(BuildContext context, DateTime clock) {
-    // Overdue first, then due today; each already in compareTasks order.
-    final due = [...state.overdueTasks(clock), ...state.dueTodayTasks(clock)];
+  Widget _tasksCard(
+    BuildContext context,
+    DateTime clock,
+    DateTime day,
+    bool isToday,
+  ) {
+    // Overdue first (only on today), then due that day (recurring tasks
+    // expanded); each in compareTasks order.
+    final overdue = isToday ? state.overdueTasks(clock) : <Task>[];
+    final skip = {for (final k in overdue) k.uid};
+    final onDay =
+        (bucketByDay(
+                  tasks: state.openTasks(clock),
+                  from: day,
+                  to: day.add(const Duration(days: 1)),
+                )[day]?.tasks ??
+                const <TaskOccurrence>[])
+            .map((o) => o.task)
+            .where((k) => !skip.contains(k.uid))
+            .toList();
+    final due = [...overdue, ...onDay];
     return TodayCard(
       slug: 'tasks',
       title: 'Tasks',
@@ -229,14 +284,11 @@ class _HomeTodayState extends State<HomeToday> {
               key: const Key('home-today-tasks-add'),
               tooltip: 'New task',
               icon: FLucideIcons.plus,
-              onPress: () => showNewTaskDialog(
-                context,
-                state,
-                due: dueOfDay(dayFromToday(0, clock)),
-              ),
+              onPress: () =>
+                  showNewTaskDialog(context, state, due: dueOfDay(day)),
             )
           : null,
-      emptyText: 'Nothing due today',
+      emptyText: isToday ? 'Nothing due today' : 'Nothing due',
       total: due.length,
       onMore: state.openTasksPanel,
       rows: [
@@ -256,11 +308,20 @@ class _HomeTodayState extends State<HomeToday> {
     );
   }
 
-  Widget _eventsCard(BuildContext context, DateTime clock) {
-    final today = <EventOccurrence>[
-      for (final g in upcomingGroups(state.events, clock, 1))
-        if (g.id == 'today') ...g.items,
-    ];
+  Widget _eventsCard(
+    BuildContext context,
+    DateTime clock,
+    DateTime day,
+    bool isToday,
+  ) {
+    final today =
+        bucketByDay(
+          events: state.events,
+          from: day,
+          to: day.add(const Duration(days: 1)),
+          includeCancelled: true,
+        )[day]?.events ??
+        const <EventOccurrence>[];
     // All-day first, then by start (the sort is stable).
     final sorted = [
       ...today.where((o) => o.allDay),
@@ -279,12 +340,12 @@ class _HomeTodayState extends State<HomeToday> {
               tooltip: 'New event',
               icon: FLucideIcons.plus,
               onPress: () async {
-                final uid = await showNewEventDialog(context, state);
+                final uid = await showNewEventDialog(context, state, day: day);
                 if (uid != null) await state.clickEvent(uid);
               },
             )
           : null,
-      emptyText: 'No events today',
+      emptyText: isToday ? 'No events today' : 'No events',
       total: sorted.length,
       onMore: state.openEventsPanel,
       rows: [

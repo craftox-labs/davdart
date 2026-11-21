@@ -82,6 +82,8 @@ Future<void> _drag(WidgetTester t, Offset from, Offset to) async {
 String? _parent(AppState s, String uid) => s.tree.find(uid)?.parent?.note.uid;
 
 void main() {
+  setUp(() => AppState.debugDefaultFocus = HomeFocus.board);
+  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
   group('moveNote', () {
     late AppState s;
     setUp(() async {
