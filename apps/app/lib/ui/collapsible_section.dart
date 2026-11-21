@@ -27,6 +27,7 @@ class CollapsibleSection extends StatefulWidget {
     this.leading,
     this.onChanged,
     this.collapsed,
+    this.trailing,
   });
   final String id;
   final String title;
@@ -51,6 +52,9 @@ class CollapsibleSection extends StatefulWidget {
   /// When set, the caller owns the collapsed state (and its persistence):
   /// the section shows it and only reports a toggle through [onChanged].
   final bool? collapsed;
+
+  /// Shown at the right end of the header row (links, add buttons).
+  final Widget? trailing;
   final Widget child;
 
   @override
@@ -91,52 +95,63 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
       children: [
         Padding(
           padding: widget.headerPadding,
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: FTappable(
-              key: Key('${widget.id}-toggle'),
-              semanticsLabel:
-                  '${_isCollapsed ? 'Expand' : 'Collapse'} ${widget.title}',
-              onPress: _toggle,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minHeight: narrowLayout(context) ? t.sizes.touchTarget : 0,
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _isCollapsed
-                          ? FLucideIcons.chevronRight
-                          : FLucideIcons.chevronDown,
-                      size: t.icons.lg,
-                      color: t.muted,
-                    ),
-                    SizedBox(width: t.space.sm),
-                    if (widget.leading != null) ...[
-                      widget.leading!,
-                      SizedBox(width: t.space.sm),
-                    ],
-                    Flexible(
-                      child: OverflowTip(
-                        title,
-                        style: t.type.labelStyle.copyWith(
-                          fontSize: t.type.caption,
-                          color: t.muted,
-                        ),
+          child: Row(
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: FTappable(
+                    key: Key('${widget.id}-toggle'),
+                    semanticsLabel:
+                        '${_isCollapsed ? 'Expand' : 'Collapse'} ${widget.title}',
+                    onPress: _toggle,
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: narrowLayout(context)
+                            ? t.sizes.touchTarget
+                            : 0,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isCollapsed
+                                ? FLucideIcons.chevronRight
+                                : FLucideIcons.chevronDown,
+                            size: t.icons.lg,
+                            color: t.muted,
+                          ),
+                          SizedBox(width: t.space.sm),
+                          if (widget.leading != null) ...[
+                            widget.leading!,
+                            SizedBox(width: t.space.sm),
+                          ],
+                          Flexible(
+                            child: OverflowTip(
+                              title,
+                              style: t.type.labelStyle.copyWith(
+                                fontSize: t.type.caption,
+                                color: t.muted,
+                              ),
+                            ),
+                          ),
+                          if (widget.count != null) ...[
+                            SizedBox(width: t.space.sm),
+                            Text(
+                              '${widget.count}',
+                              style: t.type.captionStyle.copyWith(
+                                color: t.muted,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
-                    if (widget.count != null) ...[
-                      SizedBox(width: t.space.sm),
-                      Text(
-                        '${widget.count}',
-                        style: t.type.captionStyle.copyWith(color: t.muted),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               ),
-            ),
+              if (widget.trailing != null) widget.trailing!,
+            ],
           ),
         ),
         if (!_isCollapsed) fill ? Expanded(child: widget.child) : widget.child,

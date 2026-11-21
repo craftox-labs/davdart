@@ -209,6 +209,8 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
                       selected: sel,
                       today: today,
                       clock: clock,
+                      month: month,
+                      onMonth: (m) => setState(() => _month = m),
                       grid: calendar,
                     ),
                   ),
@@ -224,8 +226,146 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
   }
 }
 
-/// Phone calendar: one line `< Sat 22 Nov v >` (day-step arrows, tap to open
-/// the month grid), expanded state persisted per Space.
+/// The one header row of the calendar card: `< title v >` with the title
+/// centred between two arrows. A `Today` button lives in a reserved slot on
+/// the right (mirrored by an empty slot on the left), sized to its text, so
+/// the title never shifts and never meets the button or the arrows.
+class CalendarHeader extends StatelessWidget {
+  const CalendarHeader({
+    super.key,
+    required this.title,
+    required this.titleKey,
+    required this.prevKey,
+    required this.nextKey,
+    required this.prevLabel,
+    required this.nextLabel,
+    required this.onPrev,
+    required this.onNext,
+    required this.showToday,
+    required this.onToday,
+    this.onToggle,
+    this.open,
+  });
+  final String title;
+  final String titleKey, prevKey, nextKey;
+  final String prevLabel, nextLabel;
+  final VoidCallback onPrev, onNext;
+  final bool showToday;
+  final VoidCallback? onToday;
+
+  /// Taps on the title (collapse or expand); null on wide.
+  final VoidCallback? onToggle;
+
+  /// The chevron: up when open, down when closed; none when null.
+  final bool? open;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final box = narrowLayout(context)
+        ? t.sizes.touchTarget
+        : t.sizes.calendarCell;
+    final todayStyle = t.type.captionStyle.copyWith(color: t.accent);
+    final tp = TextPainter(
+      text: TextSpan(text: 'Today', style: todayStyle),
+      textDirection: TextDirection.ltr,
+      maxLines: 1,
+    )..layout();
+    final slot = tp.width + 2 * t.space.sm;
+    Widget arrow(String key, IconData icon, String label, VoidCallback f) =>
+        SizedBox(
+          width: box,
+          height: box,
+          child: FTappable(
+            key: Key(key),
+            behavior: HitTestBehavior.opaque,
+            semanticsLabel: label,
+            onPress: f,
+            child: Center(
+              child: Icon(icon, size: t.icons.md, color: t.muted),
+            ),
+          ),
+        );
+    final label = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Flexible(
+          child: Text(
+            title,
+            key: Key(titleKey),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: t.type.labelStyle.copyWith(color: t.fg),
+          ),
+        ),
+        if (open != null) ...[
+          SizedBox(width: t.space.sm),
+          Icon(
+            open! ? FLucideIcons.chevronUp : FLucideIcons.chevronDown,
+            size: t.icons.md,
+            color: t.muted,
+          ),
+        ],
+      ],
+    );
+    return Row(
+      children: [
+        arrow(prevKey, FLucideIcons.chevronLeft, prevLabel, onPrev),
+        SizedBox(width: slot),
+        Expanded(
+          child: onToggle == null
+              ? Center(child: label)
+              : FTappable(
+                  key: const Key('home-cal-toggle'),
+                  behavior: HitTestBehavior.opaque,
+                  semanticsLabel: open == true
+                      ? 'Collapse calendar'
+                      : 'Expand calendar',
+                  onPress: onToggle,
+                  child: SizedBox(
+                    height: box,
+                    child: Center(child: label),
+                  ),
+                ),
+        ),
+        SizedBox(
+          width: slot,
+          child: showToday
+              ? FTappable(
+                  key: const Key('home-day-reset'),
+                  behavior: HitTestBehavior.opaque,
+                  onPress: onToday,
+                  child: SizedBox(
+                    height: box,
+                    child: Center(child: Text('Today', style: todayStyle)),
+                  ),
+                )
+              : null,
+        ),
+        arrow(nextKey, FLucideIcons.chevronRight, nextLabel, onNext),
+      ],
+    );
+  }
+}
+
+const _shortMonths = [
+  'Jan',
+  'Feb',
+  'Mar',
+  'Apr',
+  'May',
+  'Jun',
+  'Jul',
+  'Aug',
+  'Sep',
+  'Oct',
+  'Nov',
+  'Dec',
+];
+
+/// Phone calendar card: one header row (collapsed `< Sat 22 Nov v >`, day
+/// arrows; open `< Nov 2026 ^ >`, month arrows) and, when open, the month
+/// grid. Expanded state persisted per Space.
 class CollapsedCalendar extends StatelessWidget {
   const CollapsedCalendar({
     super.key,
@@ -233,12 +373,16 @@ class CollapsedCalendar extends StatelessWidget {
     required this.selected,
     required this.today,
     required this.clock,
+    required this.month,
+    required this.onMonth,
     required this.grid,
   });
   final AppState state;
   final DateTime selected;
   final DateTime today;
   final DateTime clock;
+  final DateTime month;
+  final ValueChanged<DateTime> onMonth;
   final Widget grid;
 
   @override
@@ -246,19 +390,7 @@ class CollapsedCalendar extends StatelessWidget {
     final t = tokensOf(context);
     final open = state.homeCalOpen;
     void step(int d) => state.selectHomeDay(selected.add(Duration(days: d)));
-    Widget arrow(String key, IconData icon, String label, int d) => SizedBox(
-      width: t.sizes.touchTarget,
-      height: t.sizes.touchTarget,
-      child: FTappable(
-        key: Key(key),
-        behavior: HitTestBehavior.opaque,
-        semanticsLabel: label,
-        onPress: () => step(d),
-        child: Center(
-          child: Icon(icon, size: t.icons.md, color: t.muted),
-        ),
-      ),
-    );
+    void stepMonth(int d) => onMonth(DateTime.utc(month.year, month.month + d));
     return DecoratedBox(
       key: const Key('home-calendar-card'),
       decoration: BoxDecoration(
@@ -269,87 +401,21 @@ class CollapsedCalendar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Padding(
-            padding: EdgeInsets.zero,
-            child: Row(
-              children: [
-                arrow(
-                  'home-cal-prev-day',
-                  FLucideIcons.chevronLeft,
-                  'Previous day',
-                  -1,
-                ),
-                Expanded(
-                  // The date stays centred between the two arrows; Today sits
-                  // in the free space at the right, over the toggle, so it
-                  // never shifts the date.
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      FTappable(
-                        key: const Key('home-cal-toggle'),
-                        behavior: HitTestBehavior.opaque,
-                        semanticsLabel: open
-                            ? 'Collapse calendar'
-                            : 'Expand calendar',
-                        onPress: () => state.setHomeCalOpen(!open),
-                        child: SizedBox(
-                          height: t.sizes.touchTarget,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                dayLabel(selected, clock),
-                                key: const Key('home-cal-label'),
-                                style: t.type.labelStyle.copyWith(color: t.fg),
-                              ),
-                              SizedBox(width: t.space.sm),
-                              Icon(
-                                open
-                                    ? FLucideIcons.chevronUp
-                                    : FLucideIcons.chevronDown,
-                                size: t.icons.md,
-                                color: t.muted,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      if (selected != today)
-                        Positioned(
-                          right: 0,
-                          top: 0,
-                          bottom: 0,
-                          child: FTappable(
-                            key: const Key('home-day-reset'),
-                            behavior: HitTestBehavior.opaque,
-                            onPress: state.resetHomeDay,
-                            child: Center(
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: t.space.sm,
-                                ),
-                                child: Text(
-                                  'Today',
-                                  style: t.type.captionStyle.copyWith(
-                                    color: t.accent,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                arrow(
-                  'home-cal-next-day',
-                  FLucideIcons.chevronRight,
-                  'Next day',
-                  1,
-                ),
-              ],
-            ),
+          CalendarHeader(
+            title: open
+                ? '${_shortMonths[month.month - 1]} ${month.year}'
+                : dayLabel(selected, clock),
+            titleKey: open ? 'cal-month' : 'home-cal-label',
+            prevKey: open ? 'cal-prev' : 'home-cal-prev-day',
+            nextKey: open ? 'cal-next' : 'home-cal-next-day',
+            prevLabel: open ? 'Previous month' : 'Previous day',
+            nextLabel: open ? 'Next month' : 'Next day',
+            onPrev: () => open ? stepMonth(-1) : step(-1),
+            onNext: () => open ? stepMonth(1) : step(1),
+            showToday: selected != today,
+            onToday: state.resetHomeDay,
+            onToggle: () => state.setHomeCalOpen(!open),
+            open: open,
           ),
           if (open) grid,
         ],
@@ -407,20 +473,6 @@ class MonthCalendar extends StatelessWidget {
         ? t.sizes.touchTarget
         : t.sizes.calendarCell;
     final muted = t.type.captionStyle.copyWith(color: t.muted);
-
-    Widget nav(String key, IconData icon, String label, int d) => SizedBox(
-      width: cell,
-      height: cell,
-      child: FTappable(
-        key: Key(key),
-        behavior: HitTestBehavior.opaque,
-        semanticsLabel: label,
-        onPress: () => onMonth(DateTime.utc(month.year, month.month + d)),
-        child: Center(
-          child: Icon(icon, size: t.icons.md, color: t.muted),
-        ),
-      ),
-    );
 
     Widget day(DateTime d) {
       final inMonth = d.month == month.month;
@@ -505,33 +557,19 @@ class MonthCalendar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            children: [
-              nav('cal-prev', FLucideIcons.chevronLeft, 'Previous month', -1),
-              Expanded(
-                child: Text(
-                  '${_monthNames[month.month - 1]} ${month.year}',
-                  key: const Key('cal-month'),
-                  textAlign: TextAlign.center,
-                  style: t.type.labelStyle.copyWith(color: t.fg),
-                ),
-              ),
-              if (onToday != null && selected != today)
-                FTappable(
-                  key: const Key('home-day-reset'),
-                  behavior: HitTestBehavior.opaque,
-                  onPress: onToday,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: t.space.sm),
-                    child: Text(
-                      'Today',
-                      style: t.type.captionStyle.copyWith(color: t.accent),
-                    ),
-                  ),
-                ),
-              nav('cal-next', FLucideIcons.chevronRight, 'Next month', 1),
-            ],
-          ),
+          if (!bleed)
+            CalendarHeader(
+              title: '${_monthNames[month.month - 1]} ${month.year}',
+              titleKey: 'cal-month',
+              prevKey: 'cal-prev',
+              nextKey: 'cal-next',
+              prevLabel: 'Previous month',
+              nextLabel: 'Next month',
+              onPrev: () => onMonth(DateTime.utc(month.year, month.month - 1)),
+              onNext: () => onMonth(DateTime.utc(month.year, month.month + 1)),
+              showToday: selected != today,
+              onToday: onToday,
+            ),
           Row(
             children: [
               for (var i = 0; i < 7; i++)

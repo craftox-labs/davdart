@@ -7,12 +7,12 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/key_nav.dart';
 import '../theme/tokens.dart';
+import 'collapsible_section.dart';
 import 'content_grid.dart';
 import 'event_menu.dart';
 import '../state/event_rules.dart';
 import 'events_panel.dart';
 import 'key_nav_ui.dart';
-import 'overflow_tip.dart';
 import 'parts.dart';
 import 'task_menu.dart';
 import 'task_parts.dart';
@@ -140,16 +140,14 @@ class _HomeTodayState extends State<HomeToday> {
                   ],
                 );
               } else {
-                body = IntrinsicHeight(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      for (var i = 0; i < cards.length; i++) ...[
-                        if (i > 0) SizedBox(width: gap),
-                        Expanded(child: cards[i]),
-                      ],
+                body = Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (var i = 0; i < cards.length; i++) ...[
+                      if (i > 0) SizedBox(width: gap),
+                      Expanded(child: cards[i]),
                     ],
-                  ),
+                  ],
                 );
               }
               return Padding(
@@ -332,9 +330,9 @@ class _HomeTodayState extends State<HomeToday> {
   }
 }
 
-/// One card of the Today section: header (title, count, optional "All" link
-/// and add button), then [rows], or [emptyText] when [total] is 0. Rows past
-/// the cap end in "and N more". Cards do not collapse.
+/// One section of the day list: a plain accordion header outside any card
+/// (chevron, title, count, then the "All" link and add button at the right),
+/// and one card below holding the [rows], or [emptyText] when [total] is 0.
 class TodayCard extends StatelessWidget {
   const TodayCard({
     super.key,
@@ -366,109 +364,61 @@ class TodayCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final muted = t.type.captionStyle.copyWith(color: t.muted);
-    return DecoratedBox(
-      key: Key('home-today-$slug'),
-      decoration: BoxDecoration(
-        color: t.card,
-        borderRadius: BorderRadius.circular(t.radii.card),
-        border: Border.all(color: t.cardBorder),
-      ),
-      child: Padding(
-        padding: EdgeInsets.all(t.space.md),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Padding(
-              padding: EdgeInsets.all(t.space.xs),
-              child: Row(
-                children: [
-                  // Title and count take the free width, so the link and
-                  // the add button end at the card's right edge.
-                  Expanded(
-                    child: FTappable(
-                      key: Key('home-today-$slug-toggle'),
-                      behavior: HitTestBehavior.opaque,
-                      onPress: onToggle == null
-                          ? null
-                          : () => onToggle!(!collapsed),
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: narrowLayout(context)
-                              ? t.sizes.touchTarget
-                              : 0,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              collapsed
-                                  ? FLucideIcons.chevronRight
-                                  : FLucideIcons.chevronDown,
-                              size: t.icons.sm,
-                              color: t.muted,
-                            ),
-                            SizedBox(width: t.space.xs),
-                            Flexible(
-                              child: OverflowTip(
-                                title,
-                                style: t.type.labelStyle.copyWith(
-                                  fontSize: t.type.caption,
-                                  color: t.muted,
-                                ),
-                              ),
-                            ),
-                            SizedBox(width: t.space.sm),
-                            Text(
-                              '$count',
-                              key: Key('home-today-$slug-count'),
-                              style: muted,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
+    return CollapsibleSection(
+      id: 'home-today-$slug',
+      title: title,
+      count: count,
+      collapsed: collapsed,
+      onChanged: onToggle,
+      headerPadding: EdgeInsets.only(bottom: t.space.xs),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (link != null)
+            FTappable(
+              key: Key('home-today-$slug-all'),
+              behavior: HitTestBehavior.opaque,
+              onPress: onLink,
+              // A touch-sized target on the narrow layout.
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  minHeight: narrowLayout(context) ? t.sizes.touchTarget : 0,
+                ),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    link!,
+                    maxLines: 1,
+                    style: muted.copyWith(color: t.accent),
                   ),
-                  if (link != null)
-                    FTappable(
-                      key: Key('home-today-$slug-all'),
-                      behavior: HitTestBehavior.opaque,
-                      onPress: onLink,
-                      // A touch-sized target on the narrow layout.
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: narrowLayout(context)
-                              ? t.sizes.touchTarget
-                              : 0,
-                        ),
-                        child: Center(
-                          widthFactor: 1,
-                          child: Text(
-                            link!,
-                            maxLines: 1,
-                            style: muted.copyWith(color: t.accent),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (add != null) ...[SizedBox(width: t.space.sm), add!],
-                ],
+                ),
               ),
             ),
-            if (collapsed)
-              const SizedBox.shrink()
-            else if (total == 0)
-              Padding(
-                padding: EdgeInsets.all(t.space.xs),
-                child: Text(
+          if (add != null) ...[SizedBox(width: t.space.sm), add!],
+        ],
+      ),
+      child: DecoratedBox(
+        key: Key('home-today-$slug'),
+        decoration: BoxDecoration(
+          color: t.card,
+          borderRadius: BorderRadius.circular(t.radii.card),
+          border: Border.all(color: t.cardBorder),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(t.space.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (total == 0)
+                Text(
                   emptyText,
                   key: Key('home-today-$slug-empty'),
                   style: muted,
-                ),
-              )
-            else
-              ...rows,
-            // Bottom inner padding matches the header's top (xs).
-            SizedBox(height: t.space.xs),
-          ],
+                )
+              else
+                ...rows,
+            ],
+          ),
         ),
       ),
     );

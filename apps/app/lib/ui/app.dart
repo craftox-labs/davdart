@@ -13,7 +13,6 @@ import '../state/app_state.dart';
 import '../state/note_draft.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
-import 'collapsible_section.dart';
 import 'command_palette.dart';
 import 'key_nav_ui.dart';
 import '../state/key_nav.dart';
@@ -336,27 +335,12 @@ class _ShellState extends State<Shell>
       builder: (context, _) {
         publishBoardNav(state);
         state.nav.homeStacked = false;
-        return CollapsibleSection(
-          id: 'home-board',
-          title: 'Board',
-          count: [
-            for (final c in state.columns(includeNoStatus: false)) ...c.$2,
-          ].length,
-          prefs: state.prefs,
-          prefKey: 'davdart.home.board.collapsed.v1',
-          fill: !embedded,
-          headerPadding: EdgeInsets.fromLTRB(
-            t.space.lg,
-            t.space.md,
-            t.space.lg,
-            0,
-          ),
-          child: BoardView(
-            state: state,
-            includeNoStatus: false,
-            keyboard: true,
-            embedded: embedded,
-          ),
+        // The status columns (or accordions) alone, no overall header.
+        return BoardView(
+          state: state,
+          includeNoStatus: false,
+          keyboard: true,
+          embedded: embedded,
         );
       },
     );
