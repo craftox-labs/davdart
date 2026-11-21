@@ -1,5 +1,7 @@
 import 'package:flutter/widgets.dart';
 
+import 'note_draft.dart' show setText;
+
 /// An open in-place edit of one event, like [TaskDraft]: text fields, the
 /// all-day switch, start and end (wall-clock fields; for an all-day event the
 /// end is the last day, inclusive) and the status, and whether anything
@@ -112,6 +114,49 @@ class EventDraft extends ChangeNotifier {
     originalStart = start;
     originalEnd = end;
     originalStatus = status;
+    notifyListeners();
+  }
+
+  bool _quiet = false;
+
+  @override
+  void notifyListeners() {
+    if (!_quiet) super.notifyListeners();
+  }
+
+  /// Takes the merged saved values as both the fields and the originals.
+  /// Only for a draft with nothing typed or changed.
+  void rebase({
+    required String title,
+    required String body,
+    required String tags,
+    required String location,
+    required bool allDay,
+    required DateTime start,
+    required DateTime end,
+    required String? status,
+  }) {
+    // One change for the listeners: no half-way "dirty" in between.
+    _quiet = true;
+    this.allDay = allDay;
+    this.start = start;
+    this.end = end;
+    this.status = status;
+    markSaved(
+      title: title,
+      body: body,
+      tags: tags,
+      location: location,
+      allDay: allDay,
+      start: start,
+      end: end,
+      status: status,
+    );
+    setText(titleController, title);
+    setText(bodyController, body);
+    setText(tagsController, tags);
+    setText(locationController, location);
+    _quiet = false;
     notifyListeners();
   }
 

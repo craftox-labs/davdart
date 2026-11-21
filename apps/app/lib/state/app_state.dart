@@ -800,6 +800,9 @@ class AppState extends ChangeNotifier {
 
   @override
   void dispose() {
+    // A pending autosave is dropped, not flushed: a save finishing after
+    // this would notify a disposed notifier. The shell flushes on pause and
+    // on leaving an item, so nothing normally waits here.
     for (final t in _autosaveTimers.values) {
       t.cancel();
     }
@@ -1442,6 +1445,7 @@ class AppState extends ChangeNotifier {
     }
     try {
       _setTasks(supportsTasks ? await s.loadTasks() : <Task>[]);
+      _rebaseTaskDrafts();
     } catch (e) {
       taskProblem ??= 'Tasks could not be read: $e';
     }
@@ -1459,6 +1463,7 @@ class AppState extends ChangeNotifier {
     }
     try {
       _setEvents(supportsEvents ? await s.loadEvents() : <Event>[]);
+      _rebaseEventDrafts();
     } catch (e) {
       eventProblem ??= 'Events could not be read: $e';
     }
@@ -2033,6 +2038,11 @@ class AppState extends ChangeNotifier {
   void _focusEditor(String uid) =>
       nav.focusArea(uid == mainItemUid ? NavArea.main : NavArea.peek);
 
+  String? _taskParentOf(Task t) =>
+      t.parentUid != null && findItem(t.parentUid!) != null
+      ? t.parentUid
+      : null;
+
   void startTaskEdit(String uid) {
     final t = _taskById(uid);
     if (t == null || !tasksEditable || _taskDrafts.containsKey(uid)) return;
@@ -2041,9 +2051,7 @@ class AppState extends ChangeNotifier {
       title: t.summary,
       body: t.description,
       tags: _plainTags(t.categories).join(', '),
-      originalParent: t.parentUid != null && findItem(t.parentUid!) != null
-          ? t.parentUid
-          : null,
+      originalParent: _taskParentOf(t),
       originalDue: t.due,
       originalPriority: t.priority,
     );
@@ -2388,16 +2396,23 @@ class AppState extends ChangeNotifier {
   EventDraft? eventDraftFor(String uid) => _eventDrafts[uid];
   bool dirtyEventFor(String uid) => _eventDrafts[uid]?.dirty ?? false;
 
-  /// Starts editing event [uid] (no-op if read-only, unknown or already
-  /// open).
-  void startEventEdit(String uid) {
-    final e = _eventById(uid);
-    if (e == null || !eventsEditable || _eventDrafts.containsKey(uid)) return;
+  /// The all-day flag, start and end an event edit shows (for an all-day
+  /// event the end is the last day, inclusive).
+  (bool, DateTime, DateTime) _eventWhen(Event e) {
     final allDay = e.allDay;
     final start = e.startWall ?? wallDay(wallNow(DateTime.now()));
     final endWall = e.endWall ?? start;
     var end = allDay ? endWall.subtract(const Duration(days: 1)) : endWall;
     if (end.isBefore(start)) end = start;
+    return (allDay, start, end);
+  }
+
+  /// Starts editing event [uid] (no-op if read-only, unknown or already
+  /// open).
+  void startEventEdit(String uid) {
+    final e = _eventById(uid);
+    if (e == null || !eventsEditable || _eventDrafts.containsKey(uid)) return;
+    final (allDay, start, end) = _eventWhen(e);
     _eventDrafts[uid] = EventDraft(
       uid: uid,
       title: e.summary,
@@ -2653,7 +2668,15 @@ class AppState extends ChangeNotifier {
     // Narrow: leaving an item saves its pending edit.
     final leaving = activeTab;
     if (narrow && leaving != null && leaving != t && isEditing(leaving.id)) {
-      unawaited(flushEdit(leaving.id));
+      final id = leaving.id;
+      unawaited(
+        flushEdit(id).then((ok) {
+          // The edit stays open in memory; say it is not stored yet.
+          if (!ok && isEditing(id) && dirtyItem(id)) {
+            onNotSaved?.call(_notSavedReason(id));
+          }
+        }),
+      );
     }
     if (t == null) {
       _activeViewTab = null;
@@ -2899,6 +2922,18 @@ class AppState extends ChangeNotifier {
     return f;
   }
 
+  /// Set by the shell: shows why an edit left behind could not be saved.
+  void Function(String reason)? onNotSaved;
+
+  String _notSavedReason(String uid) {
+    final empty = _taskDrafts.containsKey(uid)
+        ? _taskDrafts[uid]!.titleEmpty
+        : _eventDrafts.containsKey(uid)
+        ? _eventDrafts[uid]!.titleEmpty
+        : _drafts[uid]?.titleEmpty ?? false;
+    return empty ? 'a title is required' : (error ?? 'could not save');
+  }
+
   /// Flushes every pending edit (the app is going to the background).
   Future<void> flushAllEdits() => Future.wait([
     for (final u in _allDraftUids())
@@ -2923,6 +2958,65 @@ class AppState extends ChangeNotifier {
         continue;
       }
       d.rebase(title: n.summary, body: p.text);
+    }
+  }
+
+  /// Like [_rebaseDrafts] for tasks: a clean draft takes the synced task, a
+  /// draft with changes is left alone.
+  void _rebaseTaskDrafts() {
+    if (!narrow) return;
+    for (final d in _taskDrafts.values) {
+      final t = _taskById(d.uid);
+      if (t == null || d.dirty) continue;
+      final tags = _plainTags(t.categories).join(', ');
+      final parent = _taskParentOf(t);
+      if (t.summary.trim() == d.originalTitle.trim() &&
+          t.description.trimRight() == d.originalBody.trimRight() &&
+          tags == d.originalTags &&
+          parent == d.originalParent &&
+          t.due == d.originalDue &&
+          t.priority == d.originalPriority) {
+        continue;
+      }
+      d.rebase(
+        title: t.summary,
+        body: t.description,
+        tags: tags,
+        parent: parent,
+        due: t.due,
+        priority: t.priority,
+      );
+    }
+  }
+
+  /// Like [_rebaseDrafts] for events.
+  void _rebaseEventDrafts() {
+    if (!narrow) return;
+    for (final d in _eventDrafts.values) {
+      final e = _eventById(d.uid);
+      if (e == null || d.dirty) continue;
+      final tags = _plainTags(e.categories).join(', ');
+      final (allDay, start, end) = _eventWhen(e);
+      if (e.summary.trim() == d.originalTitle.trim() &&
+          e.description.trimRight() == d.originalBody.trimRight() &&
+          tags == d.originalTags &&
+          e.location == d.originalLocation &&
+          allDay == d.originalAllDay &&
+          start == d.originalStart &&
+          end == d.originalEnd &&
+          e.status == d.originalStatus) {
+        continue;
+      }
+      d.rebase(
+        title: e.summary,
+        body: e.description,
+        tags: tags,
+        location: e.location,
+        allDay: allDay,
+        start: start,
+        end: end,
+        status: e.status,
+      );
     }
   }
 
@@ -2973,12 +3067,13 @@ class AppState extends ChangeNotifier {
   /// title, failure): edit mode stays.
   Future<bool> saveAndLeave(String uid) async {
     if (!isEditing(uid)) return true;
-    final dirty = _taskDrafts.containsKey(uid)
-        ? dirtyTaskFor(uid)
-        : _eventDrafts.containsKey(uid)
-        ? dirtyEventFor(uid)
-        : dirtyFor(uid);
-    if (!dirty) {
+    // Narrow: through the autosave queue, so it waits for a save in flight
+    // (and drops the pending timer) instead of racing it.
+    if (narrow) {
+      await flushEdit(uid);
+      if (!isEditing(uid)) return true;
+    }
+    if (!dirtyItem(uid)) {
       _dropDraft(uid);
       return true;
     }

@@ -176,6 +176,11 @@ class _ShellState extends State<Shell>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    widget.state.onNotSaved = (reason) {
+      if (mounted) {
+        showFToast(context: context, title: Text('Not saved: $reason'));
+      }
+    };
     widget.state.openMenu = () => setState(() {
       _gridOpen = false;
       _menuOpen = true;
@@ -225,6 +230,7 @@ class _ShellState extends State<Shell>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     widget.state.openMenu = null;
+    widget.state.onNotSaved = null;
     _dock.dispose();
     _peek.dispose();
     super.dispose();

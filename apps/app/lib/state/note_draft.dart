@@ -1,5 +1,20 @@
 import 'package:flutter/widgets.dart';
 
+/// Sets [c]'s text to [text] keeping the caret where it was (clamped).
+void setText(TextEditingController c, String text) {
+  if (c.text == text) return;
+  final s = c.selection;
+  c.value = TextEditingValue(
+    text: text,
+    selection: s.isValid
+        ? TextSelection(
+            baseOffset: s.baseOffset.clamp(0, text.length),
+            extentOffset: s.extentOffset.clamp(0, text.length),
+          )
+        : TextSelection.collapsed(offset: text.length),
+  );
+}
+
 /// What the user chose when asked about unsaved edits.
 enum DraftChoice { save, discard, keep }
 
@@ -62,28 +77,25 @@ class NoteDraft extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _quiet = false;
+
+  @override
+  void notifyListeners() {
+    if (!_quiet) super.notifyListeners();
+  }
+
   /// Takes new saved [title] and [body] (merged from the server) as both the
   /// text and the originals. Only for a draft with nothing typed.
   void rebase({required String title, required String body}) {
+    // One change for the listeners: no half-way "dirty" in between.
+    _quiet = true;
     originalTitle = title;
     originalBody = body;
-    titleController.value = TextEditingValue(
-      text: title,
-      selection: _keep(titleController.selection, title),
-    );
-    bodyController.value = TextEditingValue(
-      text: body,
-      selection: _keep(bodyController.selection, body),
-    );
+    setText(titleController, title);
+    setText(bodyController, body);
+    _quiet = false;
     notifyListeners();
   }
-
-  static TextSelection _keep(TextSelection s, String text) => s.isValid
-      ? TextSelection(
-          baseOffset: s.baseOffset.clamp(0, text.length),
-          extentOffset: s.extentOffset.clamp(0, text.length),
-        )
-      : TextSelection.collapsed(offset: text.length);
 
   bool get titleEmpty => titleController.text.trim().isEmpty;
 

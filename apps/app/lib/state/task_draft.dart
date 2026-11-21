@@ -1,6 +1,8 @@
 import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 
+import 'note_draft.dart' show setText;
+
 /// An open in-place edit of one task, like [NoteDraft]: text fields, parent,
 /// due date and priority, and whether anything differs from what was loaded.
 class TaskDraft extends ChangeNotifier {
@@ -66,6 +68,43 @@ class TaskDraft extends ChangeNotifier {
     originalParent = parent;
     originalDue = due;
     originalPriority = priority;
+    notifyListeners();
+  }
+
+  bool _quiet = false;
+
+  @override
+  void notifyListeners() {
+    if (!_quiet) super.notifyListeners();
+  }
+
+  /// Takes the merged saved values as both the fields and the originals.
+  /// Only for a draft with nothing typed or changed.
+  void rebase({
+    required String title,
+    required String body,
+    required String tags,
+    required String? parent,
+    required ICalDate? due,
+    required int? priority,
+  }) {
+    // One change for the listeners: no half-way "dirty" in between.
+    _quiet = true;
+    this.parent = parent;
+    this.due = due;
+    this.priority = priority;
+    markSaved(
+      title: title,
+      body: body,
+      tags: tags,
+      parent: parent,
+      due: due,
+      priority: priority,
+    );
+    setText(titleController, title);
+    setText(bodyController, body);
+    setText(tagsController, tags);
+    _quiet = false;
     notifyListeners();
   }
 

@@ -235,6 +235,39 @@ void main() {
       expect(s.dirtyFor('n1'), isFalse);
     });
 
+    testWidgets('the preview toggle waits for a save in flight', (t) async {
+      final s = await _openNote(t);
+      await t.tap(_k('item-mode'));
+      await t.pumpAndSettle();
+      final d = s.draftFor('n1')!;
+      d.bodyController.text = 'first';
+      // An autosave is running when the toggle is pressed with newer text.
+      final running = s.flushEdit('n1');
+      d.bodyController.text = 'second';
+      await t.tap(_k('item-mode'));
+      await t.runAsync(() => running);
+      await t.pumpAndSettle();
+      expect(_body(s), contains('second'));
+      expect(s.isEditing('n1'), isFalse);
+      expect(s.autosavePending('n1'), isFalse);
+      _noError(t);
+    });
+
+    testWidgets('leaving with an empty title says it was not saved', (t) async {
+      final s = await _openNote(t);
+      await t.tap(_k('item-mode'));
+      await t.pumpAndSettle();
+      await t.enterText(_k('edit-title'), '');
+      await t.tap(_k('bar-back'));
+      await t.pumpAndSettle();
+      expect(s.activeTab, isNull);
+      expect(find.textContaining('Not saved: a title is required'), findsOne);
+      // Nothing is lost: the edit is still open in memory.
+      expect(s.dirtyFor('n1'), isTrue);
+      expect(s.tree.find('n1')!.note.summary, 'Alpha');
+      _noError(t);
+    });
+
     testWidgets('wide keeps explicit Save: no autosave', (t) async {
       final s = await pumpTasksApp(t, notes: [_note('n1', 'Alpha')]);
       await s.openNote('n1');
