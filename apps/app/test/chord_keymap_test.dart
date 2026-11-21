@@ -175,10 +175,42 @@ void main() {
         expect(by[id], isNotNull, reason: id);
         expect(by[id]!.chords, isNotEmpty, reason: id);
       }
+      // There is no chord section: each chord is an extra key on the row of
+      // the command it duplicates.
       final rows = helpRows(buildActions(s));
-      final g = rows.firstWhere((r) => r.$1 == chordGroup).$2;
-      expect(g.map((r) => r.$1), contains('Ctrl+Shift+J'));
-      expect(g.map((r) => r.$1), contains('Ctrl+Enter'));
+      expect(rows.map((r) => r.$1), isNot(contains(startsWith('Chords'))));
+      final keys = [
+        for (final g in rows)
+          for (final r in g.$2) ...r.$1.split(' / '),
+      ];
+      for (final id in s.chords.ids) {
+        expect(keys, contains(s.chords.labelFor(id)), reason: id);
+      }
+      String rowOf(String what, String group) => rows
+          .firstWhere((r) => r.$1 == group)
+          .$2
+          .firstWhere((r) => r.$2 == what)
+          .$1;
+      expect(rowOf('Go to Home', 'Go to'), 'g h / Ctrl+Shift+G');
+      expect(
+        rowOf('Command palette', 'App'),
+        'Ctrl+K / Cmd+K / : / Ctrl+Shift+K',
+      );
+      expect(
+        rowOf('Focus the area on the left', 'Navigation'),
+        'H / Ctrl+Shift+J',
+      );
+      expect(
+        rowOf('Save and leave edit mode', 'Edit'),
+        'Ctrl+Enter / Cmd+Enter',
+      );
+      expect(
+        rows
+            .firstWhere((r) => r.$1 == 'Edit')
+            .$2
+            .any((r) => r.$1 == 'Esc / Ctrl+Shift+W'),
+        isTrue,
+      );
     });
   });
 
@@ -314,7 +346,12 @@ void main() {
       expect(find.text('Alt+J'), findsOneWidget);
       expect(find.text('Alt+Q'), findsOneWidget);
       expect(find.textContaining('Ctrl+Shift+J'), findsNothing);
-      expect(find.textContaining('CHORDS'), findsOneWidget);
+      expect(find.textContaining('CHORDS'), findsNothing);
+      expect(find.byKey(const Key('help-typing-note')), findsOneWidget);
+      expect(
+        find.text('Alt+ shortcuts also work while typing.'),
+        findsOneWidget,
+      );
     });
 
     testWidgets('the palette shows chord labels', (t) async {
@@ -381,13 +418,12 @@ void main() {
       expect(find.text('Type a command or search'), findsNothing);
     });
 
-    test('native macOS never uses Q; the help names key positions', () {
+    test('native macOS never uses Q', () {
       final mac = ChordKeymap(platform: TargetPlatform.macOS, isWeb: false);
       for (final id in mac.ids) {
         expect(mac.chordFor(id)!.letter, isNot('q'), reason: id);
       }
       expect(mac.labelFor('go.tasks'), 'Cmd+Shift+T');
-      expect(chordGroup, contains('key positions on a QWERTY keyboard'));
     });
   });
 }

@@ -109,20 +109,26 @@ const editShortcuts = <(String, String)>[
   ),
 ];
 
-/// The help dialog's groups, in order. An action sits in the group named by
+/// The help dialog's groups, in reading order: the first column holds App,
+/// Navigation and Panes, the second Open, Go to and Edit, the third the Vim
+/// editing table (see [helpColumnOf]). An action sits in the group named by
 /// [helpGroupOf] its own group.
-const chordGroup =
-    'Chords (work while typing; letters are key positions on a QWERTY keyboard)';
 const helpGroups = [
-  'Navigation',
-  'Open',
-  'Edit',
-  'Go to',
-  'Panes',
   'App',
-  chordGroup,
+  'Navigation',
+  'Panes',
+  'Open',
+  'Go to',
+  'Edit',
   vimHelpGroup,
 ];
+
+/// The column (0 to 2) a help group takes in the three-column layout.
+int helpColumnOf(String group) => switch (group) {
+  'App' || 'Navigation' || 'Panes' => 0,
+  'Open' || 'Go to' || 'Edit' => 1,
+  _ => 2,
+};
 
 String helpGroupOf(String group) => switch (group) {
   'Navigation' || 'Open' || 'Edit' || 'Go to' || 'Panes' => group,
@@ -132,19 +138,33 @@ String helpGroupOf(String group) => switch (group) {
 };
 
 /// The help dialog's rows, from the registry (the single source of truth):
-/// per group, `(keys, what)` for every action that has shortcuts.
+/// per group, `(keys, what)` for every action that has shortcuts. An action's
+/// global chords (they also work while typing) are extra keys on its own row,
+/// next to the single-key command they duplicate; one with no such twin gets
+/// a row in its group. Chords of `edit.leave` join the Esc row of Edit.
 List<(String, List<(String, String)>)> helpRows(List<AppAction> actions) {
   final by = <String, List<(String, String)>>{
     for (final g in helpGroups) g: [],
   };
+  var leaveChords = const <String>[];
   for (final a in actions) {
-    if (a.chords.isNotEmpty) {
-      by[chordGroup]!.add((a.chords.join(' / '), a.helpTitle));
+    if (a.id == 'edit.leave') {
+      leaveChords = a.chords;
+      continue;
     }
-    if (a.shortcuts.isEmpty) continue;
-    by[helpGroupOf(a.group)]!.add((a.shortcuts.join(' / '), a.helpTitle));
+    final keys = [
+      ...a.shortcuts,
+      ...a.chords.where((c) => !a.shortcuts.contains(c)),
+    ];
+    if (keys.isEmpty) continue;
+    by[helpGroupOf(a.group)]!.add((keys.join(' / '), a.helpTitle));
   }
-  by['Edit']!.addAll(editShortcuts);
+  for (final (keys, what) in editShortcuts) {
+    by['Edit']!.add((
+      keys == 'Esc' ? ['Esc', ...leaveChords].join(' / ') : keys,
+      what,
+    ));
+  }
   by['App']!.addAll(knownShortcuts);
   by[vimHelpGroup]!.addAll(vimHelpRows);
   return [

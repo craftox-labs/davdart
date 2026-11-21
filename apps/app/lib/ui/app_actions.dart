@@ -715,7 +715,15 @@ Future<void> _stepTab(AppState s, int by) {
 /// (one on a phone) of key chips and descriptions.
 Future<void> showKeyboardHelp(BuildContext context, AppState state) {
   final t = tokensOf(context);
-  final rows = helpRows(buildActions(state));
+  final actions = buildActions(state);
+  final rows = helpRows(actions);
+  // The modifier prefix of the shortcuts that also work while typing on this
+  // platform: `Alt+`, `Ctrl+Shift+`, `Cmd+Shift+`.
+  final label = actions
+      .expand((a) => a.chords)
+      .where((c) => c.contains('Shift+') || c.startsWith('Alt+'))
+      .firstOrNull;
+  final chordHint = label?.replaceFirst(RegExp(r'[^+]+$'), '');
   return showAppDialog(
     context,
     title: 'Keyboard shortcuts',
@@ -725,12 +733,21 @@ Future<void> showKeyboardHelp(BuildContext context, AppState state) {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (chordHint != null)
+          Padding(
+            padding: EdgeInsets.only(bottom: t.space.md),
+            child: Text(
+              '$chordHint shortcuts also work while typing.',
+              key: const Key('help-typing-note'),
+              style: t.type.captionStyle.copyWith(color: t.muted),
+            ),
+          ),
         if (!state.vimKeys)
           Padding(
             padding: EdgeInsets.only(bottom: t.space.md),
             child: Text(
               'Vim keys are off: only the arrow keys, Enter, Esc and the '
-              'Ctrl/Cmd chords work.',
+              'Ctrl/Cmd and Alt shortcuts work.',
               style: t.type.captionStyle.copyWith(color: t.muted),
             ),
           ),
@@ -752,8 +769,8 @@ Future<void> showKeyboardHelp(BuildContext context, AppState state) {
 
 /// Help groups laid out masonry-style in as many columns as fit at least
 /// [Sizes.helpColumn] each (one under two of them, three from about 1010px).
-/// Each group goes to the shortest column so the columns
-/// stay balanced by row count.
+/// With three columns the groups sit in fixed columns ([helpColumnOf]);
+/// with fewer each goes to the shortest column.
 class HelpColumns extends StatelessWidget {
   const HelpColumns({super.key, required this.groups});
   final List<(String, List<(String, String)>)> groups;
@@ -776,8 +793,13 @@ class HelpColumns extends StatelessWidget {
         final heights = List<int>.filled(n, 0);
         for (var i = 0; i < groups.length; i++) {
           var at = 0;
-          for (var c = 1; c < n; c++) {
-            if (heights[c] < heights[at]) at = c;
+          if (n == 3) {
+            // Three columns: App, Navigation, Panes | Open, Go to, Edit | Vim.
+            at = helpColumnOf(groups[i].$1);
+          } else {
+            for (var c = 1; c < n; c++) {
+              if (heights[c] < heights[at]) at = c;
+            }
           }
           cols[at].add(i);
           heights[at] += groups[i].$2.length + 2; // rows plus the heading

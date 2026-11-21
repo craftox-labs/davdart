@@ -780,6 +780,53 @@ void main() {
       }
     });
 
+    testWidgets('wide: App, Navigation, Panes | Open, Go to, Edit | Vim', (
+      t,
+    ) async {
+      await open(t, const Size(1400, 1400));
+      Rect r(String g) => t.getRect(find.text(g));
+      final app = r('APP'), nav = r('NAVIGATION'), panes = r('PANES');
+      final open_ = r('OPEN'), go = r('GO TO'), edit = r('EDIT');
+      final vim = r('VIM EDITING');
+      expect(find.textContaining('CHORDS'), findsNothing);
+      // Column 1, top to bottom.
+      expect(nav.left, app.left);
+      expect(panes.left, app.left);
+      expect(nav.top, greaterThan(app.top));
+      expect(panes.top, greaterThan(nav.top));
+      // Column 2 is to its right, top to bottom.
+      expect(open_.left, greaterThan(app.left + 200));
+      expect(go.left, open_.left);
+      expect(edit.left, open_.left);
+      expect(go.top, greaterThan(open_.top));
+      expect(edit.top, greaterThan(go.top));
+      // Column 3: the Vim table, unchanged.
+      expect(vim.left, greaterThan(open_.left + 200));
+      expect(open_.top, app.top);
+      expect(vim.top, app.top);
+      // A chord is an extra key on the single-key command's row.
+      Finder row(String what) => find.ancestor(
+        of: find.text(what),
+        matching: find.byType(ConstrainedBox),
+      );
+      final home = row('Go to Home').first;
+      expect(
+        find.descendant(of: home, matching: find.text('g h')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: home, matching: find.textContaining('+G')),
+        findsOneWidget,
+      );
+      // The note about typing names the platform's modifier prefix.
+      expect(_k('help-typing-note'), findsOneWidget);
+      expect(
+        t.widget<Text>(_k('help-typing-note')).data,
+        endsWith('shortcuts also work while typing.'),
+      );
+      await _press(t, LogicalKeyboardKey.escape);
+    });
+
     testWidgets('no column is narrower than the minimum; chips stay whole', (
       t,
     ) async {
@@ -816,7 +863,7 @@ void main() {
       final s = await pumpTasksApp(t);
       final rows = helpRows(buildActions(s));
       final panes = rows.firstWhere((r) => r.$1 == 'Panes').$2;
-      expect(panes.any((r) => r.$1 == 'b'), isTrue);
+      expect(panes.any((r) => r.$1.split(' / ').contains('b')), isTrue);
     });
   });
 
