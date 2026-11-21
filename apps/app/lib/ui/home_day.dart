@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:davdart/davdart.dart';
 
 import 'dart:ui' show PlatformDispatcher;
@@ -151,7 +149,7 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
           _month = _monthOf(sel);
         }
         final month = _month ?? _monthOf(sel);
-        Widget calendarFor(bool bleed, {double? fillHeight}) => MonthCalendar(
+        Widget calendarFor(bool bleed, {bool square = false}) => MonthCalendar(
           state: state,
           month: month,
           selected: sel,
@@ -164,7 +162,7 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
           },
           clock: clock,
           bleed: bleed,
-          fillHeight: fillHeight,
+          square: square,
           onToday: bleed ? null : state.resetHomeDay,
         );
         final list = HomeToday(state: state, now: widget.now, stack: true);
@@ -178,19 +176,13 @@ class _HomeDayFocusState extends State<HomeDayFocus> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: LayoutBuilder(
-                      builder: (context, lc) {
-                        final h = lc.maxHeight - 2 * t.space.lg;
-                        return Padding(
-                          padding: EdgeInsets.all(t.space.lg)
-                              .copyWith(right: 0),
-                          // Scrolls when the window is shorter than the grid.
-                          child: SingleChildScrollView(
-                            key: const Key('home-calendar-scroll'),
-                            child: calendarFor(false, fillHeight: h),
-                          ),
-                        );
-                      },
+                    child: Padding(
+                      padding: EdgeInsets.all(t.space.lg).copyWith(right: 0),
+                      // Scrolls when the grid is taller than the window.
+                      child: SingleChildScrollView(
+                        key: const Key('home-calendar-scroll'),
+                        child: calendarFor(false, square: true),
+                      ),
                     ),
                   ),
                   Expanded(child: SingleChildScrollView(child: list)),
@@ -444,13 +436,12 @@ class MonthCalendar extends StatelessWidget {
     required this.clock,
     this.bleed = false,
     this.onToday,
-    this.fillHeight,
+    this.square = false,
   });
   final AppState state;
 
-  /// Wide: the height of the column the card may fill; day cells then grow
-  /// to use it (when it is more than the grid needs).
-  final double? fillHeight;
+  /// Wide: day cells are square (side = grid width / 7).
+  final bool square;
 
   /// Phone: no side padding or border, so seven cells of 44dp fit 320dp.
   final bool bleed;
@@ -483,14 +474,6 @@ class MonthCalendar extends StatelessWidget {
         ? t.sizes.touchTarget
         : t.sizes.calendarCell;
     final muted = t.type.captionStyle.copyWith(color: t.muted);
-    // Room the grid needs at its natural size: padding, header, weekday row
-    // and the week rows.
-    final natural = 2 * t.space.md + 2 * cell + weeks * cell;
-    final fill = fillHeight != null && fillHeight! > natural && !bleed;
-    // Cells grow with the column but never past sizes.calendarCellMax.
-    final maxHeight =
-        2 * t.space.md + 2 * cell + weeks * t.sizes.calendarCellMax;
-
     Widget day(DateTime d) {
       final inMonth = d.month == month.month;
       final b = buckets[d];
@@ -501,8 +484,9 @@ class MonthCalendar extends StatelessWidget {
         behavior: HitTestBehavior.opaque,
         semanticsLabel: dayLabel(d, clock),
         onPress: () => onSelect(d),
-        child: SizedBox(
-          height: fill ? null : cell,
+        child: _Cell(
+          square: square,
+          height: cell,
           child: Center(
             child: DecoratedBox(
               decoration: BoxDecoration(
@@ -570,7 +554,6 @@ class MonthCalendar extends StatelessWidget {
 
     return Container(
       key: const Key('home-calendar'),
-      height: fill ? math.min(fillHeight!, maxHeight) : null,
       padding: bleed
           ? EdgeInsets.fromLTRB(t.space.md, 0, t.space.md, t.space.md)
           : EdgeInsets.all(t.space.md),
@@ -582,7 +565,7 @@ class MonthCalendar extends StatelessWidget {
               border: Border.all(color: t.cardBorder),
             ),
       child: Column(
-        mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
+        mainAxisSize: MainAxisSize.min,
         children: [
           if (!bleed)
             CalendarHeader(
@@ -611,15 +594,12 @@ class MonthCalendar extends StatelessWidget {
             ],
           ),
           for (var w = 0; w < weeks; w++)
-            () {
-              final row = Row(
-                children: [
-                  for (var i = 0; i < 7; i++)
-                    Expanded(child: day(start.add(Duration(days: w * 7 + i)))),
-                ],
-              );
-              return fill ? Expanded(child: row) : row;
-            }(),
+            Row(
+              children: [
+                for (var i = 0; i < 7; i++)
+                  Expanded(child: day(start.add(Duration(days: w * 7 + i)))),
+              ],
+            ),
         ],
       ),
     );
@@ -637,4 +617,20 @@ class _Dot extends StatelessWidget {
       child: SizedBox(width: d, height: d),
     );
   }
+}
+
+/// A calendar day's hit box: square (wide) or a fixed [height] (phone).
+class _Cell extends StatelessWidget {
+  const _Cell({
+    required this.square,
+    required this.height,
+    required this.child,
+  });
+  final bool square;
+  final double height;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => square
+      ? AspectRatio(aspectRatio: 1, child: child)
+      : SizedBox(height: height, child: child);
 }
