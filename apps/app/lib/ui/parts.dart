@@ -146,7 +146,9 @@ class _PlainTitleFieldState extends State<_PlainTitleField> {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final style = paneTitleStyle(t);
+    // What PaneTitle's Text shows: its style merged over the inherited
+    // DefaultTextStyle (an EditableText does not inherit it by itself).
+    final style = DefaultTextStyle.of(context).style.merge(paneTitleStyle(t));
     return Align(
       alignment: Alignment.centerLeft,
       child: Stack(

@@ -99,7 +99,9 @@ void main() {
         matching: find.text('Alpha'),
       );
       final before = t.getRect(title);
-      final style = t.widget<Text>(title).style!;
+      // The style the preview Text really shows (with the inherited one).
+      final style = DefaultTextStyle.of(t.element(title)).style
+          .merge(t.widget<Text>(title).style);
       await t.tap(_k('item-mode'));
       await t.pumpAndSettle();
       expect(s.isEditing('n1'), isTrue);
@@ -112,6 +114,11 @@ void main() {
       expect(editable.style.fontSize, style.fontSize);
       expect(editable.style.fontWeight, style.fontWeight);
       expect(editable.style.color, style.color);
+      expect(editable.style.letterSpacing, style.letterSpacing);
+      expect(editable.style.wordSpacing, style.wordSpacing);
+      expect(editable.style.height, style.height);
+      expect(editable.style.fontFamily, style.fontFamily);
+      expect(editable.style.fontFeatures, style.fontFeatures);
       expect(
         find.descendant(
           of: _k('peek-toolbar'),
@@ -163,6 +170,16 @@ void main() {
       await t.pump(const Duration(milliseconds: 1000));
       expect(_body(s), 'Body of Alpha');
       expect(_k('autosave-saving'), findsOneWidget);
+      // A dot on the toggle's corner, no text beside it.
+      final dot = find.descendant(
+        of: _k('autosave-saving'),
+        matching: find.byType(Container),
+      );
+      expect(dot, findsOneWidget);
+      final toggle = t.getRect(_k('item-mode'));
+      expect(toggle.contains(t.getRect(dot).center), isTrue);
+      expect(find.text('Saving…'), findsNothing);
+      expect(find.text('Saved'), findsNothing);
       await t.pump(const Duration(milliseconds: 700));
       await t.pumpAndSettle();
       expect(_body(s), contains('Fresh words'));
@@ -170,6 +187,13 @@ void main() {
       // Still editing, nothing to confirm; the indicator says Saved.
       expect(s.isEditing('n1'), isTrue);
       expect(_k('autosave-saved'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: _k('autosave-saved'),
+          matching: find.byType(Container),
+        ),
+        findsNothing,
+      );
       _noError(t);
     });
 

@@ -55,20 +55,28 @@ class _MobileItemActionsState extends State<MobileItemActions>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (widget.editing && widget.draft != null)
-          AutosaveIndicator(
-            state: state,
-            uid: widget.uid,
-            draft: widget.draft!,
-          ),
         if (widget.canEdit)
-          IconAction(
-            key: const Key('item-mode'),
-            tooltip: widget.editing ? 'Show preview' : 'Edit',
-            icon: widget.editing ? FLucideIcons.bookOpen : FLucideIcons.pencil,
-            onPress: widget.editing
-                ? () => state.saveAndLeave(widget.uid)
-                : widget.onEdit,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              IconAction(
+                key: const Key('item-mode'),
+                tooltip: widget.editing ? 'Show preview' : 'Edit',
+                icon: widget.editing
+                    ? FLucideIcons.bookOpen
+                    : FLucideIcons.pencil,
+                onPress: widget.editing
+                    ? () => state.saveAndLeave(widget.uid)
+                    : widget.onEdit,
+              ),
+              // The save state, a dot on the button's corner.
+              if (widget.editing && widget.draft != null)
+                AutosaveIndicator(
+                  state: state,
+                  uid: widget.uid,
+                  draft: widget.draft!,
+                ),
+            ],
           ),
         IconAction(
           key: const Key('item-more'),
@@ -86,9 +94,10 @@ class _MobileItemActionsState extends State<MobileItemActions>
   }
 }
 
-/// A small muted note on the state of an open edit: Saving while a save is
-/// pending or running, Saved once everything is stored, Not saved when it
-/// could not be (an empty title, a failure).
+/// The state of an open edit as a tiny dot on the corner of the mode
+/// button: nothing once saved, a muted dot while a save is pending or
+/// running, an error-coloured dot when it could not be saved (an empty title,
+/// a failure; leaving also toasts it). Every state has a semantic label.
 class AutosaveIndicator extends StatelessWidget {
   const AutosaveIndicator({
     super.key,
@@ -108,17 +117,28 @@ class AutosaveIndicator extends StatelessWidget {
       builder: (context, _) {
         final dirty = state.dirtyItem(uid);
         final (key, label, color) = !dirty
-            ? ('saved', 'Saved', t.muted)
+            ? ('saved', 'Saved', null)
             : state.autosavePending(uid)
-            ? ('saving', 'Saving…', t.muted)
+            ? ('saving', 'Saving', t.muted)
             : ('failed', 'Not saved', t.error);
-        return Padding(
-          padding: EdgeInsets.only(right: t.space.xs),
-          child: Text(
-            label,
-            key: Key('autosave-$key'),
-            maxLines: 1,
-            style: t.type.microStyle.copyWith(color: color),
+        return Positioned(
+          top: t.space.sm,
+          right: t.space.sm,
+          child: IgnorePointer(
+            child: Semantics(
+              key: Key('autosave-$key'),
+              label: label,
+              child: color == null
+                  ? const SizedBox.shrink()
+                  : Container(
+                      width: t.sizes.statusDot,
+                      height: t.sizes.statusDot,
+                      decoration: BoxDecoration(
+                        color: color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+            ),
           ),
         );
       },
