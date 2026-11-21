@@ -273,7 +273,7 @@ class _SpaceChipState extends State<SpaceChip> with TickerProviderStateMixin {
                   active: true,
                   height: t.sizes.paneHeader,
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: t.space.md),
+                    padding: EdgeInsets.symmetric(horizontal: t.space.lg),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       spacing: t.space.sm,
