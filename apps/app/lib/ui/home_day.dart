@@ -673,7 +673,11 @@ class _HomeAdd extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final entries = addEntries(state);
+    // The menu follows the order of the Home views: Day, Board, Tasks.
+    const order = ['add-event', 'add-note', 'add-task'];
+    final entries = [
+      for (final k in order) ...addEntries(state).where((e) => e.key == k),
+    ];
     if (entries.isEmpty) return const SizedBox.shrink();
     final t = tokensOf(context);
     final lead = switch (state.homeFocus) {

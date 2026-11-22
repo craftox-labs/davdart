@@ -117,9 +117,18 @@ void main() {
     // Day leads with an event; the chevron lists note, task and event.
     await t.tap(_k('home-add-more'));
     await t.pumpAndSettle();
-    for (final k in ['home-add-note', 'home-add-task', 'home-add-event']) {
+    for (final k in ['home-add-event', 'home-add-note', 'home-add-task']) {
       expect(_k(k), findsOneWidget);
     }
+    // Event, note, task: the order of the Day, Board and Tasks views.
+    expect(
+      t.getTopLeft(_k('home-add-event')).dy,
+      lessThan(t.getTopLeft(_k('home-add-note')).dy),
+    );
+    expect(
+      t.getTopLeft(_k('home-add-note')).dy,
+      lessThan(t.getTopLeft(_k('home-add-task')).dy),
+    );
     await t.tapAt(const Offset(5, 5));
     await t.pumpAndSettle();
     await t.tap(_k('home-focus-tasks'));
