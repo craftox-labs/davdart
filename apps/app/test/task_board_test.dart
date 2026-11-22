@@ -101,4 +101,17 @@ void main() {
     expect(find.text('Busy bug'), findsOneWidget); // doing starts open
     expect(find.text('Open bug'), findsNothing); // todo starts collapsed
   });
+
+  testWidgets('wide Home has a + that offers note, task and event; phone not',
+      (t) async {
+    await pumpTasksApp(t);
+    expect(_k('home-add'), findsOneWidget);
+    await t.tap(_k('home-add'));
+    await t.pumpAndSettle();
+    for (final k in ['home-add-note', 'home-add-task', 'home-add-event']) {
+      expect(_k(k), findsOneWidget);
+    }
+    await pumpTasksApp(t, size: const Size(400, 800));
+    expect(_k('home-add'), findsNothing);
+  });
 }

@@ -10,6 +10,8 @@ import '../state/event_rules.dart';
 import '../theme/tokens.dart';
 import 'content_grid.dart';
 import 'home_today.dart';
+import 'mobile_nav.dart' show addEntries;
+import 'parts.dart';
 import 'segmented.dart';
 import 'theme.dart';
 
@@ -109,7 +111,17 @@ class HomeSwitch extends StatelessWidget {
         padding: EdgeInsets.fromLTRB(t.space.lg, t.space.lg, t.space.lg, 0),
         child: full
             ? control
-            : Align(alignment: Alignment.centerLeft, child: control),
+            : Align(
+                alignment: Alignment.centerLeft,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    control,
+                    SizedBox(width: t.space.md),
+                    _HomeAdd(state: state),
+                  ],
+                ),
+              ),
       ),
     );
   }
@@ -649,4 +661,44 @@ class _Cell extends StatelessWidget {
   final Widget child;
   @override
   Widget build(BuildContext context) => SizedBox(height: height, child: child);
+}
+
+/// Wide layouts: a + beside the Day | Board | Tasks switch that adds a note,
+/// task or event (the phone has the add button; both use [addEntries]).
+class _HomeAdd extends StatelessWidget {
+  const _HomeAdd({required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = addEntries(state);
+    if (entries.isEmpty) return const SizedBox.shrink();
+    final t = tokensOf(context);
+    return FPopoverMenu(
+      menuAnchor: Alignment.topLeft,
+      childAnchor: Alignment.bottomLeft,
+      menuBuilder: (ctx, controller, _) => [
+        FItemGroup(
+          children: [
+            for (final e in entries)
+              FItem(
+                key: Key('home-${e.key}'),
+                prefix: Icon(e.icon, size: t.icons.md, color: t.muted),
+                title: Text(e.label),
+                onPress: () {
+                  controller.hide();
+                  e.run(context);
+                },
+              ),
+          ],
+        ),
+      ],
+      builder: (ctx, controller, _) => IconAction(
+        key: const Key('home-add'),
+        icon: FLucideIcons.plus,
+        tooltip: 'New note, task or event',
+        onPress: controller.toggle,
+      ),
+    );
+  }
 }
