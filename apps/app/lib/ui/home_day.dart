@@ -663,8 +663,10 @@ class _Cell extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(height: height, child: child);
 }
 
-/// Wide layouts: a + beside the Day | Board | Tasks switch that adds a note,
-/// task or event (the phone has the add button; both use [addEntries]).
+/// Wide layouts: a split + beside the Day | Board | Tasks switch. Clicking +
+/// adds the type the current focus leads with (Day: event, Board: note,
+/// Tasks: task); the chevron opens the menu of all three. The phone has the
+/// add button; both use [addEntries].
 class _HomeAdd extends StatelessWidget {
   const _HomeAdd({required this.state});
   final AppState state;
@@ -674,31 +676,51 @@ class _HomeAdd extends StatelessWidget {
     final entries = addEntries(state);
     if (entries.isEmpty) return const SizedBox.shrink();
     final t = tokensOf(context);
-    return FPopoverMenu(
-      menuAnchor: Alignment.topLeft,
-      childAnchor: Alignment.bottomLeft,
-      menuBuilder: (ctx, controller, _) => [
-        FItemGroup(
-          children: [
-            for (final e in entries)
-              FItem(
-                key: Key('home-${e.key}'),
-                prefix: Icon(e.icon, size: t.icons.md, color: t.muted),
-                title: Text(e.label),
-                onPress: () {
-                  controller.hide();
-                  e.run(context);
-                },
-              ),
+    final lead = switch (state.homeFocus) {
+      HomeFocus.day => 'add-event',
+      HomeFocus.board => 'add-note',
+      HomeFocus.tasks => 'add-task',
+    };
+    final primary = entries.where((e) => e.key == lead).firstOrNull;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (primary != null)
+          IconAction(
+            key: const Key('home-add'),
+            icon: FLucideIcons.plus,
+            tooltip: primary.label.replaceFirst('New ', 'Add '),
+            onPress: () => primary.run(context),
+          ),
+        FPopoverMenu(
+          menuAnchor: Alignment.topLeft,
+          childAnchor: Alignment.bottomLeft,
+          menuBuilder: (ctx, controller, _) => [
+            FItemGroup(
+              children: [
+                for (final e in entries)
+                  FItem(
+                    key: Key('home-${e.key}'),
+                    prefix: Icon(e.icon, size: t.icons.md, color: t.muted),
+                    title: Text(e.label),
+                    onPress: () {
+                      controller.hide();
+                      e.run(context);
+                    },
+                  ),
+              ],
+            ),
           ],
+          builder: (ctx, controller, _) => IconAction(
+            key: Key(primary == null ? 'home-add' : 'home-add-more'),
+            icon: primary == null
+                ? FLucideIcons.plus
+                : FLucideIcons.chevronDown,
+            tooltip: primary == null ? 'New…' : 'More: note, task or event',
+            onPress: controller.toggle,
+          ),
         ),
       ],
-      builder: (ctx, controller, _) => IconAction(
-        key: const Key('home-add'),
-        icon: FLucideIcons.plus,
-        tooltip: 'New note, task or event',
-        onPress: controller.toggle,
-      ),
     );
   }
 }

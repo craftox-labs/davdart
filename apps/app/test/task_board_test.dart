@@ -52,41 +52,49 @@ void main() {
     );
   });
 
-  testWidgets('taskColumns follows the tag filter and keeps empty core columns',
-      (t) async {
-    final state = await pumpTasksApp(
-      t,
-      tasks: [
-        mkTask('a', summary: 'Tagged', tags: ['bug']),
-        mkTask('b', summary: 'Plain'),
-      ],
-    );
-    state.setTaskTagFilter('bug');
-    final cols = state.taskColumns();
-    expect([for (final c in cols) c.$1], ['backlog', 'todo', 'doing', 'done']);
-    expect([for (final x in cols[1].$2) x.summary], ['Tagged']);
-    expect(cols[2].$2, isEmpty);
-  });
+  testWidgets(
+    'taskColumns follows the tag filter and keeps empty core columns',
+    (t) async {
+      final state = await pumpTasksApp(
+        t,
+        tasks: [
+          mkTask('a', summary: 'Tagged', tags: ['bug']),
+          mkTask('b', summary: 'Plain'),
+        ],
+      );
+      state.setTaskTagFilter('bug');
+      final cols = state.taskColumns();
+      expect(
+        [for (final c in cols) c.$1],
+        ['backlog', 'todo', 'doing', 'done'],
+      );
+      expect([for (final x in cols[1].$2) x.summary], ['Tagged']);
+      expect(cols[2].$2, isEmpty);
+    },
+  );
 
-  testWidgets('backlog and blocked tags get columns; cancelled folds into done',
-      (t) async {
-    final state = await pumpTasksApp(
-      t,
-      tasks: [
-        mkTask('a', summary: 'Later', tags: ['status-backlog']),
-        mkTask('b', summary: 'Stuck', tags: ['status-blocked']),
-        mkTask('c', summary: 'Dropped', status: 'CANCELLED'),
-      ],
-    );
-    final cols = {for (final c in state.taskColumns()) c.$1: c.$2};
-    expect([for (final x in cols['backlog']!) x.summary], ['Later']);
-    expect([for (final x in cols['blocked']!) x.summary], ['Stuck']);
-    expect([for (final x in cols['done']!) x.summary], ['Dropped']);
-    expect(cols.containsKey('cancelled'), isFalse);
-  });
+  testWidgets(
+    'backlog and blocked tags get columns; cancelled folds into done',
+    (t) async {
+      final state = await pumpTasksApp(
+        t,
+        tasks: [
+          mkTask('a', summary: 'Later', tags: ['status-backlog']),
+          mkTask('b', summary: 'Stuck', tags: ['status-blocked']),
+          mkTask('c', summary: 'Dropped', status: 'CANCELLED'),
+        ],
+      );
+      final cols = {for (final c in state.taskColumns()) c.$1: c.$2};
+      expect([for (final x in cols['backlog']!) x.summary], ['Later']);
+      expect([for (final x in cols['blocked']!) x.summary], ['Stuck']);
+      expect([for (final x in cols['done']!) x.summary], ['Dropped']);
+      expect(cols.containsKey('cancelled'), isFalse);
+    },
+  );
 
-  testWidgets('phone: one collapsible section per status, titles only',
-      (t) async {
+  testWidgets('phone: one collapsible section per status, titles only', (
+    t,
+  ) async {
     await pumpTasksApp(
       t,
       size: const Size(400, 800),
@@ -102,16 +110,25 @@ void main() {
     expect(find.text('Open bug'), findsNothing); // todo starts collapsed
   });
 
-  testWidgets('wide Home has a + that offers note, task and event; phone not',
-      (t) async {
+  testWidgets('wide Home: + adds the focus type, chevron lists all three', (
+    t,
+  ) async {
     await pumpTasksApp(t);
-    expect(_k('home-add'), findsOneWidget);
-    await t.tap(_k('home-add'));
+    // Day leads with an event; the chevron lists note, task and event.
+    await t.tap(_k('home-add-more'));
     await t.pumpAndSettle();
     for (final k in ['home-add-note', 'home-add-task', 'home-add-event']) {
       expect(_k(k), findsOneWidget);
     }
+    await t.tapAt(const Offset(5, 5));
+    await t.pumpAndSettle();
+    await t.tap(_k('home-focus-tasks'));
+    await t.pumpAndSettle();
+    await t.tap(_k('home-add'));
+    await t.pumpAndSettle();
+    expect(_k('new-task-title'), findsOneWidget);
     await pumpTasksApp(t, size: const Size(400, 800));
     expect(_k('home-add'), findsNothing);
+    expect(_k('home-add-more'), findsNothing);
   });
 }
