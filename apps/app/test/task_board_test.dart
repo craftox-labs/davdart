@@ -1,0 +1,104 @@
+import 'package:davdart/davdart.dart';
+import 'package:davdart_app/ui/board_view.dart';
+import 'package:davdart_app/ui/task_board.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+import 'tasks_helper.dart';
+
+Finder _k(String k) => find.byKey(Key(k));
+
+void main() {
+  setUp(() => LocalZone.use('Asia/Bangkok'));
+  tearDown(() => LocalZone.use(null));
+
+  testWidgets('Tasks focus shows a board with a column per status', (t) async {
+    await pumpTasksApp(
+      t,
+      tasks: [
+        mkTask('a', summary: 'Open bug', status: 'NEEDS-ACTION'),
+        mkTask('b', summary: 'Busy bug', status: 'IN-PROCESS'),
+        mkTask('c', summary: 'Fixed bug', status: 'COMPLETED'),
+      ],
+    );
+    expect(find.byType(TaskBoard), findsNothing);
+    await t.tap(_k('home-focus-tasks'));
+    await t.pumpAndSettle();
+    expect(find.byType(TaskBoard), findsOneWidget);
+    expect(find.byType(BoardView), findsNothing);
+    for (final c in ['backlog', 'todo', 'doing', 'done']) {
+      expect(_k('task-board-col-$c'), findsOneWidget);
+    }
+    expect(
+      find.descendant(
+        of: _k('task-board-col-todo'),
+        matching: find.text('Open bug'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: _k('task-board-col-doing'),
+        matching: find.text('Busy bug'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: _k('task-board-col-done'),
+        matching: find.text('Fixed bug'),
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('taskColumns follows the tag filter and keeps empty core columns',
+      (t) async {
+    final state = await pumpTasksApp(
+      t,
+      tasks: [
+        mkTask('a', summary: 'Tagged', tags: ['bug']),
+        mkTask('b', summary: 'Plain'),
+      ],
+    );
+    state.setTaskTagFilter('bug');
+    final cols = state.taskColumns();
+    expect([for (final c in cols) c.$1], ['backlog', 'todo', 'doing', 'done']);
+    expect([for (final x in cols[1].$2) x.summary], ['Tagged']);
+    expect(cols[2].$2, isEmpty);
+  });
+
+  testWidgets('backlog and blocked tags get columns; cancelled folds into done',
+      (t) async {
+    final state = await pumpTasksApp(
+      t,
+      tasks: [
+        mkTask('a', summary: 'Later', tags: ['status-backlog']),
+        mkTask('b', summary: 'Stuck', tags: ['status-blocked']),
+        mkTask('c', summary: 'Dropped', status: 'CANCELLED'),
+      ],
+    );
+    final cols = {for (final c in state.taskColumns()) c.$1: c.$2};
+    expect([for (final x in cols['backlog']!) x.summary], ['Later']);
+    expect([for (final x in cols['blocked']!) x.summary], ['Stuck']);
+    expect([for (final x in cols['done']!) x.summary], ['Dropped']);
+    expect(cols.containsKey('cancelled'), isFalse);
+  });
+
+  testWidgets('phone: one collapsible section per status, titles only',
+      (t) async {
+    await pumpTasksApp(
+      t,
+      size: const Size(400, 800),
+      tasks: [
+        mkTask('a', summary: 'Busy bug', status: 'IN-PROCESS'),
+        mkTask('b', summary: 'Open bug'),
+      ],
+    );
+    await t.tap(_k('home-focus-tasks'));
+    await t.pumpAndSettle();
+    expect(_k('board-accordion'), findsOneWidget);
+    expect(find.text('Busy bug'), findsOneWidget); // doing starts open
+    expect(find.text('Open bug'), findsNothing); // todo starts collapsed
+  });
+}

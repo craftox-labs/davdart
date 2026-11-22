@@ -164,19 +164,28 @@ class DetailView extends StatelessWidget {
                                 builder: (_, pc) => FSelect<String>.rich(
                                   popoverControl: pc,
                                   key: const Key('status-menu'),
-                                  format: (v) => v,
+                                  format: (v) => v.isEmpty ? 'none' : v,
                                   hint: 'none',
                                   control: FSelectControl.lifted(
                                     value: boardOrder.contains(p.status)
                                         ? p.status
                                         : null,
+                                    // '' is the "none" row: off the boards.
                                     onChange: (v) {
                                       if (v != null) {
-                                        state.setStatus(note.uid, v);
+                                        state.setStatus(
+                                          note.uid,
+                                          v.isEmpty ? null : v,
+                                        );
                                       }
                                     },
                                   ),
                                   children: [
+                                    const FSelectItem<String>(
+                                      key: Key('status-menu-none'),
+                                      title: Text('none'),
+                                      value: '',
+                                    ),
                                     for (final s in boardOrder)
                                       FSelectItem<String>(
                                         title: Text(s),

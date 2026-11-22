@@ -13,7 +13,7 @@ Future<void> main(List<String> args) async {
   final pass = cfg['password'];
   if (args.isEmpty || url == null || user == null || pass == null) {
     stderr.writeln(
-        'usage: davdart list [--status S] [--tag T] | board | show TEXT | add TITLE [BODY] | new TITLE [--id I --status S --owner O --decided-by D --github-ref R --tags a,b] (body on stdin) | set-status MATCH STATUS | append MATCH (text on stdin) | folder TITLE [--under MATCH] (text on stdin) | move MATCH TARGET|top | export DIR | rm UID\n'
+        'usage: davdart list [--status S] [--tag T] | board | show TEXT | add TITLE [BODY] | new TITLE [--id I --status S --owner O --decided-by D --github-ref R --tags a,b] (body on stdin) | set-status MATCH STATUS | append MATCH (text on stdin) | task TITLE [--tags a,b --status S] (description on stdin) | folder TITLE [--under MATCH] (text on stdin) | move MATCH TARGET|top | export DIR | rm UID\n'
         'config: url, user, password in ~/.config/davdart/credentials '
         '(key=value lines) or DAVDART_URL, DAVDART_USER, DAVDART_PASSWORD');
     exit(2);
@@ -173,6 +173,35 @@ Future<void> main(List<String> args) async {
         p.apply();
         final saved = await c.putNote(note);
         stdout.writeln('created ${saved.uid}');
+      case 'task':
+        if (args.length < 2) {
+          stderr.writeln('task needs a TITLE; description on stdin');
+          exit(2);
+        }
+        String? topt(String k) {
+          final i = args.indexOf('--$k');
+          return i > 0 && i + 1 < args.length ? args[i + 1] : null;
+        }
+
+        final desc =
+            (await stdin.transform(const SystemEncoding().decoder).join())
+                .trim();
+        final tnow = DateTime.now();
+        final tstatus = topt('status');
+        final task = await c.putTask(Task(
+          uid:
+              '${tnow.microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32).toRadixString(16)}@davdart',
+          summary: args[1],
+          description: desc,
+          categories: [
+            ...(topt('tags') ?? '').split(',').where((t) => t.isNotEmpty),
+            if (tstatus != null) 'status-$tstatus',
+          ],
+          status: 'NEEDS-ACTION',
+          created: tnow,
+          lastModified: tnow,
+        ));
+        stdout.writeln('created task ${task.uid}');
       case 'folder':
         if (args.length < 2) {
           stderr.writeln('folder needs a TITLE; text on stdin');

@@ -313,9 +313,11 @@ void main() {
     final box = t.getRect(_k('home-focus'));
     final a = t.getRect(_k('home-focus-day'));
     final b = t.getRect(_k('home-focus-board'));
+    final c = t.getRect(_k('home-focus-tasks'));
     expect(a.width, closeTo(b.width, 0.5));
+    expect(a.width, closeTo(c.width, 0.5));
     expect(box.width, greaterThan(400 - 2 * 12 - 2));
-    expect(a.width + b.width, closeTo(box.width, 1));
+    expect(a.width + b.width + c.width, closeTo(box.width, 1));
     await pumpTasksApp(t, size: const Size(1280, 800));
     expect(t.getRect(_k('home-focus')).width, lessThan(300));
   });

@@ -86,6 +86,30 @@ class TaskContextMenu extends StatelessWidget {
         ),
       if (edit)
         NoteMenuItem(
+          'Set status',
+          FLucideIcons.circleDot,
+          () {},
+          key: const Key('menu-task-status'),
+          children: [
+            for (final s in const [
+              'backlog',
+              'todo',
+              'doing',
+              'blocked',
+              'done',
+              'cancelled',
+            ])
+              NoteMenuItem(
+                s,
+                FLucideIcons.circleDot,
+                () => state.setTaskStatus(uid, s),
+                key: Key('menu-task-status-$s'),
+                selected: task.boardStatus == s,
+              ),
+          ],
+        ),
+      if (edit)
+        NoteMenuItem(
           'Set due',
           FLucideIcons.calendar,
           () {},

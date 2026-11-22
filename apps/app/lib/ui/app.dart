@@ -17,6 +17,7 @@ import 'command_palette.dart';
 import 'key_nav_ui.dart';
 import '../state/key_nav.dart';
 import 'home_day.dart';
+import 'task_board.dart';
 import 'detail_header.dart';
 import 'detail_view.dart';
 import 'first_run_view.dart';
@@ -363,6 +364,8 @@ class _ShellState extends State<Shell>
                 HomeSwitch(state: state),
                 if (state.homeFocus == HomeFocus.day)
                   Expanded(child: HomeDayFocus(state: state))
+                else if (state.homeFocus == HomeFocus.tasks)
+                  Expanded(child: TaskBoard(state: state))
                 else if (MediaQuery.sizeOf(context).width <
                     Tokens.stackBreakpoint)
                   // Phone: the board accordions in one scroll view.

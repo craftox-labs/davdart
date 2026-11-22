@@ -97,9 +97,11 @@ class HomeSwitch extends StatelessWidget {
       fullWidth: full,
       value: state.homeFocus,
       onChanged: state.setHomeFocus,
-      segments: const [
+      segments: [
         Segment(HomeFocus.day, 'Day', 'home-focus-day'),
         Segment(HomeFocus.board, 'Board', 'home-focus-board'),
+        if (state.supportsTasks)
+          Segment(HomeFocus.tasks, 'Tasks', 'home-focus-tasks'),
       ],
     );
     return ContentCap(

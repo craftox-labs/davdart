@@ -8,9 +8,7 @@ import 'key_nav_ui.dart';
 import '../state/note_drag.dart';
 import '../theme/tokens.dart';
 import 'drag_drop.dart';
-import 'chips.dart';
-import 'collapsible_section.dart';
-import 'content_grid.dart';
+import 'board_layout.dart';
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
 import 'theme.dart';
@@ -18,13 +16,6 @@ import 'overflow_tip.dart';
 
 /// Publishes the Home board's cards (column by column) as the keyboard rows
 /// of the Home grid; a collapsed Board is skipped at move time.
-/// The status whose accordion section starts open: doing, else the first
-/// status with notes.
-String boardDefaultOpen(List<(String, List<Note>)> cols) =>
-    cols.any((c) => c.$1 == 'doing' && c.$2.isNotEmpty)
-    ? 'doing'
-    : cols.firstWhere((c) => c.$2.isNotEmpty, orElse: () => cols.first).$1;
-
 void publishBoardNav(AppState state) {
   final cols = state.columns(includeNoStatus: false);
   final open = cols.isEmpty ? '' : boardDefaultOpen(cols);
@@ -89,134 +80,19 @@ class BoardView extends StatelessWidget {
         ),
       );
     }
-    final gap = t.space.lg;
-    Widget column(String name, List<Note> notes) => _drop(
-      name,
-      context,
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.fromLTRB(
-              t.space.xs,
-              t.space.xs,
-              t.space.xs,
-              t.space.md,
-            ),
-            child: Row(
-              children: [
-                StatusDot(name == 'notes' ? null : name),
-                SizedBox(width: t.space.md),
-                Text(
-                  name.toUpperCase(),
-                  style: t.type.labelStyle.copyWith(
-                    fontSize: t.type.caption,
-                    color: t.muted,
-                  ),
-                ),
-                SizedBox(width: t.space.sm),
-                Text(
-                  '${notes.length}',
-                  style: t.type.captionStyle.copyWith(color: t.muted),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: EdgeInsets.only(bottom: fabInset(context)),
-              scrollCacheExtent: navCacheExtent,
-              children: [
-                for (final n in notes)
-                  _Card(state: state, note: n, column: name, home: keyboard),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-    // Phone widths: one column, a collapsible section per status, cards
-    // with the title only. Doing (else the first status with notes) starts
-    // open. Cards of a collapsed section are not built.
-    if (keyboard) state.nav.boardAccordion = false;
-    if (MediaQuery.sizeOf(context).width < Tokens.stackBreakpoint) {
-      final open = boardDefaultOpen(cols);
-      if (keyboard) state.nav.boardAccordion = true;
-      return ListView(
-        key: const Key('board-accordion'),
-        shrinkWrap: embedded,
-        physics: embedded ? const NeverScrollableScrollPhysics() : null,
-        padding: EdgeInsets.all(gap)
-            .copyWith(bottom: gap + (embedded ? 0 : fabInset(context))),
-        children: [
-          for (final (name, notes) in cols)
-            _drop(
-              name,
-              context,
-              CollapsibleSection(
-                key: ValueKey('board-acc-$name'),
-                id: 'board-acc-$name',
-                title: name,
-                count: notes.length,
-                initiallyCollapsed:
-                    !(state.nav.boardOpen[name] ?? name == open),
-                onChanged: (collapsed) =>
-                    state.nav.boardOpen[name] = !collapsed,
-                leading: StatusDot(name == 'notes' ? null : name),
-                headerPadding: EdgeInsets.only(bottom: t.space.sm),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (final n in notes)
-                      _Card(
-                        state: state,
-                        note: n,
-                        column: name,
-                        home: keyboard,
-                        compact: true,
-                      ),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      );
-    }
-    return ContentCap(
-      child: LayoutBuilder(
-        builder: (context, c) {
-          final avail = c.maxWidth - 2 * gap;
-          final each = (avail - (cols.length - 1) * gap) / cols.length;
-          final fits = each >= t.sizes.boardColumn;
-          if (fits) {
-            // Equal columns share the full width; gutters sit between them.
-            return Padding(
-              padding: EdgeInsets.all(gap),
-              child: Row(
-                children: [
-                  for (var i = 0; i < cols.length; i++) ...[
-                    if (i > 0) SizedBox(width: gap),
-                    Expanded(child: column(cols[i].$1, cols[i].$2)),
-                  ],
-                ],
-              ),
-            );
-          }
-          // Too narrow for the minimum: fixed-width columns that scroll.
-          return ListView(
-            scrollDirection: Axis.horizontal,
-            padding: EdgeInsets.all(gap),
-            children: [
-              for (var i = 0; i < cols.length; i++) ...[
-                if (i > 0) SizedBox(width: gap),
-                SizedBox(
-                  width: t.sizes.boardColumn,
-                  child: column(cols[i].$1, cols[i].$2),
-                ),
-              ],
-            ],
-          );
-        },
+    return BoardLayout<Note>(
+      cols: cols,
+      openMap: state.nav.boardOpen,
+      embedded: embedded,
+      dot: (n) => n == 'notes' ? null : n,
+      onAccordion: keyboard ? (a) => state.nav.boardAccordion = a : null,
+      wrap: (name, child) => _drop(name, context, child),
+      itemBuilder: (name, n, compact) => _Card(
+        state: state,
+        note: n,
+        column: name,
+        home: keyboard,
+        compact: compact,
       ),
     );
   }

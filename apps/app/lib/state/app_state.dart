@@ -154,7 +154,7 @@ enum OpenMode { peek, main }
 enum TaskFilter { open, all, completed }
 
 /// The two halves of Home.
-enum HomeFocus { day, board }
+enum HomeFocus { day, board, tasks }
 
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
@@ -3265,6 +3265,7 @@ class AppState extends ChangeNotifier {
   /// Which half of Home shows, remembered per Space; Day by default.
   HomeFocus get homeFocus => switch (prefs?.read(_homeFocusKey)) {
     'board' => HomeFocus.board,
+    'tasks' => HomeFocus.tasks,
     'day' => HomeFocus.day,
     _ => debugDefaultFocus,
   };
@@ -3411,6 +3412,31 @@ class AppState extends ChangeNotifier {
             matches(n))
           n,
     ]..sort(NoteTree.byCreated);
+  }
+
+  /// Task board columns: backlog, todo, doing and done always, then blocked
+  /// when in use. Cancelled tasks sit in done (the card is dimmed). Follows
+  /// the Tasks view's tag and folder filters, not its Open/Completed toggle.
+  List<(String, List<Task>)> taskColumns() {
+    final by = <String, List<Task>>{
+      'backlog': [],
+      'todo': [],
+      'doing': [],
+      'done': [],
+    };
+    for (final t in filteredTasks) {
+      final s = t.boardStatus;
+      (by[s == 'cancelled' ? 'done' : s] ??= []).add(t);
+    }
+    const always = ['backlog', 'todo', 'doing', 'done'];
+    final keys = [
+      ...boardOrder.where(by.containsKey),
+      ...by.keys.where((k) => !boardOrder.contains(k)),
+    ];
+    return [
+      for (final k in keys)
+        if (by[k]!.isNotEmpty || always.contains(k)) (k, by[k]!),
+    ];
   }
 
   /// Board columns in a stable order; notes with no status go last, and are

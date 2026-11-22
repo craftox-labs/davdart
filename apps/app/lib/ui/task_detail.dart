@@ -20,8 +20,10 @@ import 'theme.dart';
 import 'vim_field.dart';
 
 const _statusWords = [
+  ('backlog', 'backlog'),
   ('todo', 'needs-action'),
   ('doing', 'in-process'),
+  ('blocked', 'blocked'),
   ('done', 'completed'),
   ('cancelled', 'cancelled'),
 ];

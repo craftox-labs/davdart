@@ -141,13 +141,20 @@ class NoteEditor extends StatelessWidget {
                 popoverControl: pc,
                 key: const Key('edit-status'),
                 label: const Text('Status'),
-                format: (v) => v,
+                format: (v) => v.isEmpty ? 'none' : v,
                 hint: 'none',
                 control: FSelectControl.lifted(
                   value: draft.status,
-                  onChange: (v) => draft.setStatus(v),
+                  // '' is the "none" row: the note leaves the boards.
+                  onChange: (v) =>
+                      draft.setStatus(v == null || v.isEmpty ? null : v),
                 ),
                 children: [
+                  const FSelectItem<String>(
+                    key: Key('edit-status-none'),
+                    title: Text('none'),
+                    value: '',
+                  ),
                   for (final s in boardOrder)
                     FSelectItem<String>(title: Text(s), value: s),
                 ],
