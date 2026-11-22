@@ -3265,7 +3265,7 @@ class AppState extends ChangeNotifier {
   /// Which half of Home shows, remembered per Space; Day by default.
   HomeFocus get homeFocus => switch (prefs?.read(_homeFocusKey)) {
     'board' => HomeFocus.board,
-    'tasks' => HomeFocus.tasks,
+    'tasks' => supportsTasks ? HomeFocus.tasks : HomeFocus.day,
     'day' => HomeFocus.day,
     _ => debugDefaultFocus,
   };

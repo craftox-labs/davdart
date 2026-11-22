@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../state/note_drag.dart';
+import '../state/task_rules.dart';
 import 'board_layout.dart';
 import 'drag_drop.dart';
 import 'overflow_tip.dart';
@@ -37,6 +38,7 @@ class TaskBoard extends StatelessWidget {
             final item = state.findItem(d.uid);
             return state.tasksEditable &&
                 item is Task &&
+                !(name == 'done' && taskCompletionBlocker(item) != null) &&
                 (item.boardStatus == 'cancelled' ? 'done' : item.boardStatus) !=
                     name;
           },

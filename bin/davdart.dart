@@ -174,8 +174,8 @@ Future<void> main(List<String> args) async {
         final saved = await c.putNote(note);
         stdout.writeln('created ${saved.uid}');
       case 'task':
-        if (args.length < 2) {
-          stderr.writeln('task needs a TITLE; description on stdin');
+        if (args.length < 2 || args[1].startsWith('--')) {
+          stderr.writeln('task needs a TITLE first; description on stdin');
           exit(2);
         }
         String? topt(String k) {
@@ -188,20 +188,22 @@ Future<void> main(List<String> args) async {
                 .trim();
         final tnow = DateTime.now();
         final tstatus = topt('status');
-        final task = await c.putTask(Task(
+        final task = Task(
           uid:
               '${tnow.microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32).toRadixString(16)}@davdart',
           summary: args[1],
           description: desc,
           categories: [
             ...(topt('tags') ?? '').split(',').where((t) => t.isNotEmpty),
-            if (tstatus != null) 'status-$tstatus',
           ],
           status: 'NEEDS-ACTION',
           created: tnow,
           lastModified: tnow,
-        ));
-        stdout.writeln('created task ${task.uid}');
+        );
+        // Keeps STATUS in step with the board word (done closes the task).
+        if (tstatus != null) task.setBoardStatus(tstatus, tnow);
+        final savedTask = await c.putTask(task);
+        stdout.writeln('created task ${savedTask.uid}');
       case 'folder':
         if (args.length < 2) {
           stderr.writeln('folder needs a TITLE; text on stdin');
