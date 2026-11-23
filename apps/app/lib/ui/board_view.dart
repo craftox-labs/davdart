@@ -21,7 +21,12 @@ void publishBoardNav(AppState state) {
   final open = cols.isEmpty ? '' : boardDefaultOpen(cols);
   state.nav.publishHome('board', [
     for (final (name, notes) in state.columns(includeNoStatus: false))
-      for (final n in notes)
+      for (final n in boardCapped(
+        name,
+        notes,
+        (n) => n.lastModified,
+        showAll: state.nav.boardOpen[boardDoneAllKey] ?? false,
+      ))
         NavEntry(
           'card-${n.uid}',
           uid: n.uid,
@@ -83,8 +88,10 @@ class BoardView extends StatelessWidget {
     return BoardLayout<Note>(
       cols: cols,
       openMap: state.nav.boardOpen,
+      modified: (n) => n.lastModified,
       embedded: embedded,
       dot: (n) => n == 'notes' ? null : n,
+      onShowAll: keyboard ? () => publishBoardNav(state) : null,
       onAccordion: keyboard ? (a) => state.nav.boardAccordion = a : null,
       wrap: (name, child) => _drop(name, context, child),
       itemBuilder: (name, n, compact) => _Card(

@@ -101,9 +101,10 @@ void main() {
     expect(s.spaces.map((e) => e.name), ['Planning']);
     // The backup went to disk before the delete.
     expect(
-      tmp.listSync(recursive: true).whereType<File>().any(
-        (f) => f.path.endsWith('.ics'),
-      ),
+      tmp
+          .listSync(recursive: true)
+          .whereType<File>()
+          .any((f) => f.path.endsWith('.ics')),
       isTrue,
     );
   });
@@ -129,7 +130,10 @@ void main() {
     await t.tap(find.byKey(const Key('server-delete-go')));
     await t.pumpAndSettle();
     expect(seen.where((e) => e == 'DELETE /dav/c/'), hasLength(1));
-    expect(find.textContaining('Could not delete on the server'), findsOneWidget);
+    expect(
+      find.textContaining('Could not delete on the server'),
+      findsOneWidget,
+    );
     expect(find.textContaining('403'), findsOneWidget);
     expect(s.spaces.map((e) => e.name), ['Planning', 'Work']);
   });

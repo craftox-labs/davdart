@@ -135,13 +135,10 @@ void main() {
       t.getTopLeft(_k('home-today-tasks-late')).dy,
       lessThan(t.getTopLeft(_k('home-today-tasks-today')).dy),
     );
-    // Undated open tasks come last, under their own label.
-    expect(_k('home-today-tasks-nodate'), findsOneWidget);
-    expect(
-      t.getTopLeft(_k('home-today-tasks-undated')).dy,
-      greaterThan(t.getTopLeft(_k('home-today-tasks-today')).dy),
-    );
-    expect(_count(t, 'tasks'), '3');
+    // Undated tasks do not show in Day.
+    expect(_k('home-today-tasks-nodate'), findsNothing);
+    expect(_k('home-today-tasks-undated'), findsNothing);
+    expect(_count(t, 'tasks'), '2');
     Color chipColor(String uid) => t
         .widget<Text>(
           find.descendant(of: _k('due-$uid'), matching: find.byType(Text)),

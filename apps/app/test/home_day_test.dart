@@ -335,30 +335,6 @@ void main() {
     expect(prefs.read('davdart.home.card.collapsed.v1.tasks.other'), 'true');
   });
 
-  testWidgets('undated tasks are listed last on every selected day', (t) async {
-    final s = await pumpTasksApp(
-      t,
-      tasks: [
-        mkTask('undated'),
-        mkTask('today', days: 0),
-        mkTask('next', days: 1),
-        mkTask('done', status: 'COMPLETED'),
-      ],
-    );
-    for (final day in [null, _tomorrow()]) {
-      s.selectHomeDay(day);
-      await t.pumpAndSettle();
-      expect(_k('home-today-tasks-undated'), findsOneWidget);
-      expect(_k('home-today-tasks-done'), findsNothing);
-      expect(_k('home-today-tasks-nodate'), findsOneWidget);
-      final dated = day == null ? 'today' : 'next';
-      expect(
-        t.getTopLeft(_k('home-today-tasks-undated')).dy,
-        greaterThan(t.getTopLeft(_k('home-today-tasks-$dated')).dy),
-      );
-    }
-  });
-
   group('wide grid', () {
     for (final w in [700.0, 1280.0, 1700.0]) {
       testWidgets('50/50 columns at $w', (t) async {

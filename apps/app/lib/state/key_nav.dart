@@ -202,6 +202,10 @@ class KeyNav extends ChangeNotifier {
     _lists[homeList] = [...?_homeGroups['today'], ...?_homeGroups['board']];
   }
 
+  /// The visible rows of [list] (for tests).
+  @visibleForTesting
+  List<NavEntry> rowsOf(String list) => _rows(list);
+
   List<NavEntry> _rows(String list) => [
     for (final e in _lists[list] ?? const <NavEntry>[])
       if (!(e.hidden?.call() ?? false)) e,

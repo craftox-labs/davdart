@@ -168,7 +168,7 @@ class _HomeTodayState extends State<HomeToday> {
     DateTime day,
     bool isToday,
   ) {
-    // Overdue first (only on today), then due that day (recurring tasks
+    // Dated tasks only: overdue first (only on today), then due that day (recurring tasks
     // expanded); each in compareTasks order.
     final overdue = isToday ? state.overdueTasks(clock) : <Task>[];
     // A one-off overdue task is listed once; a repeating one also shows its
@@ -189,15 +189,7 @@ class _HomeTodayState extends State<HomeToday> {
             .where((k) => !skip.contains(k.uid))
             .toList();
     final due = [...overdue, ...onDay];
-    // Open tasks without a due date are listed last, on every day.
-    final undated = [
-      for (final k in state.openTasks(clock))
-        if (k.due == null &&
-            k.boardStatus != 'done' &&
-            k.boardStatus != 'cancelled')
-          k,
-    ];
-    final all = due.length + undated.length;
+    final all = due.length;
     bool occ(int i) => i >= overdue.length && overdueIds.contains(due[i].uid);
     return TodayCard(
       slug: 'tasks',
@@ -236,25 +228,6 @@ class _HomeTodayState extends State<HomeToday> {
               now: clock,
             ),
           ),
-        if (undated.isNotEmpty) ...[
-          _GroupLabel(
-            key: const Key('home-today-tasks-nodate'),
-            label: 'No date',
-            count: undated.length,
-          ),
-          for (final k in undated)
-            _navRow(
-              'tasks',
-              'task-${k.uid}',
-              k.uid,
-              TaskRow(
-                key: Key('home-today-tasks-${k.uid}'),
-                state: state,
-                task: k,
-                now: clock,
-              ),
-            ),
-        ],
       ],
     );
   }
@@ -403,30 +376,6 @@ class TodayCard extends StatelessWidget {
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// A small label with a count between groups of rows in a card.
-class _GroupLabel extends StatelessWidget {
-  const _GroupLabel({super.key, required this.label, required this.count});
-  final String label;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        t.space.xs,
-        t.space.md,
-        t.space.xs,
-        t.space.xs,
-      ),
-      child: Text(
-        '$label  $count',
-        style: t.type.captionStyle.copyWith(color: t.muted),
       ),
     );
   }

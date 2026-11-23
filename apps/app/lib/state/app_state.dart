@@ -506,6 +506,9 @@ class AppState extends ChangeNotifier {
   Future<void> _openCurrent() async {
     final c = catalog!;
     final id = c.current;
+    // A new Space starts with its done columns capped again.
+    nav.boardOpen.remove('done#all');
+    nav.taskBoardOpen.remove('done#all');
     source = id == null ? const EmptyNoteSource() : c.sourceFor(id);
     notes = [];
     tasks = [];
@@ -3441,21 +3444,16 @@ class AppState extends ChangeNotifier {
     ]..sort(NoteTree.byCreated);
   }
 
-  /// Task board columns: backlog, todo, doing and done always, then blocked
-  /// when in use. Cancelled tasks sit in done (the card is dimmed). Follows
+  /// Task board columns: todo, doing and done always, then backlog and
+  /// blocked when in use. Cancelled tasks sit in done (the card is dimmed). Follows
   /// the Tasks view's tag and folder filters, not its Open/Completed toggle.
   List<(String, List<Task>)> taskColumns() {
-    final by = <String, List<Task>>{
-      'backlog': [],
-      'todo': [],
-      'doing': [],
-      'done': [],
-    };
+    final by = <String, List<Task>>{'todo': [], 'doing': [], 'done': []};
     for (final t in filteredTasks) {
       final s = t.boardStatus;
       (by[s == 'cancelled' ? 'done' : s] ??= []).add(t);
     }
-    const always = ['backlog', 'todo', 'doing', 'done'];
+    const always = ['todo', 'doing', 'done'];
     final keys = [
       ...boardOrder.where(by.containsKey),
       ...by.keys.where((k) => !boardOrder.contains(k)),

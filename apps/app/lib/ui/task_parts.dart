@@ -9,6 +9,7 @@ import '../state/task_rules.dart';
 import '../theme/tokens.dart';
 import 'drag_drop.dart';
 import 'parts.dart';
+import 'task_detail.dart' show priorityBucket;
 import 'task_menu.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
@@ -98,6 +99,55 @@ class DueChip extends StatelessWidget {
         maxLines: 1,
         style: t.type.captionStyle.copyWith(color: late ? t.error : t.muted),
       ),
+    );
+  }
+}
+
+/// Whether a card has a priority or a due date to show.
+bool taskHasMeta(Task t) =>
+    t.due != null || priorityBucket(t.priority) != 'none';
+
+/// The priority word ('High', 'Medium', 'Low') or null when none is set.
+String? priorityLabel(Task t) {
+  final b = priorityBucket(t.priority);
+  return b == 'none' ? null : '${b[0].toUpperCase()}${b.substring(1)}';
+}
+
+/// The compact meta line of a task card: priority (when set) then the due
+/// chip (when set; overdue in the error colour, never for a closed task).
+/// The caller shows it only when [taskHasMeta].
+class TaskCardMeta extends StatelessWidget {
+  const TaskCardMeta({super.key, required this.task, this.now});
+  final Task task;
+  final DateTime? now;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final p = priorityLabel(task);
+    return Wrap(
+      spacing: t.space.md,
+      runSpacing: t.space.xs,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        if (p != null)
+          Text(
+            p,
+            key: Key('card-priority-${task.uid}'),
+            style: t.type.captionStyle.copyWith(
+              color: priorityBucket(task.priority) == 'high'
+                  ? t.accent
+                  : t.muted,
+            ),
+          ),
+        if (task.due != null)
+          DueChip(
+            task,
+            key: Key('card-due-${task.uid}'),
+            now: now ?? DateTime.now(),
+            overdue: task.isClosed ? false : null,
+          ),
+      ],
     );
   }
 }
@@ -214,6 +264,18 @@ class TaskRow extends StatelessWidget {
                   Flexible(
                     child: OverflowTip(
                       '#$tag',
+                      style: t.type.captionStyle.copyWith(color: t.muted),
+                    ),
+                  ),
+                ],
+                if (priorityLabel(task) != null) ...[
+                  SizedBox(width: t.space.sm),
+                  Flexible(
+                    child: Text(
+                      priorityLabel(task)!,
+                      key: Key('row-priority-${task.uid}'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: t.type.captionStyle.copyWith(color: t.muted),
                     ),
                   ),

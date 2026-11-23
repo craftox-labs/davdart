@@ -9,6 +9,7 @@ import 'board_layout.dart';
 import 'drag_drop.dart';
 import 'overflow_tip.dart';
 import 'task_menu.dart';
+import 'task_parts.dart';
 import 'theme.dart';
 
 /// Read-only board of the Space's tasks, laid out exactly like the note board
@@ -29,6 +30,7 @@ class TaskBoard extends StatelessWidget {
       return BoardLayout<Task>(
         cols: state.taskColumns(),
         openMap: state.nav.taskBoardOpen,
+        modified: (t) => t.lastModified,
         embedded: embedded,
         wrap: (name, child) => NoteDropTarget(
           key: Key('task-board-col-$name'),
@@ -64,6 +66,8 @@ class _TaskCard extends StatelessWidget {
   /// Phone: the title alone, no tags line.
   final bool compact;
 
+  bool get _hasMeta => taskHasMeta(task);
+
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
@@ -92,7 +96,16 @@ class _TaskCard extends StatelessWidget {
                 child: Padding(
                   padding: EdgeInsets.all(t.space.lg),
                   child: compact
-                      ? Text(task.summary, style: t.type.semiboldStyle)
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(task.summary, style: t.type.semiboldStyle),
+                            if (_hasMeta) ...[
+                              SizedBox(height: t.space.sm),
+                              TaskCardMeta(task: task),
+                            ],
+                          ],
+                        )
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -111,6 +124,10 @@ class _TaskCard extends StatelessWidget {
                                   color: t.muted,
                                 ),
                               ),
+                            ],
+                            if (_hasMeta) ...[
+                              SizedBox(height: t.space.sm),
+                              TaskCardMeta(task: task),
                             ],
                           ],
                         ),

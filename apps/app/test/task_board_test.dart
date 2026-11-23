@@ -26,9 +26,10 @@ void main() {
     await t.pumpAndSettle();
     expect(find.byType(TaskBoard), findsOneWidget);
     expect(find.byType(BoardView), findsNothing);
-    for (final c in ['backlog', 'todo', 'doing', 'done']) {
+    for (final c in ['todo', 'doing', 'done']) {
       expect(_k('task-board-col-$c'), findsOneWidget);
     }
+    expect(_k('task-board-col-backlog'), findsNothing);
     expect(
       find.descendant(
         of: _k('task-board-col-todo'),
@@ -53,7 +54,7 @@ void main() {
   });
 
   testWidgets(
-    'taskColumns follows the tag filter and keeps empty core columns',
+    'taskColumns follows the tag filter and keeps empty core columns, not backlog',
     (t) async {
       final state = await pumpTasksApp(
         t,
@@ -64,12 +65,9 @@ void main() {
       );
       state.setTaskTagFilter('bug');
       final cols = state.taskColumns();
-      expect(
-        [for (final c in cols) c.$1],
-        ['backlog', 'todo', 'doing', 'done'],
-      );
-      expect([for (final x in cols[1].$2) x.summary], ['Tagged']);
-      expect(cols[2].$2, isEmpty);
+      expect([for (final c in cols) c.$1], ['todo', 'doing', 'done']);
+      expect([for (final x in cols[0].$2) x.summary], ['Tagged']);
+      expect(cols[1].$2, isEmpty);
     },
   );
 
