@@ -26,6 +26,7 @@ void ioGuard() {
   test('the web-safe library never imports dart:io', () {
     const ioFiles = {
       'config.dart',
+      'collection_backup_io.dart',
       'file_store.dart',
       'space_book.dart',
       'task_file_store.dart',

@@ -92,9 +92,7 @@ class BoardLayout<T> extends StatelessWidget {
             child: ListView(
               padding: EdgeInsets.only(bottom: fabInset(context)),
               scrollCacheExtent: navCacheExtent,
-              children: [
-                for (final i in items) itemBuilder(name, i, false),
-              ],
+              children: [for (final i in items) itemBuilder(name, i, false)],
             ),
           ),
         ],
@@ -108,9 +106,8 @@ class BoardLayout<T> extends StatelessWidget {
         key: const Key('board-accordion'),
         shrinkWrap: embedded,
         physics: embedded ? const NeverScrollableScrollPhysics() : null,
-        padding: EdgeInsets.all(
-          gap,
-        ).copyWith(bottom: gap + (embedded ? 0 : fabInset(context))),
+        padding: EdgeInsets.all(gap)
+            .copyWith(bottom: gap + (embedded ? 0 : fabInset(context))),
         children: [
           for (final (name, items) in cols)
             _wrap(

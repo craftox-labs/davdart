@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import '../data/space_catalog.dart' show SpaceCatalog;
 import '../state/app_state.dart';
 import 'parts.dart';
 import 'theme.dart';
@@ -128,5 +129,112 @@ Future<void> showDeleteSpaceDialog(BuildContext context, AppState state) async {
         },
       ),
     ],
+  );
+}
+
+/// Deletes the open account Space's collection from the server for everyone.
+/// Needs the exact server name typed, shows the item count and offers a
+/// backup (an ICS snapshot: saved on a device, a download on the web).
+Future<void> showDeleteFromServerDialog(
+  BuildContext context,
+  AppState state,
+) async {
+  final ({String name, int items}) info;
+  try {
+    info = await state.serverCollectionOfCurrent();
+  } catch (e) {
+    if (!context.mounted) return;
+    return showAppDialog(
+      context,
+      title: 'Cannot delete from server',
+      content: Text('$e', key: const Key('server-delete-error')),
+      actions: [const CancelButton(label: 'Close')],
+    );
+  }
+  if (!context.mounted) return;
+  final typed = TextEditingController();
+  var backup = true;
+  var busy = false;
+  String? error;
+  return showAppDialog(
+    context,
+    title: 'Delete "${info.name}" from the server?',
+    content: StatefulBuilder(
+      builder: (ctx, setLocal) {
+        final match = typed.text == info.name;
+        Future<void> submit() async {
+          if (!match || busy) return;
+          setLocal(() {
+            busy = true;
+            error = null;
+          });
+          final err = await state.deleteCurrentFromServer(
+            confirmName: typed.text,
+            keepBackup: backup,
+          );
+          if (!ctx.mounted) return;
+          if (err == null) {
+            Navigator.of(ctx).pop();
+          } else {
+            setLocal(() {
+              busy = false;
+              error = err;
+            });
+          }
+        }
+
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: tokensOf(ctx).space.lg,
+          children: [
+            Text(
+              'This removes the space from the server for everyone who uses '
+              'it, with ${info.items} item${info.items == 1 ? '' : 's'}. '
+              'It cannot be undone.',
+              key: const Key('server-delete-text'),
+            ),
+            if (info.items > 0)
+              FCheckbox(
+                key: const Key('server-delete-backup'),
+                value: backup,
+                onChange: (v) => setLocal(() => backup = v),
+                label: Text(
+                  'Save a backup first (${SpaceCatalog.backupWhere})',
+                ),
+              ),
+            if (info.items > 0 && backup && SpaceCatalog.backupNote.isNotEmpty)
+              Text(
+                SpaceCatalog.backupNote,
+                key: const Key('server-delete-backup-note'),
+                style: tokensOf(ctx).type.captionStyle,
+              ),
+            if (info.items > 0 && !backup)
+              Text(
+                'Warning: without a backup the items are gone for good.',
+                key: const Key('server-delete-nobackup'),
+                style: tokensOf(ctx).type.captionStyle,
+              ),
+            field(
+              key: const Key('server-delete-name'),
+              controller: typed,
+              autofocus: true,
+              label: 'Type "${info.name}" to confirm',
+              error: error,
+              onChange: (_) => setLocal(() {}),
+              onSubmit: (_) => submit(),
+            ),
+            // Enabled only once the typed name matches exactly.
+            FButton(
+              key: const Key('server-delete-go'),
+              mainAxisSize: MainAxisSize.min,
+              onPress: match && !busy ? submit : null,
+              child: Text(busy ? 'Deleting…' : 'Delete from server'),
+            ),
+          ],
+        );
+      },
+    ),
+    actions: [const CancelButton()],
   );
 }

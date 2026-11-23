@@ -6,3 +6,4 @@ export 'src/file_store.dart';
 export 'src/task_file_store.dart';
 export 'src/space_book.dart';
 export 'src/event_file_store.dart';
+export 'src/collection_service.dart';

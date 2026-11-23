@@ -3,6 +3,9 @@ import 'dart:convert';
 import 'package:davdart/davdart.dart';
 import 'package:http/http.dart' as http;
 
+import 'collection_backup_native.dart'
+    if (dart.library.js_interop) 'collection_backup_web.dart'
+    as backup;
 import 'key_value_storage.dart';
 import 'note_source.dart';
 import 'persistent_store.dart';
@@ -82,6 +85,7 @@ class SpaceCatalog {
     this.planningSeed,
     this.davBase,
     this.httpClient,
+    this.backupDir,
   }) {
     _load();
     _loadAccount();
@@ -91,6 +95,9 @@ class SpaceCatalog {
   final NoteSource? planningSeed;
   final Uri? davBase;
   final http.Client? httpClient;
+
+  /// Where a native backup goes; null means the device default.
+  final String? backupDir;
 
   static const planningId = 'planning';
   static const _accountKey = 'davdart.account.v1';
@@ -393,6 +400,14 @@ class SpaceCatalog {
     } catch (_) {}
   }
 
+  /// The shared core service for the signed-in account's collections.
+  CollectionService _service(Account a) => CollectionService(
+    home: _davBase.resolve('${Uri.encodeComponent(a.user)}/'),
+    username: a.user,
+    password: a.password,
+    httpClient: httpClient,
+  );
+
   /// Renames Space [id]. For an account Space the server's display name is
   /// changed first, so other apps see it; null means done, else the reason.
   Future<String?> renameSpace(String id, String name) async {
@@ -407,13 +422,7 @@ class SpaceCatalog {
     final path = spaces[i].collection;
     if (path != null && a != null) {
       try {
-        await CalDavClient.renameCollection(
-          _davBase.resolve(path),
-          n,
-          username: a.user,
-          password: a.password,
-          client: httpClient,
-        );
+        await _service(a).rename(_davBase.resolve(path), n);
       } catch (e) {
         return 'Could not rename on the server: $e';
       }
@@ -434,13 +443,7 @@ class SpaceCatalog {
     final a = account;
     if (a == null) throw StateError('Not signed in');
     final shown = _unique(name);
-    final url = await CalDavClient.createCollection(
-      _davBase.resolve('${Uri.encodeComponent(a.user)}/'),
-      shown,
-      username: a.user,
-      password: a.password,
-      client: httpClient,
-    );
+    final url = (await _service(a).create(shown)).href!;
     final path = davPath(_davBase, url);
     final info = SpaceInfo(
       'srv-${Uri.encodeComponent(path)}',
@@ -451,6 +454,63 @@ class SpaceCatalog {
     spaces.add(info);
     _save();
     return info;
+  }
+
+  /// What the server holds for account Space [id]: the collection's name
+  /// there (the typed confirmation must match it) and its item count.
+  Future<({String name, int items})> serverCollection(String id) async {
+    final a = account;
+    final path = spaces.where((s) => s.id == id).firstOrNull?.collection;
+    if (a == null || path == null) throw StateError('Not an account space');
+    final svc = _service(a);
+    final href = _davBase.resolve(path);
+    final hit = (await svc.list())
+        .where((c) => c.href.path == _slash(href).path)
+        .firstOrNull;
+    if (hit == null) throw StateError('The server has no such collection');
+    final plan = await svc.delete(
+      href,
+      confirmName: hit.name,
+      backupDir: backupDir ?? backup.backupDirectory(),
+      allowNonEmpty: true,
+      dryRun: true,
+    );
+    return (name: hit.name, items: plan.itemCount ?? 0);
+  }
+
+  /// Where a backup ends up, for the delete dialog.
+  static const backupWhere = backup.backupWhere;
+  static const backupNote = backup.backupNote;
+
+  static Uri _slash(Uri u) =>
+      u.path.endsWith('/') ? u : u.replace(path: '${u.path}/');
+
+  /// Deletes Space [id]'s collection from the server for everyone, after
+  /// [confirmName] matches the server's name exactly. With [keepBackup] an
+  /// ICS snapshot is saved first. Null means deleted (the caller removes the
+  /// Space locally), else the server's or the safety rule's reason.
+  Future<String?> deleteOnServer(
+    String id, {
+    required String confirmName,
+    bool keepBackup = true,
+  }) async {
+    final a = account;
+    final path = spaces.where((s) => s.id == id).firstOrNull?.collection;
+    if (a == null || path == null) return 'Not an account space';
+    try {
+      await _service(a).delete(
+        _davBase.resolve(path),
+        confirmName: confirmName,
+        backupDir: backupDir ?? backup.backupDirectory(),
+        allowNonEmpty: true,
+        backupWriter: keepBackup ? backup.backupWriter() : (_, _) => null,
+      );
+      return null;
+    } on CollectionSafetyException catch (e) {
+      return e.message;
+    } catch (e) {
+      return 'Could not delete on the server: $e';
+    }
   }
 
   /// Signs out. Account Spaces stay on this device as local copies.

@@ -628,6 +628,33 @@ class AppState extends ChangeNotifier {
     return err;
   }
 
+  /// What the server holds for the open account Space (its name there and
+  /// item count); throws when it cannot be read.
+  Future<({String name, int items})> serverCollectionOfCurrent() {
+    final c = catalog, id = catalog?.current;
+    if (c == null || id == null) throw StateError('No space open');
+    return c.serverCollection(id);
+  }
+
+  /// Deletes the open account Space's collection from the server for
+  /// everyone, then removes the Space here. Null when done, else the reason
+  /// (the Space stays untouched).
+  Future<String?> deleteCurrentFromServer({
+    required String confirmName,
+    bool keepBackup = true,
+  }) async {
+    final c = catalog, id = catalog?.current;
+    if (c == null || id == null || !currentOnServer) return 'No account space';
+    final err = await c.deleteOnServer(
+      id,
+      confirmName: confirmName,
+      keepBackup: keepBackup,
+    );
+    if (err != null) return err;
+    await deleteSpace();
+    return null;
+  }
+
   /// What deleting the open Space would lose beyond this device's copy:
   /// notes with unsaved edits plus notes not yet synced to the server.
   Future<int> unsyncedInCurrent() async {

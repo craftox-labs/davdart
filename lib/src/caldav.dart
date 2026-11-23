@@ -88,6 +88,15 @@ class CollectionInfo {
   final bool holdsEvents;
 }
 
+/// A resource as the server lists it: href, etag and raw calendar-data
+/// (null when missing or empty).
+class RawResource {
+  RawResource(this.href, this.etag, this.data);
+  final String href;
+  final String? etag;
+  final String? data;
+}
+
 /// CalDAV client for one collection that holds VJOURNAL resources.
 class CalDavClient {
   CalDavClient({
@@ -253,6 +262,30 @@ class CalDavClient {
     }
   }
 
+  /// Deletes the whole collection at [url] with everything in it (DELETE).
+  /// CalDAV has no trash: callers must back up first (see
+  /// `CollectionService.delete`).
+  static Future<void> deleteCollection(
+    Uri url, {
+    required String username,
+    required String password,
+    http.Client? client,
+  }) async {
+    final u = _withSlash(url);
+    final c = CalDavClient(
+        collection: u, username: username, password: password, client: client);
+    final r = await c._send('DELETE', u);
+    if (r.statusCode != 200 && r.statusCode != 204) {
+      throw CalDavException(r.statusCode, 'DELETE collection failed');
+    }
+  }
+
+  /// Sends a raw request with this client's credentials, for capability
+  /// probes. Not for item writes.
+  Future<http.Response> sendRaw(String method, Uri url,
+          {Map<String, String> headers = const {}, String? body}) =>
+      _send(method, url, headers: headers, body: body);
+
   Uri _resolve(String href) => collection.resolve(href);
 
   Future<http.Response> _send(
@@ -268,14 +301,57 @@ class CalDavClient {
     return http.Response.fromStream(await _http.send(req));
   }
 
-  static String _reportBody(String comp) =>
+  static String _reportBody(String? comp) =>
       '''<?xml version="1.0" encoding="utf-8"?>
 <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
   <d:prop><d:getetag/><c:calendar-data/></d:prop>
   <c:filter><c:comp-filter name="VCALENDAR">
-    <c:comp-filter name="$comp"/>
+    ${comp == null ? '' : '<c:comp-filter name="$comp"/>'}
   </c:comp-filter></c:filter>
 </c:calendar-query>''';
+
+  /// Lists every resource in the collection whatever its component type,
+  /// with the raw calendar-data when the server returned any. Used to check
+  /// that typed listings did not silently drop anything.
+  Future<List<RawResource>> listRaw() async {
+    final r = await _send('REPORT', collection,
+        headers: {
+          'Depth': '1',
+          'Content-Type': 'application/xml; charset=utf-8',
+        },
+        body: _reportBody(null));
+    if (r.statusCode != 207) {
+      throw CalDavException(r.statusCode, 'REPORT failed');
+    }
+    final doc = XmlDocument.parse(utf8.decode(r.bodyBytes));
+    final out = <RawResource>[];
+    for (final resp
+        in doc.descendantElements.where((e) => e.localName == 'response')) {
+      String? text(String name) => resp.descendantElements
+          .where((e) => e.localName == name)
+          .map((e) => e.innerText)
+          .firstOrNull;
+      final href = text('href');
+      if (href == null) continue;
+      if (_resolve(href).path == collection.path) continue;
+      final data = text('calendar-data');
+      out.add(RawResource(href, text('getetag'),
+          data == null || data.trim().isEmpty ? null : data));
+    }
+    return out;
+  }
+
+  /// Fetches the raw body of the resource at [href].
+  Future<List<int>> getRawBytes(String href) async {
+    final r = await _send('GET', _resolve(href));
+    if (r.statusCode != 200) {
+      throw CalDavException(r.statusCode, 'GET failed for $href');
+    }
+    return r.bodyBytes;
+  }
+
+  /// Absolute path of [href] as this collection sees it.
+  String pathOf(String href) => _resolve(href).path;
 
   /// Lists every note in the collection, with href and etag set.
   Future<List<Note>> listNotes() async {

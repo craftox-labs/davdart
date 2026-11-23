@@ -1,0 +1,838 @@
+import 'dart:math';
+
+import 'caldav.dart';
+import 'event.dart';
+import 'merge.dart';
+import 'note.dart';
+import 'note_tree.dart';
+import 'plan_item.dart';
+import 'saved_view.dart';
+import 'task.dart';
+
+/// Which resource type an item is stored as.
+enum ItemKind {
+  note,
+  task,
+  event;
+
+  static ItemKind parse(String s) => ItemKind.values.firstWhere(
+        (k) => k.name == s.toLowerCase().trim(),
+        orElse: () => throw ItemServiceException(
+            'unknown kind "$s" (expected note, task or event)'),
+      );
+}
+
+/// A refused or impossible item operation (not found, ambiguous, bad move,
+/// wrong kind for the operation).
+class ItemServiceException implements Exception {
+  ItemServiceException(this.message);
+  final String message;
+  @override
+  String toString() => 'ItemServiceException: $message';
+}
+
+/// Plain, JSON-ready view of one item. Dates are raw iCalendar text
+/// (`20261225`, `20261225T090000Z`) for due, start and end, ISO 8601 for
+/// created and modified.
+class ItemData {
+  const ItemData({
+    required this.kind,
+    required this.uid,
+    required this.title,
+    this.href,
+    this.etag,
+    this.body = '',
+    this.tags = const [],
+    this.status,
+    this.parentUid,
+    this.isFolder = false,
+    this.due,
+    this.start,
+    this.end,
+    this.location,
+    this.priority,
+    this.created,
+    this.modified,
+  });
+
+  final ItemKind kind;
+  final String uid;
+  final String title;
+  final String? href;
+  final String? etag;
+  final String body;
+  final List<String> tags;
+
+  /// Board status word (`todo`, `doing`, `done`, ...), or null.
+  final String? status;
+  final String? parentUid;
+  final bool isFolder;
+  final String? due;
+  final String? start;
+  final String? end;
+  final String? location;
+  final int? priority;
+  final DateTime? created;
+  final DateTime? modified;
+
+  /// [full] false leaves out the body, for lists.
+  Map<String, Object?> toJson({bool full = true}) => {
+        'kind': kind.name,
+        'uid': uid,
+        'title': title,
+        if (href != null) 'href': href,
+        if (etag != null) 'etag': etag,
+        if (full) 'body': body,
+        'tags': tags,
+        if (status != null) 'status': status,
+        if (parentUid != null) 'parent': parentUid,
+        if (isFolder) 'folder': true,
+        if (due != null) 'due': due,
+        if (start != null) 'start': start,
+        if (end != null) 'end': end,
+        if (location != null && location!.isNotEmpty) 'location': location,
+        if (priority != null) 'priority': priority,
+        if (created != null) 'created': created!.toIso8601String(),
+        if (modified != null) 'modified': modified!.toIso8601String(),
+      };
+}
+
+/// One page of [ItemData].
+class ItemPage {
+  const ItemPage(this.items, this.total, this.offset, this.limit);
+  final List<ItemData> items;
+  final int total;
+  final int offset;
+  final int limit;
+  bool get hasMore => offset + items.length < total;
+  Map<String, Object?> toJson() => {
+        'total': total,
+        'offset': offset,
+        'limit': limit,
+        'hasMore': hasMore,
+        'items': [for (final i in items) i.toJson(full: false)],
+      };
+}
+
+/// A node of the compact [Overview] tree.
+class OverviewNode {
+  OverviewNode(this.kind, this.uid, this.title, this.status, this.folder);
+  final ItemKind kind;
+  final String uid;
+  final String title;
+  final String? status;
+  final bool folder;
+  final List<OverviewNode> children = [];
+
+  /// Children left out because of the depth limit.
+  int hiddenChildren = 0;
+
+  Map<String, Object?> toJson() => {
+        'kind': kind.name,
+        'uid': uid,
+        'title': title,
+        if (status != null) 'status': status,
+        if (folder) 'folder': true,
+        if (children.isNotEmpty)
+          'children': [for (final c in children) c.toJson()],
+        if (hiddenChildren > 0) 'hidden': hiddenChildren,
+      };
+}
+
+/// Compact picture of a collection: tree plus counts.
+class Overview {
+  Overview(this.roots, this.total, this.byKind, this.byStatus, this.byTag);
+  final List<OverviewNode> roots;
+  final int total;
+  final Map<String, int> byKind;
+  final Map<String, int> byStatus;
+  final Map<String, int> byTag;
+  Map<String, Object?> toJson() => {
+        'total': total,
+        'byKind': byKind,
+        'byStatus': byStatus,
+        'byTag': byTag,
+        'tree': [for (final r in roots) r.toJson()],
+      };
+}
+
+/// Outcome of a write. With [dryRun] nothing was changed: [item] is what the
+/// item would look like and [changes] what would be done.
+class ItemChange {
+  const ItemChange(this.action, this.dryRun, this.changes, this.item);
+  final String action;
+  final bool dryRun;
+  final List<String> changes;
+  final ItemData item;
+  Map<String, Object?> toJson() => {
+        'action': action,
+        'dryRun': dryRun,
+        'changes': changes,
+        'item': item.toJson(),
+      };
+}
+
+// ---- internal: one wrapper over the three resource types ----
+
+class _Ref {
+  _Ref(this.raw);
+  final Object raw; // Note, Task or Event
+
+  ItemKind get kind => switch (raw) {
+        Note() => ItemKind.note,
+        Task() => ItemKind.task,
+        _ => ItemKind.event,
+      };
+
+  String get uid => switch (raw) {
+        Note n => n.uid,
+        Task t => t.uid,
+        Event e => e.uid,
+        _ => '',
+      };
+  String? get href => switch (raw) {
+        Note n => n.href,
+        Task t => t.href,
+        Event e => e.href,
+        _ => null,
+      };
+  String get title => switch (raw) {
+        Note n => n.summary,
+        Task t => t.summary,
+        Event e => e.summary,
+        _ => '',
+      };
+  set title(String v) => switch (raw) {
+        Note n => n.summary = v,
+        Task t => t.summary = v,
+        Event e => e.summary = v,
+        _ => null,
+      };
+  String get body => switch (raw) {
+        Note n => n.description,
+        Task t => t.description,
+        Event e => e.description,
+        _ => '',
+      };
+  set body(String v) => switch (raw) {
+        Note n => n.description = v,
+        Task t => t.description = v,
+        Event e => e.description = v,
+        _ => null,
+      };
+  List<String> get tags => switch (raw) {
+        Note n => n.categories,
+        Task t => t.categories,
+        Event e => e.categories,
+        _ => <String>[],
+      };
+  set tags(List<String> v) => switch (raw) {
+        Note n => n.categories = v,
+        Task t => t.categories = v,
+        Event e => e.categories = v,
+        _ => null,
+      };
+  String? get parentUid => switch (raw) {
+        Note n => n.parentUid,
+        Task t => t.parentUid,
+        Event e => e.parentUid,
+        _ => null,
+      };
+  set parentUid(String? v) => switch (raw) {
+        Note n => n.parentUid = v,
+        Task t => t.parentUid = v,
+        Event e => e.parentUid = v,
+        _ => null,
+      };
+  DateTime? get created => switch (raw) {
+        Note n => n.created ?? n.dtstamp,
+        Task t => t.created ?? t.dtstamp,
+        Event e => e.created ?? e.dtstamp,
+        _ => null,
+      };
+
+  _Ref clone() => _Ref(switch (raw) {
+        Note n => n.copyWith(),
+        Task t => t.copyWith(),
+        Event e => e.copyWith(),
+        _ => raw,
+      });
+
+  String? get status => switch (raw) {
+        Note n => PlanItem.fromNote(n).status,
+        Task t => t.boardStatus,
+        Event e => e.categories
+            .where((c) => c.startsWith('status-'))
+            .map((c) => c.substring(7))
+            .firstOrNull,
+        _ => null,
+      };
+
+  /// [base] is the collection URL: a href the server returned relative to it
+  /// (after a PUT) is made absolute-path, as list returns it.
+  ItemData toData([Uri? base]) {
+    final d = _toData();
+    final h = d.href;
+    if (base == null || h == null || h.startsWith('/')) return d;
+    return ItemData(
+        kind: d.kind,
+        uid: d.uid,
+        title: d.title,
+        href: base.resolve(h).path,
+        etag: d.etag,
+        body: d.body,
+        tags: d.tags,
+        status: d.status,
+        parentUid: d.parentUid,
+        isFolder: d.isFolder,
+        due: d.due,
+        start: d.start,
+        end: d.end,
+        location: d.location,
+        priority: d.priority,
+        created: d.created,
+        modified: d.modified);
+  }
+
+  ItemData _toData() {
+    switch (raw) {
+      case Note n:
+        return ItemData(
+            kind: ItemKind.note,
+            uid: n.uid,
+            title: n.summary,
+            href: n.href,
+            etag: n.etag,
+            body: n.description,
+            tags: List.of(n.categories),
+            status: status,
+            parentUid: n.parentUid,
+            isFolder: isFolderNote(n),
+            created: n.created,
+            modified: n.lastModified);
+      case Task t:
+        return ItemData(
+            kind: ItemKind.task,
+            uid: t.uid,
+            title: t.summary,
+            href: t.href,
+            etag: t.etag,
+            body: t.description,
+            tags: List.of(t.categories),
+            status: t.boardStatus,
+            parentUid: t.parentUid,
+            due: t.due?.value,
+            start: t.dtstart?.value,
+            priority: t.priority,
+            created: t.created,
+            modified: t.lastModified);
+      default:
+        final e = raw as Event;
+        return ItemData(
+            kind: ItemKind.event,
+            uid: e.uid,
+            title: e.summary,
+            href: e.href,
+            etag: e.etag,
+            body: e.description,
+            tags: List.of(e.categories),
+            status: status,
+            parentUid: e.parentUid,
+            start: e.dtstart?.value,
+            end: e.dtend?.value,
+            location: e.location,
+            created: e.created,
+            modified: e.lastModified);
+    }
+  }
+
+  /// PUT through the client. On a 412 the server copy is fetched, merged
+  /// three-way against [base] and written once more; a second conflict throws.
+  Future<_Ref> put(CalDavClient c, _Ref base) async {
+    switch (raw) {
+      case Note n:
+        try {
+          return _Ref(await c.putNote(n));
+        } on ConflictException {
+          final remote = await c.getNote(n.href!);
+          return _Ref(
+              await c.putNote(mergeNotes(base.raw as Note, n, remote).note));
+        }
+      case Task t:
+        try {
+          return _Ref(await c.putTask(t));
+        } on ConflictException {
+          final remote = await c.getTask(t.href!);
+          return _Ref(
+              await c.putTask(mergeTasks(base.raw as Task, t, remote).task));
+        }
+      default:
+        final e = raw as Event;
+        try {
+          return _Ref(await c.putEvent(e));
+        } on ConflictException {
+          final remote = await c.getEvent(e.href!);
+          return _Ref(await c
+              .putEvent(mergeEvents(base.raw as Event, e, remote).event));
+        }
+    }
+  }
+
+  Future<void> delete(CalDavClient c) => switch (raw) {
+        Note n => c.deleteNote(n),
+        Task t => c.deleteTask(t),
+        _ => c.deleteEvent(raw as Event),
+      };
+}
+
+/// Parses `YYYY-MM-DD`, `YYYY-MM-DDTHH:MM[:SS][Z]` or the compact iCalendar
+/// forms into an [ICalDate]. A timed value without Z is floating.
+ICalDate parseWhen(String s) {
+  final m = RegExp(
+          r'^(\d{4})-?(\d{2})-?(\d{2})(?:[T ](\d{2}):?(\d{2})(?::?(\d{2}))?(Z)?)?$')
+      .firstMatch(s.trim());
+  if (m == null) {
+    throw ItemServiceException('cannot read date "$s" (use YYYY-MM-DD or '
+        'YYYY-MM-DDTHH:MM[:SS][Z])');
+  }
+  final y = m.group(1)!, mo = m.group(2)!, d = m.group(3)!;
+  if (m.group(4) == null) return ICalDate('$y$mo$d', ';VALUE=DATE');
+  return ICalDate('$y$mo${d}T${m.group(4)}${m.group(5)}${m.group(6) ?? '00'}'
+      '${m.group(7) ?? ''}');
+}
+
+/// Item operations over one CalDAV collection, generic over note, task and
+/// event, for any front-end (CLI, MCP, app). Every write goes through
+/// [CalDavClient] (ETag preconditions; a lost race is merged and retried once)
+/// and has a `dryRun` option that changes nothing.
+class ItemService {
+  ItemService(this.client, {DateTime Function()? now})
+      : _now = now ?? DateTime.now;
+
+  final CalDavClient client;
+  final DateTime Function() _now;
+
+  Future<List<_Ref>> _load([ItemKind? only]) async {
+    final out = <_Ref>[];
+    if (only == null || only == ItemKind.note) {
+      out.addAll((await client.listNotes()).map(_Ref.new));
+    }
+    if (only == null || only == ItemKind.task) {
+      out.addAll((await client.listTasks()).map(_Ref.new));
+    }
+    if (only == null || only == ItemKind.event) {
+      out.addAll((await client.listEvents()).map(_Ref.new));
+    }
+    return out
+        .where((r) => !(r.raw is Note && isViewNote(r.raw as Note)))
+        .toList();
+  }
+
+  /// One note-shaped proxy per item so [NoteTree] can arrange all kinds.
+  NoteTree _tree(List<_Ref> refs) => NoteTree.build([
+        for (final r in refs)
+          Note(
+              uid: r.uid,
+              summary: r.title,
+              parentUid: r.parentUid,
+              created: r.created)
+      ]);
+
+  _Ref _find(List<_Ref> refs, String id, {ItemKind? kind}) {
+    final low = id.toLowerCase();
+    var hits = refs
+        .where((r) =>
+            (kind == null || r.kind == kind) && (r.uid == id || r.href == id))
+        .toList();
+    if (hits.isEmpty) {
+      hits = refs
+          .where((r) =>
+              (kind == null || r.kind == kind) && r.title.toLowerCase() == low)
+          .toList();
+    }
+    if (hits.isEmpty) throw ItemServiceException('no item matches "$id"');
+    if (hits.length > 1) {
+      throw ItemServiceException(
+          '${hits.length} items match "$id": ${hits.map((h) => '${h.title} (${h.uid})').join(' | ')}');
+    }
+    return hits.single;
+  }
+
+  /// Compact tree (to [maxDepth] levels, default 2) plus tag and status
+  /// counts. [under] limits the tree to one folder or item.
+  Future<Overview> overview({int maxDepth = 2, String? under}) async {
+    final refs = await _load();
+    final tree = _tree(refs);
+    final byUid = {for (final r in refs) r.uid: r};
+    OverviewNode node(NoteNode n, int depth) {
+      final r = byUid[n.note.uid]!;
+      final o = OverviewNode(r.kind, r.uid, r.title, r.status,
+          r.raw is Note && isFolderNote(r.raw as Note));
+      if (depth >= maxDepth) {
+        o.hiddenChildren = n.children.length;
+      } else {
+        for (final c in n.children) {
+          o.children.add(node(c, depth + 1));
+        }
+      }
+      return o;
+    }
+
+    final List<NoteNode> start;
+    if (under == null) {
+      start = tree.roots;
+    } else {
+      start = tree.find(_find(refs, under).uid)!.children;
+    }
+    final byKind = <String, int>{};
+    final byStatus = <String, int>{};
+    final byTag = <String, int>{};
+    for (final r in refs) {
+      byKind[r.kind.name] = (byKind[r.kind.name] ?? 0) + 1;
+      final s = r.status;
+      if (s != null) byStatus[s] = (byStatus[s] ?? 0) + 1;
+      for (final t in r.tags) {
+        if (t.startsWith('status-') || t == folderTag) continue;
+        byTag[t] = (byTag[t] ?? 0) + 1;
+      }
+    }
+    return Overview([for (final n in start) node(n, 1)], refs.length, byKind,
+        byStatus, byTag);
+  }
+
+  /// Filtered, paged list without bodies. [under] is a folder (or any item)
+  /// uid or title: everything below it. Folders are left out unless
+  /// [includeFolders].
+  Future<ItemPage> list({
+    ItemKind? kind,
+    String? tag,
+    String? status,
+    String? under,
+    bool includeFolders = false,
+    int limit = 50,
+    int offset = 0,
+  }) async {
+    final refs = await _load(kind);
+    Set<String>? below;
+    if (under != null) {
+      final all = kind == null ? refs : await _load();
+      below = _tree(all)
+          .descendants(_find(all, under).uid)
+          .map((n) => n.uid)
+          .toSet();
+    }
+    final low = status?.toLowerCase();
+    final hits = refs.where((r) {
+      if (!includeFolders && r.raw is Note && isFolderNote(r.raw as Note)) {
+        return false;
+      }
+      if (tag != null && !r.tags.contains(tag)) return false;
+      if (low != null && r.status != low) return false;
+      if (below != null && !below.contains(r.uid)) return false;
+      return true;
+    }).toList()
+      ..sort((a, b) {
+        final c = a.created!.compareTo(b.created!);
+        return c != 0 ? c : a.title.compareTo(b.title);
+      });
+    final lim = limit.clamp(1, 500);
+    final off = offset < 0 ? 0 : offset;
+    return ItemPage([for (final r in hits.skip(off).take(lim)) r.toData()],
+        hits.length, off, lim);
+  }
+
+  /// One item by uid, href or exact title.
+  Future<ItemData> get(String id, {ItemKind? kind}) async =>
+      _find(await _load(kind), id, kind: kind).toData();
+
+  String _newUid() =>
+      '${_now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32).toRadixString(16)}@davdart';
+
+  List<String> _cleanTags(Iterable<String> t) => {
+        for (final x in t)
+          if (x.trim().isNotEmpty) x.trim().replaceAll(',', '-')
+      }.toList();
+
+  /// Creates an item. [due] and [priority] apply to tasks; [start], [end] and
+  /// [location] to events (start required); [folder] makes a note a folder.
+  Future<ItemChange> create(
+    ItemKind kind,
+    String title, {
+    String body = '',
+    List<String> tags = const [],
+    String? status,
+    String? parent,
+    bool folder = false,
+    String? due,
+    int? priority,
+    String? start,
+    String? end,
+    String? location,
+    bool dryRun = false,
+  }) async {
+    if (title.trim().isEmpty) throw ItemServiceException('title is empty');
+    if (folder && kind != ItemKind.note) {
+      throw ItemServiceException('only notes can be folders');
+    }
+    if (kind != ItemKind.task && (due != null || priority != null)) {
+      throw ItemServiceException('due and priority apply to tasks only');
+    }
+    if (kind != ItemKind.event &&
+        (start != null || end != null || location != null)) {
+      throw ItemServiceException(
+          'start, end and location apply to events only');
+    }
+    String? parentUid;
+    if (parent != null) parentUid = _find(await _load(), parent).uid;
+    final now = _now();
+    final cats = _cleanTags([...tags, if (folder) folderTag]);
+    final uid = _newUid();
+    final _Ref ref;
+    switch (kind) {
+      case ItemKind.note:
+        final n = Note(
+            uid: uid,
+            summary: title,
+            description: body,
+            categories: cats,
+            parentUid: parentUid,
+            created: now,
+            lastModified: now);
+        ref = _Ref(n);
+        if (status != null) _setStatus(ref, status, now);
+      case ItemKind.task:
+        final t = Task(
+            uid: uid,
+            summary: title,
+            description: body,
+            categories: cats,
+            status: 'NEEDS-ACTION',
+            priority: priority,
+            due: due == null ? null : parseWhen(due),
+            parentUid: parentUid,
+            created: now,
+            lastModified: now);
+        ref = _Ref(t);
+        if (status != null) _setStatus(ref, status, now);
+      case ItemKind.event:
+        if (start == null) throw ItemServiceException('an event needs a start');
+        final e = Event(
+            uid: uid,
+            summary: title,
+            description: body,
+            location: location ?? '',
+            categories: cats,
+            dtstart: parseWhen(start),
+            dtend: end == null ? null : parseWhen(end),
+            parentUid: parentUid,
+            created: now,
+            lastModified: now);
+        ref = _Ref(e);
+        if (status != null) _setStatus(ref, status, now);
+    }
+    final desc = ['create ${folder ? 'folder' : kind.name} "$title"'];
+    if (dryRun) return ItemChange('create', true, desc, ref.toData());
+    return ItemChange('create', false, desc,
+        (await ref.put(client, ref)).toData(client.collection));
+  }
+
+  Future<ItemChange> _edit(
+    String id,
+    String action,
+    ItemKind? kind,
+    bool dryRun,
+    List<String> Function(_Ref edit, List<_Ref> all) apply,
+  ) async {
+    final all = await _load(kind);
+    final base = _find(all, id, kind: kind);
+    final edit = base.clone();
+    final changes = apply(edit, all);
+    if (changes.isEmpty || dryRun) {
+      return ItemChange(action, dryRun, changes, edit.toData());
+    }
+    return ItemChange(action, false, changes,
+        (await edit.put(client, base)).toData(client.collection));
+  }
+
+  /// Changes title, body, location (events) or start and end (events).
+  /// Null leaves a field as it is.
+  Future<ItemChange> update(
+    String id, {
+    ItemKind? kind,
+    String? title,
+    String? body,
+    String? location,
+    String? start,
+    String? end,
+    bool dryRun = false,
+  }) =>
+      _edit(id, 'update', kind, dryRun, (e, _) {
+        final ch = <String>[];
+        if (title != null && title != e.title) {
+          ch.add('title: "${e.title}" -> "$title"');
+          e.title = title;
+        }
+        if (body != null && body != e.body) {
+          ch.add('body: ${e.body.length} -> ${body.length} chars');
+          e.body = body;
+        }
+        final raw = e.raw;
+        if (location != null || start != null || end != null) {
+          if (raw is! Event) {
+            throw ItemServiceException(
+                'location, start and end apply to events only');
+          }
+          if (location != null && location != raw.location) {
+            ch.add('location: "${raw.location}" -> "$location"');
+            raw.location = location;
+          }
+          if (start != null) {
+            ch.add('start: ${raw.dtstart?.value} -> $start');
+            raw.dtstart = parseWhen(start);
+          }
+          if (end != null) {
+            ch.add('end: ${raw.dtend?.value} -> $end');
+            raw.dtend = parseWhen(end);
+            raw.duration = null;
+          }
+        }
+        return ch;
+      });
+
+  /// Moves an item under [parent] (uid or title), or to the top level when
+  /// [parent] is null. Refuses a move that would make a loop.
+  Future<ItemChange> move(String id, String? parent, {bool dryRun = false}) =>
+      _edit(id, 'move', null, dryRun, (e, all) {
+        final target = parent == null ? null : _find(all, parent);
+        if (!_tree(all).canMove(e.uid, target?.uid)) {
+          throw ItemServiceException(
+              'cannot move "${e.title}" under "${target?.title}"');
+        }
+        if (e.parentUid == target?.uid) return [];
+        final from = e.parentUid;
+        e.parentUid = target?.uid;
+        return ['parent: ${from ?? 'top'} -> ${target?.uid ?? 'top'}'];
+      });
+
+  /// Replaces ([set]), adds to ([add]) or removes from ([remove]) the tags.
+  /// Status tags are managed by [setStatus]; this leaves them alone unless
+  /// named explicitly.
+  Future<ItemChange> setTags(String id,
+          {List<String>? set,
+          List<String> add = const [],
+          List<String> remove = const [],
+          ItemKind? kind,
+          bool dryRun = false}) =>
+      _edit(id, 'tags', kind, dryRun, (e, _) {
+        final before = List.of(e.tags);
+        var t = set == null
+            ? List.of(before)
+            : [
+                ..._cleanTags(set),
+                ...before
+                    .where((x) => x.startsWith('status-') || x == folderTag)
+              ];
+        for (final a in _cleanTags(add)) {
+          if (!t.contains(a)) t.add(a);
+        }
+        t.removeWhere(remove.contains);
+        t = t.toSet().toList();
+        if (_same(t, before)) return [];
+        e.tags = t;
+        return ['tags: ${before.join(',')} -> ${t.join(',')}'];
+      });
+
+  static bool _same(List<String> a, List<String> b) =>
+      a.length == b.length && a.toSet().containsAll(b);
+
+  void _setStatus(_Ref e, String? word, DateTime now) {
+    final w = word?.trim().toLowerCase();
+    switch (e.raw) {
+      case Task t:
+        if (w == null || w.isEmpty) {
+          throw ItemServiceException('a task always has a status');
+        }
+        t.setBoardStatus(w, now);
+      case Note n:
+        final p = PlanItem.fromNote(n);
+        if (w == null || w.isEmpty) {
+          p.clearStatus();
+        } else if (p.statusLine != null) {
+          p.setStatus(w);
+        } else {
+          n.categories
+            ..removeWhere((c) => c.startsWith('status-'))
+            ..add('status-$w');
+        }
+        p.apply();
+      default:
+        final ev = e.raw as Event;
+        ev.categories.removeWhere((c) => c.startsWith('status-'));
+        if (w != null && w.isNotEmpty) ev.categories.add('status-$w');
+    }
+  }
+
+  /// Sets the board status word. Tasks keep STATUS, percent and completion
+  /// in step (via [Task.setBoardStatus]); notes and events use `status-*`
+  /// tags (and the body header of a plan note). A null [status] clears it
+  /// (not for tasks).
+  Future<ItemChange> setStatus(String id, String? status,
+          {ItemKind? kind, bool dryRun = false}) =>
+      _edit(id, 'status', kind, dryRun, (e, _) {
+        final before = e.status;
+        _setStatus(e, status, _now());
+        final after = e.status;
+        return before == after
+            ? []
+            : ['status: ${before ?? '-'} -> ${after ?? '-'}'];
+      });
+
+  /// Sets the due date of a task ([due] null clears it).
+  Future<ItemChange> setDue(String id, String? due, {bool dryRun = false}) =>
+      _edit(id, 'due', ItemKind.task, dryRun, (e, _) {
+        final t = e.raw as Task;
+        final nd = due == null ? null : parseWhen(due);
+        if (nd == t.due) return [];
+        final ch = ['due: ${t.due?.value ?? '-'} -> ${nd?.value ?? '-'}'];
+        t.due = nd;
+        return ch;
+      });
+
+  /// Sets the priority of a task (1 highest .. 9 lowest; null clears it).
+  Future<ItemChange> setPriority(String id, int? priority,
+      {bool dryRun = false}) {
+    if (priority != null && (priority < 0 || priority > 9)) {
+      throw ItemServiceException('priority is 0..9');
+    }
+    return _edit(id, 'priority', ItemKind.task, dryRun, (e, _) {
+      final t = e.raw as Task;
+      if (t.priority == priority) return [];
+      final ch = ['priority: ${t.priority ?? '-'} -> ${priority ?? '-'}'];
+      t.priority = priority;
+      return ch;
+    });
+  }
+
+  /// Deletes an item. With [adoptChildren] (default) its children move up to
+  /// its own parent first, so none are left dangling.
+  Future<ItemChange> delete(String id,
+      {ItemKind? kind, bool adoptChildren = true, bool dryRun = false}) async {
+    final all = await _load();
+    final ref = _find(all, id, kind: kind);
+    final kids = adoptChildren
+        ? all.where((r) => r.parentUid == ref.uid).toList()
+        : <_Ref>[];
+    final changes = [
+      'delete ${ref.kind.name} "${ref.title}"',
+      for (final k in kids) 'move "${k.title}" to ${ref.parentUid ?? 'top'}',
+    ];
+    if (!dryRun) {
+      for (final k in kids) {
+        final edit = k.clone()..parentUid = ref.parentUid;
+        await edit.put(client, k);
+      }
+      await ref.delete(client);
+    }
+    return ItemChange('delete', dryRun, changes, ref.toData());
+  }
+}

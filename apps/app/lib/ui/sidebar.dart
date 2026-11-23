@@ -244,6 +244,19 @@ List<FItemGroup> spaceMenuGroups(
                         currentName: sp.name,
                       );
                     }, key: Key('menu-space-rename-${sp.id}')),
+                    if (sp.onServer)
+                      NoteMenuItem(
+                        'Delete from server…',
+                        FLucideIcons.trash2,
+                        () async {
+                          onPick?.call();
+                          // Opens it first: the dialog acts on the open Space.
+                          if (!await state.switchSpace(sp.id)) return;
+                          if (!context.mounted) return;
+                          showDeleteFromServerDialog(context, state);
+                        },
+                        key: Key('menu-space-server-delete-${sp.id}'),
+                      ),
                   ],
                 ],
                 child: item,
@@ -288,6 +301,18 @@ List<FItemGroup> spaceMenuGroups(
             title: const Text('Delete this space…'),
             onPress: () => manage(() => showDeleteSpaceDialog(context, state)),
           ),
+          if (state.currentOnServer)
+            FItem(
+              key: const Key('space-server-delete'),
+              prefix: Icon(
+                FLucideIcons.cloudOff,
+                size: t.icons.md,
+                color: t.muted,
+              ),
+              title: const Text('Delete from server…'),
+              onPress: () =>
+                  manage(() => showDeleteFromServerDialog(context, state)),
+            ),
         ],
       ],
     ),
