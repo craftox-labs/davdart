@@ -69,7 +69,35 @@ void main() {
     });
     test('write group', () async {
       final c = await connect(env.server({ToolGroup.write}));
-      expect(await toolNames(c), ['create', 'delete', 'move', 'update']);
+      expect(await toolNames(c), ['create', 'move', 'update']);
+    });
+    test('delete group is only delete', () async {
+      final c = await connect(env.server({ToolGroup.delete}));
+      expect(await toolNames(c), ['delete']);
+    });
+    test('read,write cannot delete', () async {
+      final c = await connect(env.server({ToolGroup.read, ToolGroup.write}));
+      expect(await toolNames(c), [
+        'collections',
+        'create',
+        'get',
+        'list',
+        'move',
+        'overview',
+        'update'
+      ]);
+      await expectLater(call(c, 'delete', {'id': 'x'}), throwsA(anything));
+    });
+    test('history tool only with a history log', () async {
+      final f =
+          File('${Directory.systemTemp.createTempSync('h').path}/h.jsonl');
+      final c = await connect(buildMcpServer(
+          items: env.items,
+          groups: {ToolGroup.read},
+          history: HistoryLog(f.path)));
+      expect(await toolNames(c),
+          ['collections', 'get', 'history', 'list', 'overview']);
+      expect(f.existsSync(), isTrue);
     });
     test('admin group needs a backup dir', () {
       expect(() => env.server({ToolGroup.admin}), throwsArgumentError);
@@ -92,6 +120,8 @@ void main() {
     });
     test('group parsing', () {
       expect(ToolGroup.parse('read, write'), {ToolGroup.read, ToolGroup.write});
+      expect(ToolGroup.parse('read,write,delete'),
+          {ToolGroup.read, ToolGroup.write, ToolGroup.delete});
       expect(() => ToolGroup.parse('root'), throwsFormatException);
     });
   });
@@ -116,7 +146,8 @@ void main() {
     });
 
     test('omitted: the configured collection, unchanged', () async {
-      final c = await connect(make({ToolGroup.read, ToolGroup.write}));
+      final c = await connect(
+          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));
       final (e, _) = await call(c, 'create', {'kind': 'note', 'title': 'A'});
       expect(e, isFalse);
       expect(env.fake.ics, hasLength(1));
@@ -126,7 +157,8 @@ void main() {
     });
 
     test('a second collection by name and by href', () async {
-      final c = await connect(make({ToolGroup.read, ToolGroup.write}));
+      final c = await connect(
+          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));
       var (e, r) = await call(
           c, 'create', {'collection': 'Other', 'kind': 'note', 'title': 'B'});
       expect(e, isFalse, reason: '$r');
@@ -155,14 +187,16 @@ void main() {
     });
 
     test('the configured collection by name reaches the same data', () async {
-      final c = await connect(make({ToolGroup.read, ToolGroup.write}));
+      final c = await connect(
+          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));
       await call(c, 'create', {'kind': 'note', 'title': 'A'});
       final (_, l) = await call(c, 'list', {'collection': 'Work'});
       expect(l['items'], hasLength(1));
     });
 
     test('unknown or escaping collections are refused', () async {
-      final c = await connect(make({ToolGroup.read, ToolGroup.write}));
+      final c = await connect(
+          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));
       for (final bad in [
         'Nope',
         'other',
@@ -186,7 +220,8 @@ void main() {
 
     test('a collection that does not hold the kind gives a clear error',
         () async {
-      final c = await connect(make({ToolGroup.read, ToolGroup.write}));
+      final c = await connect(
+          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));
       final (e, m) = await call(c, 'create', {
         'collection': 'Todos',
         'kind': 'event',
@@ -246,6 +281,7 @@ void main() {
     setUp(() async => c = await connect(env.server({
           ToolGroup.read,
           ToolGroup.write,
+          ToolGroup.delete,
         })));
 
     test('create, list, get, update, move, delete', () async {
@@ -362,6 +398,175 @@ void main() {
       expect(d['dryRun'], isTrue);
       expect(d['items'], 1);
       expect(backup.listSync(), isEmpty, reason: 'dry run writes nothing');
+    });
+  });
+
+  group('writer and history', () {
+    late Directory dir;
+    late File file;
+    late McpClient c;
+    Future<McpClient> start({String? defaultWriter, bool del = true}) async {
+      c = await connect(buildMcpServer(
+          items: env.items,
+          collections: env.collections,
+          groups: {ToolGroup.read, ToolGroup.write, if (del) ToolGroup.delete},
+          history: HistoryLog(file.path),
+          defaultWriter: defaultWriter));
+      return c;
+    }
+
+    List<Map<String, dynamic>> lines() => [
+          for (final l in file.readAsLinesSync())
+            if (l.isNotEmpty) jsonDecode(l) as Map<String, dynamic>
+        ];
+
+    setUp(() {
+      dir = Directory.systemTemp.createTempSync('hist');
+      file = File('${dir.path}/h.jsonl');
+    });
+
+    test('writer is stored as X-WRITER, shown by get, kept on update',
+        () async {
+      await start();
+      var (e, r) = await call(c, 'create',
+          {'kind': 'note', 'title': 'A', 'writer': 'bot-a', 'body': 'x'});
+      expect(e, isFalse, reason: '$r');
+      expect(r['item']['writer'], 'bot-a');
+      expect(env.fake.ics.values.single, contains('X-WRITER:bot-a'));
+      // an update without a writer keeps the stamp
+      (e, r) = await call(c, 'update', {'id': 'A', 'body': 'y'});
+      expect(e, isFalse, reason: '$r');
+      expect(env.fake.ics.values.single, contains('X-WRITER:bot-a'));
+      expect((await call(c, 'get', {'id': 'A'})).$2['writer'], 'bot-a');
+      // another writer replaces it, one line only
+      await call(c, 'update', {
+        'id': 'A',
+        'tags_add': ['t'],
+        'writer': 'bot-b'
+      });
+      final ics = env.fake.ics.values.single;
+      expect(RegExp('X-WRITER').allMatches(ics), hasLength(1));
+      expect(ics, contains('X-WRITER:bot-b'));
+      // move and the other kinds take it too
+      await call(
+          c, 'create', {'kind': 'task', 'title': 'T', 'writer': 'bot-t'});
+      await call(c, 'move', {'id': 'T', 'parent': 'A', 'writer': 'bot-m'});
+      expect((await call(c, 'get', {'id': 'T'})).$2['writer'], 'bot-m');
+    });
+
+    test('writer is sanitised and the default writer applies', () async {
+      await start(defaultWriter: 'default-bot');
+      await call(c, 'create', {'kind': 'note', 'title': 'A'});
+      expect(env.fake.ics.values.single, contains('X-WRITER:default-bot'));
+      await call(c, 'update',
+          {'id': 'A', 'body': 'z', 'writer': 'evil\r\nATTENDEE:x;y,z'});
+      final ics = env.fake.ics.values.single;
+      expect(ics, isNot(contains('\nATTENDEE')));
+      expect(ics, contains('X-WRITER:evil__ATTENDEE:x_y_z'));
+    });
+
+    test('history records writes with BEFORE snapshots, not dry runs',
+        () async {
+      await start();
+      await call(c, 'create',
+          {'kind': 'note', 'title': 'A', 'body': 'one', 'writer': 'w1'});
+      await call(c, 'update',
+          {'id': 'A', 'body': 'two', 'writer': 'w2', 'dry_run': true});
+      expect(lines(), hasLength(1));
+      await call(c, 'update', {'id': 'A', 'body': 'two', 'writer': 'w2'});
+      await call(c, 'delete', {'id': 'A', 'writer': 'w3'});
+      final l = lines();
+      expect(l.map((e) => e['tool']), ['create', 'update', 'delete']);
+      expect(l[0]['before'], isNull);
+      expect(l[1]['writer'], 'w2');
+      expect(l[1]['before'].single, contains('DESCRIPTION:one'));
+      expect(l[2]['before'].single, contains('DESCRIPTION:two'));
+      expect(l[2]['before'].single, contains('X-WRITER:w2'));
+      expect(l[2]['uid'], l[0]['uid']);
+      expect(l[0]['collection'], '/dav/c/');
+      expect(
+          l.every((e) => e['time'] is String && e['kind'] == 'note'), isTrue);
+      expect(env.fake.ics, isEmpty);
+    });
+
+    test('delete logs the children it re-parents', () async {
+      await start();
+      await call(c, 'create', {'kind': 'note', 'title': 'F', 'folder': true});
+      await call(c, 'create', {'kind': 'note', 'title': 'K', 'parent': 'F'});
+      final dd = await call(c, 'delete', {'id': 'F'});
+      final d = lines().last;
+      expect(dd.$1, isFalse, reason: '${dd.$2}');
+      expect(d['tool'], 'delete');
+      expect(d['children'], hasLength(1));
+      expect(d['before'], hasLength(2));
+      expect(d['before'][1], contains('SUMMARY:K'));
+    });
+
+    test('history tool: filters, hides bodies unless asked', () async {
+      await start();
+      await call(c, 'create', {'kind': 'note', 'title': 'A', 'writer': 'w'});
+      await call(c, 'create', {'kind': 'note', 'title': 'B'});
+      await call(c, 'update', {'id': 'A', 'body': 'q' * 500});
+      var (e, r) = await call(c, 'history', {});
+      expect(e, isFalse, reason: '$r');
+      expect(r['count'], 3);
+      expect(r['entries'].first['tool'], 'update');
+      expect(r['entries'].first.containsKey('before'), isFalse);
+      expect(r['entries'].first['beforeCount'], 1);
+      expect(r['entries'].first['args']['body'].length, lessThan(250));
+      (e, r) = await call(c, 'history', {'id': 'A', 'limit': 1});
+      expect(r['count'], 1);
+      (e, r) = await call(c, 'history', {'id': 'B'});
+      expect(r['entries'].single['title'], 'B');
+      (e, r) = await call(c, 'history',
+          {'id': 'A', 'include_bodies': true, 'collection': 'Work'});
+      expect(r['entries'].first['before'].single, contains('SUMMARY:A'));
+      (e, r) = await call(c, 'history', {'collection': 'Nope'});
+      expect(e, isTrue);
+    });
+
+    test('never logs secrets; line size is capped', () async {
+      c = await connect(buildMcpServer(
+          items: env.items,
+          groups: {ToolGroup.read, ToolGroup.write},
+          history: HistoryLog(file.path, maxLine: 20000, maxBefore: 50000)));
+      await call(c, 'create', {'kind': 'note', 'title': 'A'});
+      await call(c, 'update', {'id': 'A', 'body': 'b' * 90000});
+      await call(c, 'update', {'id': 'A', 'body': 'c' * 90000});
+      final raw = file.readAsStringSync();
+      for (final l in raw.split('\n')) {
+        expect(l.length, lessThanOrEqualTo(20500));
+      }
+      expect(raw, isNot(contains('p-secret')));
+      expect(lines().last['before'].single.length, lessThan(5100));
+      final log = HistoryLog(file.path);
+      expect(log.cleanArgs({'token': 't', 'Password': 'p', 'title': 'x'}),
+          {'title': 'x'});
+    });
+
+    test('an unwritable history refuses update and delete', () async {
+      await start();
+      await call(c, 'create', {'kind': 'note', 'title': 'A'});
+      file.deleteSync();
+      Directory(file.path).createSync(); // a directory cannot be appended to
+      final (e, m) = await call(c, 'update', {'id': 'A', 'body': 'z'});
+      expect(e, isTrue);
+      expect(m, contains('history log failed'));
+      final (e2, _) = await call(c, 'delete', {'id': 'A'});
+      expect(e2, isTrue);
+      expect(env.fake.ics, hasLength(1));
+      expect(env.fake.ics.values.single, isNot(contains('DESCRIPTION:z')));
+    });
+
+    test('--read-only semantics: read group alone has no write tools',
+        () async {
+      c = await connect(buildMcpServer(
+          items: env.items,
+          groups: {ToolGroup.read},
+          history: HistoryLog(file.path)));
+      for (final t in ['create', 'update', 'move', 'delete']) {
+        await expectLater(call(c, t, {'id': 'x'}), throwsA(anything));
+      }
     });
   });
 

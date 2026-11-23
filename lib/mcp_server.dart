@@ -9,14 +9,22 @@ import 'package:mcp_dart/mcp_dart.dart';
 
 import 'davdart.dart';
 import 'io.dart';
+import 'mcp_history.dart';
+
+export 'mcp_history.dart';
 
 /// Tool groups, selectable at start.
 enum ToolGroup {
   /// overview, list, get and the list action of collections.
   read,
 
-  /// create, update, move, delete.
+  /// create, update, move (and the history tool when a log is configured
+  /// it belongs to read). Cannot delete: that is the delete group.
   write,
+
+  /// delete (one item). Separate from write so a bot can be given edits
+  /// without being able to remove anything.
+  delete,
 
   /// collection create, rename, delete.
   admin;
@@ -28,7 +36,7 @@ enum ToolGroup {
       if (s.isEmpty) continue;
       out.add(ToolGroup.values.firstWhere((g) => g.name == s,
           orElse: () => throw FormatException(
-              'unknown tool group "$s" (expected read, write or admin)')));
+              'unknown tool group "$s" (expected read, write, delete or admin)')));
     }
     if (out.isEmpty) throw const FormatException('--tools is empty');
     return out;
@@ -60,6 +68,8 @@ McpServer buildMcpServer({
   CollectionService? collections,
   Set<ToolGroup> groups = const {ToolGroup.read},
   String? backupDir,
+  HistoryLog? history,
+  String? defaultWriter,
 }) {
   if (groups.contains(ToolGroup.admin) && (backupDir ?? '').isEmpty) {
     throw ArgumentError('the admin group needs a backup directory '
@@ -73,6 +83,7 @@ McpServer buildMcpServer({
   );
   final read = groups.contains(ToolGroup.read);
   final write = groups.contains(ToolGroup.write);
+  final del = groups.contains(ToolGroup.delete);
   final admin = groups.contains(ToolGroup.admin);
 
   void tool(String name, String description, Map<String, JsonSchema> props,
@@ -174,6 +185,104 @@ McpServer buildMcpServer({
   final dryS =
       JsonSchema.boolean(description: 'Preview the change without writing it');
   final tagsS = JsonSchema.array(items: JsonSchema.string());
+  final writerS = JsonSchema.string(
+      description: 'Optional name of who is making this change (a bot or '
+          'person label). Stored as the item\'s X-WRITER property and in the '
+          'history log. Self-declared: not authentication, anyone with the '
+          'token can claim any name; never rely on it for trust.');
+  final fallbackWriter = cleanWriter(defaultWriter);
+  history?.ensureWritable();
+
+  /// Runs a write, adding the writer stamp and the history entry. [id] set:
+  /// the item's BEFORE snapshot (and, for a delete that adopts children,
+  /// theirs) is logged before the write, which is refused if the log cannot
+  /// be written. A create is logged once it has its uid. Dry runs change
+  /// nothing and are not logged.
+  Future<Object?> logged(String tool, _A a, ItemService svc,
+      Future<Object?> Function(String? writer) run,
+      {String? id, ItemKind? kind, bool adopt = false}) async {
+    final writer = cleanWriter(a.string('writer')) ?? fallbackWriter;
+    final dry = a.boolean('dry_run') ?? false;
+    final log = history;
+    if (dry || log == null) return run(writer);
+    final coll = _slash(svc.client.collection.path);
+    Map<String, Object?> base(ItemData? it) => {
+          'tool': tool,
+          'collection': coll,
+          if (it != null) ...{
+            'uid': it.uid,
+            'kind': it.kind.name,
+            'title': it.title,
+            if (it.href != null) 'href': it.href,
+          },
+          if (writer != null) 'writer': writer,
+          'args': log.cleanArgs(a.m),
+        };
+    Future<String> ics(ItemData it) async => utf8
+        .decode(await svc.client.getRawBytes(it.href!), allowMalformed: true);
+    String? entryId;
+    if (id != null) {
+      final item = await svc.get(id, kind: kind);
+      final kids = <ItemData>[];
+      if (adopt) {
+        final page =
+            await svc.list(under: item.uid, includeFolders: true, limit: 500);
+        kids.addAll(page.items.where((i) => i.parentUid == item.uid));
+      }
+      final entry = base(item);
+      try {
+        final before = <String>[await ics(item)];
+        if (kids.isNotEmpty) {
+          entry['children'] = [
+            for (final k in kids) {'uid': k.uid, 'href': k.href}
+          ];
+          for (final k in kids) {
+            before.add(await ics(k));
+          }
+        }
+        entry['before'] = before;
+        entryId = log.append(entry);
+      } catch (e) {
+        throw ItemServiceException(
+            'history log failed ($e); the change was not made');
+      }
+    }
+    final Object? result;
+    try {
+      result = await run(writer);
+    } catch (e) {
+      if (entryId != null) {
+        try {
+          log.append({
+            'tool': tool,
+            'collection': coll,
+            'failed': entryId,
+            'error': '$e'.length > 500 ? '$e'.substring(0, 500) : '$e',
+          });
+        } catch (_) {}
+      }
+      rethrow;
+    }
+    if (entryId == null) {
+      final it = result is Map ? result['item'] : null;
+      final uid = it is Map ? it['uid'] : null;
+      try {
+        log.append({
+          ...base(null),
+          if (it is Map) ...{
+            'uid': uid,
+            'kind': it['kind'],
+            'title': it['title'],
+            if (it['href'] != null) 'href': it['href'],
+          },
+        });
+      } catch (e) {
+        throw ItemServiceException(
+            'the item was created (uid $uid) but the history log failed: $e');
+      }
+    }
+    return result;
+  }
 
   if (read) {
     tool(
@@ -228,6 +337,38 @@ McpServer buildMcpServer({
         (a) async => (await (await svcFor(a, a.kind('kind')))
                 .get(a.req('id'), kind: a.kind('kind')))
             .toJson());
+    final log = history;
+    if (log != null) {
+      tool(
+          'history',
+          'Recent writes made through this server, newest first: time, tool, '
+              'collection, item, writer, arguments. Filter by collection and '
+              'item id (uid, href or exact title). The BEFORE snapshots (ICS '
+              'of the item as it was) are left out unless include_bodies. '
+              'Writer names are self-declared.$_collNote',
+          {
+            'collection': collS,
+            'id': idS,
+            'limit': JsonSchema.integer(
+                minimum: 1, maximum: 200, description: 'Default 20'),
+            'include_bodies': JsonSchema.boolean(
+                description: 'Include BEFORE snapshots and full arguments'),
+          },
+          [],
+          true, (a) async {
+        String? coll;
+        if (a.string('collection') != null &&
+            a.string('collection')!.trim().isNotEmpty) {
+          coll = _slash((await svcFor(a)).client.collection.path);
+        }
+        final entries = log.read(
+            collection: coll,
+            item: a.string('id'),
+            limit: a.integer('limit') ?? 20,
+            bodies: a.boolean('include_bodies') ?? false);
+        return {'count': entries.length, 'entries': entries};
+      });
+    }
   }
 
   if (write) {
@@ -251,24 +392,31 @@ McpServer buildMcpServer({
           'start': JsonSchema.string(),
           'end': JsonSchema.string(),
           'location': JsonSchema.string(),
+          'writer': writerS,
           'dry_run': dryS,
         },
         ['kind', 'title'],
-        false,
-        (a) async => (await (await svcFor(a, a.kind('kind'))).create(
-                a.kind('kind')!, a.req('title'),
-                body: a.string('body') ?? '',
-                tags: a.strings('tags'),
-                status: a.string('status'),
-                parent: a.string('parent'),
-                folder: a.boolean('folder') ?? false,
-                due: a.string('due'),
-                priority: a.integer('priority'),
-                start: a.string('start'),
-                end: a.string('end'),
-                location: a.string('location'),
-                dryRun: a.boolean('dry_run') ?? false))
-            .toJson());
+        false, (a) async {
+      final svc = await svcFor(a, a.kind('kind'));
+      return logged(
+          'create',
+          a,
+          svc,
+          (w) async => (await svc.create(a.kind('kind')!, a.req('title'),
+                  writer: w,
+                  body: a.string('body') ?? '',
+                  tags: a.strings('tags'),
+                  status: a.string('status'),
+                  parent: a.string('parent'),
+                  folder: a.boolean('folder') ?? false,
+                  due: a.string('due'),
+                  priority: a.integer('priority'),
+                  start: a.string('start'),
+                  end: a.string('end'),
+                  location: a.string('location'),
+                  dryRun: a.boolean('dry_run') ?? false))
+              .toJson());
+    });
     tool(
         'update',
         'Change fields of one item; only the fields you pass change. Tags: '
@@ -291,11 +439,15 @@ McpServer buildMcpServer({
           'start': JsonSchema.string(),
           'end': JsonSchema.string(),
           'location': JsonSchema.string(),
+          'writer': writerS,
           'dry_run': dryS,
         },
         ['id'],
-        false,
-        (a) async => _update(await svcFor(a, a.kind('kind')), a));
+        false, (a) async {
+      final svc = await svcFor(a, a.kind('kind'));
+      return logged('update', a, svc, (w) => _update(svc, a, w),
+          id: a.req('id'), kind: a.kind('kind'));
+    });
     tool(
         'move',
         'Move an item under a parent folder or item, or to the top level '
@@ -304,16 +456,26 @@ McpServer buildMcpServer({
           'collection': collS,
           'id': idS,
           'parent': JsonSchema.string(),
+          'writer': writerS,
           'dry_run': dryS,
         },
         ['id'],
         false, (a) async {
       final p = a.string('parent');
-      return (await (await svcFor(a)).move(
-              a.req('id'), p == null || p.toLowerCase() == 'top' ? null : p,
-              dryRun: a.boolean('dry_run') ?? false))
-          .toJson();
+      final svc = await svcFor(a);
+      return logged(
+          'move',
+          a,
+          svc,
+          (w) async => (await svc.move(
+                  a.req('id'), p == null || p.toLowerCase() == 'top' ? null : p,
+                  writer: w, dryRun: a.boolean('dry_run') ?? false))
+              .toJson(),
+          id: a.req('id'));
     });
+  }
+
+  if (del) {
     tool(
         'delete',
         'Delete one item. Children move up to its parent unless '
@@ -323,17 +485,27 @@ McpServer buildMcpServer({
           'id': idS,
           'kind': kindS,
           'adopt_children': JsonSchema.boolean(description: 'Default true'),
+          'writer': writerS,
           'dry_run': dryS,
         },
         ['id'],
-        false,
-        (a) async => (await (await svcFor(a, a.kind('kind'))).delete(
-                a.req('id'),
-                kind: a.kind('kind'),
-                adoptChildren: a.boolean('adopt_children') ?? true,
-                dryRun: a.boolean('dry_run') ?? false))
-            .toJson(),
-        destructive: true);
+        false, (a) async {
+      final svc = await svcFor(a, a.kind('kind'));
+      final adopt = a.boolean('adopt_children') ?? true;
+      return logged(
+          'delete',
+          a,
+          svc,
+          (w) async => (await svc.delete(a.req('id'),
+                  kind: a.kind('kind'),
+                  adoptChildren: adopt,
+                  writer: w,
+                  dryRun: a.boolean('dry_run') ?? false))
+              .toJson(),
+          id: a.req('id'),
+          kind: a.kind('kind'),
+          adopt: adopt);
+    }, destructive: true);
   }
 
   if (read || admin) {
@@ -417,7 +589,7 @@ McpServer buildMcpServer({
 
 /// update = fields, then tags, status, due, priority, in that order, on the
 /// item resolved once up front.
-Future<Object?> _update(ItemService items, _A a) async {
+Future<Object?> _update(ItemService items, _A a, String? writer) async {
   final dry = a.boolean('dry_run') ?? false;
   final item = await items.get(a.req('id'), kind: a.kind('kind'));
   final id = item.uid;
@@ -451,6 +623,7 @@ Future<Object?> _update(ItemService items, _A a) async {
         start: a.string('start'),
         end: a.string('end'),
         location: a.string('location'),
+        writer: writer,
         dryRun: dry));
   }
   if (has('tags_add') || has('tags_remove') || has('tags_set')) {
@@ -459,20 +632,23 @@ Future<Object?> _update(ItemService items, _A a) async {
         set: has('tags_set') ? a.strings('tags_set') : null,
         add: a.strings('tags_add'),
         remove: a.strings('tags_remove'),
+        writer: writer,
         dryRun: dry));
   }
   if (has('status')) {
     final s = a.string('status')!;
     take(await items.setStatus(id, s.isEmpty ? null : s,
-        kind: kind, dryRun: dry));
+        kind: kind, writer: writer, dryRun: dry));
   }
   if (has('due')) {
     final d = a.string('due')!;
-    take(await items.setDue(id, d.isEmpty ? null : d, dryRun: dry));
+    take(await items.setDue(id, d.isEmpty ? null : d,
+        writer: writer, dryRun: dry));
   }
   if (has('priority')) {
     final p = a.integer('priority')!;
-    take(await items.setPriority(id, p < 0 ? null : p, dryRun: dry));
+    take(await items.setPriority(id, p < 0 ? null : p,
+        writer: writer, dryRun: dry));
   }
   return ItemChange('update', dry, changes, last).toJson();
 }

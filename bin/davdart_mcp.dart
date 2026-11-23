@@ -12,8 +12,17 @@ const _usage = '''davdart_mcp: MCP server over davdart notes, tasks and events.
   --bind ADDR                  HTTP bind address (default 127.0.0.1)
   --token-env VAR              HTTP: env var holding the bearer token (required)
   --allow-host NAME            HTTP: extra Host header to accept (repeatable)
-  --tools read,write,admin     tool groups to expose (default: read)
-  --read-only                  same as --tools read
+  --tools read,write,delete,admin
+                               tool groups to expose (default: read).
+                               write = create, update, move (no delete);
+                               delete = delete one item; admin = collection
+                               create, rename, delete
+  --read-only                  same as --tools read (refuses every other group)
+  --history-file PATH          append every write to this JSONL file (mode 600),
+                               with a BEFORE snapshot of the item; adds the
+                               read tool "history". Default: no log
+  --default-writer NAME        writer label for writes that pass none (stored as
+                               X-WRITER; self-declared, not authentication)
   --backup-dir DIR             admin: where collection delete writes backups
   -h, --help
 
@@ -31,6 +40,8 @@ Future<void> main(List<String> args) async {
   var bind = '127.0.0.1';
   String? tokenEnv;
   String? backupDir;
+  String? historyFile;
+  String? defaultWriter;
   var readOnly = false;
   Set<ToolGroup>? groups;
   final hosts = <String>{};
@@ -55,6 +66,10 @@ Future<void> main(List<String> args) async {
         hosts.add(val(++i));
       case '--backup-dir':
         backupDir = val(++i);
+      case '--history-file':
+        historyFile = val(++i);
+      case '--default-writer':
+        defaultWriter = val(++i);
       case '--read-only':
         readOnly = true;
       case '--tools':
@@ -96,7 +111,9 @@ Future<void> main(List<String> args) async {
       items: svc.items,
       collections: svc.collections,
       groups: enabled,
-      backupDir: backupDir);
+      backupDir: backupDir,
+      history: historyFile == null ? null : HistoryLog(historyFile),
+      defaultWriter: defaultWriter);
 
   final names = (enabled.map((g) => g.name).toList()..sort()).join(',');
   if (stdio) {

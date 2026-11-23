@@ -81,3 +81,17 @@ due, priority, start, end, body). Lists leave out bodies.
 
 `board`, `show`, `add`, `new`, `set-status`, `append`, `task`, `folder`, `export`, `rm` still
 work with their old output. Prefer the generic commands above.
+
+## MCP server (`davdart_mcp`)
+
+Tool groups (`--tools`, default `read`): `read` (overview, list, get, collections list, and `history`
+when a log is set), `write` (create, update, move), `delete` (delete one item, separate on purpose:
+`write` cannot delete), `admin` (collection create, rename, delete). `--read-only` is the same as
+`--tools read` and conflicts with any other group.
+
+Every write tool takes an optional `writer` label (and the server has `--default-writer NAME`). It is
+stored as the item's `X-WRITER` property, kept through later updates and shown by `get`. It is
+self-declared, not authentication. `--history-file PATH` appends one JSONL entry per real write
+(not dry runs): time, tool, collection, item, writer, arguments and a BEFORE snapshot of the item as
+ICS. If the log cannot be written, update, move and delete are refused. The `history` tool returns
+entries newest first without the snapshots unless `include_bodies`.

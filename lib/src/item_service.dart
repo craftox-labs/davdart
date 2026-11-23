@@ -53,6 +53,7 @@ class ItemData {
     this.priority,
     this.created,
     this.modified,
+    this.writer,
   });
 
   final ItemKind kind;
@@ -75,6 +76,10 @@ class ItemData {
   final DateTime? created;
   final DateTime? modified;
 
+  /// Self-declared name of whoever wrote the item last (its `X-WRITER`
+  /// property). Not authentication.
+  final String? writer;
+
   /// [full] false leaves out the body, for lists.
   Map<String, Object?> toJson({bool full = true}) => {
         'kind': kind.name,
@@ -94,6 +99,7 @@ class ItemData {
         if (priority != null) 'priority': priority,
         if (created != null) 'created': created!.toIso8601String(),
         if (modified != null) 'modified': modified!.toIso8601String(),
+        if (writer != null) 'writer': writer,
       };
 }
 
@@ -170,6 +176,17 @@ class ItemChange {
         'changes': changes,
         'item': item.toJson(),
       };
+}
+
+final _writerLine = RegExp(r'^X-WRITER:(.*)$', caseSensitive: false);
+
+/// A writer label made safe for an iCalendar line: letters, digits and
+/// `._@:/ -` only, at most 64 characters; null when nothing is left.
+String? cleanWriter(String? name) {
+  if (name == null) return null;
+  var w = name.replaceAll(RegExp(r'[^A-Za-z0-9._@:/ -]'), '_').trim();
+  if (w.length > 64) w = w.substring(0, 64);
+  return w.isEmpty ? null : w;
 }
 
 // ---- internal: one wrapper over the three resource types ----
@@ -251,6 +268,36 @@ class _Ref {
         _ => null,
       };
 
+  List<String> get _extra => switch (raw) {
+        Note n => n.extraLines,
+        Task t => t.extraLines,
+        Event e => e.extraLines,
+        _ => <String>[],
+      };
+
+  /// The `X-WRITER` value, or null.
+  String? get writer {
+    for (final l in _extra) {
+      final m = _writerLine.firstMatch(l);
+      if (m != null) return m.group(1);
+    }
+    return null;
+  }
+
+  /// Stamps [name] as the writer (replacing an earlier stamp). A null or
+  /// empty name leaves the item untouched, so an existing stamp is kept.
+  void stampWriter(String? name) {
+    final w = cleanWriter(name);
+    if (w == null) return;
+    final extra = _extra;
+    final at = extra.indexWhere(_writerLine.hasMatch);
+    if (at >= 0) {
+      extra[at] = 'X-WRITER:$w';
+    } else {
+      extra.add('X-WRITER:$w');
+    }
+  }
+
   _Ref clone() => _Ref(switch (raw) {
         Note n => n.copyWith(),
         Task t => t.copyWith(),
@@ -291,10 +338,37 @@ class _Ref {
         location: d.location,
         priority: d.priority,
         created: d.created,
-        modified: d.modified);
+        modified: d.modified,
+        writer: d.writer);
   }
 
-  ItemData _toData() {
+  ItemData _toData() => _withWriter(_toData0());
+
+  ItemData _withWriter(ItemData d) {
+    final w = writer;
+    if (w == null) return d;
+    return ItemData(
+        kind: d.kind,
+        uid: d.uid,
+        title: d.title,
+        href: d.href,
+        etag: d.etag,
+        body: d.body,
+        tags: d.tags,
+        status: d.status,
+        parentUid: d.parentUid,
+        isFolder: d.isFolder,
+        due: d.due,
+        start: d.start,
+        end: d.end,
+        location: d.location,
+        priority: d.priority,
+        created: d.created,
+        modified: d.modified,
+        writer: w);
+  }
+
+  ItemData _toData0() {
     switch (raw) {
       case Note n:
         return ItemData(
@@ -568,6 +642,7 @@ class ItemService {
     String? start,
     String? end,
     String? location,
+    String? writer,
     bool dryRun = false,
   }) async {
     if (title.trim().isEmpty) throw ItemServiceException('title is empty');
@@ -630,6 +705,7 @@ class ItemService {
         ref = _Ref(e);
         if (status != null) _setStatus(ref, status, now);
     }
+    ref.stampWriter(writer);
     final desc = ['create ${folder ? 'folder' : kind.name} "$title"'];
     if (dryRun) return ItemChange('create', true, desc, ref.toData());
     return ItemChange('create', false, desc,
@@ -641,12 +717,14 @@ class ItemService {
     String action,
     ItemKind? kind,
     bool dryRun,
-    List<String> Function(_Ref edit, List<_Ref> all) apply,
-  ) async {
+    List<String> Function(_Ref edit, List<_Ref> all) apply, [
+    String? writer,
+  ]) async {
     final all = await _load(kind);
     final base = _find(all, id, kind: kind);
     final edit = base.clone();
     final changes = apply(edit, all);
+    edit.stampWriter(writer);
     if (changes.isEmpty || dryRun) {
       return ItemChange(action, dryRun, changes, edit.toData());
     }
@@ -664,6 +742,7 @@ class ItemService {
     String? location,
     String? start,
     String? end,
+    String? writer,
     bool dryRun = false,
   }) =>
       _edit(id, 'update', kind, dryRun, (e, _) {
@@ -697,11 +776,12 @@ class ItemService {
           }
         }
         return ch;
-      });
+      }, writer);
 
   /// Moves an item under [parent] (uid or title), or to the top level when
   /// [parent] is null. Refuses a move that would make a loop.
-  Future<ItemChange> move(String id, String? parent, {bool dryRun = false}) =>
+  Future<ItemChange> move(String id, String? parent,
+          {String? writer, bool dryRun = false}) =>
       _edit(id, 'move', null, dryRun, (e, all) {
         final target = parent == null ? null : _find(all, parent);
         if (!_tree(all).canMove(e.uid, target?.uid)) {
@@ -712,7 +792,7 @@ class ItemService {
         final from = e.parentUid;
         e.parentUid = target?.uid;
         return ['parent: ${from ?? 'top'} -> ${target?.uid ?? 'top'}'];
-      });
+      }, writer);
 
   /// Replaces ([set]), adds to ([add]) or removes from ([remove]) the tags.
   /// Status tags are managed by [setStatus]; this leaves them alone unless
@@ -722,6 +802,7 @@ class ItemService {
           List<String> add = const [],
           List<String> remove = const [],
           ItemKind? kind,
+          String? writer,
           bool dryRun = false}) =>
       _edit(id, 'tags', kind, dryRun, (e, _) {
         final before = List.of(e.tags);
@@ -740,7 +821,7 @@ class ItemService {
         if (_same(t, before)) return [];
         e.tags = t;
         return ['tags: ${before.join(',')} -> ${t.join(',')}'];
-      });
+      }, writer);
 
   static bool _same(List<String> a, List<String> b) =>
       a.length == b.length && a.toSet().containsAll(b);
@@ -777,7 +858,7 @@ class ItemService {
   /// tags (and the body header of a plan note). A null [status] clears it
   /// (not for tasks).
   Future<ItemChange> setStatus(String id, String? status,
-          {ItemKind? kind, bool dryRun = false}) =>
+          {ItemKind? kind, String? writer, bool dryRun = false}) =>
       _edit(id, 'status', kind, dryRun, (e, _) {
         final before = e.status;
         _setStatus(e, status, _now());
@@ -785,10 +866,11 @@ class ItemService {
         return before == after
             ? []
             : ['status: ${before ?? '-'} -> ${after ?? '-'}'];
-      });
+      }, writer);
 
   /// Sets the due date of a task ([due] null clears it).
-  Future<ItemChange> setDue(String id, String? due, {bool dryRun = false}) =>
+  Future<ItemChange> setDue(String id, String? due,
+          {String? writer, bool dryRun = false}) =>
       _edit(id, 'due', ItemKind.task, dryRun, (e, _) {
         final t = e.raw as Task;
         final nd = due == null ? null : parseWhen(due);
@@ -796,11 +878,11 @@ class ItemService {
         final ch = ['due: ${t.due?.value ?? '-'} -> ${nd?.value ?? '-'}'];
         t.due = nd;
         return ch;
-      });
+      }, writer);
 
   /// Sets the priority of a task (1 highest .. 9 lowest; null clears it).
   Future<ItemChange> setPriority(String id, int? priority,
-      {bool dryRun = false}) {
+      {String? writer, bool dryRun = false}) {
     if (priority != null && (priority < 0 || priority > 9)) {
       throw ItemServiceException('priority is 0..9');
     }
@@ -810,13 +892,16 @@ class ItemService {
       final ch = ['priority: ${t.priority ?? '-'} -> ${priority ?? '-'}'];
       t.priority = priority;
       return ch;
-    });
+    }, writer);
   }
 
   /// Deletes an item. With [adoptChildren] (default) its children move up to
   /// its own parent first, so none are left dangling.
   Future<ItemChange> delete(String id,
-      {ItemKind? kind, bool adoptChildren = true, bool dryRun = false}) async {
+      {ItemKind? kind,
+      bool adoptChildren = true,
+      String? writer,
+      bool dryRun = false}) async {
     final all = await _load();
     final ref = _find(all, id, kind: kind);
     final kids = adoptChildren
@@ -829,6 +914,7 @@ class ItemService {
     if (!dryRun) {
       for (final k in kids) {
         final edit = k.clone()..parentUid = ref.parentUid;
+        edit.stampWriter(writer);
         await edit.put(client, k);
       }
       await ref.delete(client);

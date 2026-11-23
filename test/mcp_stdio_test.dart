@@ -70,6 +70,15 @@ void main() {
     expect(page['total'], 1);
   }, timeout: const Timeout(Duration(seconds: 90)));
 
+  test('read,write does not serve delete; delete group does', () async {
+    var c = await spawn(['--tools', 'read,write']);
+    final names = (await c.listTools()).tools.map((t) => t.name).toSet();
+    expect(names, containsAll(['create', 'update', 'move']));
+    expect(names, isNot(contains('delete')));
+    c = await spawn(['--tools', 'read,write,delete']);
+    expect((await c.listTools()).tools.map((t) => t.name), contains('delete'));
+  }, timeout: const Timeout(Duration(seconds: 120)));
+
   test('admin without --backup-dir refuses to start', () async {
     final r = await Process.run(Platform.resolvedExecutable, [
       'run',
