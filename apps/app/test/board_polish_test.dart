@@ -333,36 +333,7 @@ void main() {
     });
   });
 
-  group('home tag filter and column toggle', () {
-    testWidgets('tag filter narrows cards, clears, and is saved per Space', (
-      t,
-    ) async {
-      final prefs = MemoryStorage();
-      final s = await pumpTasksApp(
-        t,
-        prefs: prefs,
-        tasks: [
-          mkTask('a', tags: ['red']),
-          mkTask('b', tags: ['blue']),
-        ],
-      );
-      await t.tap(_k('home-focus-tasks'));
-      await t.pumpAndSettle();
-      expect(_k('task-card-a'), findsOneWidget);
-      expect(_k('task-card-b'), findsOneWidget);
-      await t.tap(_k('home-tag-filter'));
-      await t.pumpAndSettle();
-      await t.tap(_k('home-tag-red'));
-      await t.pumpAndSettle();
-      expect(_k('task-card-a'), findsOneWidget);
-      expect(_k('task-card-b'), findsNothing);
-      expect(s.homeTag(HomeFocus.tasks), 'red');
-      await t.tap(_k('home-tag-clear'));
-      await t.pumpAndSettle();
-      expect(_k('task-card-b'), findsOneWidget);
-      expect(s.homeTag(HomeFocus.tasks), isNull);
-    });
-
+  group('home column toggle', () {
     testWidgets('hidden columns are saved and the last one stays', (t) async {
       final prefs = MemoryStorage();
       final s = await pumpTasksApp(t, prefs: prefs, tasks: [mkTask('a')]);
@@ -385,7 +356,7 @@ void main() {
       expect(s.taskColumns().map((c) => c.$1), ['doing', 'done']);
     });
 
-    testWidgets('note board filters by tag and hides columns', (t) async {
+    testWidgets('note board hides columns', (t) async {
       final s = await pumpTasksApp(
         t,
         notes: [
@@ -404,9 +375,6 @@ void main() {
       await t.tap(_k('home-focus-board'));
       await t.pumpAndSettle();
       expect([for (final c in s.homeColumns()) c.$1], ['todo', 'doing']);
-      s.setHomeTag(HomeFocus.board, 'red');
-      expect(s.homeColumns().expand((c) => c.$2).map((n) => n.uid), ['n1']);
-      s.setHomeTag(HomeFocus.board, null);
       s.toggleHomeCol(HomeFocus.board, 'todo');
       expect([for (final c in s.homeColumns()) c.$1], ['doing']);
     });
@@ -426,7 +394,7 @@ void main() {
       expect(s.taskColumns().length, 1);
     });
 
-    testWidgets('tag and hidden columns survive a rebuilt state', (t) async {
+    testWidgets('hidden columns survive a rebuilt state', (t) async {
       final prefs = MemoryStorage();
       final s = await pumpTasksApp(
         t,
@@ -435,7 +403,6 @@ void main() {
           mkTask('a', tags: ['red']),
         ],
       );
-      s.setHomeTag(HomeFocus.tasks, 'red');
       s.toggleHomeCol(HomeFocus.tasks, 'doing');
       final s2 = await pumpTasksApp(
         t,
@@ -444,27 +411,30 @@ void main() {
           mkTask('a', tags: ['red']),
         ],
       );
-      expect(s2.homeTag(HomeFocus.tasks), 'red');
       expect(s2.homeHiddenCols(HomeFocus.tasks), {'doing'});
-      expect(s2.homeTag(HomeFocus.board), isNull);
     });
 
-    testWidgets('bar wraps at phone width without overflow', (t) async {
-      await pumpTasksApp(
-        t,
-        size: const Size(320, 800),
-        tasks: [
-          mkTask('a', tags: ['a-very-long-tag-name-indeed-yes']),
-        ],
-      );
+    testWidgets('toggle is a header icon: wide only, badge when hidden', (
+      t,
+    ) async {
+      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
       await t.tap(_k('home-focus-tasks'));
       await t.pumpAndSettle();
-      await t.tap(_k('home-tag-filter'));
+      expect(_k('home-cols'), findsOneWidget);
+      expect(_k('home-cols-badge'), findsNothing);
+      s.toggleHomeCol(HomeFocus.tasks, 'doing');
       await t.pumpAndSettle();
-      await t.tap(_k('home-tag-a-very-long-tag-name-indeed-yes'));
+      expect(_k('home-cols-badge'), findsOneWidget);
+      await t.tap(_k('home-focus-day'));
       await t.pumpAndSettle();
-      expect(t.takeException(), isNull);
-      expect(_k('home-tag-clear'), findsOneWidget);
+      expect(_k('home-cols'), findsNothing);
+    });
+
+    testWidgets('phone layout has no toggle', (t) async {
+      await pumpTasksApp(t, size: const Size(320, 800), tasks: [mkTask('a')]);
+      await t.tap(_k('home-focus-tasks'));
+      await t.pumpAndSettle();
+      expect(_k('home-cols'), findsNothing);
     });
 
     testWidgets('absent hidden column is unchecked and counted hidden', (
@@ -474,7 +444,10 @@ void main() {
       s.toggleHomeCol(HomeFocus.tasks, 'blocked');
       await t.tap(_k('home-focus-tasks'));
       await t.pumpAndSettle();
-      expect(find.text('Columns (3/4)'), findsOneWidget);
+      expect(
+        find.descendant(of: _k('home-cols-badge'), matching: find.text('1')),
+        findsOneWidget,
+      );
       await t.tap(_k('home-cols'));
       await t.pumpAndSettle();
       expect(

@@ -16,7 +16,7 @@ import 'board_view.dart';
 import 'command_palette.dart';
 import 'key_nav_ui.dart';
 import '../state/key_nav.dart';
-import 'home_board_bar.dart';
+import 'home_columns_toggle.dart';
 import 'home_day.dart';
 import 'task_board.dart';
 import 'detail_header.dart';
@@ -363,8 +363,6 @@ class _ShellState extends State<Shell>
               ScopeText(state: state),
               if (state.activeTab == null) ...[
                 HomeSwitch(state: state),
-                if (state.homeFocus != HomeFocus.day)
-                  HomeBoardBar(state: state, focus: state.homeFocus),
                 if (state.homeFocus == HomeFocus.day)
                   Expanded(child: HomeDayFocus(state: state))
                 else if (state.homeFocus == HomeFocus.tasks)
@@ -903,6 +901,11 @@ class TopBar extends StatelessWidget {
               child: const FCircularProgress(),
             ),
           ),
+        if (home &&
+            !showMenu &&
+            state.activeTab == null &&
+            state.homeFocus != HomeFocus.day)
+          HomeColumnsToggle(state: state, focus: state.homeFocus),
         if (home) ScopeActions(state: state, overflow: narrow),
         if (state.activeTab == null || (showMenu && state.mainIsPage))
           const SizedBox.shrink()

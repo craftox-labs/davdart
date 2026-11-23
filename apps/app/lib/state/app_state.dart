@@ -693,7 +693,6 @@ class AppState extends ChangeNotifier {
     prefs?.remove('davdart.folders.collapsed.v1.$id');
     prefs?.remove('davdart.tags.open.v1.$id');
     for (final f in HomeFocus.values) {
-      prefs?.remove('davdart.home.tag.v1.${f.name}.$id');
       prefs?.remove('davdart.home.hidden.v1.${f.name}.$id');
     }
     c.remove(id);
@@ -3318,27 +3317,8 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _homeTagKey(HomeFocus f) => 'davdart.home.tag.v1.${f.name}.$_spaceKey';
   String _homeHiddenKey(HomeFocus f) =>
       'davdart.home.hidden.v1.${f.name}.$_spaceKey';
-
-  /// The tag the Home Board or Tasks view is filtered to (per Space, saved).
-  String? homeTag(HomeFocus f) {
-    final v = prefs?.read(_homeTagKey(f));
-    return v == null || v.isEmpty ? null : v;
-  }
-
-  /// Sets the Home tag filter of [f]; null or the current tag clears it.
-  void setHomeTag(HomeFocus f, String? tag) {
-    if (tag == null || tag == homeTag(f)) {
-      prefs?.remove(_homeTagKey(f));
-    } else {
-      prefs?.write(_homeTagKey(f), tag);
-    }
-    nav.boardOpen.remove('done#all');
-    nav.taskBoardOpen.remove('done#all');
-    notifyListeners();
-  }
 
   /// Status columns hidden on the Home Board or Tasks view (per Space, saved).
   Set<String> homeHiddenCols(HomeFocus f) => {
@@ -3532,16 +3512,10 @@ class AppState extends ChangeNotifier {
 
   /// Task board columns: todo, doing and done always, then backlog and
   /// blocked when in use. Cancelled tasks sit in done (the card is dimmed). Follows
-  /// the Home tag and the Tasks view's folder filter, not its Open/Completed toggle.
+  /// the Tasks view's tag and folder filters, not its Open/Completed toggle.
   List<(String, List<Task>)> taskColumns({bool all = false}) {
     final by = <String, List<Task>>{'todo': [], 'doing': [], 'done': []};
-    final tag = homeTag(HomeFocus.tasks);
-    // The Home tag replaces the Tasks view's tag filter here (one filter).
-    for (final t in tasks) {
-      if (tag != null && !t.categories.contains(tag)) continue;
-      if (taskFolderFilter != null && !taskIsUnder(t, taskFolderFilter!)) {
-        continue;
-      }
+    for (final t in filteredTasks) {
       final s = t.boardStatus;
       (by[s == 'cancelled' ? 'done' : s] ??= []).add(t);
     }
@@ -3557,20 +3531,9 @@ class AppState extends ChangeNotifier {
     return all ? cols : _visibleCols(HomeFocus.tasks, cols);
   }
 
-  /// Home board columns (notes with a status): the Home tag filter and the
-  /// hidden columns applied; [all] keeps the hidden ones (the toggle's list).
+  /// Home board columns (notes with a status): the hidden columns applied; [all] keeps the hidden ones (the toggle's list).
   List<(String, List<Note>)> homeColumns({bool all = false}) {
-    final tag = homeTag(HomeFocus.board);
-    final cols = [
-      for (final (k, notes) in columns(includeNoStatus: false))
-        (
-          k,
-          [
-            for (final n in notes)
-              if (tag == null || n.categories.contains(tag)) n,
-          ],
-        ),
-    ];
+    final cols = columns(includeNoStatus: false);
     return all ? cols : _visibleCols(HomeFocus.board, cols);
   }
 
