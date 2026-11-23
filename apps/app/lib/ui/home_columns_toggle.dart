@@ -63,11 +63,7 @@ class HomeColumnsToggle extends StatelessWidget {
                   ),
                   child: Text(
                     '${hidden.length}',
-                    style: TextStyle(
-                      fontSize: 10,
-                      height: 1.3,
-                      color: t.onAccent,
-                    ),
+                    style: t.type.captionStyle.copyWith(color: t.onAccent),
                   ),
                 ),
               ),
