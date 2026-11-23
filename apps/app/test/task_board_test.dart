@@ -1,4 +1,5 @@
 import 'package:davdart/davdart.dart';
+import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/board_view.dart';
 import 'package:davdart_app/ui/task_board.dart';
 import 'package:flutter/widgets.dart';
@@ -63,7 +64,7 @@ void main() {
           mkTask('b', summary: 'Plain'),
         ],
       );
-      state.setTaskTagFilter('bug');
+      state.setHomeTag(HomeFocus.tasks, 'bug');
       final cols = state.taskColumns();
       expect([for (final c in cols) c.$1], ['todo', 'doing', 'done']);
       expect([for (final x in cols[0].$2) x.summary], ['Tagged']);

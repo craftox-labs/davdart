@@ -19,43 +19,44 @@ class HomeBoardBar extends StatelessWidget {
     final tasks = focus == HomeFocus.tasks;
     final tag = state.homeTag(focus);
     final tags = tasks ? state.taskTags : state.tags;
-    final cols = [
-      for (final c
-          in tasks
-              ? state.taskColumns(all: true)
-              : state.homeColumns(all: true))
-        c.$1,
-    ];
-    final hidden = state.homeHiddenCols(focus);
+    final (cols, hidden) = state.homeColumnChoices(focus);
     if (tags.isEmpty && tag == null && cols.length < 2) {
       return const SizedBox.shrink();
     }
     Widget menu({
       required String key,
       required String label,
-      required List<FItem> items,
+      required List<FItem> Function(VoidCallback close) items,
     }) => FPopoverMenu(
       menuAnchor: Alignment.topLeft,
       childAnchor: Alignment.bottomLeft,
-      menuBuilder: (ctx, controller, _) => [FItemGroup(children: items)],
+      menuBuilder: (ctx, controller, _) => [
+        FItemGroup(children: items(controller.hide)),
+      ],
       builder: (ctx, controller, _) => FButton(
         key: Key(key),
         variant: FButtonVariant.outline,
         size: FButtonSizeVariant.sm,
         onPress: controller.toggle,
-        child: Text(label),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 160),
+          child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
       ),
     );
     return ContentCap(
       child: Padding(
         padding: EdgeInsets.fromLTRB(t.space.lg, t.space.md, t.space.lg, 0),
-        child: Row(
+        child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: t.space.md,
+          runSpacing: t.space.sm,
           children: [
             if (tags.isNotEmpty || tag != null) ...[
               menu(
                 key: 'home-tag-filter',
                 label: tag == null ? 'Tag' : 'Tag: $tag',
-                items: [
+                items: (close) => [
                   for (final g in {...tags, ?tag})
                     FItem(
                       key: Key('home-tag-$g'),
@@ -63,7 +64,10 @@ class HomeBoardBar extends StatelessWidget {
                       suffix: g == tag
                           ? Icon(FLucideIcons.check, size: t.icons.md)
                           : null,
-                      onPress: () => state.setHomeTag(focus, g),
+                      onPress: () {
+                        close();
+                        state.setHomeTag(focus, g);
+                      },
                     ),
                 ],
               ),
@@ -75,7 +79,6 @@ class HomeBoardBar extends StatelessWidget {
                   tooltip: 'Clear tag filter',
                   onPress: () => state.setHomeTag(focus, null),
                 ),
-              SizedBox(width: t.space.md),
             ],
             if (cols.length > 1)
               menu(
@@ -83,7 +86,7 @@ class HomeBoardBar extends StatelessWidget {
                 label: hidden.isEmpty
                     ? 'Columns'
                     : 'Columns (${cols.length - hidden.length}/${cols.length})',
-                items: [
+                items: (_) => [
                   for (final c in cols)
                     FItem(
                       key: Key('home-col-$c'),

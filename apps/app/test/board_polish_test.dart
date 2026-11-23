@@ -410,5 +410,61 @@ void main() {
       s.toggleHomeCol(HomeFocus.board, 'todo');
       expect([for (final c in s.homeColumns()) c.$1], ['doing']);
     });
+
+    testWidgets('absent hidden column stays listed; counts match the board', (
+      t,
+    ) async {
+      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      s.toggleHomeCol(HomeFocus.tasks, 'blocked'); // absent: still saved
+      final (names, hidden) = s.homeColumnChoices(HomeFocus.tasks);
+      expect(names, ['todo', 'doing', 'done', 'blocked']);
+      expect(hidden, isEmpty);
+      for (final c in ['todo', 'doing', 'done']) {
+        s.toggleHomeCol(HomeFocus.tasks, c);
+      }
+      expect(s.homeColumnChoices(HomeFocus.tasks).$2, {'todo', 'doing'});
+      expect(s.taskColumns().length, 1);
+    });
+
+    testWidgets('tag and hidden columns survive a rebuilt state', (t) async {
+      final prefs = MemoryStorage();
+      final s = await pumpTasksApp(
+        t,
+        prefs: prefs,
+        tasks: [
+          mkTask('a', tags: ['red']),
+        ],
+      );
+      s.setHomeTag(HomeFocus.tasks, 'red');
+      s.toggleHomeCol(HomeFocus.tasks, 'doing');
+      final s2 = await pumpTasksApp(
+        t,
+        prefs: prefs,
+        tasks: [
+          mkTask('a', tags: ['red']),
+        ],
+      );
+      expect(s2.homeTag(HomeFocus.tasks), 'red');
+      expect(s2.homeHiddenCols(HomeFocus.tasks), {'doing'});
+      expect(s2.homeTag(HomeFocus.board), isNull);
+    });
+
+    testWidgets('bar wraps at phone width without overflow', (t) async {
+      await pumpTasksApp(
+        t,
+        size: const Size(320, 800),
+        tasks: [
+          mkTask('a', tags: ['a-very-long-tag-name-indeed-yes']),
+        ],
+      );
+      await t.tap(_k('home-focus-tasks'));
+      await t.pumpAndSettle();
+      await t.tap(_k('home-tag-filter'));
+      await t.pumpAndSettle();
+      await t.tap(_k('home-tag-a-very-long-tag-name-indeed-yes'));
+      await t.pumpAndSettle();
+      expect(t.takeException(), isNull);
+      expect(_k('home-tag-clear'), findsOneWidget);
+    });
   });
 }
