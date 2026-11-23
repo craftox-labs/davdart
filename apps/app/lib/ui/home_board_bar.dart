@@ -19,7 +19,7 @@ class HomeBoardBar extends StatelessWidget {
     final tasks = focus == HomeFocus.tasks;
     final tag = state.homeTag(focus);
     final tags = tasks ? state.taskTags : state.tags;
-    final (cols, hidden) = state.homeColumnChoices(focus);
+    final (cols, _, hidden) = state.homeColumnChoices(focus);
     if (tags.isEmpty && tag == null && cols.length < 2) {
       return const SizedBox.shrink();
     }

@@ -3348,8 +3348,9 @@ class AppState extends ChangeNotifier {
   /// The Columns menu of [f]: every column now present, then saved hidden
   /// names that are absent (so they can be shown again), and which of them
   /// are hidden. Hidden is empty when everything would be (the board then
-  /// shows all).
-  (List<String>, Set<String>) homeColumnChoices(HomeFocus f) {
+  /// shows all). The third set is every name shown unchecked: those hidden
+  /// on the board plus absent saved ones (for the check marks and label).
+  (List<String>, Set<String>, Set<String>) homeColumnChoices(HomeFocus f) {
     final present = [
       for (final c
           in f == HomeFocus.tasks
@@ -3363,14 +3364,19 @@ class AppState extends ChangeNotifier {
       ...(saved.where((c) => !present.contains(c)).toList()..sort()),
     ];
     final hidden = saved.intersection(present.toSet());
-    return (names, hidden.length >= present.length ? <String>{} : hidden);
+    final effective = hidden.length >= present.length ? <String>{} : hidden;
+    return (
+      names,
+      effective,
+      {...effective, ...saved.where((c) => !present.contains(c))},
+    );
   }
 
   /// Shows or hides a column; the last visible column cannot be hidden.
   void toggleHomeCol(HomeFocus f, String name) {
     final saved = homeHiddenCols(f);
     if (!saved.remove(name)) {
-      final (names, hidden) = homeColumnChoices(f);
+      final (names, hidden, _) = homeColumnChoices(f);
       final present = [
         for (final c
             in f == HomeFocus.tasks

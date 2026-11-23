@@ -416,7 +416,7 @@ void main() {
     ) async {
       final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
       s.toggleHomeCol(HomeFocus.tasks, 'blocked'); // absent: still saved
-      final (names, hidden) = s.homeColumnChoices(HomeFocus.tasks);
+      final (names, hidden, _) = s.homeColumnChoices(HomeFocus.tasks);
       expect(names, ['todo', 'doing', 'done', 'blocked']);
       expect(hidden, isEmpty);
       for (final c in ['todo', 'doing', 'done']) {
@@ -465,6 +465,32 @@ void main() {
       await t.pumpAndSettle();
       expect(t.takeException(), isNull);
       expect(_k('home-tag-clear'), findsOneWidget);
+    });
+
+    testWidgets('absent hidden column is unchecked and counted hidden', (
+      t,
+    ) async {
+      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      s.toggleHomeCol(HomeFocus.tasks, 'blocked');
+      await t.tap(_k('home-focus-tasks'));
+      await t.pumpAndSettle();
+      expect(find.text('Columns (3/4)'), findsOneWidget);
+      await t.tap(_k('home-cols'));
+      await t.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: _k('home-col-blocked'),
+          matching: find.byIcon(FLucideIcons.check),
+        ),
+        findsNothing,
+      );
+      expect(
+        find.descendant(
+          of: _k('home-col-todo'),
+          matching: find.byIcon(FLucideIcons.check),
+        ),
+        findsOneWidget,
+      );
     });
   });
 }
