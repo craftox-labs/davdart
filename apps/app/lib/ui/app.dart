@@ -16,6 +16,7 @@ import 'board_view.dart';
 import 'command_palette.dart';
 import 'key_nav_ui.dart';
 import '../state/key_nav.dart';
+import 'home_board_bar.dart';
 import 'home_day.dart';
 import 'task_board.dart';
 import 'detail_header.dart';
@@ -362,6 +363,8 @@ class _ShellState extends State<Shell>
               ScopeText(state: state),
               if (state.activeTab == null) ...[
                 HomeSwitch(state: state),
+                if (state.homeFocus != HomeFocus.day)
+                  HomeBoardBar(state: state, focus: state.homeFocus),
                 if (state.homeFocus == HomeFocus.day)
                   Expanded(child: HomeDayFocus(state: state))
                 else if (state.homeFocus == HomeFocus.tasks)

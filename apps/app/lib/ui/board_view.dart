@@ -17,10 +17,10 @@ import 'overflow_tip.dart';
 /// Publishes the Home board's cards (column by column) as the keyboard rows
 /// of the Home grid; a collapsed Board is skipped at move time.
 void publishBoardNav(AppState state) {
-  final cols = state.columns(includeNoStatus: false);
+  final cols = state.homeColumns();
   final open = cols.isEmpty ? '' : boardDefaultOpen(cols);
   state.nav.publishHome('board', [
-    for (final (name, notes) in state.columns(includeNoStatus: false))
+    for (final (name, notes) in cols)
       for (final n in boardCapped(
         name,
         notes,
@@ -69,7 +69,9 @@ class BoardView extends StatelessWidget {
         child: Text(state.error!, style: TextStyle(color: t.muted)),
       );
     }
-    final cols = state.columns(includeNoStatus: includeNoStatus);
+    final cols = keyboard
+        ? state.homeColumns()
+        : state.columns(includeNoStatus: includeNoStatus);
     if (cols.isEmpty && !state.loading) {
       final hasNotes = state.filtered.isNotEmpty;
       return Center(

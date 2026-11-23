@@ -155,7 +155,11 @@ void main() {
     });
 
     testWidgets('wide: Show all (X) expands the done column', (t) async {
-      await pumpTasksApp(t, tasks: [for (var i = 0; i < 13; i++) _done(i)]);
+      await pumpTasksApp(
+        t,
+        size: const Size(1280, 1600),
+        tasks: [for (var i = 0; i < 13; i++) _done(i)],
+      );
       await t.tap(_k('home-focus-tasks'));
       await t.pumpAndSettle();
       expect(_k('board-done-show-all'), findsOneWidget);
@@ -179,7 +183,7 @@ void main() {
     testWidgets('phone accordion: capped with Show all', (t) async {
       await pumpTasksApp(
         t,
-        size: const Size(400, 900),
+        size: const Size(400, 1600),
         tasks: [for (var i = 0; i < 12; i++) _done(i)],
       );
       await t.tap(_k('home-focus-tasks'));
@@ -282,6 +286,7 @@ void main() {
     testWidgets('Show fewer collapses the done column again', (t) async {
       final s = await pumpTasksApp(
         t,
+        size: const Size(1280, 1600),
         tasks: [for (var i = 0; i < 12; i++) _done(i)],
       );
       await t.tap(_k('home-focus-tasks'));
@@ -325,6 +330,85 @@ void main() {
       await t.pumpAndSettle();
       expect(t.takeException(), isNull);
       expect(t.getRect(_k('card-due-w')).right, lessThanOrEqualTo(320));
+    });
+  });
+
+  group('home tag filter and column toggle', () {
+    testWidgets('tag filter narrows cards, clears, and is saved per Space', (
+      t,
+    ) async {
+      final prefs = MemoryStorage();
+      final s = await pumpTasksApp(
+        t,
+        prefs: prefs,
+        tasks: [
+          mkTask('a', tags: ['red']),
+          mkTask('b', tags: ['blue']),
+        ],
+      );
+      await t.tap(_k('home-focus-tasks'));
+      await t.pumpAndSettle();
+      expect(_k('task-card-a'), findsOneWidget);
+      expect(_k('task-card-b'), findsOneWidget);
+      await t.tap(_k('home-tag-filter'));
+      await t.pumpAndSettle();
+      await t.tap(_k('home-tag-red'));
+      await t.pumpAndSettle();
+      expect(_k('task-card-a'), findsOneWidget);
+      expect(_k('task-card-b'), findsNothing);
+      expect(s.homeTag(HomeFocus.tasks), 'red');
+      await t.tap(_k('home-tag-clear'));
+      await t.pumpAndSettle();
+      expect(_k('task-card-b'), findsOneWidget);
+      expect(s.homeTag(HomeFocus.tasks), isNull);
+    });
+
+    testWidgets('hidden columns are saved and the last one stays', (t) async {
+      final prefs = MemoryStorage();
+      final s = await pumpTasksApp(t, prefs: prefs, tasks: [mkTask('a')]);
+      await t.tap(_k('home-focus-tasks'));
+      await t.pumpAndSettle();
+      expect(_k('task-board-col-doing'), findsOneWidget);
+      await t.tap(_k('home-cols'));
+      await t.pumpAndSettle();
+      await t.tap(_k('home-col-doing'));
+      await t.pumpAndSettle();
+      expect(_k('task-board-col-doing'), findsNothing);
+      expect(_k('task-board-col-todo'), findsOneWidget);
+      expect(s.homeHiddenCols(HomeFocus.tasks), {'doing'});
+      s.toggleHomeCol(HomeFocus.tasks, 'todo');
+      s.toggleHomeCol(HomeFocus.tasks, 'done');
+      expect(s.taskColumns().map((c) => c.$1), ['done']);
+      s.toggleHomeCol(HomeFocus.tasks, 'done'); // the last one stays
+      expect(s.taskColumns().map((c) => c.$1), ['done']);
+      s.toggleHomeCol(HomeFocus.tasks, 'doing');
+      expect(s.taskColumns().map((c) => c.$1), ['doing', 'done']);
+    });
+
+    testWidgets('note board filters by tag and hides columns', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        notes: [
+          Note(
+            uid: 'n1',
+            summary: 'One',
+            categories: const ['status-todo', 'red'],
+          ),
+          Note(
+            uid: 'n2',
+            summary: 'Two',
+            categories: const ['status-doing', 'blue'],
+          ),
+        ],
+      );
+      await t.tap(_k('home-focus-board'));
+      await t.pumpAndSettle();
+      expect([for (final c in s.homeColumns()) c.$1], ['todo', 'doing']);
+      s.setHomeTag(HomeFocus.board, 'red');
+      expect(s.homeColumns().expand((c) => c.$2).map((n) => n.uid), ['n1']);
+      s.setHomeTag(HomeFocus.board, null);
+      s.toggleHomeCol(HomeFocus.board, 'todo');
+      expect([for (final c in s.homeColumns()) c.$1], ['doing']);
     });
   });
 }
