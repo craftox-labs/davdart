@@ -60,6 +60,8 @@ due, priority, start, end, body). Lists leave out bodies.
   exact name, refuses a non-empty collection without `--non-empty`, and writes an ICS
   backup first (CalDAV has no trash); report the backup path. Run it with `--dry-run`
   first and show the plan to the user.
+- `--collection HREF|NAME`: run an item command in another collection under the home instead of
+  the configured one (names and hrefs from `collections list`; anything not listed is refused).
 - `collections list`, `collections probe [ID]` (what the server supports, for example
   whether it accepts events or notes) are read-only and safe.
 - Exit codes: 0 ok, 1 failed, 2 usage, 3 refused by a flag. Errors are plain text on stderr

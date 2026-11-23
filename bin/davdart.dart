@@ -28,7 +28,8 @@ generic commands (a "kind" is note, task or event; ID is a uid, href or exact ti
   delete ID [--kind K] [--no-adopt]
   collections list | probe [ID] | create NAME [--components VJOURNAL,VTODO,VEVENT]
               | rename ID NAME | delete ID --confirm NAME [--non-empty] [--allow-unreadable] [--backup-dir DIR]
-options: --json (machine output), --dry-run (preview a write), --read-only (refuse item writes;
+options: --collection HREF|NAME (item commands: another collection under the home; default the configured one),
+  --json (machine output), --dry-run (preview a write), --read-only (refuse item writes;
   also DAVDART_READ_ONLY=1), --allow-admin (needed for collections create, rename, delete)
 aliases (old output kept): list, board, show TEXT, add TITLE [BODY], new TITLE [--id I --status S
   --owner O --decided-by D --github-ref R --tags a,b --under ID] (body on stdin), set-status MATCH STATUS,
@@ -194,11 +195,47 @@ Future<int> runCli(
     e.writeln('$usageText\nmissing url, user or password in the config');
     return 2;
   }
+  var target = Uri.parse(url);
+  final want = p.opt('collection');
+  if (want != null && cmd != 'collections') {
+    // Only a collection the home lists is reachable (href or exact name).
+    try {
+      final h = cfg['home'] ?? environ['DAVDART_HOME'];
+      final base = Uri.parse(url);
+      final segs = base.pathSegments.where((s) => s.isNotEmpty).toList();
+      final home = h != null && h.isNotEmpty
+          ? Uri.parse(h)
+          : base.replace(
+              path: '/${segs.take(segs.length - 1).join('/')}/', query: null);
+      final cs = CollectionService(
+          home: home, username: user, password: pass, httpClient: httpClient);
+      String sl(String x) => x.endsWith('/') ? x : '$x/';
+      final u = cs.home.resolve(want.trim());
+      final all = await cs.list();
+      var hits = all
+          .where((c) =>
+              c.href.host == u.host &&
+              c.href.port == u.port &&
+              sl(c.href.path) == sl(u.path))
+          .toList();
+      if (hits.isEmpty) hits = all.where((c) => c.name == want.trim()).toList();
+      if (hits.isEmpty) {
+        return fail(
+            1, 'no collection "$want" under the home (see: collections list)');
+      }
+      if (hits.length > 1) {
+        return fail(
+            1,
+            '${hits.length} collections are named "$want"; '
+            'pass the href');
+      }
+      target = hits.single.href;
+    } on CalDavException catch (x) {
+      return fail(1, 'server: $x');
+    }
+  }
   final client = CalDavClient(
-      collection: Uri.parse(url),
-      username: user,
-      password: pass,
-      client: httpClient);
+      collection: target, username: user, password: pass, client: httpClient);
   final svc = ItemService(client);
   final ctx = _Ctx(
     p: p,

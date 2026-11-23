@@ -37,6 +37,20 @@ enum ToolGroup {
 
 const _kinds = ['note', 'task', 'event'];
 
+const _collNote = ' Pass collection (href or exact name from the collections '
+    'tool, action list; call it first) to work in another collection.';
+
+String _slash(String p) => p.endsWith('/') ? p : '$p/';
+
+/// True when [want] (an href, absolute or relative to [home]) names [c]. Only
+/// collections the home lists can match, so no other path or host is reachable.
+bool _sameHref(Uri home, Uri c, String want) {
+  final u = home.resolve(want);
+  return u.host == c.host &&
+      u.port == c.port &&
+      _slash(u.path) == _slash(c.path);
+}
+
 /// Builds an [McpServer] exposing the enabled [groups].
 ///
 /// [collections] and [backupDir] are needed for the admin group; without a
@@ -92,7 +106,69 @@ McpServer buildMcpServer({
     );
   }
 
+  // Item services per collection, built on demand with the configured
+  // credentials and kept for this server (session) only.
+  final byPath = <String, ItemService>{};
+  final configuredPath = _slash(items.client.collection.path);
+
+  /// The service for the `collection` argument: the configured collection when
+  /// omitted, else a collection found by [CollectionService.list] under the
+  /// home (href or exact display name). Anything else is refused.
+  Future<ItemService> svcFor(_A a, [ItemKind? kind]) async {
+    final q = a.string('collection');
+    if (q == null || q.trim().isEmpty) return items;
+    final svc = collections;
+    if (svc == null) {
+      throw ItemServiceException(
+          'the collection argument needs collection access, which is not '
+          'configured on this server');
+    }
+    final all = await svc.list();
+    final want = q.trim();
+    CollectionInfo? hit;
+    final byHref = all.where((c) => _sameHref(svc.home, c.href, want)).toList();
+    if (byHref.length == 1) {
+      hit = byHref.single;
+    } else if (byHref.isEmpty) {
+      final byName = all.where((c) => c.name == want).toList();
+      if (byName.length > 1) {
+        throw ItemServiceException('${byName.length} collections are named '
+            '"$want"; pass the href from the collections list');
+      }
+      hit = byName.firstOrNull;
+    }
+    if (hit == null) {
+      throw ItemServiceException('no collection "$want" under the home; call '
+          'the collections tool (action list) for names and hrefs');
+    }
+    if (kind != null &&
+        !(kind == ItemKind.note
+            ? hit.holdsNotes
+            : kind == ItemKind.task
+                ? hit.holdsTasks
+                : hit.holdsEvents)) {
+      throw ItemServiceException('collection "${hit.name}" does not hold '
+          '${kind.name}s (it accepts: ${[
+        if (hit.holdsNotes) 'notes',
+        if (hit.holdsTasks) 'tasks',
+        if (hit.holdsEvents) 'events',
+      ].join(', ')})');
+    }
+    final path = _slash(hit.href.path);
+    if (path == configuredPath) return items;
+    return byPath.putIfAbsent(
+        path,
+        () => ItemService(CalDavClient(
+            collection: hit!.href,
+            username: svc.username,
+            password: svc.password,
+            client: svc.httpClient)));
+  }
+
   final kindS = JsonSchema.string(enumValues: _kinds, description: 'Item kind');
+  final collS = JsonSchema.string(
+      description: 'Collection href or exact name from the collections list '
+          'action; default is the configured collection');
   final idS = JsonSchema.string(
       description: 'uid, href or exact title (case-insensitive) of the item');
   final dryS =
@@ -103,8 +179,9 @@ McpServer buildMcpServer({
     tool(
         'overview',
         'Counts by kind, status and tag plus the folder tree (depth-limited). '
-            'Start here to learn how a space is organised.',
+            'Start here to learn how a space is organised.$_collNote',
         {
+          'collection': collS,
           'depth': JsonSchema.integer(
               minimum: 1, maximum: 6, description: 'Tree depth, default 2'),
           'under': JsonSchema.string(
@@ -112,14 +189,15 @@ McpServer buildMcpServer({
         },
         [],
         true,
-        (a) async => (await items.overview(
+        (a) async => (await (await svcFor(a)).overview(
                 maxDepth: a.integer('depth') ?? 2, under: a.string('under')))
             .toJson());
     tool(
         'list',
         'Page through items (without bodies), oldest first. Filter by kind, '
-            'tag, status or subtree. Use get for the body.',
+            'tag, status or subtree. Use get for the body.$_collNote',
         {
+          'collection': collS,
           'kind': kindS,
           'tag': JsonSchema.string(),
           'status': JsonSchema.string(),
@@ -132,7 +210,7 @@ McpServer buildMcpServer({
         },
         [],
         true,
-        (a) async => (await items.list(
+        (a) async => (await (await svcFor(a, a.kind('kind'))).list(
                 kind: a.kind('kind'),
                 tag: a.string('tag'),
                 status: a.string('status'),
@@ -143,12 +221,13 @@ McpServer buildMcpServer({
             .toJson());
     tool(
         'get',
-        'One item in full, including its body and etag.',
-        {'id': idS, 'kind': kindS},
+        'One item in full, including its body and etag.$_collNote',
+        {'collection': collS, 'id': idS, 'kind': kindS},
         ['id'],
         true,
-        (a) async =>
-            (await items.get(a.req('id'), kind: a.kind('kind'))).toJson());
+        (a) async => (await (await svcFor(a, a.kind('kind')))
+                .get(a.req('id'), kind: a.kind('kind')))
+            .toJson());
   }
 
   if (write) {
@@ -156,8 +235,10 @@ McpServer buildMcpServer({
         'create',
         'Create a note, task or event. Folders are notes with folder=true. '
             'due and priority are for tasks; start, end and location for events '
-            '(an event needs start). Dates: YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS][Z].',
+            '(an event needs start). Dates: YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS][Z].'
+            '$_collNote',
         {
+          'collection': collS,
           'kind': kindS,
           'title': JsonSchema.string(),
           'body': JsonSchema.string(),
@@ -174,7 +255,8 @@ McpServer buildMcpServer({
         },
         ['kind', 'title'],
         false,
-        (a) async => (await items.create(a.kind('kind')!, a.req('title'),
+        (a) async => (await (await svcFor(a, a.kind('kind'))).create(
+                a.kind('kind')!, a.req('title'),
                 body: a.string('body') ?? '',
                 tags: a.strings('tags'),
                 status: a.string('status'),
@@ -192,8 +274,10 @@ McpServer buildMcpServer({
         'Change fields of one item; only the fields you pass change. Tags: '
             'tags_add, tags_remove or tags_set. status (empty string clears it '
             'on notes and events). due and priority are for tasks (empty due '
-            'clears, priority -1 clears); start, end and location for events.',
+            'clears, priority -1 clears); start, end and location for events.'
+            '$_collNote',
         {
+          'collection': collS,
           'id': idS,
           'kind': kindS,
           'title': JsonSchema.string(),
@@ -211,12 +295,13 @@ McpServer buildMcpServer({
         },
         ['id'],
         false,
-        (a) => _update(items, a));
+        (a) async => _update(await svcFor(a, a.kind('kind')), a));
     tool(
         'move',
         'Move an item under a parent folder or item, or to the top level '
-            '(omit parent or pass "top"). Cycles are refused.',
+            '(omit parent or pass "top"). Cycles are refused.$_collNote',
         {
+          'collection': collS,
           'id': idS,
           'parent': JsonSchema.string(),
           'dry_run': dryS,
@@ -224,7 +309,7 @@ McpServer buildMcpServer({
         ['id'],
         false, (a) async {
       final p = a.string('parent');
-      return (await items.move(
+      return (await (await svcFor(a)).move(
               a.req('id'), p == null || p.toLowerCase() == 'top' ? null : p,
               dryRun: a.boolean('dry_run') ?? false))
           .toJson();
@@ -232,8 +317,9 @@ McpServer buildMcpServer({
     tool(
         'delete',
         'Delete one item. Children move up to its parent unless '
-            'adopt_children is false. There is no trash: use dry_run first.',
+            'adopt_children is false. There is no trash: use dry_run first.$_collNote',
         {
+          'collection': collS,
           'id': idS,
           'kind': kindS,
           'adopt_children': JsonSchema.boolean(description: 'Default true'),
@@ -241,7 +327,8 @@ McpServer buildMcpServer({
         },
         ['id'],
         false,
-        (a) async => (await items.delete(a.req('id'),
+        (a) async => (await (await svcFor(a, a.kind('kind'))).delete(
+                a.req('id'),
                 kind: a.kind('kind'),
                 adoptChildren: a.boolean('adopt_children') ?? true,
                 dryRun: a.boolean('dry_run') ?? false))

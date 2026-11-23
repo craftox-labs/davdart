@@ -4,6 +4,7 @@ import 'package:test/test.dart';
 
 import '../bin/davdart.dart';
 import 'support/fake_caldav.dart';
+import 'support/fake_dav_server.dart';
 
 void main() {
   late FakeCalDav fake;
@@ -52,6 +53,40 @@ void main() {
       expect(await cli(['frobnicate']), 2);
       expect(await cli(['create', 'T']), 2, reason: 'kind missing');
       expect(err.toString(), contains('--kind'));
+    });
+  });
+
+  group('--collection', () {
+    test('default unchanged, second collection reachable, unknown refused',
+        () async {
+      final other = FakeCalDav();
+      Future<int> run(List<String> a) => runCli(a,
+          config: {
+            'url': FakeCalDav.collection.toString(),
+            'user': 'u',
+            'password': 'p'
+          },
+          env: const {},
+          out: out,
+          err: err,
+          readStdin: () async => '',
+          httpClient: multiHome(fake, other));
+      expect(await run(['create', 'A', '--kind', 'note']), 0, reason: '$err');
+      expect(
+          await run(['create', 'B', '--kind', 'note', '--collection', 'Other']),
+          0,
+          reason: '$err');
+      expect(fake.ics, hasLength(1));
+      expect(other.ics, hasLength(1));
+      out.clear();
+      expect(await run(['list', '--collection', '/dav/d/', '--json']), 0);
+      expect(out.toString(), contains('"B"'));
+      expect(out.toString(), isNot(contains('"A"')));
+      for (final bad in ['Nope', '../x/', 'https://evil.test/dav/d/']) {
+        err.clear();
+        expect(await run(['list', '--collection', bad]), 1, reason: bad);
+        expect(err.toString(), contains('no collection'));
+      }
     });
   });
 

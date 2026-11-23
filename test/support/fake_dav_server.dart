@@ -24,6 +24,36 @@ http.Client withHome(FakeCalDav fake, {String name = 'Work'}) =>
       return fake.respond(r);
     });
 
+/// A home listing three collections: Work (/dav/c/, [work]), Other (/dav/d/,
+/// [other]) and Todos (/dav/t/, tasks only, answered by [other]).
+http.Client multiHome(FakeCalDav work, FakeCalDav other) {
+  String entry(String path, String name, [List<String> comps = const []]) =>
+      '<d:response><d:href>$path</d:href><d:propstat><d:prop>'
+      '<d:displayname>$name</d:displayname><d:resourcetype><d:collection/>'
+      '<c:calendar/></d:resourcetype><c:supported-calendar-component-set>'
+      '${comps.map((c) => '<c:comp name="$c"/>').join()}'
+      '</c:supported-calendar-component-set></d:prop>'
+      '<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>';
+  return MockClient((r) async {
+    if (r.method == 'PROPFIND' && r.url.path == '/dav/') {
+      return http.Response(
+          '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
+          'xmlns:c="urn:ietf:params:xml:ns:caldav">'
+          '${entry('/dav/c/', 'Work')}${entry('/dav/d/', 'Other')}'
+          '${entry('/dav/t/', 'Todos', ['VTODO'])}</d:multistatus>',
+          207);
+    }
+    if (r.url.path.startsWith('/dav/d/') || r.url.path.startsWith('/dav/t/')) {
+      // The fake always writes /dav/c/ hrefs; show this collection's own.
+      final res = await other.respond(r);
+      final dir = r.url.path.substring(0, 7);
+      return http.Response(res.body.replaceAll('/dav/c/', dir), res.statusCode,
+          headers: res.headers);
+    }
+    return work.respond(r);
+  });
+}
+
 /// A real localhost HTTP server (ephemeral port) answering with [client], so a
 /// spawned process can talk to the fake. Collection URL: `$base/dav/c`.
 class FakeDavServer {

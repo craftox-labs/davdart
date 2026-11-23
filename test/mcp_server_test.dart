@@ -96,6 +96,125 @@ void main() {
     });
   });
 
+  group('collection argument', () {
+    late FakeCalDav other;
+    late McpServer Function(Set<ToolGroup>) make;
+    setUp(() {
+      other = FakeCalDav();
+      final h = multiHome(env.fake, other);
+      final items = ItemService(CalDavClient(
+          collection: FakeCalDav.collection,
+          username: 'u',
+          password: 'p',
+          client: h));
+      final cs = CollectionService(
+          home: Uri.parse('https://fake.test/dav/'),
+          username: 'u',
+          password: 'p',
+          httpClient: h);
+      make = (g) => buildMcpServer(items: items, collections: cs, groups: g);
+    });
+
+    test('omitted: the configured collection, unchanged', () async {
+      final c = await connect(make({ToolGroup.read, ToolGroup.write}));
+      final (e, _) = await call(c, 'create', {'kind': 'note', 'title': 'A'});
+      expect(e, isFalse);
+      expect(env.fake.ics, hasLength(1));
+      expect(other.ics, isEmpty);
+      final (_, l) = await call(c, 'list');
+      expect(l['items'], hasLength(1));
+    });
+
+    test('a second collection by name and by href', () async {
+      final c = await connect(make({ToolGroup.read, ToolGroup.write}));
+      var (e, r) = await call(
+          c, 'create', {'collection': 'Other', 'kind': 'note', 'title': 'B'});
+      expect(e, isFalse, reason: '$r');
+      expect(other.ics, hasLength(1));
+      expect(env.fake.ics, isEmpty);
+      (e, r) = await call(c, 'list', {'collection': '/dav/d/'});
+      expect(e, isFalse, reason: '$r');
+      expect(r['items'].single['title'], 'B');
+      (e, r) = await call(c, 'list', {'collection': 'https://fake.test/dav/d'});
+      expect(r['items'], hasLength(1));
+      (e, r) = await call(c, 'overview', {'collection': 'Other'});
+      expect(e, isFalse, reason: '$r');
+      (e, r) = await call(c, 'get', {'collection': 'Other', 'id': 'B'});
+      expect(r['title'], 'B');
+      (e, r) = await call(c, 'update', {
+        'collection': 'Other',
+        'id': 'B',
+        'tags_add': ['x']
+      });
+      expect(e, isFalse, reason: '$r');
+      (e, r) = await call(c, 'move', {'collection': 'Other', 'id': 'B'});
+      expect(e, isFalse, reason: '$r');
+      (e, r) = await call(c, 'delete', {'collection': 'Other', 'id': 'B'});
+      expect(e, isFalse, reason: '$r');
+      expect(other.ics, isEmpty);
+    });
+
+    test('the configured collection by name reaches the same data', () async {
+      final c = await connect(make({ToolGroup.read, ToolGroup.write}));
+      await call(c, 'create', {'kind': 'note', 'title': 'A'});
+      final (_, l) = await call(c, 'list', {'collection': 'Work'});
+      expect(l['items'], hasLength(1));
+    });
+
+    test('unknown or escaping collections are refused', () async {
+      final c = await connect(make({ToolGroup.read, ToolGroup.write}));
+      for (final bad in [
+        'Nope',
+        'other',
+        '/dav/x/',
+        '../etc/',
+        '/dav/d/../x/',
+        'https://evil.test/dav/d/',
+        'http://fake.test:8080/dav/d/',
+        '//evil.test/dav/d/',
+      ]) {
+        final (e, m) = await call(c, 'list', {'collection': bad});
+        expect(e, isTrue, reason: bad);
+        expect(m, contains('no collection'), reason: bad);
+      }
+      final (e, _) = await call(
+          c, 'create', {'collection': 'Nope', 'kind': 'note', 'title': 'x'});
+      expect(e, isTrue);
+      expect(env.fake.ics, isEmpty);
+      expect(other.ics, isEmpty);
+    });
+
+    test('a collection that does not hold the kind gives a clear error',
+        () async {
+      final c = await connect(make({ToolGroup.read, ToolGroup.write}));
+      final (e, m) = await call(c, 'create', {
+        'collection': 'Todos',
+        'kind': 'event',
+        'title': 'x',
+        'start': '2026-01-01'
+      });
+      expect(e, isTrue);
+      expect(m, contains('does not hold events'));
+      expect(m, contains('tasks'));
+      expect(other.ics, isEmpty);
+    });
+
+    test('read-only and tool groups are unaffected', () async {
+      final c = await connect(make({ToolGroup.read}));
+      expect(await toolNames(c), ['collections', 'get', 'list', 'overview']);
+      await expectLater(
+          call(c, 'create',
+              {'collection': 'Other', 'kind': 'note', 'title': 'x'}),
+          throwsA(anything));
+      expect(other.ics, isEmpty);
+      final tools = (await c.listTools()).tools;
+      for (final t in tools.where((t) => t.name != 'collections')) {
+        expect(t.inputSchema.toJson()['properties'], contains('collection'));
+        expect(t.description, contains('collections tool'));
+      }
+    });
+  });
+
   group('read-only refusal', () {
     late McpClient c;
     setUp(() async => c = await connect(env.server({ToolGroup.read})));
