@@ -5,6 +5,7 @@ import 'collection_backup_stub.dart'
     if (dart.library.io) 'collection_backup_io.dart';
 import 'collection_service.dart' show BackupWriter;
 import 'event.dart';
+import 'ical.dart' show serializeEvent, serializeNote, serializeTask;
 import 'merge.dart';
 import 'note.dart';
 import 'note_tree.dart';
@@ -371,6 +372,28 @@ class _Ref {
         _ => raw,
       });
 
+  /// The item as iCalendar text, for comparing copies.
+  String get ics => switch (raw) {
+        Note n => serializeNote(n),
+        Task t => serializeTask(t),
+        _ => serializeEvent(raw as Event),
+      };
+
+  /// Content lines (unfolded) without the ones that legitimately change in
+  /// a move: uid, stamps, the parent link (checked on its own) and the
+  /// writer stamp.
+  List<String> get contentLines {
+    final text = ics.replaceAll(RegExp(r'\r?\n[ \t]'), '');
+    return [
+      for (final l in text.split(RegExp(r'\r?\n')))
+        if (l.isNotEmpty &&
+            !RegExp(r'^(UID|DTSTAMP|CREATED|LAST-MODIFIED|PRODID|X-WRITER)[:;]')
+                .hasMatch(l) &&
+            !l.startsWith('RELATED-TO;RELTYPE=PARENT:'))
+          l
+    ];
+  }
+
   /// Creates this item (no etag: only if absent) through [c].
   Future<void> putNew(CalDavClient c) async {
     switch (raw) {
@@ -586,6 +609,24 @@ class ItemService {
     return out
         .where((r) => !(r.raw is Note && isViewNote(r.raw as Note)))
         .toList();
+  }
+
+  /// Saved-view notes (hidden by [_load]).
+  Future<List<_Ref>> _loadViews() async => [
+        for (final n in await client.listNotes())
+          if (isViewNote(n)) _Ref(n)
+      ];
+
+  /// The first difference between two items' content, as "FIELD", or null.
+  static String? _contentDiff(_Ref o, _Ref c) {
+    final a = o.contentLines, b = c.contentLines;
+    String name(String l) => l.split(RegExp(r'[:;]')).first;
+    final rest = List.of(b);
+    for (final l in a) {
+      if (!rest.remove(l)) return name(l);
+    }
+    if (rest.isNotEmpty) return name(rest.first);
+    return null;
   }
 
   /// One note-shaped proxy per item so [NoteTree] can arrange all kinds.
@@ -1111,6 +1152,15 @@ class ItemService {
     }
     final tAll = await target._load();
     final under0 = under == null ? null : target._find(tAll, under);
+    if (under0 != null &&
+        !(under0.raw is Note && isFolderNote(under0.raw as Note))) {
+      throw ItemServiceException('--under "${under0.title}" is not a folder '
+          'in the target collection; nothing was moved');
+    }
+    final views = [
+      for (final v in await _loadViews())
+        if (inSet.contains(v.parentUid)) v
+    ];
     final fresh = {for (final r in set) r.uid: target._newUid()};
     final kids =
         subtree ? <_Ref>[] : all.where((r) => r.parentUid == root.uid).toList();
@@ -1142,11 +1192,16 @@ class ItemService {
       for (final k in kids)
         'children left behind: "${k.title}" moves to '
             '${root.parentUid ?? 'top'}',
+      if (views.isNotEmpty)
+        'left behind, ${views.length} view notes: they are re-parented to '
+            '${root.parentUid ?? 'top level'}, not moved',
       if (unreadable.isNotEmpty)
         '${unreadable.length} unreadable resource(s) stay untouched',
       'delete the ${set.length} original(s) after every copy is verified',
     ];
-    if (dryRun) return MoveResult(true, plan, entries, dir, false);
+    if (dryRun) {
+      return MoveResult(true, plan, entries, dir, false, views.length);
+    }
 
     // Backup of the raw source set.
     final rawByPath = {for (final r in raw) client.pathOf(r.href): r};
@@ -1156,9 +1211,10 @@ class ItemService {
     for (final r in set) {
       final h = r.href;
       final body = h == null ? null : rawByPath[client.pathOf(h)]?.data;
-      if (h == null || body == null) {
+      if (h == null || body == null || body.trim().isEmpty) {
         throw ItemServiceException(
-            'cannot back up "${r.title}": no raw copy; nothing was moved');
+            'cannot back up "${r.title}": no raw copy or it is empty; '
+            'nothing was moved');
       }
       final label = client.pathOf(h).split('/').where((x) => x.isNotEmpty).last;
       final safe = label
@@ -1166,6 +1222,12 @@ class ItemService {
           .replaceAll(RegExp(r'^\.+'), '_');
       files['${'${++i}'.padLeft(width, '0')}-$safe'
           '${safe.endsWith('.ics') ? '' : '.ics'}'] = body;
+    }
+    if (files.length != set.length ||
+        files.values.any((t) => t.trim().isEmpty)) {
+      throw ItemServiceException(
+          'backup set is incomplete (${files.length} of ${set.length}, or an '
+          'empty file); nothing was moved');
     }
     final written = (backupWriter ?? writeBackupFiles)(dir!, files);
     if (written != null && written != files.length) {
@@ -1206,6 +1268,9 @@ class ItemService {
         bad = 'status differs';
       } else if (!_same((List.of(c.tags)..sort()), (List.of(o.tags)..sort()))) {
         bad = 'tags differ';
+      } else {
+        final f = _contentDiff(o, c);
+        if (f != null) bad = 'field $f differs';
       }
       if (bad != null) {
         throw ItemServiceException('verification failed for "${x.title}" '
@@ -1225,24 +1290,38 @@ class ItemService {
             'originals were kept; ${madeText()}');
       }
     }
-    // Delete originals, children first.
+    // Re-parent what stays behind, then delete originals, children first.
+    // On failure, list every copy whose original is still there.
     var deleted = 0;
+    String pending() {
+      final left = entries.reversed.skip(deleted);
+      return 'copied but not cleaned up (old uid, new uid, new href): '
+          '${left.map((x) => '${x.oldUid} -> ${x.newUid} ${back[x.newUid]?.href}').join('; ')}. '
+          'To resolve: check the copies in the target, then delete the '
+          'listed originals (or, to undo, the listed copies); the backup is '
+          'at $dir. Nothing was auto-deleted beyond $deleted original(s)';
+    }
+
     try {
-      for (final k in kids) {
+      for (final k in [...kids, ...views]) {
         final edit = k.clone()..parentUid = root.parentUid;
         edit.stampWriter(writer);
         await edit.put(client, k);
       }
+    } catch (e) {
+      throw ItemServiceException('re-parenting failed ($e); no original was '
+          'deleted; ${pending()}');
+    }
+    try {
       for (final r in set.reversed) {
         await r.delete(client);
         deleted++;
       }
     } catch (e) {
       throw ItemServiceException('delete failed after $deleted of '
-          '${set.length} originals ($e); all copies are in the target and '
-          'the backup is at $dir');
+          '${set.length} originals ($e); ${pending()}');
     }
-    return MoveResult(false, plan, entries, dir, true);
+    return MoveResult(false, plan, entries, dir, true, views.length);
   }
 }
 
@@ -1267,14 +1346,19 @@ class MoveEntry {
 /// written; [deleted] says the originals are gone.
 class MoveResult {
   const MoveResult(
-      this.dryRun, this.plan, this.entries, this.backupPath, this.deleted);
+      this.dryRun, this.plan, this.entries, this.backupPath, this.deleted,
+      [this.viewNotesLeft = 0]);
   final bool dryRun;
   final List<String> plan;
   final List<MoveEntry> entries;
   final String? backupPath;
   final bool deleted;
+
+  /// View notes under the moved set, left in the source and re-parented.
+  final int viewNotesLeft;
   Map<String, Object?> toJson() => {
         'action': 'move-to-collection',
+        'view_notes_left_behind': viewNotesLeft,
         'dryRun': dryRun,
         'deleted': deleted,
         'backup': backupPath,

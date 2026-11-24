@@ -16,6 +16,9 @@ void main() {
   late ItemService src, dst;
   int putsToOther = 0;
   int? failPutAt;
+  int deletes = 0;
+  int? failDeleteAt;
+  String Function(String)? mangle;
 
   ItemService svcFor(String path, http.Client c) => ItemService(CalDavClient(
       collection: Uri.parse('https://fake.test$path'),
@@ -28,14 +31,25 @@ void main() {
     other = FakeCalDav();
     putsToOther = 0;
     failPutAt = null;
+    deletes = 0;
+    failDeleteAt = null;
+    mangle = null;
     final inner = multiHome(work, other);
     net = MockClient((r) async {
       if (r.method == 'PUT' && r.url.path.startsWith('/dav/d/')) {
         putsToOther++;
         if (failPutAt == putsToOther) return http.Response('', 500);
       }
+      if (r.method == 'DELETE' && r.url.path.startsWith('/dav/c/')) {
+        deletes++;
+        if (failDeleteAt == deletes) return http.Response('', 500);
+      }
       final req = http.Request(r.method, r.url)..headers.addAll(r.headers);
-      req.body = r.body;
+      req.body = r.method == 'PUT' &&
+              r.url.path.startsWith('/dav/d/') &&
+              mangle != null
+          ? mangle!(r.body)
+          : r.body;
       return http.Response.fromStream(await inner.send(req));
     });
     src = svcFor('/dav/c', net);
@@ -223,6 +237,98 @@ void main() {
         () => src.moveToCollection(svcFor('/dav/c/', net), 'Proj',
             backupDir: '/b'),
         throwsA(isA<ItemServiceException>()));
+  });
+
+  test('verify compares body, dates, priority and extra lines', () async {
+    await src.create(ItemKind.task, 'T',
+        body: 'the body', due: '2026-12-05', priority: 3);
+    await src.create(ItemKind.event, 'E',
+        body: 'ev body', start: '2026-12-01', location: 'Room 1');
+    mangle = (b) => b.replaceFirst('the body', 'the bodY');
+    await expectLater(
+        src.moveToCollection(dst, 'T',
+            backupDir: '/b', backupWriter: (d, f) => f.length),
+        throwsA(isA<ItemServiceException>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+                contains('"T"'), contains('DESCRIPTION'), contains('kept')))));
+    expect(work.ics, hasLength(2));
+    mangle = (b) => b.replaceFirst('LOCATION:Room 1', 'LOCATION:Room 2');
+    await expectLater(
+        src.moveToCollection(dst, 'E',
+            backupDir: '/b', backupWriter: (d, f) => f.length),
+        throwsA(isA<ItemServiceException>()
+            .having((e) => e.message, 'message', contains('LOCATION'))));
+    mangle = (b) => b.replaceFirst(RegExp(r'PRIORITY:\d'), 'PRIORITY:7');
+    await expectLater(
+        src.moveToCollection(dst, 'T',
+            backupDir: '/b', backupWriter: (d, f) => f.length),
+        throwsA(isA<ItemServiceException>()
+            .having((e) => e.message, 'message', contains('PRIORITY'))));
+    expect(work.ics, hasLength(2));
+    mangle = null;
+    final r = await src.moveToCollection(dst, 'T',
+        backupDir: '/b', backupWriter: (d, f) => f.length);
+    expect(r.deleted, isTrue);
+    final t = await dst.get(r.entries.single.newUid);
+    expect(t.body, 'the body');
+    expect(t.due, isNotNull);
+  });
+
+  test('--under must be a folder in the target', () async {
+    await tree();
+    await dst.create(ItemKind.note, 'Plain');
+    await expectLater(
+        src.moveToCollection(dst, 'SubA',
+            under: 'Plain',
+            dryRun: true,
+            backupDir: '/b',
+            backupWriter: (d, f) => f.length),
+        throwsA(isA<ItemServiceException>()
+            .having((e) => e.message, 'message', contains('not a folder'))));
+    await expectLater(
+        src.moveToCollection(dst, 'SubA',
+            under: 'Plain', backupDir: '/b', backupWriter: (d, f) => f.length),
+        throwsA(isA<ItemServiceException>()));
+    expect(other.ics, hasLength(1));
+    expect(work.ics, hasLength(7));
+  });
+
+  test('view notes under the moved set are re-parented, not moved', () async {
+    final ids = await tree();
+    await src.client.putNote(Note(
+        uid: 'view-1',
+        summary: 'A view',
+        categories: [viewTag],
+        parentUid: ids['a']));
+    final plan =
+        await src.moveToCollection(dst, 'SubA', dryRun: true, backupDir: '/b');
+    expect(plan.viewNotesLeft, 1);
+    expect(plan.plan.join('\n'), contains('left behind, 1 view notes'));
+    final r = await src.moveToCollection(dst, 'SubA',
+        backupDir: '/b', backupWriter: (d, f) => f.length);
+    expect(r.deleted, isTrue);
+    expect(r.viewNotesLeft, 1);
+    final v =
+        (await src.client.listNotes()).singleWhere((n) => n.uid == 'view-1');
+    expect(v.parentUid, ids['proj']);
+    expect((await dst.client.listNotes()).any(isViewNote), isFalse);
+  });
+
+  test('a failed delete lists copied-but-not-cleaned items', () async {
+    final ids = await tree();
+    failDeleteAt = 3;
+    await expectLater(
+        src.moveToCollection(dst, 'Proj',
+            backupDir: '/b', backupWriter: (d, f) => f.length),
+        throwsA(isA<ItemServiceException>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('copied but not cleaned up'), contains(ids['proj']!),
+                contains('/dav/d/'), contains('after 2 of 6')))));
+    expect(work.ics, hasLength(5));
+    expect(other.ics, hasLength(6));
   });
 
   group('CLI move-to', () {

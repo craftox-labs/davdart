@@ -74,8 +74,11 @@ due, priority, start, end, body). Lists leave out bodies.
 - `move-to ID --to-collection HREF|NAME --backup-dir DIR --allow-admin [--under FOLDER] [--no-subtree]
   [--allow-unreadable]`: moves an item and, for a folder, its whole subtree (notes, tasks, events) into
   another collection under the home. Copies get new uids and parent links are remapped; the root lands at
-  top level of the target (or under `--under`, a folder in the target). Order: raw ICS backup of the source
-  set, copy all, read back and verify (kind, title, tags, status, parent), check the originals did not
+  top level of the target (or under `--under`, which must be a folder in the target). View notes under
+  the moved set stay behind and are re-parented to the root's old parent; a failed delete lists the
+  copied-but-not-cleaned items. Order: raw ICS backup of the source
+  set, copy all, read back and verify (kind, title, tags, status, parent, and the full content: body, dates,
+  rrule, priority, location, extra lines), check the originals did not
   change, then delete the originals. Any failure before the delete keeps the originals and names the
   copies already made. It prints the old uid to new uid mapping. `--dry-run` prints the plan and writes
   nothing (no backup either). It deletes, so it needs `--allow-admin` and is refused under `--read-only`.

@@ -588,6 +588,10 @@ class _Ctx {
             if (!r.dryRun) {
               o.writeln('moved ${r.entries.length} item(s); backup: '
                   '${r.backupPath}');
+              if (r.viewNotesLeft > 0) {
+                o.writeln('left behind, ${r.viewNotesLeft} view notes '
+                    '(re-parented)');
+              }
               o.writeln('old uid\tnew uid');
               for (final x in r.entries) {
                 o.writeln('${x.oldUid}\t${x.newUid}');
