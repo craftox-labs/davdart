@@ -56,7 +56,7 @@ due, priority, start, end, body). Lists leave out bodies.
   1-4 high, 5 medium, 6-9 low; `create --priority` and MCP `update` priority work on notes too).
   Always set it with the command, not by editing the body. Events have no priority. `get --json`
   shows a note's priority as 1, 5 or 9.
-- Tags are free words without commas. `tag --set` keeps status and folder tags; `tag --add/--remove` of `kind-projects` or `kind-folder` is refused (make folders with `create --folder`; Projects containers come from the app's Projects actions).
+- Tags are free words without commas. `tag --set` keeps status and folder tags; `tag --add/--remove` of `kind-projects` or `kind-folder` is refused (make folders with `create --folder`). Projects: a Space has one container folder tagged `kind-projects` (title "Projects"), made with `create Projects --kind note --folder --tags kind-projects`; its direct child folders are the projects (`create NAME --kind note --folder --under CONTAINER_ID`). Project-ness comes from location only, projects do not nest, and an item belongs to the project above it. File new work under the project folder (`--under`); progress is derived (done / open + review + done), never stored.
 - Saved-view notes are hidden from listings; leave them alone.
 - Search before creating: look for an existing item or folder first to avoid duplicates.
 - Titles identify items for the user: keep them short and plain, no emoji.
