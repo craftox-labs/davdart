@@ -334,7 +334,8 @@ void main() {
       expect(n.categories, containsAll(['x', 'y', 'status-todo']));
       expect(PlanItem.fromNote(n).text, 'New body');
       expect(PlanItem.fromNote(n).status, 'todo');
-      expect(find.text('New body'), findsOneWidget);
+      // The card's snippet and the detail body both show it.
+      expect(find.text('New body'), findsNWidgets(2));
     });
 
     testWidgets('Ctrl+S saves', (t) async {

@@ -4,6 +4,7 @@ import 'package:flutter/widgets.dart';
 
 import '../state/app_state.dart';
 import '../state/note_drag.dart';
+import '../theme/tokens.dart';
 import 'theme.dart';
 
 /// Makes [child] draggable as a note ([NoteDrag]). Phones (touch platforms)
@@ -18,6 +19,7 @@ class NoteDraggable extends StatelessWidget {
     required this.label,
     required this.child,
     this.atPointer = false,
+    this.longPress = false,
   });
   final String uid;
   final NoteDragSource source;
@@ -26,6 +28,10 @@ class NoteDraggable extends StatelessWidget {
   /// move/drop offset is the pointer position (board cards read it to tell
   /// the upper half from the lower).
   final bool atPointer;
+
+  /// Touch platforms start the drag after a long press instead of never
+  /// (a plain touch drag still scrolls). Mouse drags are unchanged.
+  final bool longPress;
 
   /// Text of the floating chip under the pointer.
   final String label;
@@ -38,34 +44,51 @@ class NoteDraggable extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
+    final anchor = atPointer
+        ? pointerDragAnchorStrategy
+        : childDragAnchorStrategy;
+    final data = NoteDrag(uid, source);
+    final feedback = _feedback(t);
+    final ghost = Opacity(opacity: t.motion.dragGhost, child: child);
+    if (longPress && _touchPlatform) {
+      return LongPressDraggable<NoteDrag>(
+        data: data,
+        dragAnchorStrategy: anchor,
+        feedback: feedback,
+        childWhenDragging: ghost,
+        child: child,
+      );
+    }
     return Draggable<NoteDrag>(
-      data: NoteDrag(uid, source),
-      dragAnchorStrategy: atPointer
-          ? pointerDragAnchorStrategy
-          : childDragAnchorStrategy,
+      data: data,
+      dragAnchorStrategy: anchor,
       maxSimultaneousDrags: _touchPlatform ? 0 : 1,
-      feedback: DefaultTextStyle(
-        style: t.type.captionStyle.copyWith(color: t.fg),
-        child: Container(
-          constraints: BoxConstraints(maxWidth: t.sizes.tabMax),
-          padding: EdgeInsets.symmetric(
-            horizontal: t.space.md,
-            vertical: t.space.sm,
-          ),
-          decoration: BoxDecoration(
-            color: t.panel,
-            border: Border.all(color: t.divider),
-            borderRadius: BorderRadius.circular(t.radii.small),
-          ),
-          child: Text(
-            label.isEmpty ? 'Untitled' : label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
+      feedback: feedback,
+      childWhenDragging: ghost,
+      child: child,
+    );
+  }
+
+  Widget _feedback(Tokens t) {
+    return DefaultTextStyle(
+      style: t.type.captionStyle.copyWith(color: t.fg),
+      child: Container(
+        constraints: BoxConstraints(maxWidth: t.sizes.tabMax),
+        padding: EdgeInsets.symmetric(
+          horizontal: t.space.md,
+          vertical: t.space.sm,
+        ),
+        decoration: BoxDecoration(
+          color: t.panel,
+          border: Border.all(color: t.divider),
+          borderRadius: BorderRadius.circular(t.radii.small),
+        ),
+        child: Text(
+          label.isEmpty ? 'Untitled' : label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
       ),
-      childWhenDragging: Opacity(opacity: t.motion.dragGhost, child: child),
-      child: child,
     );
   }
 }

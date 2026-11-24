@@ -1970,6 +1970,28 @@ class AppState extends ChangeNotifier {
   /// The user-facing tags of [t] (no `status-`/`kind-` markers).
   List<String> taskTagsOf(Task t) => _plainTags(t.categories);
 
+  /// The user-facing tags of [n] (no `status-`/`kind-` markers).
+  List<String> noteTagsOf(Note n) => _plainTags(n.categories);
+
+  /// Title of the nearest folder above item [uid], or null at the top level.
+  String? folderNameOf(String uid) {
+    var cur = switch (findItem(uid)) {
+      Task t => t.parentUid,
+      Note n => n.parentUid,
+      _ => null,
+    };
+    for (var i = 0; cur != null && i <= tasks.length + notes.length; i++) {
+      final item = findItem(cur);
+      if (item is Note && AppState.isFolder(item)) return item.summary;
+      cur = item is Task
+          ? item.parentUid
+          : item is Note
+          ? item.parentUid
+          : null;
+    }
+    return null;
+  }
+
   bool isOverdue(Task t, [DateTime? now]) =>
       isTaskOverdue(t, now ?? DateTime.now());
 

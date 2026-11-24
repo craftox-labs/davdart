@@ -8,6 +8,7 @@ import '../state/note_drag.dart';
 import '../state/task_rules.dart';
 import '../theme/tokens.dart';
 import 'board_layout.dart';
+import 'chips.dart';
 import 'drag_drop.dart';
 import 'key_nav_ui.dart';
 import 'new_note_dialog.dart';
@@ -21,6 +22,16 @@ import 'theme.dart';
 /// task (also the kind-filter menu's icons).
 IconData kindIcon(bool isTask) =>
     isTask ? FLucideIcons.listChecks : FLucideIcons.fileText;
+
+/// Most tags a board card lists; the rest show as "+N".
+const boardCardMaxTags = 2;
+
+/// The first two lines' worth of a note body for a card: markdown noise
+/// stripped lightly, whitespace collapsed. Empty when there is no body.
+String noteSnippet(String body) => body
+    .replaceAll(RegExp(r'^\s*#+\s*', multiLine: true), '')
+    .replaceAll(RegExp(r'\s+'), ' ')
+    .trim();
 
 /// Publishes the Home board's cards (column by column) as the keyboard rows
 /// of the Home grid; a collapsed Board is skipped at move time.
@@ -93,8 +104,9 @@ class HomeBoard extends StatelessWidget {
       onAccordion: (a) => state.nav.boardAccordion = a,
       wrap: (name, child) => _drop(name, context, child),
       itemBuilder: (name, i, compact) => _CardDrop(
-        // Phone accordion: no drag (stage 3). Done is ordered by time and
-        // Other is not a status, so only the other columns take a position.
+        // Phone accordion: a long-press drag drops on a section (status
+        // change) only, no position. Done is ordered by time and Other is not
+        // a status, so only the other wide columns take a position.
         enabled: !compact && name != 'done' && name != otherColumn,
         accepts: (d) => _canDropOn(d, i, name),
         onDrop: (d, after) => _dropAt(name, i.uid, d, after),
@@ -253,9 +265,18 @@ class _Card extends StatelessWidget {
         ? state.peekUid == task.uid || state.mainTaskUid == task.uid
         : state.peekUid == note!.uid;
     final plan = note == null ? null : PlanItem.fromNote(note);
-    final tags = task == null || compact
+    // Phone cards keep title, glyph, priority and due only.
+    final allTags = compact
         ? const <String>[]
-        : state.taskTagsOf(task);
+        : task != null
+        ? state.taskTagsOf(task)
+        : state.noteTagsOf(note!);
+    final shownTags = allTags.take(boardCardMaxTags).toList();
+    final moreTags = allTags.length - shownTags.length;
+    final folder = compact || state.scopeUid != null
+        ? null
+        : state.folderNameOf(item.uid);
+    final snippet = note == null || compact ? '' : noteSnippet(plan!.text);
     final title = task != null
         ? OverflowTip(task.summary, maxLines: 3, style: t.type.semiboldStyle)
         : Text(
@@ -284,17 +305,41 @@ class _Card extends StatelessWidget {
           SizedBox(height: t.space.xxs),
           OverflowTip(
             note.summary,
-            maxLines: 2,
+            maxLines: 1,
             style: t.type.bodyStyle.copyWith(color: t.muted),
           ),
         ],
-        if (tags.isNotEmpty) ...[
-          SizedBox(height: t.space.sm),
+        if (snippet.isNotEmpty) ...[
+          SizedBox(height: t.space.xxs),
           Text(
-            tags.join(' · '),
-            maxLines: 1,
+            snippet,
+            key: Key('card-snippet-${item.uid}'),
+            maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: t.type.captionStyle.copyWith(color: t.muted),
+            style: t.type.bodyStyle.copyWith(color: t.muted),
+          ),
+        ],
+        if (folder != null || shownTags.isNotEmpty) ...[
+          SizedBox(height: t.space.sm),
+          Wrap(
+            spacing: t.space.md,
+            runSpacing: t.space.xs,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (folder != null)
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: t.sizes.tabMax),
+                  child: TagChip(folder, key: Key('card-folder-${item.uid}')),
+                ),
+              if (shownTags.isNotEmpty)
+                Text(
+                  [...shownTags, if (moreTags > 0) '+$moreTags'].join(' · '),
+                  key: Key('card-tags-${item.uid}'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.type.captionStyle.copyWith(color: t.muted),
+                ),
+            ],
           ),
         ],
         if (task != null && taskHasMeta(task)) ...[
@@ -312,10 +357,15 @@ class _Card extends StatelessWidget {
             ),
           ),
         ],
-        if (note != null && !compact && plan!.owner != null) ...[
+        if (note != null &&
+            !compact &&
+            (plan!.owner ?? plan.decidedBy) != null) ...[
           SizedBox(height: t.space.sm),
           Text(
-            plan.owner!,
+            [
+              if (plan.owner != null) plan.owner!,
+              if (plan.decidedBy != null) 'decided by ${plan.decidedBy!}',
+            ].join(' · '),
             style: t.type.captionStyle.copyWith(color: t.muted),
           ),
         ],
@@ -337,6 +387,7 @@ class _Card extends StatelessWidget {
       uid: item.uid,
       source: NoteDragSource.board,
       atPointer: true,
+      longPress: compact,
       label: item.title,
       child: _keyRow(t, card),
     );

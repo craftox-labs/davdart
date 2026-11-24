@@ -438,7 +438,8 @@ void main() {
       await t.tap(find.text('davdart-decisions').first);
       await t.pumpAndSettle();
       expect(find.text('Confirmed'), findsOneWidget);
-      expect(find.textContaining('first slice is the core'), findsOneWidget);
+      // The card's snippet and the detail pane both show it.
+      expect(find.textContaining('first slice is the core'), findsNWidgets(2));
       // The board stays visible beside the detail on a wide screen.
       expect(find.text('BACKLOG'), findsOneWidget);
     });
