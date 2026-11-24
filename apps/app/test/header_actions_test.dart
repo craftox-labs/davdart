@@ -48,13 +48,15 @@ void main() {
       expect(s.scopeUid, isNull);
     });
 
-    testWidgets('refresh stays visible; menu sits right of it', (t) async {
+    testWidgets('refresh stays visible; menu sits left of Columns and it', (
+      t,
+    ) async {
       final s = await _app(t);
       s.openFolder('f');
       await t.pumpAndSettle();
       final r = t.getRect(_refresh);
       final m = t.getRect(_k('scope-more'));
-      expect(m.left, greaterThanOrEqualTo(r.right));
+      expect(m.right, lessThanOrEqualTo(r.left));
     });
 
     testWidgets('Columns slot is stable across Board and Tasks', (t) async {

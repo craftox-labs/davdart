@@ -850,7 +850,11 @@ class TopBar extends StatelessWidget {
   Widget _title(Tokens t) {
     if (state.scope != null || state.activeViewName != null) {
       return Center(
-        child: ScopeCrumbs(state: state, label: state.activeViewName),
+        child: ScopeCrumbs(
+          state: state,
+          label: state.activeViewName,
+          compact: true,
+        ),
       );
     }
     return SpaceChip(state: state);
@@ -931,13 +935,15 @@ class TopBar extends StatelessWidget {
           refresh,
         ] else ...[
           viewControl,
+          // Menu first: Columns and refresh keep their place whether or not
+          // a folder is open.
+          if (home) ScopeActions(state: state),
           if (home &&
               !showMenu &&
               state.activeTab == null &&
               state.homeFocus != HomeFocus.day)
             HomeColumnsToggle(state: state, focus: state.homeFocus),
           refresh,
-          if (home) ScopeActions(state: state),
         ],
       ],
     );

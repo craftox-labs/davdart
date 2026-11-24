@@ -17,10 +17,28 @@ import 'theme.dart';
 /// fixed left position: the folder actions live in [ScopeActions] on the
 /// right, so scoping never moves it. [label] replaces the Space name (a saved
 /// view's name) while no folder is open.
-class ScopeCrumbs extends StatelessWidget {
-  const ScopeCrumbs({super.key, required this.state, this.label});
+class ScopeCrumbs extends StatefulWidget {
+  const ScopeCrumbs({
+    super.key,
+    required this.state,
+    this.label,
+    this.compact = false,
+  });
   final AppState state;
   final String? label;
+
+  /// Phone: inside a folder the row is "[house] › … › Current", the current
+  /// folder taking all the remaining width (up to two lines) and the
+  /// ancestors folded into the "…" sheet.
+  final bool compact;
+
+  @override
+  State<ScopeCrumbs> createState() => _ScopeCrumbsState();
+}
+
+class _ScopeCrumbsState extends State<ScopeCrumbs>
+    with TickerProviderStateMixin {
+  AppState get state => widget.state;
 
   @override
   Widget build(BuildContext context) {
@@ -34,14 +52,112 @@ class ScopeCrumbs extends StatelessWidget {
     ) {
       path.insert(0, n.note);
     }
-    return _crumbs(context, t, path, folder != null);
+    return widget.compact && folder != null
+        ? _compact(context, t, path)
+        : _crumbs(context, t, path, folder != null);
+  }
+
+  String get _space =>
+      state.currentSpaceName ?? (state.noSpace ? 'No space' : 'Notes');
+
+  /// Phone breadcrumb inside a folder: house › … › current.
+  Widget _compact(BuildContext context, Tokens t, List<Note> path) {
+    final style = paneTitleStyle(t);
+    final names = [
+      for (final n in path) n.summary.isEmpty ? 'Untitled' : n.summary,
+    ];
+    final ancestors = path.length > 1
+        ? path.sublist(0, path.length - 1)
+        : <Note>[];
+    Widget sep() => Padding(
+      padding: EdgeInsets.symmetric(horizontal: t.space.xs),
+      child: Text('›', style: style.copyWith(color: t.muted)),
+    );
+    return Row(
+      children: [
+        FTappable(
+          key: const Key('crumb-space'),
+          semanticsLabel: 'Show the whole space',
+          onPress: () => state.openFolder(null),
+          builder: (_, _, _) => Padding(
+            padding: EdgeInsets.all(t.space.xs),
+            child: Icon(FLucideIcons.house, size: t.icons.lg, color: t.accent),
+          ),
+        ),
+        sep(),
+        if (ancestors.isNotEmpty) ...[
+          FTappable(
+            key: const Key('crumb-more'),
+            semanticsLabel: 'Parent folders',
+            onPress: () => _showAncestors(context, t, path),
+            builder: (_, _, _) => Padding(
+              padding: EdgeInsets.symmetric(horizontal: t.space.xs),
+              child: Text('…', style: style.copyWith(color: t.muted)),
+            ),
+          ),
+          sep(),
+        ],
+        Expanded(
+          child: Semantics(
+            label: [_space, ...names].join(' › '),
+            excludeSemantics: true,
+            child: OverflowTip(
+              names.last,
+              textKey: const Key('crumb-folder'),
+              maxLines: 2,
+              style: style,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Sheet listing the Space root and every ancestor, top-down, indented.
+  void _showAncestors(BuildContext context, Tokens t, List<Note> path) {
+    final ancestors = path.sublist(0, path.length - 1);
+    showMenuSheet(context, this, (ctx, c) {
+      FItem row(Key key, IconData icon, String label, int level, String? uid) =>
+          FItem(
+            key: key,
+            prefix: Padding(
+              padding: EdgeInsets.only(left: t.space.lg * level),
+              child: Icon(icon, size: t.icons.md, color: t.muted),
+            ),
+            title: Text(label),
+            onPress: () {
+              c.hide();
+              state.openFolder(uid);
+            },
+          );
+      return [
+        FItemGroup(
+          children: [
+            row(
+              const Key('crumb-anc-root'),
+              FLucideIcons.house,
+              _space,
+              0,
+              null,
+            ),
+            for (var i = 0; i < ancestors.length; i++)
+              row(
+                Key('crumb-anc-${i + 1}'),
+                FLucideIcons.folder,
+                ancestors[i].summary.isEmpty
+                    ? 'Untitled'
+                    : ancestors[i].summary,
+                i + 1,
+                ancestors[i].uid,
+              ),
+          ],
+        ),
+      ];
+    });
   }
 
   Widget _crumbs(BuildContext context, Tokens t, List<Note> path, bool scoped) {
-    final space =
-        (!scoped ? label : null) ??
-        state.currentSpaceName ??
-        (state.noSpace ? 'No space' : 'Notes');
+    final space = (!scoped ? widget.label : null) ?? _space;
     final style = paneTitleStyle(t);
     final sep = Padding(
       padding: EdgeInsets.symmetric(horizontal: t.space.sm),
