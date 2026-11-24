@@ -10,6 +10,7 @@ import 'merge.dart';
 import 'note.dart';
 import 'note_tree.dart';
 import 'plan_item.dart';
+import 'projects.dart' show projectsTag;
 import 'saved_view.dart';
 import 'status.dart';
 import 'task.dart';
@@ -693,7 +694,9 @@ class ItemService {
       final s = r.status;
       if (s != null) byStatus[s] = (byStatus[s] ?? 0) + 1;
       for (final t in r.tags) {
-        if (t.startsWith('status-') || t == folderTag) continue;
+        if (t.startsWith('status-') || t == folderTag || t == projectsTag) {
+          continue;
+        }
         byTag[t] = (byTag[t] ?? 0) + 1;
       }
     }
@@ -942,8 +945,10 @@ class ItemService {
             ? List.of(before)
             : [
                 ..._cleanTags(set),
-                ...before
-                    .where((x) => x.startsWith('status-') || x == folderTag)
+                ...before.where((x) =>
+                    x.startsWith('status-') ||
+                    x == folderTag ||
+                    x == projectsTag)
               ];
         for (final a in _cleanTags(add)) {
           if (!t.contains(a)) t.add(a);

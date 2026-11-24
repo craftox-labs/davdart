@@ -36,4 +36,5 @@ export 'src/zone.dart' show LocalZone;
 export 'src/task_store.dart';
 export 'src/task_sync_engine.dart';
 export 'src/plan_item.dart';
+export 'src/projects.dart';
 export 'src/saved_view.dart';

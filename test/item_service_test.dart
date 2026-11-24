@@ -51,6 +51,19 @@ void main() {
     expect(page.toJson()['items'], isA<List>());
   });
 
+  test('overview and tag edits hide and keep the projects tag', () async {
+    final c = (await svc.create(ItemKind.note, 'Projects',
+            tags: [projectsTag], folder: true))
+        .item
+        .uid;
+    await mk(ItemKind.note, 'N', parent: c, tags: ['x']);
+    final o = await svc.overview(maxDepth: 2);
+    expect(o.byTag, {'x': 1});
+    await svc.setTags(c, set: ['y']);
+    final back = (await svc.get(c)).tags;
+    expect(back, containsAll([folderTag, projectsTag, 'y']));
+  });
+
   test('overview gives tree and counts', () async {
     final f = await mk(ItemKind.note, 'Folder', folder: true);
     final sub = await mk(ItemKind.note, 'Sub', parent: f, folder: true);
