@@ -172,7 +172,7 @@ class HomeSwitch extends StatelessWidget {
                     SizedBox(width: t.space.xxs),
                     piece(
                       _KindFilter(state: state, side: side),
-                      on: false,
+                      on: !onDay,
                       radius: BorderRadius.horizontal(right: r),
                       border: Border.fromBorderSide(line),
                     ),
