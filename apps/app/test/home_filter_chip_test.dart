@@ -49,11 +49,13 @@ void main() {
       expect(_k('home-today-tasks-t-deep'), findsOneWidget);
       expect(_k('home-today-tasks-t-out'), findsNothing);
       expect(s.scopedEvents.map((e) => e.uid), ['e-in']);
+      expect(s.filteredEvents.map((e) => e.uid), ['e-in']);
       expect(s.filteredTasks.map((k) => k.uid), ['t-in', 't-deep']);
       expect(s.openTasks().map((k) => k.uid).toSet(), {'t-in', 't-deep'});
       s.openFolder(null);
       await t.pumpAndSettle();
       expect(s.scopedEvents.length, 2);
+      expect(s.filteredEvents.length, 2);
       expect(_k('home-today-tasks-t-out'), findsOneWidget);
     });
 

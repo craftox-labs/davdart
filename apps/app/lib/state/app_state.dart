@@ -2251,10 +2251,13 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Events after the tag filter, for the agenda (past included).
+  /// Events after the folder scope and tag filter, for the agenda (past
+  /// included).
   List<Event> get filteredEvents => [
     for (final e in events)
-      if (eventTagFilter == null || e.categories.contains(eventTagFilter)) e,
+      if (eventInScope(e) &&
+          (eventTagFilter == null || e.categories.contains(eventTagFilter)))
+        e,
   ];
 
   /// Agenda groups from the day of [from] for [days] days: Today, Tomorrow,

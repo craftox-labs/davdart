@@ -335,8 +335,8 @@ class _SideMenuPageState extends State<SideMenuPage>
     with TickerProviderStateMixin {
   int? _count(Section s) => switch (s) {
     Section.notes => _noteCount(widget.state),
-    Section.tasks => widget.state.tasks.length,
-    Section.events => widget.state.events.length,
+    Section.tasks => widget.state.tasks.where(widget.state.taskInScope).length,
+    Section.events => widget.state.events.where(widget.state.eventInScope).length,
     _ => null,
   };
 
