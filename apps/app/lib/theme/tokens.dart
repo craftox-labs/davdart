@@ -219,6 +219,7 @@ class SizeTokens {
     this.listMin = 280,
     this.paneHeader = 44,
     this.sectionHeader = 32,
+    this.filterChipRow = 28,
     this.detailTab = 280,
     this.boardColumn = 264,
     this.contentMax = 1800,
@@ -273,6 +274,7 @@ class SizeTokens {
   /// Height of every side-panel section's title row, so titles never move
   /// when switching sections (trailing actions must fit inside it).
   final double sectionHeader;
+  final double filterChipRow;
 
   /// Width of the detail header tab where the note replaces the list.
   final double detailTab;

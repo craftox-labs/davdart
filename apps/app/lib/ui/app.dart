@@ -362,7 +362,6 @@ class _ShellState extends State<Shell>
             children: [
               ScopeText(state: state),
               if (state.activeTab == null) ...[
-                FilterChips(state: state),
                 HomeSwitch(state: state),
                 if (state.homeFocus == HomeFocus.day)
                   Expanded(child: HomeDayFocus(state: state))

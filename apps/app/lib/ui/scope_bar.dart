@@ -215,9 +215,11 @@ class ScopeText extends StatelessWidget {
   }
 }
 
-/// "Filtered: search "foo" x  folder "Name" x": one line under the Home
-/// header while a search or a folder scope is active. Each x clears its
-/// filter (clearing the folder shows the whole Space). Nothing when none is.
+/// The active search as one slim chip, `search "foo" x`: its x clears the
+/// search. The folder scope is not repeated here (the breadcrumb shows it and
+/// has its own clear). Nothing, and no space, when no search is active. The
+/// Home switcher places it: in its row on wide screens, on a line above it on
+/// phones.
 class FilterChips extends StatelessWidget {
   const FilterChips({super.key, required this.state});
   final AppState state;
@@ -225,54 +227,37 @@ class FilterChips extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final q = state.query.trim();
-    final folder = state.scope;
-    if (q.isEmpty && folder == null) return const SizedBox.shrink();
+    if (q.isEmpty) return const SizedBox.shrink();
     final t = tokensOf(context);
-    Widget chip(String slug, String label, String tip, VoidCallback clear) =>
-        FBadge(
-          key: Key('filter-chip-$slug'),
-          variant: FBadgeVariant.outline,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
-              IconAction(
-                key: Key('clear-filter-$slug'),
-                compact: true,
-                tooltip: tip,
-                icon: FLucideIcons.x,
-                onPress: clear,
-              ),
-            ],
-          ),
-        );
-    return Padding(
-      key: const Key('filter-chips'),
-      padding: EdgeInsets.fromLTRB(
-        t.space.lg,
-        t.space.sm,
-        t.space.lg,
-        t.space.sm,
-      ),
-      child: Wrap(
-        spacing: t.space.md,
-        runSpacing: t.space.sm,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text(
-            'Filtered:',
-            style: t.type.captionStyle.copyWith(color: t.muted),
-          ),
-          if (q.isNotEmpty)
-            chip('search', 'search "$q"', 'Clear search', state.clearSearch),
-          if (folder != null)
-            chip(
-              'folder',
-              'folder "${folder.summary}"',
-              'Show the whole space',
-              () => state.openFolder(null),
+    return Semantics(
+      container: true,
+      label: 'Filtered by search "$q"',
+      child: ConstrainedBox(
+        key: const Key('filter-chips'),
+        constraints: BoxConstraints(maxHeight: t.sizes.filterChipRow),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          widthFactor: 1,
+          child: FBadge(
+            key: const Key('filter-chip-search'),
+            variant: FBadgeVariant.outline,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Flexible(
+                  child: Text('search "$q"', overflow: TextOverflow.ellipsis),
+                ),
+                SizedBox(width: t.space.xs),
+                FTappable(
+                  key: const Key('clear-filter-search'),
+                  semanticsLabel: 'Clear search',
+                  onPress: state.clearSearch,
+                  builder: (_, _, _) => Icon(FLucideIcons.x, size: t.icons.sm),
+                ),
+              ],
             ),
-        ],
+          ),
+        ),
       ),
     );
   }

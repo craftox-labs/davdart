@@ -12,6 +12,7 @@ import 'content_grid.dart';
 import 'home_today.dart';
 import 'mobile_nav.dart' show addEntries;
 import 'parts.dart';
+import 'scope_bar.dart' show FilterChips;
 import 'segmented.dart';
 import 'theme.dart';
 
@@ -110,7 +111,17 @@ class HomeSwitch extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.fromLTRB(t.space.lg, t.space.lg, t.space.lg, 0),
         child: full
-            ? control
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (state.query.trim().isNotEmpty) ...[
+                    FilterChips(state: state),
+                    SizedBox(height: t.space.xs),
+                  ],
+                  control,
+                ],
+              )
             : Align(
                 alignment: Alignment.centerLeft,
                 child: Row(
@@ -119,6 +130,10 @@ class HomeSwitch extends StatelessWidget {
                     control,
                     SizedBox(width: t.space.md),
                     _HomeAdd(state: state),
+                    if (state.query.trim().isNotEmpty) ...[
+                      SizedBox(width: t.space.md),
+                      Flexible(child: FilterChips(state: state)),
+                    ],
                   ],
                 ),
               ),

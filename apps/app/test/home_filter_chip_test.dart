@@ -108,22 +108,45 @@ void main() {
       expect(_k('filter-chips'), findsNothing);
     });
 
-    testWidgets('folder chip lists the folder, x leaves it; breadcrumb stays', (
-      t,
-    ) async {
+    testWidgets('folder is not in the chip; breadcrumb clears it', (t) async {
       final s = await _app(t);
       s.openFolder('f');
+      await t.pumpAndSettle();
+      expect(_k('filter-chips'), findsNothing);
+      expect(_k('crumb-folder'), findsOneWidget);
       s.setQuery('bar');
       await t.pumpAndSettle();
-      expect(_k('filter-chip-folder'), findsOneWidget);
       expect(_k('filter-chip-search'), findsOneWidget);
-      expect(_k('crumb-folder'), findsOneWidget);
-      await t.tap(_k('clear-filter-folder'));
+      expect(_k('filter-chip-folder'), findsNothing);
+      await t.tap(_k('scope-close'));
       await t.pumpAndSettle();
       expect(s.scopeUid, isNull);
       expect(s.query, 'bar');
-      expect(_k('filter-chip-folder'), findsNothing);
       expect(_k('filter-chip-search'), findsOneWidget);
+    });
+
+    testWidgets('chip is slim and sits in the switcher row on wide', (t) async {
+      final s = await _app(t);
+      s.setQuery('foo');
+      await t.pumpAndSettle();
+      final chip = t.getRect(_k('filter-chip-search'));
+      final sw = t.getRect(_k('home-focus'));
+      expect(chip.height, lessThanOrEqualTo(28));
+      expect(chip.left, greaterThan(sw.right));
+      expect(chip.center.dy, closeTo(sw.center.dy, 8));
+    });
+
+    testWidgets('chip sits on a slim line above the switcher on phone', (
+      t,
+    ) async {
+      final s = await _app(t, size: const Size(390, 800));
+      s.setQuery('foo');
+      await t.pumpAndSettle();
+      final chip = t.getRect(_k('filter-chip-search'));
+      final sw = t.getRect(_k('home-focus'));
+      expect(chip.bottom, lessThanOrEqualTo(sw.top));
+      expect(chip.height, lessThanOrEqualTo(28));
+      expect(chip.left, closeTo(sw.left, 1));
     });
 
     testWidgets('phone Home button clears a search, keeps the folder', (
@@ -138,7 +161,7 @@ void main() {
       expect(s.query, '');
       expect(s.scopeUid, 'f');
       expect(_k('filter-chip-search'), findsNothing);
-      expect(_k('filter-chip-folder'), findsOneWidget);
+      expect(_k('filter-chip-folder'), findsNothing);
     });
   });
 }
