@@ -15,7 +15,7 @@ Status: v0, in development. APIs, note formats and the UI will still change.
 ## What works today
 
 - A UI-free Dart core: notes, tasks, events, plan items, folders, saved views, a CalDAV client and sync engines for each type.
-- A Flutter web app (built on forui 0.28.0): icon rail with Notes, Tasks, Events, Views, Search, Spaces, Account and Settings; a tab strip; a full-page item view with in-place editing; board and list views; a Home page with a Day focus (month calendar with event and task dots, and cards for the selected day's events and tasks, undated tasks listed last) and a Board focus, remembered per Space; an optional mirrored layout; a token-driven theme.
+- A Flutter web app (built on forui 0.28.0): icon rail with Notes, Tasks, Events, Projects, Views, Search, Spaces, Account and Settings; a tab strip; a full-page item view with in-place editing; board and list views; a Home page with a Day focus (month calendar with event and task dots, and cards for the selected day's events and tasks, undated tasks listed last) and a Board focus, remembered per Space; an optional mirrored layout; a token-driven theme.
 - A small board server that serves the app and proxies CalDAV to the upstream server.
 - A CLI for listing, creating, moving and exporting notes.
 
