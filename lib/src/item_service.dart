@@ -1,6 +1,9 @@
 import 'dart:math';
 
 import 'caldav.dart';
+import 'collection_backup_stub.dart'
+    if (dart.library.io) 'collection_backup_io.dart';
+import 'collection_service.dart' show BackupWriter;
 import 'event.dart';
 import 'merge.dart';
 import 'note.dart';
@@ -296,6 +299,87 @@ class _Ref {
       extra[at] = 'X-WRITER:$w';
     } else {
       extra.add('X-WRITER:$w');
+    }
+  }
+
+  String? get etag => switch (raw) {
+        Note n => n.etag,
+        Task t => t.etag,
+        Event e => e.etag,
+        _ => null,
+      };
+
+  bool get hasSiblings => switch (raw) {
+        Note n => n.siblingLines.isNotEmpty,
+        Task t => t.siblingLines.isNotEmpty,
+        Event e => e.siblingLines.isNotEmpty,
+        _ => false,
+      };
+
+  /// A copy with a new uid and parent, without href or etag, for creating
+  /// the item in another collection.
+  _Ref reuid(String uid, String? parent) => _Ref(switch (raw) {
+        Note n => Note(
+            uid: uid,
+            summary: n.summary,
+            description: n.description,
+            categories: List.of(n.categories),
+            status: n.status,
+            parentUid: parent,
+            created: n.created,
+            lastModified: n.lastModified,
+            extraLines: List.of(n.extraLines),
+            calendarLines: List.of(n.calendarLines),
+            propertyParams: Map.of(n.propertyParams)),
+        Task t => Task(
+            uid: uid,
+            summary: t.summary,
+            description: t.description,
+            categories: List.of(t.categories),
+            status: t.status,
+            percentComplete: t.percentComplete,
+            priority: t.priority,
+            due: t.due,
+            dtstart: t.dtstart,
+            completed: t.completed,
+            rrule: t.rrule,
+            parentUid: parent,
+            created: t.created,
+            lastModified: t.lastModified,
+            extraLines: List.of(t.extraLines),
+            calendarLines: List.of(t.calendarLines),
+            propertyParams: Map.of(t.propertyParams)),
+        Event e => Event(
+            uid: uid,
+            summary: e.summary,
+            description: e.description,
+            location: e.location,
+            categories: List.of(e.categories),
+            status: e.status,
+            dtstart: e.dtstart,
+            dtend: e.dtend,
+            duration: e.duration,
+            rrule: e.rrule,
+            exdates: List.of(e.exdates),
+            rdates: List.of(e.rdates),
+            parentUid: parent,
+            created: e.created,
+            lastModified: e.lastModified,
+            extraLines: List.of(e.extraLines),
+            calendarLines: List.of(e.calendarLines),
+            propertyParams: Map.of(e.propertyParams)),
+        _ => raw,
+      });
+
+  /// Creates this item (no etag: only if absent) through [c].
+  Future<void> putNew(CalDavClient c) async {
+    switch (raw) {
+      case Note n:
+        await c.putNote(n);
+      case Task t:
+        await c.putTask(t);
+      default:
+        await c.putEvent(raw as Event);
     }
   }
 
@@ -955,4 +1039,246 @@ class ItemService {
     }
     return ItemChange('delete', dryRun, changes, ref.toData());
   }
+
+  /// Moves an item, and with [subtree] (default) everything below it, into
+  /// the collection served by [target]. Copies get new uids; parent links are
+  /// remapped inside the moved set; the moved root becomes top level in the
+  /// target, or goes under [under] (uid, href or title there).
+  ///
+  /// Order: plan, raw ICS backup of the source set into [backupDir] (required
+  /// unless [dryRun]), copy everything, read the target back and check every
+  /// copy (kind, title, tags, status, parent), check the originals did not
+  /// change, and only then delete the originals. Any failure before the
+  /// delete leaves the originals untouched (copies already made stay in the
+  /// target and are named in the error). Recurring items with per-occurrence
+  /// overrides are refused. A collection holding unreadable resources is
+  /// refused unless [allowUnreadable] (they are never moved or deleted).
+  /// Without [subtree], children left behind move up to the moved item's
+  /// own parent.
+  Future<MoveResult> moveToCollection(
+    ItemService target,
+    String id, {
+    String? under,
+    bool subtree = true,
+    String? backupDir,
+    bool allowUnreadable = false,
+    bool dryRun = false,
+    String? writer,
+    BackupWriter? backupWriter,
+  }) async {
+    String norm(Uri u) =>
+        '${u.host}:${u.port}${u.path.endsWith('/') ? u.path : '${u.path}/'}';
+    if (norm(client.collection) == norm(target.client.collection)) {
+      throw ItemServiceException('source and target are the same collection');
+    }
+    if (!dryRun && (backupDir == null || backupDir.isEmpty)) {
+      throw ItemServiceException('a move needs a backup directory');
+    }
+    final all = await _load();
+    final root = _find(all, id);
+    final byUid = {for (final r in all) r.uid: r};
+    final tree = _tree(all);
+    final set = <_Ref>[
+      root,
+      if (subtree)
+        for (final n in tree.descendants(root.uid)) byUid[n.uid]!,
+    ];
+    final inSet = {for (final r in set) r.uid};
+    for (final r in set) {
+      if (r.hasSiblings) {
+        throw ItemServiceException('"${r.title}" is a repeating item with '
+            'changed occurrences; it cannot be moved');
+      }
+    }
+    // Unreadable resources in the source.
+    final raw = await client.listRaw();
+    final readable = <String>{
+      for (final n in await client.listNotes())
+        if (n.href != null) client.pathOf(n.href!),
+      for (final t in await client.listTasks())
+        if (t.href != null) client.pathOf(t.href!),
+      for (final e in await client.listEvents())
+        if (e.href != null) client.pathOf(e.href!),
+    };
+    final unreadable = [
+      for (final r in raw)
+        if (!readable.contains(client.pathOf(r.href))) r.href
+    ];
+    if (unreadable.isNotEmpty && !allowUnreadable) {
+      throw ItemServiceException('the source holds ${unreadable.length} '
+          'unreadable resource(s) (${unreadable.take(5).join(', ')}); nothing '
+          'was moved. Allow unreadable to move anyway (they stay untouched)');
+    }
+    final tAll = await target._load();
+    final under0 = under == null ? null : target._find(tAll, under);
+    final fresh = {for (final r in set) r.uid: target._newUid()};
+    final kids =
+        subtree ? <_Ref>[] : all.where((r) => r.parentUid == root.uid).toList();
+    final entries = [
+      for (final r in set)
+        MoveEntry(
+            r.kind,
+            r.uid,
+            fresh[r.uid]!,
+            r.title,
+            r.uid == root.uid
+                ? under0?.uid
+                : (inSet.contains(r.parentUid) ? fresh[r.parentUid] : null)),
+    ];
+    final stamp = _now()
+        .toUtc()
+        .toIso8601String()
+        .replaceAll(RegExp(r'[:.]'), '')
+        .replaceAll('-', '');
+    final dir = backupDir == null ? null : '$backupDir/move-$stamp';
+    final plan = [
+      'move ${set.length} item(s) from ${client.collection.path} to '
+          '${target.client.collection.path}'
+          '${under0 == null ? '' : ' under "${under0.title}"'}',
+      if (dir != null) 'back up ${set.length} source item(s) to $dir',
+      for (final x in entries)
+        '${x.kind.name} "${x.title}" ${x.oldUid} -> ${x.newUid}'
+            '${x.newParent == null ? ' (top)' : ' (parent ${x.newParent})'}',
+      for (final k in kids)
+        'children left behind: "${k.title}" moves to '
+            '${root.parentUid ?? 'top'}',
+      if (unreadable.isNotEmpty)
+        '${unreadable.length} unreadable resource(s) stay untouched',
+      'delete the ${set.length} original(s) after every copy is verified',
+    ];
+    if (dryRun) return MoveResult(true, plan, entries, dir, false);
+
+    // Backup of the raw source set.
+    final rawByPath = {for (final r in raw) client.pathOf(r.href): r};
+    final files = <String, String>{};
+    final width = '${set.length}'.length;
+    var i = 0;
+    for (final r in set) {
+      final h = r.href;
+      final body = h == null ? null : rawByPath[client.pathOf(h)]?.data;
+      if (h == null || body == null) {
+        throw ItemServiceException(
+            'cannot back up "${r.title}": no raw copy; nothing was moved');
+      }
+      final label = client.pathOf(h).split('/').where((x) => x.isNotEmpty).last;
+      final safe = label
+          .replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_')
+          .replaceAll(RegExp(r'^\.+'), '_');
+      files['${'${++i}'.padLeft(width, '0')}-$safe'
+          '${safe.endsWith('.ics') ? '' : '.ics'}'] = body;
+    }
+    final written = (backupWriter ?? writeBackupFiles)(dir!, files);
+    if (written != null && written != files.length) {
+      throw ItemServiceException(
+          'backup wrote $written of ${files.length} files; nothing was moved');
+    }
+
+    // Copy everything first.
+    final made = <String>[];
+    String madeText() => made.isEmpty
+        ? 'no copies were made'
+        : 'copies already in the target: ${made.join(', ')}';
+    try {
+      for (final x in entries) {
+        final copy = byUid[x.oldUid]!.reuid(x.newUid, x.newParent);
+        copy.stampWriter(writer);
+        await copy.putNew(target.client);
+        made.add(x.newUid);
+      }
+    } catch (e) {
+      throw ItemServiceException('copy failed ($e); the originals were kept; '
+          '${madeText()}');
+    }
+    // Read the target back and check every copy.
+    final back = {for (final r in await target._load()) r.uid: r};
+    for (final x in entries) {
+      final o = byUid[x.oldUid]!, c = back[x.newUid];
+      String? bad;
+      if (c == null) {
+        bad = 'missing';
+      } else if (c.kind != o.kind) {
+        bad = 'wrong kind';
+      } else if (c.title != o.title) {
+        bad = 'title differs';
+      } else if (c.parentUid != x.newParent) {
+        bad = 'parent differs';
+      } else if (c.status != o.status) {
+        bad = 'status differs';
+      } else if (!_same((List.of(c.tags)..sort()), (List.of(o.tags)..sort()))) {
+        bad = 'tags differ';
+      }
+      if (bad != null) {
+        throw ItemServiceException('verification failed for "${x.title}" '
+            '(${x.newUid}): $bad; the originals were kept; ${madeText()}');
+      }
+    }
+    if (made.length != set.length) {
+      throw ItemServiceException('verification failed: ${made.length} copies '
+          'for ${set.length} items; the originals were kept; ${madeText()}');
+    }
+    // The originals must be unchanged since they were read.
+    final now = {for (final r in await _load()) r.uid: r};
+    for (final r in set) {
+      final n = now[r.uid];
+      if (n == null || n.etag != r.etag) {
+        throw ItemServiceException('"${r.title}" changed while moving; the '
+            'originals were kept; ${madeText()}');
+      }
+    }
+    // Delete originals, children first.
+    var deleted = 0;
+    try {
+      for (final k in kids) {
+        final edit = k.clone()..parentUid = root.parentUid;
+        edit.stampWriter(writer);
+        await edit.put(client, k);
+      }
+      for (final r in set.reversed) {
+        await r.delete(client);
+        deleted++;
+      }
+    } catch (e) {
+      throw ItemServiceException('delete failed after $deleted of '
+          '${set.length} originals ($e); all copies are in the target and '
+          'the backup is at $dir');
+    }
+    return MoveResult(false, plan, entries, dir, true);
+  }
+}
+
+/// One item of a cross-collection move: kind, old and new uid, title and the
+/// new parent uid (null: top level).
+class MoveEntry {
+  const MoveEntry(
+      this.kind, this.oldUid, this.newUid, this.title, this.newParent);
+  final ItemKind kind;
+  final String oldUid, newUid, title;
+  final String? newParent;
+  Map<String, Object?> toJson() => {
+        'kind': kind.name,
+        'title': title,
+        'old_uid': oldUid,
+        'new_uid': newUid,
+        'parent': newParent,
+      };
+}
+
+/// Outcome of [ItemService.moveToCollection]. With [dryRun] nothing was
+/// written; [deleted] says the originals are gone.
+class MoveResult {
+  const MoveResult(
+      this.dryRun, this.plan, this.entries, this.backupPath, this.deleted);
+  final bool dryRun;
+  final List<String> plan;
+  final List<MoveEntry> entries;
+  final String? backupPath;
+  final bool deleted;
+  Map<String, Object?> toJson() => {
+        'action': 'move-to-collection',
+        'dryRun': dryRun,
+        'deleted': deleted,
+        'backup': backupPath,
+        'plan': plan,
+        'items': [for (final e in entries) e.toJson()],
+      };
 }

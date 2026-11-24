@@ -21,6 +21,8 @@ generic commands (a "kind" is note, task or event; ID is a uid, href or exact ti
          [--due DATE] [--priority 0-9] [--start WHEN] [--end WHEN] [--location TEXT]
   update ID [--kind K] [--title T] [--body TEXT|--stdin] [--location L] [--start W] [--end W]
   move ID TARGET|top
+  move-to ID --to-collection HREF|NAME --backup-dir DIR --allow-admin [--under FOLDER] [--no-subtree]
+          [--allow-unreadable]   (copy to another collection, verify, delete originals; use --dry-run first)
   tag ID [--add a,b] [--remove a,b] [--set a,b]
   status ID STATUS|none
   due ID DATE|none            (tasks)
@@ -63,6 +65,7 @@ const _boolFlags = {
   'no-adopt',
   'non-empty',
   'allow-unreadable',
+  'no-subtree',
 };
 
 /// Parsed command line: positionals, value options (repeatable) and flags.
@@ -115,7 +118,8 @@ List<String> _csv(String? s) => (s ?? '')
     .toList();
 
 const _itemWrites = {
-  'create', 'update', 'move', 'tag', 'status', 'due', 'priority', 'delete',
+  'create', 'update', 'move', 'move-to', 'tag', 'status', 'due', 'priority',
+  'delete',
   // aliases
   'add', 'new', 'set-status', 'append', 'task', 'folder', 'rm',
 };
@@ -174,18 +178,19 @@ Future<int> runCli(
       const {'1', 'true', 'yes'}
           .contains((environ['DAVDART_READ_ONLY'] ?? '').toLowerCase());
   final sub = rest.isEmpty ? '' : rest.first;
-  final isAdmin = cmd == 'collections' &&
-      const {'create', 'rename', 'delete'}.contains(sub);
+  final isAdmin = (cmd == 'collections' &&
+          const {'create', 'rename', 'delete'}.contains(sub)) ||
+      cmd == 'move-to';
   if (_itemWrites.contains(cmd) && ro) {
     return fail(3,
         'refused: read-only mode (--read-only or DAVDART_READ_ONLY=1) forbids "$cmd"');
   }
   if (isAdmin) {
     if (ro) {
-      return fail(3, 'refused: read-only mode forbids "collections $sub"');
+      return fail(3, 'refused: read-only mode forbids "$cmd"');
     }
     if (!p.flag('allow-admin')) {
-      return fail(3, 'refused: "collections $sub" needs --allow-admin');
+      return fail(3, 'refused: "$cmd" needs --allow-admin');
     }
   }
 
@@ -195,44 +200,58 @@ Future<int> runCli(
     e.writeln('$usageText\nmissing url, user or password in the config');
     return 2;
   }
+
+  /// Resolves a collection href or exact name under the home; only a
+  /// collection the home lists is reachable.
+  Future<Uri> resolveCollection(String want) async {
+    final h = cfg['home'] ?? environ['DAVDART_HOME'];
+    final base = Uri.parse(url);
+    final segs = base.pathSegments.where((s) => s.isNotEmpty).toList();
+    final home = h != null && h.isNotEmpty
+        ? Uri.parse(h)
+        : base.replace(
+            path: '/${segs.take(segs.length - 1).join('/')}/', query: null);
+    final cs = CollectionService(
+        home: home, username: user, password: pass, httpClient: httpClient);
+    String sl(String x) => x.endsWith('/') ? x : '$x/';
+    final u = cs.home.resolve(want.trim());
+    final all = await cs.list();
+    var hits = all
+        .where((c) =>
+            c.href.host == u.host &&
+            c.href.port == u.port &&
+            sl(c.href.path) == sl(u.path))
+        .toList();
+    if (hits.isEmpty) hits = all.where((c) => c.name == want.trim()).toList();
+    if (hits.isEmpty) {
+      throw ItemServiceException(
+          'no collection "$want" under the home (see: collections list)');
+    }
+    if (hits.length > 1) {
+      throw ItemServiceException(
+          '${hits.length} collections are named "$want"; pass the href');
+    }
+    return hits.single.href;
+  }
+
   var target = Uri.parse(url);
   final want = p.opt('collection');
-  if (want != null && cmd != 'collections') {
-    // Only a collection the home lists is reachable (href or exact name).
-    try {
-      final h = cfg['home'] ?? environ['DAVDART_HOME'];
-      final base = Uri.parse(url);
-      final segs = base.pathSegments.where((s) => s.isNotEmpty).toList();
-      final home = h != null && h.isNotEmpty
-          ? Uri.parse(h)
-          : base.replace(
-              path: '/${segs.take(segs.length - 1).join('/')}/', query: null);
-      final cs = CollectionService(
-          home: home, username: user, password: pass, httpClient: httpClient);
-      String sl(String x) => x.endsWith('/') ? x : '$x/';
-      final u = cs.home.resolve(want.trim());
-      final all = await cs.list();
-      var hits = all
-          .where((c) =>
-              c.href.host == u.host &&
-              c.href.port == u.port &&
-              sl(c.href.path) == sl(u.path))
-          .toList();
-      if (hits.isEmpty) hits = all.where((c) => c.name == want.trim()).toList();
-      if (hits.isEmpty) {
-        return fail(
-            1, 'no collection "$want" under the home (see: collections list)');
-      }
-      if (hits.length > 1) {
-        return fail(
-            1,
-            '${hits.length} collections are named "$want"; '
-            'pass the href');
-      }
-      target = hits.single.href;
-    } on CalDavException catch (x) {
-      return fail(1, 'server: $x');
+  Uri? moveTarget;
+  try {
+    if (want != null && cmd != 'collections') {
+      target = await resolveCollection(want);
     }
+    if (cmd == 'move-to') {
+      final to = p.opt('to-collection');
+      if (to == null) throw UsageError('move-to needs --to-collection');
+      moveTarget = await resolveCollection(to);
+    }
+  } on ItemServiceException catch (x) {
+    return fail(1, x.message);
+  } on UsageError catch (x) {
+    return fail(2, x.message);
+  } on CalDavException catch (x) {
+    return fail(1, 'server: $x');
   }
   final client = CalDavClient(
       collection: target, username: user, password: pass, client: httpClient);
@@ -253,6 +272,7 @@ Future<int> runCli(
     env: environ,
     httpClient: httpClient,
     defaultBackupDir: defaultBackupDir,
+    moveTarget: moveTarget,
   );
   try {
     await ctx.run(cmd, rest);
@@ -289,6 +309,7 @@ class _Ctx {
     required this.env,
     required this.httpClient,
     required this.defaultBackupDir,
+    this.moveTarget,
   });
   final Parsed p;
   final StringSink o;
@@ -302,6 +323,7 @@ class _Ctx {
   final Map<String, String> env;
   final http.Client? httpClient;
   final String? defaultBackupDir;
+  final Uri? moveTarget;
 
   ItemKind? get kind => p.opt('kind') == null || p.opt('kind') == 'all'
       ? null
@@ -538,6 +560,43 @@ class _Ctx {
         final target = t == 'top' ? null : await resolve(t);
         final c = await svc.move(it.uid, target?.uid, dryRun: dry);
         done(c, '${it.title}: now under ${target?.title ?? 'top'}');
+      case 'move-to':
+        final id = _need(rest, 0, 'an ID');
+        final dir = p.opt('backup-dir');
+        if (!dry && (dir == null || dir.isEmpty)) {
+          throw UsageError('move-to needs --backup-dir DIR');
+        }
+        final tsvc = ItemService(CalDavClient(
+            collection: moveTarget!,
+            username: cfg['user']!,
+            password: cfg['password']!,
+            client: httpClient));
+        try {
+          final r = await svc.moveToCollection(tsvc, id,
+              under: p.opt('under'),
+              subtree: !p.flag('no-subtree'),
+              backupDir: dir,
+              allowUnreadable: p.flag('allow-unreadable'),
+              dryRun: dry);
+          if (json) {
+            emit(r.toJson());
+          } else {
+            if (r.dryRun) o.writeln('dry run, nothing changed:');
+            for (final l in r.plan) {
+              o.writeln('  $l');
+            }
+            if (!r.dryRun) {
+              o.writeln('moved ${r.entries.length} item(s); backup: '
+                  '${r.backupPath}');
+              o.writeln('old uid\tnew uid');
+              for (final x in r.entries) {
+                o.writeln('${x.oldUid}\t${x.newUid}');
+              }
+            }
+          }
+        } finally {
+          if (httpClient == null) tsvc.client.close();
+        }
       case 'tag':
         final it = await resolve(_need(rest, 0, 'an ID'), kind: kind);
         final c = await svc.setTags(it.uid,

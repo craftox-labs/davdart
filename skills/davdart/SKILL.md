@@ -71,6 +71,17 @@ due, priority, start, end, body). Lists leave out bodies.
   exact name, refuses a non-empty collection without `--non-empty`, and writes an ICS
   backup first (CalDAV has no trash); report the backup path. Run it with `--dry-run`
   first and show the plan to the user.
+- `move-to ID --to-collection HREF|NAME --backup-dir DIR --allow-admin [--under FOLDER] [--no-subtree]
+  [--allow-unreadable]`: moves an item and, for a folder, its whole subtree (notes, tasks, events) into
+  another collection under the home. Copies get new uids and parent links are remapped; the root lands at
+  top level of the target (or under `--under`, a folder in the target). Order: raw ICS backup of the source
+  set, copy all, read back and verify (kind, title, tags, status, parent), check the originals did not
+  change, then delete the originals. Any failure before the delete keeps the originals and names the
+  copies already made. It prints the old uid to new uid mapping. `--dry-run` prints the plan and writes
+  nothing (no backup either). It deletes, so it needs `--allow-admin` and is refused under `--read-only`.
+  Repeating items with changed occurrences are refused; a source collection with unreadable resources is
+  refused unless `--allow-unreadable`. Not in the MCP server (it deletes and needs a backup directory):
+  use the CLI. Always `--dry-run` first, show the plan to the human and ask before the real run.
 - `--collection HREF|NAME`: run an item command in another collection under the home instead of
   the configured one (names and hrefs from `collections list`; anything not listed is refused).
 - `collections list`, `collections probe [ID]` (what the server supports, for example
@@ -81,7 +92,7 @@ due, priority, start, end, body). Lists leave out bodies.
 ## When to ask a human
 
 - Before any delete of more than one item, any `collections` change, or any move that
-  reorganises a whole folder: show the `--dry-run` result and ask.
+  reorganises a whole folder, and always before `move-to`: show the `--dry-run` result and ask.
 - When two items match an ID (the error lists them) and you cannot tell which one is meant.
 - When a folder or tag you would need does not exist yet, or a status outside the fixed set seems needed.
 - When the server refuses (rights, a collection that does not hold that kind): report it,
