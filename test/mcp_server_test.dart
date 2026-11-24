@@ -337,10 +337,16 @@ void main() {
       expect(err, isFalse, reason: '$m');
       var (_, g) = await call(c, 'get', {'id': 'N'});
       expect(g['status'], 'doing');
-      (err, m) = await call(c, 'update', {'id': 'N', 'status': 'review'});
+      (err, m) = await call(c, 'update', {'id': 'N', 'status': 'to_review'});
+      expect(err, isFalse, reason: '$m');
+      (_, g) = await call(c, 'get', {'id': 'N'});
+      expect(g['status'], 'review');
+      (err, m) = await call(c, 'update', {'id': 'N', 'status': 'wip'});
       expect(err, isTrue);
-      expect(m,
-          contains('allowed: backlog, todo, doing, blocked, done, canceled'));
+      expect(
+          m,
+          contains(
+              'allowed: backlog, todo, doing, blocked, review, done, canceled'));
       (err, m) = await call(c, 'update', {'id': 'N', 'status': 'wontfix'});
       expect(err, isFalse);
       (_, g) = await call(c, 'get', {'id': 'N'});

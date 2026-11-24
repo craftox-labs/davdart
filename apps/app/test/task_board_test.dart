@@ -80,9 +80,13 @@ void main() {
           mkTask('a', summary: 'Later', tags: ['status-backlog']),
           mkTask('b', summary: 'Stuck', tags: ['status-blocked']),
           mkTask('c', summary: 'Dropped', status: 'CANCELLED'),
+          mkTask('r', summary: 'Shipped', tags: ['status-review']),
         ],
       );
+      expect([for (final c in state.taskColumns()) c.$1],
+          ['backlog', 'todo', 'doing', 'blocked', 'review', 'done']);
       final cols = {for (final c in state.taskColumns()) c.$1: c.$2};
+      expect([for (final x in cols['review']!) x.summary], ['Shipped']);
       expect([for (final x in cols['backlog']!) x.summary], ['Later']);
       expect([for (final x in cols['blocked']!) x.summary], ['Stuck']);
       expect([for (final x in cols['done']!) x.summary], ['Dropped']);

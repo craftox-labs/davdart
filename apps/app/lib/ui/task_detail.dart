@@ -24,6 +24,7 @@ const _statusWords = [
   ('todo', 'needs-action'),
   ('doing', 'in-process'),
   ('blocked', 'blocked'),
+  ('review', 'review'),
   ('done', 'completed'),
   ('canceled', 'canceled'),
 ];

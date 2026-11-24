@@ -3563,8 +3563,8 @@ class AppState extends ChangeNotifier {
     ]..sort(NoteTree.byCreated);
   }
 
-  /// Task board columns: todo, doing and done always, then backlog and
-  /// blocked when in use, and Other for words outside the fixed set.
+  /// Task board columns: todo, doing and done always, then backlog,
+  /// blocked and review when in use, and Other for words outside the fixed set.
   /// Canceled tasks sit in done (the card is dimmed). Follows the Tasks
   /// view's tag and folder filters, not its Open/Completed toggle.
   List<(String, List<Task>)> taskColumns({bool all = false}) {

@@ -178,15 +178,19 @@ void main() {
       final id = (n['item'] as Map)['uid'] as String;
       final s = await jcli(['status', id, 'in_progress']);
       expect((s['item'] as Map)['status'], 'doing');
+      final r = await jcli(['status', id, 'ready_for_review']);
+      expect((r['item'] as Map)['status'], 'review');
       out.clear();
       err.clear();
-      expect(await cli(['status', id, 'review']), 1);
-      expect(err.toString(),
-          contains('allowed: backlog, todo, doing, blocked, done, canceled'));
+      expect(await cli(['status', id, 'wip']), 1);
+      expect(
+          err.toString(),
+          contains(
+              'allowed: backlog, todo, doing, blocked, review, done, canceled'));
       err.clear();
       expect(await cli(['new', 'W', '--status', 'wip']), 1);
       expect(err.toString(), contains('unknown status "wip"'));
-      expect(await cli(['task', 'T', '--status', 'review'], stdinText: 'd'), 1);
+      expect(await cli(['task', 'T', '--status', 'wip'], stdinText: 'd'), 1);
     });
 
     test('priority on notes: words and numbers', () async {

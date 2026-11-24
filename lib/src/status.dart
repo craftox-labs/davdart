@@ -4,6 +4,7 @@ const allowedStatuses = [
   'todo',
   'doing',
   'blocked',
+  'review',
   'done',
   'canceled',
 ];
@@ -16,6 +17,10 @@ const statusAliases = {
   'duplicate': 'canceled',
   'wontfix': 'canceled',
   'draft': 'backlog',
+  'in_review': 'review',
+  'in-review': 'review',
+  'ready_for_review': 'review',
+  'to_review': 'review',
 };
 
 /// The allowed status for [word] (trimmed, lower-cased, aliases resolved), or

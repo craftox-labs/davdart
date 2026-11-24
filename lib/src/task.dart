@@ -228,7 +228,7 @@ class Task {
   bool get isClosed => isCompleted || isCancelled;
   bool get isRecurring => rrule != null && rrule!.isNotEmpty;
 
-  /// The board status word (`backlog`, `todo`, `doing`, `blocked`, `done`,
+  /// The board status word (`backlog`, `todo`, `doing`, `blocked`, `review`, `done`,
   /// `canceled`): a `status-*` tag wins, else derived from [status].
   String get boardStatus {
     for (final c in categories) {

@@ -153,6 +153,10 @@ void main() {
     expect(t.status, 'NEEDS-ACTION');
     expect(t.boardStatus, 'blocked');
     expect(t.categories, contains('status-blocked'));
+    t.setBoardStatus('review', now);
+    expect(t.status, 'NEEDS-ACTION');
+    expect(t.boardStatus, 'review');
+    expect(t.categories, contains('status-review'));
     t.setBoardStatus('doing', now);
     expect(t.status, 'IN-PROCESS');
     final plain = Task(uid: 'p');

@@ -96,6 +96,7 @@ class TaskContextMenu extends StatelessWidget {
               'todo',
               'doing',
               'blocked',
+              'review',
               'done',
               'canceled',
             ])

@@ -145,6 +145,11 @@ void main() {
       ('wontfix', 'canceled'),
       ('draft', 'backlog'),
       ('blocked', 'blocked'),
+      ('review', 'review'),
+      ('in_review', 'review'),
+      ('In-Review', 'review'),
+      ('ready_for_review', 'review'),
+      ('to_review', 'review'),
     ]) {
       expect((await svc.setStatus(n, word)).item.status, want, reason: word);
       expect((await svc.setStatus(t, word)).item.status, want, reason: word);
@@ -154,12 +159,12 @@ void main() {
     await svc.setStatus(t, 'done');
     await svc.setStatus(n, 'doing');
     await expectLater(
-        svc.setStatus(n, 'review'),
+        svc.setStatus(n, 'wip'),
         throwsA(isA<ItemServiceException>().having(
             (e) => e.message,
             'message',
             contains(
-                'allowed: backlog, todo, doing, blocked, done, canceled'))));
+                'allowed: backlog, todo, doing, blocked, review, done, canceled'))));
     expect((await svc.get(n)).status, 'doing', reason: 'unchanged');
     expect(() => svc.create(ItemKind.note, 'X', status: 'wip'),
         throwsA(isA<ItemServiceException>()));

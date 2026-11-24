@@ -49,7 +49,9 @@ const _collNote = ' Pass collection (href or exact name from the collections '
     'tool, action list; call it first) to work in another collection.';
 
 final _statusNote = 'one of ${allowedStatuses.join(', ')}; '
-    'in_progress and in-progress mean doing, cancelled, duplicate and wontfix '
+    'review means shipped and waiting on tm to check; doing means partly shipped '
+    'with work remaining; in_progress and in-progress mean doing, in_review, '
+    'in-review, ready_for_review and to_review mean review, cancelled, duplicate and wontfix '
     'mean canceled, draft means backlog; any other word is refused';
 
 String _slash(String p) => p.endsWith('/') ? p : '$p/';

@@ -61,6 +61,12 @@ void main() {
   setUp(() => AppState.debugDefaultFocus = HomeFocus.board);
   tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
+  test('review sits between doing and done in the fixed order', () {
+    expect(boardOrder,
+        ['backlog', 'todo', 'doing', 'blocked', 'review', 'done', 'canceled']);
+    expect(statusColumn('review'), 'review');
+  });
+
   group('columns', () {
     late AppState s;
     setUp(() async {

@@ -40,9 +40,11 @@ due, priority, start, end, body). Lists leave out bodies.
 - Folders are notes tagged `kind-folder` (`create --folder`). They hold items of any kind.
 - Parent links are the iCalendar RELATED-TO property; `--under` and `move` set it. Do not
   put structure in titles.
-- Status is one of a fixed set: `backlog`, `todo`, `doing`, `blocked`, `done`, `canceled`.
+- Status is one of a fixed set: `backlog`, `todo`, `doing`, `blocked`, `review`, `done`, `canceled`.
+  `review` = built, pushed and deployed, waiting on tm's check (tm moves it to `done`); set
+  it when shipping. `doing` = partly shipped with work remaining.
   Aliases are accepted and stored as the canonical word: `in_progress`, `in-progress` ->
-  `doing`; `cancelled`, `duplicate`, `wontfix` -> `canceled`; `draft` -> `backlog`. Any other
+  `doing`; `in_review`, `in-review`, `ready_for_review`, `to_review` -> `review`; `cancelled`, `duplicate`, `wontfix` -> `canceled`; `draft` -> `backlog`. Any other
   word is refused with an error listing the allowed ones (CLI and MCP alike). Old items with
   other words are never rewritten silently; the board shows them in an Other column, so
   re-status them with `status`. Notes and events carry it as a `status-<word>`
