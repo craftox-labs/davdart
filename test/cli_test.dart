@@ -167,6 +167,9 @@ void main() {
       final g = await jcli(['get', tid]);
       expect(g['tags'], containsAll(['y', 'z']));
       expect(g['tags'], isNot(contains('x')));
+      expect(await cli(['tag', tid, '--add', 'kind-projects']), 1);
+      expect(err.toString(), contains('create --folder'));
+      expect(await cli(['tag', tid, '--remove', 'kind-folder']), 1);
       await jcli(['move', tid, 'top']);
       expect((await jcli(['get', tid])).containsKey('parent'), isFalse);
       await jcli(['delete', tid]);

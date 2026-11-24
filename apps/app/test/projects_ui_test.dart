@@ -221,6 +221,33 @@ void main() {
       expect(s.tasks.firstWhere((k) => k.uid == free).parentUid, isNull);
       await _end(t);
     });
+
+    testWidgets('container scope gives new items no container parent', (
+      t,
+    ) async {
+      final s = await _app(t);
+      s.openFolder('c');
+      final tid = await t.runAsync(() => s.addTask('Loose'));
+      final eid = await t.runAsync(
+        () => s.addEvent('Evt', start: DateTime.utc(2026, 12, 1, 9)),
+      );
+      await t.runAsync(() => s.addNote('Nt', parentUid: 'c'));
+      expect(s.tasks.firstWhere((k) => k.uid == tid).parentUid, isNull);
+      expect(s.events.firstWhere((e) => e.uid == eid).parentUid, isNull);
+      expect(s.notes.firstWhere((n) => n.summary == 'Nt').parentUid, isNull);
+      await _end(t);
+    });
+
+    testWidgets('concurrent addProject creates one container', (t) async {
+      final s = await _app(t, notes: [_f('x', 'Other')]);
+      final r = await t.runAsync(
+        () => Future.wait([s.addProject('P1'), s.addProject('P2')]),
+      );
+      expect(r!.every((u) => u != null), isTrue);
+      expect(s.projectIndex.containers(), hasLength(1));
+      expect(s.projectIndex.projects(), hasLength(2));
+      await _end(t);
+    });
   });
 
   group('phone', () {

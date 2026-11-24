@@ -1306,20 +1306,36 @@ class AppState extends ChangeNotifier {
   /// uid, or null (empty title, read-only Space, failure).
   Future<String?> addProject(String title) async {
     if (title.trim().isEmpty || !editable) return null;
-    var container = projectIndex.containers().firstOrNull;
-    if (container == null) {
-      final c = _newFolder(projectsTitle, tags: [projectsTag])!;
-      await _save(c);
-      if (error != null) return null;
-      container = tree.find(c.uid)?.note;
-      if (container == null) return null;
+    // A second call while one is running waits for it and re-reads the containers, so a
+    // double submit never creates two containers.
+    while (_projectsBusy != null) {
+      await _projectsBusy;
     }
-    final n = _newFolder(title, parentUid: container.uid)!;
-    await _save(n);
-    if (error != null) return null;
-    openFolder(n.uid);
-    return n.uid;
+    final done = Completer<void>();
+    _projectsBusy = done.future;
+    try {
+      var container = projectIndex.containers().firstOrNull;
+      if (container == null) {
+        final c = _newFolder(projectsTitle, tags: [projectsTag])!;
+        await _save(c);
+        if (error != null) return null;
+        // A sync may have landed a container meanwhile: the oldest wins.
+        container =
+            projectIndex.containers().firstOrNull ?? tree.find(c.uid)?.note;
+        if (container == null) return null;
+      }
+      final n = _newFolder(title, parentUid: container.uid)!;
+      await _save(n);
+      if (error != null) return null;
+      openFolder(n.uid);
+      return n.uid;
+    } finally {
+      _projectsBusy = null;
+      done.complete();
+    }
   }
+
+  Future<void>? _projectsBusy;
 
   bool loading = false;
   String? error;
@@ -1713,10 +1729,12 @@ class AppState extends ChangeNotifier {
     final t = title.trim();
     if (t.isEmpty) return;
     final now = DateTime.now().toUtc();
+    // Nothing loose under a Projects container (same rule as tasks/events).
+    final pn = parentUid == null ? null : tree.find(parentUid)?.note;
     final n = Note(
       uid: 'davdart-${now.microsecondsSinceEpoch}',
       summary: t,
-      parentUid: parentUid,
+      parentUid: pn != null && isProjectsContainer(pn) ? null : parentUid,
       created: now,
       lastModified: now,
     );
@@ -2028,8 +2046,11 @@ class AppState extends ChangeNotifier {
   /// under the scope, so a project's items stay in the project).
   String? _parentOrScope(String? parentUid) {
     if (parentUid != null && findItem(parentUid) != null) return parentUid;
-    if (parentUid == null && scopeUid != null && tree.find(scopeUid!) != null) {
-      return scopeUid;
+    if (parentUid == null && scopeUid != null) {
+      final sc = tree.find(scopeUid!)?.note;
+      // A Projects container is no place for loose items: they would be
+      // invisible on the Projects panel. Treat it as no scope.
+      if (sc != null && !isProjectsContainer(sc)) return scopeUid;
     }
     return null;
   }

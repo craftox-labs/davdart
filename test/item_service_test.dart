@@ -64,6 +64,22 @@ void main() {
     expect(back, containsAll([folderTag, projectsTag, 'y']));
   });
 
+  test('tag add and remove refuse kind-projects and kind-folder', () async {
+    final c = (await svc.create(ItemKind.note, 'Projects',
+            tags: [projectsTag], folder: true))
+        .item
+        .uid;
+    final n = await mk(ItemKind.note, 'N');
+    for (final t in [projectsTag, folderTag]) {
+      await expectLater(
+          svc.setTags(c, remove: [t]), throwsA(isA<ItemServiceException>()));
+      await expectLater(
+          svc.setTags(n, add: [t]), throwsA(isA<ItemServiceException>()));
+    }
+    expect((await svc.get(c)).tags, containsAll([folderTag, projectsTag]));
+    expect((await svc.get(n)).tags, isNot(contains(projectsTag)));
+  });
+
   test('overview gives tree and counts', () async {
     final f = await mk(ItemKind.note, 'Folder', folder: true);
     final sub = await mk(ItemKind.note, 'Sub', parent: f, folder: true);

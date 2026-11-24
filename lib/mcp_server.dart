@@ -428,7 +428,8 @@ McpServer buildMcpServer({
     tool(
         'update',
         'Change fields of one item; only the fields you pass change. Tags: '
-            'tags_add, tags_remove or tags_set. status ($_statusNote; empty '
+            'tags_add, tags_remove or tags_set (kind-projects and kind-folder '
+            'cannot be added or removed; create folders with create). status ($_statusNote; empty '
             'string clears it on notes and events). due is for tasks (empty '
             'clears); priority for tasks and notes (1-4 high, 5 medium, 6-9 '
             'low; -1 clears; a note keeps it as a "priority: high|medium|low" '

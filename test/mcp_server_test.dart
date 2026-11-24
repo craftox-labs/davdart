@@ -186,6 +186,22 @@ void main() {
       expect(other.ics, isEmpty);
     });
 
+    test('update refuses kind-projects in tags_add and tags_remove', () async {
+      final c = await connect(env.server({ToolGroup.write}));
+      var (e, r) = await call(
+          c, 'create', {'title': 'F', 'kind': 'note', 'folder': true});
+      expect(e, isFalse, reason: '$r');
+      final id = (r['item'] as Map)['uid'] as String;
+      for (final k in ['tags_add', 'tags_remove']) {
+        (e, r) = await call(c, 'update', {
+          'id': id,
+          k: ['kind-projects']
+        });
+        expect(e, isTrue);
+        expect('$r', contains('create --folder'));
+      }
+    });
+
     test('the configured collection by name reaches the same data', () async {
       final c = await connect(
           make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));

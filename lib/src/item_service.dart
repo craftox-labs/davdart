@@ -940,6 +940,14 @@ class ItemService {
           String? writer,
           bool dryRun = false}) =>
       _edit(id, 'tags', kind, dryRun, (e, _) {
+        for (final x in [..._cleanTags(add), ..._cleanTags(remove)]) {
+          if (x == projectsTag || x == folderTag) {
+            throw ItemServiceException('"$x" cannot be added or removed with '
+                'tags: it would turn a folder into a Projects container or '
+                'back, or un-project its children. Use create --folder (or '
+                'the Projects actions in the app) instead');
+          }
+        }
         final before = List.of(e.tags);
         var t = set == null
             ? List.of(before)
