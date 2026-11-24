@@ -274,4 +274,38 @@ void main() {
       expect(out.toString(), startsWith('created task '));
     });
   });
+
+  group('rank', () {
+    Future<List<String>> order(String status) async => [
+          for (final i in (await jcli(
+              ['list', '--kind', 'task', '--status', status]))['items'] as List)
+            (i as Map)['title'] as String
+        ];
+    test('top, bottom, before, after, none, errors, read-only', () async {
+      for (final n in ['a', 'b', 'c']) {
+        await jcli(['create', n, '--kind', 'task', '--status', 'todo']);
+      }
+      var r = await jcli(['rank', 'c', 'top']);
+      expect((r['order'] as List).first['title'], 'c');
+      expect(await order('todo'), ['c', 'a', 'b']);
+      await jcli(['rank', 'c', 'bottom']);
+      expect(await order('todo'), ['a', 'b', 'c']);
+      await jcli(['rank', 'c', 'before', 'a']);
+      expect(await order('todo'), ['c', 'a', 'b']);
+      await jcli(['rank', 'c', 'after', 'a']);
+      expect(await order('todo'), ['a', 'c', 'b']);
+      out.clear();
+      expect(await cli(['get', 'c']), 0);
+      expect(out.toString(), contains('rank: '));
+      await jcli(['rank', 'c', 'none']);
+      out.clear();
+      expect(await cli(['rank', 'a', 'top']), 0);
+      expect(out.toString(), contains('todo column now'));
+      expect(await cli(['rank', 'a']), 2);
+      expect(await cli(['rank', 'a', 'sideways']), 2);
+      expect(await cli(['rank', 'a', 'before']), 2);
+      expect(await cli(['rank', 'a', 'before', 'ghost']), 1);
+      expect(await cli(['rank', 'a', 'top', '--read-only']), 3);
+    });
+  });
 }

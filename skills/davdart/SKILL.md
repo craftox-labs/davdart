@@ -28,7 +28,7 @@ due, priority, start, end, body). Lists leave out bodies.
   [--under FOLDER] [--folder] [--due D] [--priority 0-9] [--start W --end W --location L]`
 - `update ID [--title] [--body|--stdin] [--location --start --end]`
 - `move ID TARGET|top` (refuses loops), `tag ID --add a,b --remove c --set a,b`,
-  `status ID WORD|none`, `due ID DATE|none`, `priority ID N|high|medium|low|none`, `delete ID [--no-adopt]`.
+  `status ID WORD|none`, `rank ID top|bottom|before OTHER|after OTHER|none`, `due ID DATE|none`, `priority ID N|high|medium|low|none`, `delete ID [--no-adopt]`.
 - Dates: `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM[:SS][Z]`.
 - Put long text on stdin (`--stdin`), not in shell arguments.
 - Preview any write first with `--dry-run`: it prints what would change and writes nothing.
@@ -56,6 +56,14 @@ due, priority, start, end, body). Lists leave out bodies.
   1-4 high, 5 medium, 6-9 low; `create --priority` and MCP `update` priority work on notes too).
   Always set it with the command, not by editing the body. Events have no priority. `get --json`
   shows a note's priority as 1, 5 or 9.
+- Order: a status is a board column, ordered by manual rank, then priority (high, medium, low, none),
+  then due date, then creation. "Move X to the top of todo": `rank X top`; "put X above Y":
+  `rank X before Y`; `rank X none` drops the manual rank so priority and due decide again. Rank
+  only exists inside one status (the item needs a status, OTHER must share it; events cannot be
+  ranked) and may rewrite neighbours' ranks. It prints the column's new order: check it. Priority
+  words: high (1-4), medium (5), low (6-9). `list --status S` shows the column in board order and
+  `get` shows `rank` when set. MCP: the `rank` tool in the `write` group (`position` top|bottom|none,
+  or `before`/`after`).
 - Tags are free words without commas. `tag --set` keeps status and folder tags; `tag --add/--remove` of `kind-projects` or `kind-folder` is refused (make folders with `create --folder`). Projects: a Space has one container folder tagged `kind-projects` (title "Projects"), made with `create Projects --kind note --folder --tags kind-projects`; its direct child folders are the projects (`create NAME --kind note --folder --under CONTAINER_ID`). Project-ness comes from location only, projects do not nest, and an item belongs to the project above it. File new work under the project folder (`--under`); progress is derived (done / open + review + done), never stored.
 - Saved-view notes are hidden from listings; leave them alone.
 - Search before creating: look for an existing item or folder first to avoid duplicates.
@@ -110,7 +118,7 @@ work with their old output. Prefer the generic commands above.
 ## MCP server (`davdart_mcp`)
 
 Tool groups (`--tools`, default `read`): `read` (overview, list, get, collections list, and `history`
-when a log is set), `write` (create, update, move), `delete` (delete one item, separate on purpose:
+when a log is set), `write` (create, update, move, rank), `delete` (delete one item, separate on purpose:
 `write` cannot delete), `admin` (collection create, rename, delete). `--read-only` is the same as
 `--tools read` and conflicts with any other group.
 

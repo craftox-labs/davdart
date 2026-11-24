@@ -1,5 +1,6 @@
 import 'dart:math';
 
+import 'board_order.dart';
 import 'caldav.dart';
 import 'collection_backup_stub.dart'
     if (dart.library.io) 'collection_backup_io.dart';
@@ -11,6 +12,7 @@ import 'note.dart';
 import 'note_tree.dart';
 import 'plan_item.dart';
 import 'projects.dart' show projectsTag;
+import 'rank.dart' show planRanks;
 import 'saved_view.dart';
 import 'status.dart';
 import 'task.dart';
@@ -60,6 +62,7 @@ class ItemData {
     this.created,
     this.modified,
     this.writer,
+    this.rank,
   });
 
   final ItemKind kind;
@@ -86,6 +89,9 @@ class ItemData {
   /// property). Not authentication.
   final String? writer;
 
+  /// Manual board order (lower first), or null; notes and tasks only.
+  final double? rank;
+
   /// [full] false leaves out the body, for lists.
   Map<String, Object?> toJson({bool full = true}) => {
         'kind': kind.name,
@@ -106,6 +112,7 @@ class ItemData {
         if (created != null) 'created': created!.toIso8601String(),
         if (modified != null) 'modified': modified!.toIso8601String(),
         if (writer != null) 'writer': writer,
+        if (rank != null) 'rank': rank,
       };
 }
 
@@ -181,6 +188,33 @@ class ItemChange {
         'dryRun': dryRun,
         'changes': changes,
         'item': item.toJson(),
+      };
+}
+
+/// One card of a column after [ItemService.rankItem].
+class RankedItem {
+  const RankedItem(this.uid, this.title, this.rank);
+  final String uid;
+  final String title;
+  final double? rank;
+  Map<String, Object?> toJson() =>
+      {'uid': uid, 'title': title, if (rank != null) 'rank': rank};
+}
+
+/// Outcome of [ItemService.rankItem]: what was written (the moved item and
+/// any neighbours whose rank had to change) and the column's order after.
+class RankChange {
+  const RankChange(this.dryRun, this.status, this.changes, this.order);
+  final bool dryRun;
+  final String status;
+  final List<String> changes;
+  final List<RankedItem> order;
+  Map<String, Object?> toJson() => {
+        'action': 'rank',
+        'dryRun': dryRun,
+        'status': status,
+        'changes': changes,
+        'order': [for (final r in order) r.toJson()],
       };
 }
 
@@ -414,6 +448,25 @@ class _Ref {
         _ => raw,
       });
 
+  /// The board view of a note or task; null for an event.
+  BoardItem? get boardItem => switch (raw) {
+        Note n => BoardItem.note(n),
+        Task t => BoardItem.task(t),
+        _ => null,
+      };
+
+  double? get rank => switch (raw) {
+        Note n => n.rank,
+        Task t => t.rank,
+        _ => null,
+      };
+
+  set rank(double? v) => switch (raw) {
+        Note n => n.rank = v,
+        Task t => t.rank = v,
+        _ => null,
+      };
+
   String? get status => switch (raw) {
         Note n => PlanItem.fromNote(n).status,
         Task t => t.boardStatus,
@@ -448,7 +501,8 @@ class _Ref {
         priority: d.priority,
         created: d.created,
         modified: d.modified,
-        writer: d.writer);
+        writer: d.writer,
+        rank: d.rank);
   }
 
   ItemData _toData() => _withWriter(_toData0());
@@ -474,7 +528,8 @@ class _Ref {
         priority: d.priority,
         created: d.created,
         modified: d.modified,
-        writer: w);
+        writer: w,
+        rank: d.rank);
   }
 
   ItemData _toData0() {
@@ -493,7 +548,8 @@ class _Ref {
             isFolder: isFolderNote(n),
             priority: PlanItem.fromNote(n).priority,
             created: n.created,
-            modified: n.lastModified);
+            modified: n.lastModified,
+            rank: n.rank);
       case Task t:
         return ItemData(
             kind: ItemKind.task,
@@ -509,7 +565,8 @@ class _Ref {
             start: t.dtstart?.value,
             priority: t.priority,
             created: t.created,
-            modified: t.lastModified);
+            modified: t.lastModified,
+            rank: t.rank);
       default:
         final e = raw as Event;
         return ItemData(
@@ -737,6 +794,14 @@ class ItemService {
       return true;
     }).toList()
       ..sort((a, b) {
+        // A status list is a board column: board order for notes and tasks
+        // (rank first), events after them by creation.
+        if (status != null) {
+          final ba = a.boardItem, bb = b.boardItem;
+          if (ba != null && bb != null) return compareBoardItems(ba, bb);
+          if (ba != null) return -1;
+          if (bb != null) return 1;
+        }
         final c = a.created!.compareTo(b.created!);
         return c != 0 ? c : a.title.compareTo(b.title);
       });
@@ -1065,6 +1130,113 @@ class ItemService {
               'priority applies to tasks and notes only; "${e.title}" is an event');
       }
     }, writer);
+  }
+
+  /// Puts a note or task at a place in its status column (the board order of
+  /// [compareBoardItems]): exactly one of [top], [bottom], [before] (an item
+  /// in the same column), [after], or [clear] (drop its manual rank so
+  /// priority and due decide again). Rank only exists inside a status. Like
+  /// the app's drag, this may also write neighbours (unranked cards above the
+  /// spot, or a re-spread of the column). Returns the column order after.
+  Future<RankChange> rankItem(
+    String id, {
+    bool top = false,
+    bool bottom = false,
+    String? before,
+    String? after,
+    bool clear = false,
+    String? writer,
+    bool dryRun = false,
+  }) async {
+    final n = [top, bottom, before != null, after != null, clear]
+        .where((x) => x)
+        .length;
+    if (n != 1) {
+      throw ItemServiceException(
+          'rank needs exactly one of top, bottom, before, after, clear');
+    }
+    final all = await _load();
+    final base = _find(all, id);
+    final bi = base.boardItem;
+    if (bi == null) {
+      throw ItemServiceException(
+          'rank applies to notes and tasks only; "${base.title}" is an event');
+    }
+    if (base.raw is Note && isFolderNote(base.raw as Note)) {
+      throw ItemServiceException(
+          'rank applies to notes and tasks, not folders; "${base.title}" is a folder');
+    }
+    final st = base.status;
+    if (st == null) {
+      throw ItemServiceException(
+          'cannot rank "${base.title}": it has no status (rank orders a status column)');
+    }
+    String col(String s) => canonicalStatus(s) ?? s;
+    final column = <_Ref>[
+      for (final r in all)
+        if (r.boardItem != null &&
+            r.status != null &&
+            col(r.status!) == col(st) &&
+            !(r.raw is Note && isFolderNote(r.raw as Note)))
+          r,
+    ]..sort((a, b) => compareBoardItems(a.boardItem!, b.boardItem!));
+    final others = [
+      for (final r in column)
+        if (r.uid != base.uid) r,
+    ];
+    _Ref sibling(String q) {
+      final r = _find(all, q);
+      if (r.uid == base.uid) {
+        throw ItemServiceException(
+            'cannot place "${base.title}" relative to itself');
+      }
+      if (!others.any((o) => o.uid == r.uid)) {
+        throw ItemServiceException(
+            '"${r.title}" is not in the ${col(st)} column with "${base.title}"');
+      }
+      return r;
+    }
+
+    final Map<String, double?> plan;
+    if (clear) {
+      plan = {base.uid: null};
+    } else {
+      final int at;
+      if (top) {
+        at = 0;
+      } else if (bottom) {
+        at = others.length;
+      } else if (before != null) {
+        at = others.indexWhere((o) => o.uid == sibling(before).uid);
+      } else {
+        at = others.indexWhere((o) => o.uid == sibling(after!).uid) + 1;
+      }
+      plan = planRanks([for (final o in others) (o.uid, o.rank)], at, base.uid);
+    }
+    final byUid = {for (final r in column) r.uid: r};
+    final edits = <_Ref, _Ref>{}; // original -> edited clone
+    final changes = <String>[];
+    for (final e in plan.entries) {
+      final orig = byUid[e.key]!;
+      if (orig.rank == e.value) continue;
+      final c = orig.clone()..rank = e.value;
+      edits[orig] = c;
+      changes
+          .add('${orig.title}: rank ${orig.rank ?? '-'} -> ${e.value ?? '-'}');
+    }
+    for (final c in edits.values) {
+      c.stampWriter(writer);
+    }
+    final after0 = [
+      for (final r in column) edits[r] ?? r,
+    ]..sort((a, b) => compareBoardItems(a.boardItem!, b.boardItem!));
+    if (!dryRun) {
+      for (final en in edits.entries) {
+        await en.value.put(client, en.key);
+      }
+    }
+    return RankChange(dryRun, col(st), changes,
+        [for (final r in after0) RankedItem(r.uid, r.title, r.rank)]);
   }
 
   /// Deletes an item. With [adoptChildren] (default) its children move up to

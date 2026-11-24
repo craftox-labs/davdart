@@ -459,6 +459,50 @@ McpServer buildMcpServer({
           id: a.req('id'), kind: a.kind('kind'));
     });
     tool(
+        'rank',
+        'Reorder a note or task inside its status column (the board order: '
+            'manual rank, then priority, due, creation). Give exactly one of '
+            'position "top" or "bottom", before or after (another item in the '
+            'same status), or position "none" to drop its manual rank so '
+            'priority and due decide again. Items without a status cannot be '
+            'ranked. May also write neighbours whose rank must change. '
+            'Returns the column order after.$_collNote',
+        {
+          'collection': collS,
+          'id': idS,
+          'position': JsonSchema.string(
+              description: '"top", "bottom" or "none" (clear the rank)'),
+          'before': JsonSchema.string(
+              description: 'uid, href or exact title of the item to go above'),
+          'after': JsonSchema.string(
+              description: 'uid, href or exact title of the item to go below'),
+          'writer': writerS,
+          'dry_run': dryS,
+        },
+        ['id'],
+        false, (a) async {
+      final pos = a.string('position')?.toLowerCase();
+      if (pos != null && !const {'top', 'bottom', 'none'}.contains(pos)) {
+        throw ItemServiceException(
+            'position must be top, bottom or none (or pass before/after)');
+      }
+      final svc = await svcFor(a);
+      return logged(
+          'rank',
+          a,
+          svc,
+          (w) async => (await svc.rankItem(a.req('id'),
+                  top: pos == 'top',
+                  bottom: pos == 'bottom',
+                  clear: pos == 'none',
+                  before: a.string('before'),
+                  after: a.string('after'),
+                  writer: w,
+                  dryRun: a.boolean('dry_run') ?? false))
+              .toJson(),
+          id: a.req('id'));
+    });
+    tool(
         'move',
         'Move an item under a parent folder or item, or to the top level '
             '(omit parent or pass "top"). Cycles are refused.$_collNote',

@@ -69,7 +69,7 @@ void main() {
     });
     test('write group', () async {
       final c = await connect(env.server({ToolGroup.write}));
-      expect(await toolNames(c), ['create', 'move', 'update']);
+      expect(await toolNames(c), ['create', 'move', 'rank', 'update']);
     });
     test('delete group is only delete', () async {
       final c = await connect(env.server({ToolGroup.delete}));
@@ -84,6 +84,7 @@ void main() {
         'list',
         'move',
         'overview',
+        'rank',
         'update'
       ]);
       await expectLater(call(c, 'delete', {'id': 'x'}), throwsA(anything));
@@ -104,7 +105,7 @@ void main() {
       expect(() => env.server({ToolGroup.admin}, backup: '/tmp/x'),
           returnsNormally);
     });
-    test('all groups give eight tools', () async {
+    test('all groups give nine tools', () async {
       final c = await connect(env.server(ToolGroup.values.toSet(),
           backup: Directory.systemTemp.path));
       expect(await toolNames(c), [
@@ -115,6 +116,7 @@ void main() {
         'list',
         'move',
         'overview',
+        'rank',
         'update'
       ]);
     });
@@ -345,6 +347,28 @@ void main() {
       expect(d['dryRun'], isFalse);
       (_, page) = await call(c, 'list', {'kind': 'task'});
       expect(page['total'], 0);
+    });
+
+    test('rank reorders a status column', () async {
+      for (final n in ['A', 'B', 'C']) {
+        await call(c, 'create', {'kind': 'task', 'title': n, 'status': 'todo'});
+      }
+      var (err, m) = await call(c, 'rank', {'id': 'C', 'position': 'top'});
+      expect(err, isFalse, reason: '$m');
+      expect([for (final x in m['order'] as List) (x as Map)['title']],
+          ['C', 'A', 'B']);
+      (err, m) = await call(c, 'rank', {'id': 'C', 'after': 'B'});
+      expect([for (final x in m['order'] as List) (x as Map)['title']],
+          ['A', 'B', 'C']);
+      (err, m) =
+          await call(c, 'rank', {'id': 'A', 'before': 'C', 'dry_run': true});
+      expect(m['dryRun'], isTrue);
+      (err, m) = await call(c, 'rank', {'id': 'C', 'position': 'none'});
+      expect(err, isFalse, reason: '$m');
+      (err, _) = await call(c, 'rank', {'id': 'A', 'position': 'sideways'});
+      expect(err, isTrue);
+      (err, _) = await call(c, 'rank', {'id': 'A'});
+      expect(err, isTrue);
     });
 
     test('status is a fixed set; note priority through update', () async {

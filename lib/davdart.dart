@@ -1,6 +1,7 @@
 /// UI-free core for notes, tasks and events over CalDAV, stored as VJOURNAL.
 library;
 
+export 'src/board_order.dart';
 export 'src/caldav.dart';
 export 'src/ical.dart'
     show

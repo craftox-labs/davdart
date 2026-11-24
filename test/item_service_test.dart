@@ -295,6 +295,94 @@ void main() {
     expect(parseWhen('2026-12-24T09:30').isFloating, isTrue);
     expect(() => parseWhen('tomorrow'), throwsA(isA<ItemServiceException>()));
   });
+
+  group('rankItem', () {
+    Future<String> st(ItemKind k, String title, String status,
+            {int? priority}) async =>
+        (await svc.create(k, title, status: status, priority: priority))
+            .item
+            .uid;
+    Future<List<String>> col(String status) async =>
+        [for (final i in (await svc.list(status: status)).items) i.title];
+
+    test('top, bottom, before, after, none', () async {
+      for (final n in ['a', 'b', 'c', 'd']) {
+        await st(ItemKind.task, n, 'todo');
+      }
+      await st(ItemKind.note, 'n', 'doing');
+      var r = await svc.rankItem('c', top: true);
+      expect([for (final x in r.order) x.title].first, 'c');
+      expect(await col('todo'), ['c', 'a', 'b', 'd']);
+      r = await svc.rankItem('a', bottom: true);
+      expect(await col('todo'), ['c', 'b', 'd', 'a']);
+      r = await svc.rankItem('a', before: 'b');
+      expect(await col('todo'), ['c', 'a', 'b', 'd']);
+      r = await svc.rankItem('c', after: 'b');
+      expect(await col('todo'), ['a', 'b', 'c', 'd']);
+      expect([for (final x in r.order) x.title], ['a', 'b', 'c', 'd']);
+      expect((await svc.get('c')).rank, isNotNull);
+      r = await svc.rankItem('c', clear: true);
+      expect((await svc.get('c')).rank, isNull);
+      expect(await col('todo'), ['a', 'b', 'd', 'c']);
+    });
+
+    test('ranks neighbours, outranks priority, clear falls back', () async {
+      await st(ItemKind.task, 'low', 'todo', priority: 9);
+      await st(ItemKind.task, 'high', 'todo', priority: 1);
+      await st(ItemKind.note, 'plain', 'todo');
+      expect(await col('todo'), ['high', 'low', 'plain']);
+      await svc.rankItem('plain', top: true);
+      expect(await col('todo'), ['plain', 'high', 'low']);
+      // Dropping after the unranked 'high' ranks the unranked cards above.
+      await svc.rankItem('low', after: 'high');
+      expect(await col('todo'), ['plain', 'high', 'low']);
+      expect((await svc.get('high')).rank, isNotNull);
+      await svc.rankItem('plain', clear: true);
+      expect(await col('todo'), ['high', 'low', 'plain']);
+    });
+
+    test('a tiny gap re-spreads the column', () async {
+      for (final n in ['a', 'b', 'c']) {
+        await st(ItemKind.task, n, 'todo');
+      }
+      await svc.rankItem('a', top: true);
+      await svc.rankItem('b', after: 'a');
+      for (var i = 0; i < 60; i++) {
+        await svc.rankItem('c', after: 'a');
+        await svc.rankItem('b', after: 'a');
+      }
+      expect(await col('todo'), ['a', 'b', 'c']);
+      final ranks = [
+        for (final t in ['a', 'b', 'c']) (await svc.get(t)).rank!
+      ];
+      expect(ranks[0] < ranks[1] && ranks[1] < ranks[2], isTrue);
+    });
+
+    test('dry run writes nothing; errors are clear', () async {
+      await st(ItemKind.task, 'a', 'todo');
+      await st(ItemKind.task, 'b', 'todo');
+      await st(ItemKind.task, 'z', 'doing');
+      final plain = (await svc.create(ItemKind.note, 'nostatus')).item.uid;
+      final ev = await mk(ItemKind.event, 'Ev');
+      final r = await svc.rankItem('b', top: true, dryRun: true);
+      expect(r.changes, isNotEmpty);
+      expect((await svc.get('b')).rank, isNull);
+      Future<void> bad(Future<Object?> f, String m) => expectLater(
+          f,
+          throwsA(isA<ItemServiceException>()
+              .having((e) => e.message, 'message', contains(m))));
+      await bad(svc.rankItem(plain, top: true), 'no status');
+      await bad(svc.rankItem(ev, top: true), 'event');
+      final fo =
+          (await svc.create(ItemKind.note, 'Fold', folder: true)).item.uid;
+      await bad(svc.rankItem(fo, top: true), 'folder');
+      await bad(svc.rankItem('a', before: 'z'), 'not in the todo column');
+      await bad(svc.rankItem('a', before: 'a'), 'itself');
+      await bad(svc.rankItem('a'), 'exactly one');
+      await bad(svc.rankItem('a', top: true, bottom: true), 'exactly one');
+      await bad(svc.rankItem('a', before: 'nope'), 'no item matches');
+    });
+  });
 }
 
 /// Runs [before] ahead of each PUT, then lets the fake server answer.

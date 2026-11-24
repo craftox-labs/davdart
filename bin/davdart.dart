@@ -27,6 +27,7 @@ generic commands (a "kind" is note, task or event; ID is a uid, href or exact ti
   status ID STATUS|none
   due ID DATE|none            (tasks)
   priority ID N|none          (tasks and notes; notes: high|medium|low or 1/5/9)
+  rank ID top|bottom|before OTHER|after OTHER|none   (order inside the item's status column)
   delete ID [--kind K] [--no-adopt]
   collections list | probe [ID] | create NAME [--components VJOURNAL,VTODO,VEVENT]
               | rename ID NAME | delete ID --confirm NAME [--non-empty] [--allow-unreadable] [--backup-dir DIR]
@@ -119,7 +120,7 @@ List<String> _csv(String? s) => (s ?? '')
 
 const _itemWrites = {
   'create', 'update', 'move', 'move-to', 'tag', 'status', 'due', 'priority',
-  'delete',
+  'rank', 'delete',
   // aliases
   'add', 'new', 'set-status', 'append', 'task', 'folder', 'rm',
 };
@@ -406,6 +407,7 @@ class _Ctx {
     if (i.parentUid != null) o.writeln('parent: ${i.parentUid}');
     if (i.due != null) o.writeln('due: ${i.due}');
     if (i.priority != null) o.writeln('priority: ${i.priority}');
+    if (i.rank != null) o.writeln('rank: ${i.rank}');
     if (i.start != null) o.writeln('start: ${i.start}');
     if (i.end != null) o.writeln('end: ${i.end}');
     if (i.location != null && i.location!.isNotEmpty) {
@@ -638,6 +640,35 @@ class _Ctx {
             kind: it.kind,
             dryRun: dry);
         done(c, '${it.title}: priority ${c.item.priority ?? '-'}');
+      case 'rank':
+        final it = await resolve(_need(rest, 0, 'an ID'), kind: kind);
+        final how = _need(rest, 1, 'top|bottom|before OTHER|after OTHER|none')
+            .toLowerCase();
+        String? other;
+        if (how == 'before' || how == 'after') {
+          other = (await resolve(_need(rest, 2, 'the other item'))).uid;
+        } else if (!const {'top', 'bottom', 'none'}.contains(how)) {
+          throw UsageError(
+              'rank needs top, bottom, before OTHER, after OTHER or none');
+        }
+        final r = await svc.rankItem(it.uid,
+            top: how == 'top',
+            bottom: how == 'bottom',
+            before: how == 'before' ? other : null,
+            after: how == 'after' ? other : null,
+            clear: how == 'none',
+            dryRun: dry);
+        if (json) {
+          emit(r.toJson());
+        } else {
+          o.writeln(r.dryRun
+              ? 'dry run, nothing changed (${r.status} column after):'
+              : '${it.title}: ${r.status} column now:');
+          for (final x in r.order) {
+            o.writeln(
+                '  ${x.rank ?? '-'}  ${x.title}  ${x.uid}');
+          }
+        }
       case 'delete':
         final it = await resolve(_need(rest, 0, 'an ID'), kind: kind);
         final c = await svc.delete(it.uid,
