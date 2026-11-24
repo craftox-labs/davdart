@@ -197,7 +197,7 @@ void main() {
     expect(_k('home-today-tasks-${s.tasks.single.uid}'), findsOneWidget);
   });
 
-  testWidgets('ignores panel filters and the folder scope', (t) async {
+  testWidgets('ignores panel tag filters, follows the folder scope', (t) async {
     final s = await pumpTasksApp(
       t,
       notes: [
@@ -208,18 +208,21 @@ void main() {
         mkTask('out', days: 0, tags: ['b']),
       ],
       events: [
-        mkEvent('e1', summary: 'Tagged', tags: ['x']),
+        mkEvent('e1', summary: 'Tagged', tags: ['x'], parent: 'f'),
         mkEvent('e2', summary: 'Plain', hour: 11),
       ],
     );
     s.setTaskTagFilter('a');
-    s.setTaskFolderFilter('f');
     s.setEventTagFilter('x');
-    s.openFolder('f');
     await t.pumpAndSettle();
     expect(_k('home-today-tasks-in'), findsOneWidget);
     expect(_k('home-today-tasks-out'), findsOneWidget);
     expect(_count(t, 'events'), '2');
+    s.openFolder('f');
+    await t.pumpAndSettle();
+    expect(_k('home-today-tasks-in'), findsOneWidget);
+    expect(_k('home-today-tasks-out'), findsNothing);
+    expect(_count(t, 'events'), '1');
   });
 
   testWidgets('rolls over at local midnight (fake clock)', (t) async {

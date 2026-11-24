@@ -148,11 +148,11 @@ void main() {
       expect(_p('task-row-late'), findsOneWidget);
       expect(_p('task-row-today'), findsNothing);
       s.setTaskTagFilter('home');
-      s.setTaskFolderFilter('f');
+      s.openFolder('f');
       await t.pumpAndSettle();
       expect(_p('task-row-today'), findsOneWidget);
       expect(_p('task-row-late'), findsNothing);
-      s.setTaskFolderFilter(null);
+      s.openFolder(null);
       await t.pumpAndSettle();
       expect(_p('task-row-late'), findsOneWidget);
       expect(_k('tasks-tags-drawer'), findsOneWidget);
@@ -162,7 +162,7 @@ void main() {
 
     testWidgets('no match and empty messages', (t) async {
       final s = await _tab(t);
-      s.setTaskFolderFilter('a'); // a note with no tasks under it
+      s.openFolder('a'); // a note with no tasks under it
       await t.pumpAndSettle();
       expect(_p('tasks-no-match'), findsOneWidget);
       final e = await pumpTasksApp(t);

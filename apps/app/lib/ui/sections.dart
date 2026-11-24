@@ -505,10 +505,7 @@ class ViewsSection extends _Section {
             key: const Key('clear-query'),
             tooltip: 'Clear search',
             icon: FLucideIcons.x,
-            onPress: () {
-              state.searchController.clear();
-              state.setQuery('');
-            },
+            onPress: state.clearSearch,
           ),
         ],
       ),

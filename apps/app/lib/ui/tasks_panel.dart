@@ -251,7 +251,7 @@ class _Filters extends StatelessWidget {
     }
 
     walk(state.tree.roots, 0);
-    final folder = state.taskFolderFilter;
+    final folder = state.scopeUid;
     return Wrap(
       spacing: t.space.md,
       runSpacing: t.space.md,
@@ -274,9 +274,8 @@ class _Filters extends StatelessWidget {
                   value: folder != null && folders.any((e) => e.$1 == folder)
                       ? folder
                       : '',
-                  onChange: (v) => state.setTaskFolderFilter(
-                    v == null || v.isEmpty ? null : v,
-                  ),
+                  onChange: (v) =>
+                      state.openFolder(v == null || v.isEmpty ? null : v),
                 ),
                 children: [
                   FSelectItem<String>(

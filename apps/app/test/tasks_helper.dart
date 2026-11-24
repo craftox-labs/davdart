@@ -106,8 +106,10 @@ Event mkEvent(
   List<String> tags = const [],
   String description = '',
   List<String> siblingLines = const [],
+  String? parent,
 }) => Event(
   uid: uid,
+  parentUid: parent,
   summary: summary ?? uid,
   dtstart: allDay ? dueIn(days) : timedIn(days, hour),
   dtend: allDay ? dueIn(days + span) : timedIn(days, hour + hours),

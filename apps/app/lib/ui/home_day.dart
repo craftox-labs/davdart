@@ -485,7 +485,7 @@ class MonthCalendar extends StatelessWidget {
     final weeks = ((lead + days) / 7).ceil();
     final end = start.add(Duration(days: weeks * 7));
     final buckets = bucketByDay(
-      events: state.events,
+      events: state.scopedEvents,
       tasks: state.openTasks(clock),
       from: start,
       to: end,

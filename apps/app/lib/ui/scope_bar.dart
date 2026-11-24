@@ -214,3 +214,66 @@ class ScopeText extends StatelessWidget {
     );
   }
 }
+
+/// "Filtered: search "foo" x  folder "Name" x": one line under the Home
+/// header while a search or a folder scope is active. Each x clears its
+/// filter (clearing the folder shows the whole Space). Nothing when none is.
+class FilterChips extends StatelessWidget {
+  const FilterChips({super.key, required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final q = state.query.trim();
+    final folder = state.scope;
+    if (q.isEmpty && folder == null) return const SizedBox.shrink();
+    final t = tokensOf(context);
+    Widget chip(String slug, String label, String tip, VoidCallback clear) =>
+        FBadge(
+          key: Key('filter-chip-$slug'),
+          variant: FBadgeVariant.outline,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(child: Text(label, overflow: TextOverflow.ellipsis)),
+              IconAction(
+                key: Key('clear-filter-$slug'),
+                compact: true,
+                tooltip: tip,
+                icon: FLucideIcons.x,
+                onPress: clear,
+              ),
+            ],
+          ),
+        );
+    return Padding(
+      key: const Key('filter-chips'),
+      padding: EdgeInsets.fromLTRB(
+        t.space.lg,
+        t.space.sm,
+        t.space.lg,
+        t.space.sm,
+      ),
+      child: Wrap(
+        spacing: t.space.md,
+        runSpacing: t.space.sm,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Text(
+            'Filtered:',
+            style: t.type.captionStyle.copyWith(color: t.muted),
+          ),
+          if (q.isNotEmpty)
+            chip('search', 'search "$q"', 'Clear search', state.clearSearch),
+          if (folder != null)
+            chip(
+              'folder',
+              'folder "${folder.summary}"',
+              'Show the whole space',
+              () => state.openFolder(null),
+            ),
+        ],
+      ),
+    );
+  }
+}

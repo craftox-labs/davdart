@@ -362,6 +362,7 @@ class _ShellState extends State<Shell>
             children: [
               ScopeText(state: state),
               if (state.activeTab == null) ...[
+                FilterChips(state: state),
                 HomeSwitch(state: state),
                 if (state.homeFocus == HomeFocus.day)
                   Expanded(child: HomeDayFocus(state: state))
@@ -520,7 +521,12 @@ class _ShellState extends State<Shell>
                 setState(() => _menuOpen = true);
               },
               onGrid: () => setState(() => _gridOpen = true),
-              onHome: () => _show(null),
+              onHome: () {
+                // Home means start fresh: a leftover search goes, the
+                // deliberate folder scope stays.
+                state.clearSearch();
+                _show(null);
+              },
             )
           : null,
       // Narrow: the side menu and the edge strip live in the body, so the top

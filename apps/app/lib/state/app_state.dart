@@ -529,7 +529,6 @@ class AppState extends ChangeNotifier {
     taskFilter = TaskFilter.open;
     taskTagFilter = null;
     eventTagFilter = null;
-    taskFolderFilter = null;
     tree = NoteTree.build(const []);
     peekUid = null;
     query = '';
@@ -1698,11 +1697,10 @@ class AppState extends ChangeNotifier {
   /// when fine. Notes are unaffected by it.
   String? taskError;
 
-  /// Tasks view filters (not saved): which tasks, a tag, a parent folder or
-  /// note whose subtree to show.
+  /// Tasks view filters (not saved): which tasks and a tag. The folder is
+  /// the one Home scope ([scopeUid]), shared with notes, Day and Today.
   TaskFilter taskFilter = TaskFilter.open;
   String? taskTagFilter;
-  String? taskFolderFilter;
 
   void setTaskFilter(TaskFilter f) {
     taskFilter = f;
@@ -1711,11 +1709,6 @@ class AppState extends ChangeNotifier {
 
   void setTaskTagFilter(String? tag) {
     taskTagFilter = taskTagFilter == tag ? null : tag;
-    notifyListeners();
-  }
-
-  void setTaskFolderFilter(String? uid) {
-    taskFolderFilter = uid;
     notifyListeners();
   }
 
@@ -1734,12 +1727,39 @@ class AppState extends ChangeNotifier {
     return false;
   }
 
-  /// Tasks after the Tasks view's tag and folder filters (status filter not
-  /// applied; see [taskFilter]).
+  /// True when [e] sits under [uid] (a folder, note or task) at any depth.
+  bool eventIsUnder(Event e, String uid) {
+    var cur = e.parentUid;
+    for (var i = 0; cur != null && i <= tasks.length + notes.length; i++) {
+      if (cur == uid) return true;
+      final item = findItem(cur);
+      cur = item is Task
+          ? item.parentUid
+          : item is Note
+          ? item.parentUid
+          : null;
+    }
+    return false;
+  }
+
+  /// Whether task [t] is in the open scope (always, with no scope).
+  bool taskInScope(Task t) => scopeUid == null || taskIsUnder(t, scopeUid!);
+
+  /// Whether event [e] is in the open scope (always, with no scope).
+  bool eventInScope(Event e) => scopeUid == null || eventIsUnder(e, scopeUid!);
+
+  /// The events in the open scope, for Home Day and the Today cards.
+  List<Event> get scopedEvents => [
+    for (final e in events)
+      if (eventInScope(e)) e,
+  ];
+
+  /// Tasks after the Tasks view's tag filter and the open scope (status
+  /// filter not applied; see [taskFilter]).
   List<Task> get filteredTasks => [
     for (final t in tasks)
       if ((taskTagFilter == null || t.categories.contains(taskTagFilter)) &&
-          (taskFolderFilter == null || taskIsUnder(t, taskFolderFilter!)))
+          taskInScope(t))
         t,
   ];
 
@@ -1777,9 +1797,7 @@ class AppState extends ChangeNotifier {
     if (taskTagFilter != null && !taskTags.contains(taskTagFilter)) {
       taskTagFilter = null;
     }
-    if (taskFolderFilter != null && findItem(taskFolderFilter!) == null) {
-      taskFolderFilter = null;
-    }
+    if (scopeUid != null && tree.find(scopeUid!) == null) scopeUid = null;
   }
 
   Task? _taskById(String uid) {
@@ -1804,13 +1822,13 @@ class AppState extends ChangeNotifier {
 
   // Selectors. [now] defaults to the current time (tests pass their own).
 
-  /// Open tasks (not completed, not cancelled): overdue first, then by due
-  /// date, priority, title.
+  /// Open tasks (not completed, not cancelled) in the open scope: overdue
+  /// first, then by due date, priority, title.
   List<Task> openTasks([DateTime? now]) {
     final n = now ?? DateTime.now();
     return [
       for (final t in tasks)
-        if (!t.isClosed) t,
+        if (!t.isClosed && taskInScope(t)) t,
     ]..sort((a, b) => compareTasks(a, b, n));
   }
 
@@ -3236,6 +3254,12 @@ class AppState extends ChangeNotifier {
   void setQuery(String q) {
     query = q;
     notifyListeners();
+  }
+
+  /// Clears the search text (and its field), leaving tag and folder alone.
+  void clearSearch() {
+    searchController.clear();
+    setQuery('');
   }
 
   void setTag(String? t) {

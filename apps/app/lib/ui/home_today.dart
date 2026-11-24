@@ -240,7 +240,7 @@ class _HomeTodayState extends State<HomeToday> {
   ) {
     final today =
         bucketByDay(
-          events: state.events,
+          events: state.scopedEvents,
           from: day,
           to: day.add(const Duration(days: 1)),
           includeCancelled: true,
