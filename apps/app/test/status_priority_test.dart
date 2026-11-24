@@ -35,7 +35,7 @@ class _Seed implements NoteSource {
     _note('d', 'Mid', status: 'todo', priority: 'medium', day: 4),
     _note('e', 'Plain two', status: 'todo', day: 5),
     _note('s', 'Stray', status: 'in_progress', day: 6),
-    _note('x', 'Stray two', status: 'review', day: 7),
+    _note('x', 'Stray two', status: 'wip', day: 7),
     _note('k', 'Cut', status: 'canceled', day: 8),
     _note('p', 'No status', priority: 'high', day: 9),
   ];
