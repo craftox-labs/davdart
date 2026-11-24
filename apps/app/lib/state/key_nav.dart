@@ -496,6 +496,7 @@ String? navListId(AppState s, NavArea a) => switch (a) {
     Section.notes => 'notes',
     Section.tasks => 'tasks',
     Section.events => 'events',
+    Section.projects => 'projects',
     Section.views => 'views',
     Section.search => 'search',
     _ => null,

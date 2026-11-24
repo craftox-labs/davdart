@@ -338,6 +338,7 @@ class _SideMenuPageState extends State<SideMenuPage>
     Section.tasks => widget.state.tasks.where(widget.state.taskInScope).length,
     Section.events =>
       widget.state.events.where(widget.state.eventInScope).length,
+    Section.projects => widget.state.projectIndex.projects().length,
     _ => null,
   };
 

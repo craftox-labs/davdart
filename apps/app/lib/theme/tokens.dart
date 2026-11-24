@@ -261,6 +261,7 @@ class SizeTokens {
     this.segmentHeight = 28,
     this.calendarDot = 5,
     this.ring = 2,
+    this.progressBar = 4,
   });
 
   /// Edge of the logo on the first-run screen (and other large uses).
@@ -332,6 +333,9 @@ class SizeTokens {
       segmentMin,
       segmentHeight;
   final double calendarDot, ring;
+
+  /// Height of the thin progress bar on a project row.
+  final double progressBar;
 
   /// Narrow layout: widest the Space chip in the top bar gets, and the width
   /// of the left-edge zone whose swipe opens the side menu.

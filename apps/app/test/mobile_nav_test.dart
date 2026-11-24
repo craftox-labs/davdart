@@ -361,6 +361,7 @@ void main() {
             'filter-notes',
             'filter-tasks',
             'filter-events',
+            'filter-projects',
             'filter-views',
             'filter-search',
             'menu-settings',

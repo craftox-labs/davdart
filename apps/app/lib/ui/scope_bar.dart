@@ -52,6 +52,11 @@ class _ScopeCrumbsState extends State<ScopeCrumbs>
     ) {
       path.insert(0, n.note);
     }
+    // The Projects container level is skipped: Space > Project > folders.
+    if (path.length > 1) {
+      final last = path.last;
+      path.removeWhere((n) => n != last && isProjectsContainer(n));
+    }
     return widget.compact && folder != null
         ? _compact(context, t, path)
         : _crumbs(context, t, path, folder != null);

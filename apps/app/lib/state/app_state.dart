@@ -22,7 +22,16 @@ enum ViewMode { board, list }
 /// The section the side panel shows, chosen with the icon rail.
 /// `notes` is shown as "Notes"; the ids stay so saved selections still load.
 /// Spaces is a popup on the rail, not a section.
-enum Section { notes, tasks, events, views, search, account, settings }
+enum Section {
+  notes,
+  tasks,
+  events,
+  projects,
+  views,
+  search,
+  account,
+  settings,
+}
 
 /// The fixed status set, in board order.
 const boardOrder = allowedStatuses;
@@ -452,6 +461,7 @@ class AppState extends ChangeNotifier {
     Section.notes => supportsNotes,
     Section.tasks => supportsTasks,
     Section.events => supportsEvents,
+    Section.projects => supportsNotes,
     _ => true,
   };
 
@@ -476,7 +486,9 @@ class AppState extends ChangeNotifier {
   /// After a Space switch: the Tasks and Events lists stay (the choice on
   /// the rail survives), any other section falls back to Notes.
   void keepListSection() {
-    if (section != Section.tasks && section != Section.events) {
+    if (section != Section.tasks &&
+        section != Section.events &&
+        section != Section.projects) {
       setSection(Section.notes);
     }
   }
@@ -1253,20 +1265,60 @@ class AppState extends ChangeNotifier {
     String? parentUid,
     String text = '',
   }) async {
+    final n = _newFolder(title, parentUid: parentUid, text: text);
+    if (n == null) return;
+    await _save(n);
+    if (error == null) openFolder(n.uid);
+  }
+
+  Note? _newFolder(
+    String title, {
+    String? parentUid,
+    String text = '',
+    List<String> tags = const [],
+  }) {
     final t = title.trim();
-    if (t.isEmpty) return;
+    if (t.isEmpty) return null;
     final now = DateTime.now().toUtc();
-    final n = Note(
+    return Note(
       uid: 'davdart-${now.microsecondsSinceEpoch}',
       summary: t,
       description: text.trim(),
-      categories: [folderTag],
+      categories: [folderTag, ...tags],
       parentUid: parentUid,
       created: now,
       lastModified: now,
     );
+  }
+
+  // --- Projects ---
+  //
+  // A project is a folder directly under a Projects container (a folder
+  // tagged `kind-folder` and `kind-projects`). Derived from location; see
+  // [ProjectIndex]. Opening a project is the ordinary folder scope.
+
+  /// Projects, counts and progress of the open Space, derived on demand.
+  ProjectIndex get projectIndex => ProjectIndex(notes, tasks, events);
+
+  /// Adds a project folder under the Space's Projects container and opens
+  /// it. The container (title "Projects") is created first when the Space
+  /// has none; with several, the oldest is used. Returns the new project's
+  /// uid, or null (empty title, read-only Space, failure).
+  Future<String?> addProject(String title) async {
+    if (title.trim().isEmpty || !editable) return null;
+    var container = projectIndex.containers().firstOrNull;
+    if (container == null) {
+      final c = _newFolder(projectsTitle, tags: [projectsTag])!;
+      await _save(c);
+      if (error != null) return null;
+      container = tree.find(c.uid)?.note;
+      if (container == null) return null;
+    }
+    final n = _newFolder(title, parentUid: container.uid)!;
     await _save(n);
-    if (error == null) openFolder(n.uid);
+    if (error != null) return null;
+    openFolder(n.uid);
+    return n.uid;
   }
 
   bool loading = false;
@@ -1964,14 +2016,22 @@ class AppState extends ChangeNotifier {
       status: 'NEEDS-ACTION',
       due: due,
       priority: priority,
-      parentUid: parentUid != null && findItem(parentUid) != null
-          ? parentUid
-          : null,
+      parentUid: _parentOrScope(parentUid),
       categories: _plainTags(tags),
       created: now,
       lastModified: now,
     );
     return await _taskEdit((src) => src.saveTask(task)) ? task.uid : null;
+  }
+
+  /// [parentUid] when it exists, else the open scope folder (new items go
+  /// under the scope, so a project's items stay in the project).
+  String? _parentOrScope(String? parentUid) {
+    if (parentUid != null && findItem(parentUid) != null) return parentUid;
+    if (parentUid == null && scopeUid != null && tree.find(scopeUid!) != null) {
+      return scopeUid;
+    }
+    return null;
   }
 
   static List<String> _plainTags(Iterable<String> tags) => [
@@ -2333,6 +2393,7 @@ class AppState extends ChangeNotifier {
       description: description ?? '',
       location: location.trim(),
       categories: _plainTags(tags),
+      parentUid: _parentOrScope(null),
       dtstart: eventDate(first, allDay: allDay),
       dtend: last,
       created: now,

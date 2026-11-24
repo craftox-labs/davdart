@@ -18,6 +18,7 @@ import 'move_space_dialog.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
 import 'new_space_dialog.dart';
+import 'projects_panel.dart';
 import 'parts.dart';
 import 'task_menu.dart';
 import 'theme.dart';
@@ -240,6 +241,10 @@ List<AppAction> buildActions(AppState state) {
       'agenda',
       'calendar',
     ], 'e'),
+    go('go.projects', 'Go to Projects', Section.projects, const [
+      'project',
+      'progress',
+    ], 'p'),
     go('go.views', 'Go to Views', Section.views, const [
       'saved',
       'filters',
@@ -260,6 +265,14 @@ List<AppAction> buildActions(AppState state) {
       keywords: const ['add', 'create', 'directory'],
       enabled: notes,
       run: (c) => showNewFolderDialog(c.context, c.state),
+    ),
+    AppAction(
+      id: 'project.new',
+      title: 'New project',
+      group: 'Create',
+      keywords: const ['add', 'create', 'projects'],
+      enabled: notes,
+      run: (c) => showNewProjectDialog(c.context, c.state),
     ),
     AppAction(
       id: 'task.new',
@@ -513,12 +526,14 @@ List<AppAction> buildActions(AppState state) {
         Section.notes => s.editable,
         Section.tasks => s.tasksEditable,
         Section.events => s.eventsEditable,
+        Section.projects => s.editable,
         _ => false,
       },
       run: (c) => switch (c.state.section) {
         Section.notes => showNewNoteDialog(c.context, c.state),
         Section.tasks => showNewTaskDialog(c.context, c.state),
         Section.events => showNewEventDialog(c.context, c.state),
+        Section.projects => showNewProjectDialog(c.context, c.state),
         _ => null,
       },
     ),

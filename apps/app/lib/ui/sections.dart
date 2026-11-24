@@ -135,6 +135,7 @@ class NotesSection extends _Section {
     final t = tokensOf(context);
     final tree = <Widget>[];
     final rows = <NavEntry>[];
+    final projects = state.projectIndex;
     void walk(List<NoteNode> nodes, int depth) {
       for (final n in nodes) {
         final kids = n.children.isNotEmpty;
@@ -189,7 +190,9 @@ class NotesSection extends _Section {
                     ),
                     if (AppState.isFolder(n.note)) ...[
                       Icon(
-                        open && kids
+                        projects.isProject(n.note.uid)
+                            ? FLucideIcons.folderKanban
+                            : open && kids
                             ? FLucideIcons.folderOpen
                             : FLucideIcons.folder,
                         size: t.icons.tree,

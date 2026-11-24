@@ -154,6 +154,7 @@ class ShellFrame extends StatelessWidget {
   Section.notes => (FLucideIcons.fileText, 'Notes'),
   Section.tasks => (FLucideIcons.listChecks, 'Tasks'),
   Section.events => (FLucideIcons.calendar, 'Events'),
+  Section.projects => (FLucideIcons.folderKanban, 'Projects'),
   Section.views => (FLucideIcons.bookmark, 'Views'),
   Section.search => (FLucideIcons.search, 'Search'),
   Section.account => (FLucideIcons.circleUser, 'Account'),
@@ -167,6 +168,7 @@ List<Section> topSections([AppState? state]) => [
   if (state?.supportsNotes ?? true) Section.notes,
   if (state?.supportsTasks ?? true) Section.tasks,
   if (state?.supportsEvents ?? true) Section.events,
+  if (state?.supportsSection(Section.projects) ?? true) Section.projects,
   Section.views,
   Section.search,
 ];
@@ -540,46 +542,58 @@ class IconRail extends StatelessWidget {
       width: t.sizes.rail,
       child: Padding(
         padding: EdgeInsets.only(bottom: t.space.lg),
-        child: Column(
-          spacing: t.space.xs,
-          children: [
-            // The logo's centre is on the tab row's centreline and the Spaces
-            // item's centre on the side panel header's; the block is as tall
-            // as when Spaces sat right under the logo, so the items below
-            // keep their positions.
-            SizedBox(
-              height: math.max(oldSpacesTop, spacesTop) + t.sizes.railItem,
-              child: Stack(
-                children: [
-                  Positioned(
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: logoBand,
-                    child: const Align(
-                      alignment: Alignment.bottomCenter,
-                      child: LogoSlot(),
-                    ),
-                  ),
-                  Positioned(
-                    top: spacesTop,
-                    left: 0,
-                    right: 0,
-                    child: Center(
-                      child: SpacesMenuButton(
-                        key: const Key('rail-spaces'),
-                        state: state,
-                        mirror: mirror,
+        // Scrolls when the window is too short for every item (the Spacer
+        // still pushes Account and Settings to the bottom when it fits).
+        child: LayoutBuilder(
+          builder: (context, box) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: box.maxHeight),
+              child: IntrinsicHeight(
+                child: Column(
+                  spacing: t.space.xs,
+                  children: [
+                    // The logo's centre is on the tab row's centreline and the Spaces
+                    // item's centre on the side panel header's; the block is as tall
+                    // as when Spaces sat right under the logo, so the items below
+                    // keep their positions.
+                    SizedBox(
+                      height:
+                          math.max(oldSpacesTop, spacesTop) + t.sizes.railItem,
+                      child: Stack(
+                        children: [
+                          Positioned(
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: logoBand,
+                            child: const Align(
+                              alignment: Alignment.bottomCenter,
+                              child: LogoSlot(),
+                            ),
+                          ),
+                          Positioned(
+                            top: spacesTop,
+                            left: 0,
+                            right: 0,
+                            child: Center(
+                              child: SpacesMenuButton(
+                                key: const Key('rail-spaces'),
+                                state: state,
+                                mirror: mirror,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ),
-                ],
+                    for (final s in topSections(state)) button(s),
+                    const Spacer(),
+                    for (final s in bottomSections(state)) button(s),
+                  ],
+                ),
               ),
             ),
-            for (final s in topSections(state)) button(s),
-            const Spacer(),
-            for (final s in bottomSections(state)) button(s),
-          ],
+          ),
         ),
       ),
     );

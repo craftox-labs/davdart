@@ -10,6 +10,7 @@ import 'events_panel.dart';
 import 'new_space_dialog.dart';
 import 'note_menu.dart';
 import 'parts.dart';
+import 'projects_panel.dart';
 import 'resize_handle.dart';
 import 'sections.dart';
 import 'shell_frame.dart';
@@ -93,6 +94,7 @@ Widget sectionBody(AppState state, Section section, VoidCallback onPick) =>
       Section.notes => NotesSection(state: state, onPick: onPick),
       Section.tasks => TasksPanel(state: state, onPick: onPick),
       Section.events => EventsPanel(state: state, onPick: onPick),
+      Section.projects => ProjectsPanel(state: state, onPick: onPick),
       Section.views => ViewsSection(state: state, onPick: onPick),
       Section.search => SearchSection(state: state, onPick: onPick),
       Section.account => AccountSection(state: state, onPick: onPick),
