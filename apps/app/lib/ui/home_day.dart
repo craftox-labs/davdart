@@ -116,8 +116,8 @@ class HomeSwitch extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (state.query.trim().isNotEmpty) ...[
-                    FilterChips(state: state),
-                    SizedBox(height: t.space.xs),
+                    FilterChips(state: state, fullWidth: true),
+                    SizedBox(height: t.space.lg),
                   ],
                   control,
                 ],

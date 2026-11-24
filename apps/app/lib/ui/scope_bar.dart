@@ -83,56 +83,18 @@ class ScopeCrumbs extends StatelessWidget {
   }
 }
 
-/// Folder actions (move, edit, delete, close) for the right side of the top
-/// bar; empty when no folder is open. With [overflow] (narrow bars) they
-/// collapse into one "more" button that opens a menu, so the bar never runs
-/// out of width.
+/// Folder actions (move, edit, delete, close) for the right end of the top
+/// bar, folded into one "more" menu on every width; empty when no folder is
+/// open.
 class ScopeActions extends StatelessWidget {
-  const ScopeActions({super.key, required this.state, this.overflow = false});
+  const ScopeActions({super.key, required this.state});
   final AppState state;
-  final bool overflow;
 
   @override
   Widget build(BuildContext context) {
     final folder = state.scope;
     if (folder == null) return const SizedBox.shrink();
-    if (overflow) return _menu(context, folder);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (state.editable) ...[
-          if (state.spaces.length > 1)
-            IconAction(
-              key: const Key('scope-move'),
-              compact: true,
-              tooltip: 'Move folder to another space',
-              icon: FLucideIcons.folderInput,
-              onPress: () => showMoveSpaceDialog(context, state, folder),
-            ),
-          IconAction(
-            key: const Key('scope-edit'),
-            compact: true,
-            tooltip: 'Edit folder',
-            icon: FLucideIcons.pencil,
-            onPress: () => showEditNoteDialog(context, state, folder),
-          ),
-          IconAction(
-            key: const Key('scope-delete'),
-            compact: true,
-            tooltip: 'Delete folder',
-            icon: FLucideIcons.trash2,
-            onPress: () => confirmDeleteNote(context, state, folder),
-          ),
-        ],
-        IconAction(
-          key: const Key('scope-close'),
-          compact: true,
-          tooltip: 'Show the whole space',
-          icon: FLucideIcons.x,
-          onPress: () => state.openFolder(null),
-        ),
-      ],
-    );
+    return _menu(context, folder);
   }
 }
 
@@ -221,8 +183,11 @@ class ScopeText extends StatelessWidget {
 /// Home switcher places it: in its row on wide screens, on a line above it on
 /// phones.
 class FilterChips extends StatelessWidget {
-  const FilterChips({super.key, required this.state});
+  const FilterChips({super.key, required this.state, this.fullWidth = false});
   final AppState state;
+
+  /// Phone: the chip runs the full width of its parent, text left, x right.
+  final bool fullWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -237,24 +202,41 @@ class FilterChips extends StatelessWidget {
         constraints: BoxConstraints(maxHeight: t.sizes.filterChipRow),
         child: Align(
           alignment: Alignment.centerLeft,
-          widthFactor: 1,
-          child: FBadge(
-            key: const Key('filter-chip-search'),
-            variant: FBadgeVariant.outline,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Flexible(
-                  child: Text('search "$q"', overflow: TextOverflow.ellipsis),
-                ),
-                SizedBox(width: t.space.xs),
-                FTappable(
-                  key: const Key('clear-filter-search'),
-                  semanticsLabel: 'Clear search',
-                  onPress: state.clearSearch,
-                  builder: (_, _, _) => Icon(FLucideIcons.x, size: t.icons.sm),
-                ),
-              ],
+          widthFactor: fullWidth ? null : 1,
+          heightFactor: 1,
+          child: SizedBox(
+            width: fullWidth ? double.infinity : null,
+            child: FBadge(
+              key: const Key('filter-chip-search'),
+              variant: FBadgeVariant.outline,
+              child: Row(
+                mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
+                children: [
+                  if (fullWidth)
+                    Expanded(
+                      child: Text(
+                        'search "$q"',
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.left,
+                      ),
+                    )
+                  else
+                    Flexible(
+                      child: Text(
+                        'search "$q"',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  SizedBox(width: t.space.xs),
+                  FTappable(
+                    key: const Key('clear-filter-search'),
+                    semanticsLabel: 'Clear search',
+                    onPress: state.clearSearch,
+                    builder: (_, _, _) =>
+                        Icon(FLucideIcons.x, size: t.icons.sm),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

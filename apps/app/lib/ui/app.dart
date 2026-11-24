@@ -883,6 +883,34 @@ class TopBar extends StatelessWidget {
         child: Text(label),
       ),
     );
+    // Per-view controls: the Board/List switch on a view tab.
+    final Widget viewControl =
+        state.activeTab == null || (showMenu && state.mainIsPage)
+        ? const SizedBox.shrink()
+        : !narrow
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              toggle('Board', ViewMode.board),
+              SizedBox(width: t.space.xs),
+              toggle('List', ViewMode.list),
+            ],
+          )
+        : IconAction(
+            compact: true,
+            tooltip: board ? 'Show list' : 'Show board',
+            icon: board ? FLucideIcons.list : FLucideIcons.squareKanban,
+            onPress: () =>
+                state.setView(board ? ViewMode.list : ViewMode.board),
+          );
+    // Sync or reload in progress: the icon turns.
+    final refresh = IconAction(
+      compact: true,
+      tooltip: 'Reload',
+      icon: FLucideIcons.refreshCw,
+      spinning: state.syncing || state.loading,
+      onPress: state.load,
+    );
     return PaneHeaderRow(
       key: const Key('top-bar'),
       children: [
@@ -897,41 +925,20 @@ class TopBar extends StatelessWidget {
         SizedBox(width: t.space.xs),
         Expanded(child: showMenu ? _title(t) : _lead(t)),
         SizedBox(width: t.space.md),
-        if (state.loading)
-          Padding(
-            padding: EdgeInsets.only(right: t.space.md),
-            child: SizedBox(
-              width: t.sizes.spinner,
-              height: t.sizes.spinner,
-              child: const FCircularProgress(),
-            ),
-          ),
-        if (home &&
-            !showMenu &&
-            state.activeTab == null &&
-            state.homeFocus != HomeFocus.day)
-          HomeColumnsToggle(state: state, focus: state.homeFocus),
-        if (home) ScopeActions(state: state, overflow: narrow),
-        if (state.activeTab == null || (showMenu && state.mainIsPage))
-          const SizedBox.shrink()
-        else if (!narrow) ...[
-          toggle('Board', ViewMode.board),
-          SizedBox(width: t.space.xs),
-          toggle('List', ViewMode.list),
-        ] else
-          IconAction(
-            compact: true,
-            tooltip: board ? 'Show list' : 'Show board',
-            icon: board ? FLucideIcons.list : FLucideIcons.squareKanban,
-            onPress: () =>
-                state.setView(board ? ViewMode.list : ViewMode.board),
-          ),
-        IconAction(
-          compact: true,
-          tooltip: 'Reload',
-          icon: FLucideIcons.refreshCw,
-          onPress: state.load,
-        ),
+        if (narrow) ...[
+          if (home) ScopeActions(state: state),
+          viewControl,
+          refresh,
+        ] else ...[
+          viewControl,
+          if (home &&
+              !showMenu &&
+              state.activeTab == null &&
+              state.homeFocus != HomeFocus.day)
+            HomeColumnsToggle(state: state, focus: state.homeFocus),
+          refresh,
+          if (home) ScopeActions(state: state),
+        ],
       ],
     );
   }

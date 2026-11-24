@@ -36,7 +36,6 @@ Future<AppState> _app(WidgetTester t, {Size? size}) async {
 }
 
 void main() {
-
   group('scope everywhere', () {
     testWidgets('folder scope shows items under it on Day, hides others', (
       t,
@@ -118,6 +117,8 @@ void main() {
       await t.pumpAndSettle();
       expect(_k('filter-chip-search'), findsOneWidget);
       expect(_k('filter-chip-folder'), findsNothing);
+      await t.tap(_k('scope-more'));
+      await t.pumpAndSettle();
       await t.tap(_k('scope-close'));
       await t.pumpAndSettle();
       expect(s.scopeUid, isNull);
@@ -147,6 +148,7 @@ void main() {
       expect(chip.bottom, lessThanOrEqualTo(sw.top));
       expect(chip.height, lessThanOrEqualTo(28));
       expect(chip.left, closeTo(sw.left, 1));
+      expect(chip.right, closeTo(sw.right, 1));
     });
 
     testWidgets('phone Home button clears a search, keeps the folder', (

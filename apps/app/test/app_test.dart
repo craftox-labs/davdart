@@ -951,9 +951,11 @@ void main() {
       // Closing the scope bar shows the whole space.
       state.select(null);
       await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('scope-more')));
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('scope-close')));
       await t.pumpAndSettle();
-      expect(find.byKey(const Key('scope-close')), findsNothing);
+      expect(find.byKey(const Key('scope-more')), findsNothing);
       expect(find.byKey(const Key('crumb-folder')), findsNothing);
     });
 

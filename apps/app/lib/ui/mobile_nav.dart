@@ -336,7 +336,8 @@ class _SideMenuPageState extends State<SideMenuPage>
   int? _count(Section s) => switch (s) {
     Section.notes => _noteCount(widget.state),
     Section.tasks => widget.state.tasks.where(widget.state.taskInScope).length,
-    Section.events => widget.state.events.where(widget.state.eventInScope).length,
+    Section.events =>
+      widget.state.events.where(widget.state.eventInScope).length,
     _ => null,
   };
 

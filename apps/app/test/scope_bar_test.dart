@@ -78,10 +78,8 @@ void main() {
       await t.pumpWidget(DavdartApp(state: s));
       await t.pumpAndSettle();
       final crumb = t.getRect(find.byKey(const Key('crumb-space'))).center.dy;
-      // Narrow bars (below 440) fold the folder actions into one menu button.
-      final keys = w < 440
-          ? ['scope-more']
-          : ['scope-edit', 'scope-delete', 'scope-close'];
+      // The folder actions are folded into one menu button at every width.
+      final keys = ['scope-more'];
       for (final k in keys) {
         final c = t.getRect(find.byKey(Key(k))).center.dy;
         expect((c - crumb).abs(), lessThanOrEqualTo(1), reason: '$k vs crumb');
@@ -119,7 +117,7 @@ void main() {
     expect(scoped.left, root.left);
     expect(scoped.center.dy, root.center.dy);
     expect(t.getRect(find.byKey(const Key('top-bar'))), bar);
-    expect(find.byKey(const Key('scope-close')), findsOneWidget);
+    expect(find.byKey(const Key('scope-more')), findsOneWidget);
     s.openFolder(null);
     await t.pumpAndSettle();
     expect(t.getRect(find.byKey(const Key('crumb-space'))).left, root.left);

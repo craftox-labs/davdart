@@ -14,7 +14,11 @@ class IconAction extends StatelessWidget {
     required this.tooltip,
     required this.onPress,
     this.compact = false,
+    this.spinning = false,
   });
+
+  /// Rotates the icon continuously while true (a refresh in progress).
+  final bool spinning;
 
   /// Extra-small button, for dense bars such as the top bar.
   final bool compact;
@@ -33,10 +37,48 @@ class IconAction extends StatelessWidget {
         size: compact ? FButtonSizeVariant.xs : FButtonSizeVariant.sm,
         semanticsLabel: tooltip,
         onPress: onPress,
-        child: Icon(icon),
+        child: spinning ? SpinIcon(icon) : Icon(icon),
       ),
     ),
   );
+}
+
+/// An icon that turns continuously while it is mounted; callers mount it only
+/// while busy, so no ticker runs when idle. Still under reduced motion.
+class SpinIcon extends StatefulWidget {
+  const SpinIcon(this.icon, {super.key});
+  final IconData icon;
+
+  @override
+  State<SpinIcon> createState() => _SpinIconState();
+}
+
+class _SpinIconState extends State<SpinIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(seconds: 1),
+  );
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _c.stop();
+    } else if (!_c.isAnimating) {
+      _c.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      RotationTransition(turns: _c, child: Icon(widget.icon));
 }
 
 /// The one header row every pane starts with (side panel section title, top
