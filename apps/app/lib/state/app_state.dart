@@ -2152,6 +2152,71 @@ class AppState extends ChangeNotifier {
     return _taskEdit((src) => src.saveTask(copy));
   }
 
+  /// Drops a Home board card into [column]. With [index] (the insertion
+  /// point among the column's other cards, in shown order) the card is placed
+  /// there by writing a manual rank ([planRanks]: normally one write; more
+  /// only when ranks must be given to unranked cards above or the column is
+  /// re-spread). Without it only the status changes and the card's old rank
+  /// is dropped so it does not jump to an arbitrary place. A card already in
+  /// [column] with no [index] is left alone.
+  Future<void> placeBoardItem(String uid, String column, {int? index}) async {
+    String? from;
+    final others = <(String, double?)>[];
+    final byUid = <String, BoardItem>{};
+    for (final (name, items) in homeColumns(all: true)) {
+      for (final i in items) {
+        byUid[i.uid] = i;
+        if (i.uid == uid) from = name;
+        if (name == column && i.uid != uid) others.add((i.uid, i.rank));
+      }
+    }
+    final moved = byUid[uid];
+    if (moved == null) return;
+    final plan = index == null
+        ? const <String, double>{}
+        : planRanks(others, index, uid);
+    final changed = from != column;
+    if (!changed && index == null) return;
+    final now = DateTime.now();
+    final noteSaves = <Note>[], taskSaves = <Task>[];
+    for (final id in {uid, ...plan.keys}) {
+      final item = byUid[id];
+      if (item == null) continue;
+      final status = id == uid && changed;
+      final double? rank = plan.containsKey(id)
+          ? plan[id]
+          : (status ? null : item.rank);
+      if (item.isTask) {
+        final copy = item.task!.copyWith();
+        if (status) {
+          if (column == 'done' && taskCompletionBlocker(copy) != null) return;
+          copy.setBoardStatus(column, now);
+        }
+        copy.rank = rank;
+        taskSaves.add(copy);
+      } else {
+        var copy = item.note!.copyWith();
+        if (status) copy = (PlanItem.fromNote(copy)..setStatus(column)).apply();
+        copy.rank = rank;
+        noteSaves.add(copy);
+      }
+    }
+    if (noteSaves.isNotEmpty) {
+      await _edit((src) async {
+        for (final n in noteSaves) {
+          await src.save(n);
+        }
+      });
+    }
+    if (taskSaves.isNotEmpty) {
+      await _taskEdit((src) async {
+        for (final t in taskSaves) {
+          await src.saveTask(t);
+        }
+      });
+    }
+  }
+
   /// Deletes a task; its sub-tasks and sub-notes move up to its parent so
   /// none are lost.
   Future<bool> deleteTask(String uid) async {

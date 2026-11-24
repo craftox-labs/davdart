@@ -15,7 +15,6 @@ import 'mobile_nav.dart' show addEntries;
 import 'note_menu.dart' show NoteMenuItem, menuRows;
 import 'parts.dart';
 import 'scope_bar.dart' show FilterChips;
-import 'segmented.dart';
 import 'theme.dart';
 
 // Home's Day focus: a month calendar that picks a day, and the day section
@@ -97,24 +96,66 @@ class HomeSwitch extends StatelessWidget {
 
   Widget _build(BuildContext context, Tokens t) {
     final full = narrowLayout(context);
-    final control = Segmented<HomeFocus>(
-      key: const Key('home-focus'),
-      fullWidth: true,
-      value: state.homeFocus,
-      onChanged: state.setHomeFocus,
-      segments: [
-        Segment(HomeFocus.day, 'Day', 'home-focus-day'),
-        Segment(HomeFocus.board, 'Board', 'home-focus-board'),
-      ],
+    // One outlined box, Day (half) | Board (the other half), the kind filter
+    // inside the Board half so it reads as the Board's own filter.
+    final side = full ? t.sizes.touchTarget : t.sizes.segmentHeight;
+    final onDay = state.homeFocus == HomeFocus.day;
+    Widget half(Widget child, bool on, {Key? key}) => Expanded(
+      child: DecoratedBox(
+        key: key,
+        decoration: BoxDecoration(
+          color: on ? t.selected : null,
+          borderRadius: BorderRadius.circular(t.radii.card),
+        ),
+        child: child,
+      ),
     );
-    // Day (half) | Board (the rest) | the square kind filter, on every width.
-    final strip = Row(
+    Widget label(String text, bool on, String key, HomeFocus f) => FTappable(
+      key: Key(key),
+      behavior: HitTestBehavior.opaque,
+      semanticsLabel: text,
+      onPress: () => state.setHomeFocus(f),
+      child: SizedBox(
+        height: side,
+        child: Center(
+          child: Text(
+            text,
+            style: t.type.captionStyle.copyWith(
+              color: on ? t.fg : t.muted,
+              fontWeight: on ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+        ),
+      ),
+    );
+    final strip = DecoratedBox(
       key: const Key('home-strip'),
-      children: [
-        Expanded(child: control),
-        SizedBox(width: t.space.md),
-        _KindFilter(state: state),
-      ],
+      decoration: BoxDecoration(
+        border: Border.all(color: t.cardBorder),
+        borderRadius: BorderRadius.circular(t.radii.card),
+      ),
+      child: Row(
+        key: const Key('home-focus'),
+        children: [
+          half(label('Day', onDay, 'home-focus-day', HomeFocus.day), onDay),
+          half(
+            Row(
+              children: [
+                Expanded(
+                  child: label(
+                    'Board',
+                    !onDay,
+                    'home-focus-board',
+                    HomeFocus.board,
+                  ),
+                ),
+                _KindFilter(state: state, side: side),
+              ],
+            ),
+            !onDay,
+          ),
+        ],
+      ),
     );
     return ContentCap(
       child: Padding(
@@ -697,17 +738,15 @@ class _Cell extends StatelessWidget {
 /// a narrowed board never looks like missing items; dimmed and inactive on
 /// Day, where it keeps its place.
 class _KindFilter extends StatelessWidget {
-  const _KindFilter({required this.state});
+  const _KindFilter({required this.state, required this.side});
   final AppState state;
+  final double side;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final active = state.homeFocus == HomeFocus.board;
     final kind = state.homeKind;
-    final side = narrowLayout(context)
-        ? t.sizes.touchTarget
-        : t.sizes.segmentHeight;
     IconData iconOf(HomeKind k) => switch (k) {
       HomeKind.all => FLucideIcons.listFilter,
       HomeKind.notes => kindIcon(false),
@@ -724,20 +763,20 @@ class _KindFilter extends StatelessWidget {
       semanticsLabel: 'Show: ${kind.name}',
       onPress: onPress,
       child: SizedBox(
-        width: side,
+        width: side * 1.3,
         height: side,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            border: Border.all(color: t.cardBorder),
-            borderRadius: BorderRadius.circular(t.radii.card),
-          ),
-          child: Center(
-            child: Icon(
-              iconOf(kind),
-              key: Key('home-kind-icon-${kind.name}'),
-              size: t.icons.md,
-              color: kind == HomeKind.all ? t.muted : t.fg,
-            ),
+        child: Center(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                iconOf(kind),
+                key: Key('home-kind-icon-${kind.name}'),
+                size: t.icons.md,
+                color: kind == HomeKind.all ? t.muted : t.fg,
+              ),
+              Icon(FLucideIcons.chevronDown, size: t.icons.sm, color: t.muted),
+            ],
           ),
         ),
       ),

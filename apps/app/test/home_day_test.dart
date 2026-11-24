@@ -315,14 +315,15 @@ void main() {
     final b = t.getRect(_k('home-focus-board'));
     final k = t.getRect(_k('home-kind'));
     expect(_k('home-focus-tasks'), findsNothing);
-    // Day and Board share the width; the square kind filter sits at the far
-    // right, outside the segmented box.
-    expect(a.width, closeTo(b.width, 0.5));
-    expect(a.width + b.width, closeTo(box.width, 1));
-    expect(k.width, closeTo(k.height, 0.5));
-    expect(k.left, greaterThanOrEqualTo(box.right));
+    // Day is half the box; Board plus its kind filter (inside the Board half)
+    // fill the other half.
+    expect(a.width, closeTo(box.width / 2, 1));
+    expect(b.left, greaterThanOrEqualTo(a.right - 0.5));
+    expect(k.right, closeTo(box.right, 1.5));
+    expect(k.left, greaterThanOrEqualTo(b.right - 0.5));
+    expect(b.width + k.width, closeTo(box.width / 2, 1.5));
     await pumpTasksApp(t, size: const Size(1280, 800));
-    expect(t.getRect(_k('home-focus')).width, lessThan(300));
+    expect(t.getRect(_k('home-focus')).width, lessThanOrEqualTo(320));
   });
 
   testWidgets('section collapse is remembered per Space key', (t) async {

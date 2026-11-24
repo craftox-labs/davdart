@@ -41,12 +41,12 @@ class BoardItem {
 
   bool get canceled => isTask && task!.isCancelled;
 
-  /// Seam for stage 2 (manual drag order, X-DAVDART-RANK): a lower rank sorts
-  /// first and ranked items sort before unranked ones. Always null for now.
-  double? get rank => null;
+  /// Manual order (X-DAVDART-RANK): a lower rank sorts first and ranked
+  /// items sort before unranked ones.
+  double? get rank => isTask ? task!.rank : note!.rank;
 }
 
-/// The order inside a column: manual rank (stage 2, none yet), then priority
+/// The order inside a column: manual rank, then priority
 /// (high, medium, low, unset), then due date earliest first (undated after
 /// dated), then creation oldest first, then title. Overdue does not jump the
 /// queue. The done column is ordered by modified time in `boardCapped`.

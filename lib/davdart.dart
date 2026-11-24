@@ -26,6 +26,7 @@ export 'src/event_sync_engine.dart';
 export 'src/item_service.dart';
 export 'src/merge.dart';
 export 'src/note.dart';
+export 'src/rank.dart';
 export 'src/note_tree.dart';
 export 'src/space.dart';
 export 'src/status.dart';

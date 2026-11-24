@@ -1,3 +1,5 @@
+import 'rank.dart';
+
 /// A note or task-like journal entry, stored as an iCalendar VJOURNAL.
 class Note {
   Note({
@@ -59,6 +61,11 @@ class Note {
   /// Server-side location and entity tag, set by the CalDAV client.
   String? href;
   String? etag;
+
+  /// Manual order in a board column (`X-DAVDART-RANK`): lower first, null
+  /// for none. Kept in [extraLines].
+  double? get rank => rankOfLines(extraLines);
+  set rank(double? v) => setRankInLines(extraLines, v);
 
   Note copyWith({
     String? summary,

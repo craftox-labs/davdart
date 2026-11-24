@@ -17,9 +17,15 @@ class NoteDraggable extends StatelessWidget {
     required this.source,
     required this.label,
     required this.child,
+    this.atPointer = false,
   });
   final String uid;
   final NoteDragSource source;
+
+  /// The floating chip's corner sits at the pointer, so a drop target's
+  /// move/drop offset is the pointer position (board cards read it to tell
+  /// the upper half from the lower).
+  final bool atPointer;
 
   /// Text of the floating chip under the pointer.
   final String label;
@@ -34,6 +40,9 @@ class NoteDraggable extends StatelessWidget {
     final t = tokensOf(context);
     return Draggable<NoteDrag>(
       data: NoteDrag(uid, source),
+      dragAnchorStrategy: atPointer
+          ? pointerDragAnchorStrategy
+          : childDragAnchorStrategy,
       maxSimultaneousDrags: _touchPlatform ? 0 : 1,
       feedback: DefaultTextStyle(
         style: t.type.captionStyle.copyWith(color: t.fg),

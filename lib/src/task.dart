@@ -1,5 +1,6 @@
 import 'package:timezone/timezone.dart' as tz;
 
+import 'rank.dart';
 import 'zone.dart';
 
 /// A date or date-time property value of a task (DUE, DTSTART), kept as the
@@ -291,6 +292,11 @@ class Task {
     const rfc = {'todo', 'doing', 'done', 'canceled', 'cancelled'};
     if (had || !rfc.contains(word)) categories.add('status-$word');
   }
+
+  /// Manual order in a board column (`X-DAVDART-RANK`): lower first, null
+  /// for none. Kept in [extraLines].
+  double? get rank => rankOfLines(extraLines);
+  set rank(double? v) => setRankInLines(extraLines, v);
 
   Task copyWith({
     String? summary,

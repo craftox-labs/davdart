@@ -1,6 +1,7 @@
 import 'event.dart';
 import 'note.dart';
 import 'plan_item.dart';
+import 'rank.dart';
 import 'task.dart';
 
 /// One place where both sides changed the same lines (or the same scalar) to
@@ -137,6 +138,15 @@ TextMerge mergeText(String base, String local, String remote,
   return TextMerge(out.join('\n'), conflicts);
 }
 
+/// Three-way pick of a rank: the changed side wins; both changed, the later
+/// writer ([preferLocal]) wins.
+double? _rankPick(double? b, double? l, double? r, bool preferLocal) {
+  if (l == r) return l;
+  if (l == b) return r;
+  if (r == b) return l;
+  return preferLocal ? l : r;
+}
+
 /// Merged note plus what had to be decided.
 bool _sameMap(Map<String, String> a, Map<String, String> b) =>
     a.length == b.length && a.entries.every((e) => b[e.key] == e.value);
@@ -193,17 +203,23 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
 
   // Raw lines this core does not model: take the side that changed them; if
   // both did, the winner's copy.
-  if (!sameList(local.extraLines, remote.extraLines)) {
-    final pick = sameList(local.extraLines, base.extraLines)
-        ? remote.extraLines
-        : sameList(remote.extraLines, base.extraLines) || preferLocal
-            ? local.extraLines
-            : remote.extraLines;
-    final copy = List.of(pick);
+  // The rank line is a field of its own (last writer wins, no revision), so
+  // the comparison ignores it.
+  final lx = linesWithoutRank(local.extraLines),
+      rx = linesWithoutRank(remote.extraLines),
+      bx = linesWithoutRank(base.extraLines);
+  if (!sameList(lx, rx)) {
+    final pick = sameList(lx, bx)
+        ? rx
+        : sameList(rx, bx) || preferLocal
+            ? lx
+            : rx;
     merged.extraLines
       ..clear()
-      ..addAll(copy);
+      ..addAll(pick);
   }
+  final rk = _rankPick(base.rank, local.rank, remote.rank, preferLocal);
+  if (rk != remote.rank || !sameList(lx, rx)) merged.rank = rk;
   if (!_sameMap(local.propertyParams, remote.propertyParams)) {
     final pick = _sameMap(local.propertyParams, base.propertyParams)
         ? remote.propertyParams
@@ -318,17 +334,23 @@ TaskMerge mergeTasks(Task base, Task local, Task remote) {
       pick('parent', base.parentUid, local.parentUid, remote.parentUid);
   if (merged.status != 'COMPLETED') merged.completed = null;
 
-  if (!sameList(local.extraLines, remote.extraLines)) {
-    final src = sameList(local.extraLines, base.extraLines)
-        ? remote.extraLines
-        : sameList(remote.extraLines, base.extraLines) || preferLocal
-            ? local.extraLines
-            : remote.extraLines;
-    final copy = List.of(src);
+  // The rank line is a field of its own (last writer wins, no revision), so
+  // the comparison ignores it.
+  final lx = linesWithoutRank(local.extraLines),
+      rx = linesWithoutRank(remote.extraLines),
+      bx = linesWithoutRank(base.extraLines);
+  if (!sameList(lx, rx)) {
+    final src = sameList(lx, bx)
+        ? rx
+        : sameList(rx, bx) || preferLocal
+            ? lx
+            : rx;
     merged.extraLines
       ..clear()
-      ..addAll(copy);
+      ..addAll(src);
   }
+  final rk = _rankPick(base.rank, local.rank, remote.rank, preferLocal);
+  if (rk != remote.rank || !sameList(lx, rx)) merged.rank = rk;
   if (!_sameMap(local.propertyParams, remote.propertyParams)) {
     final src = _sameMap(local.propertyParams, base.propertyParams)
         ? remote.propertyParams

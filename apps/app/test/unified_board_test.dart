@@ -108,7 +108,7 @@ void main() {
       expect(order([n('x', title: 'Zed'), n('y', title: 'Abe')]), ['y', 'x']);
     });
 
-    test('no manual rank yet (stage 2 seam)', () {
+    test('no rank unless set', () {
       expect(n('a').rank, isNull);
       expect(k('a').rank, isNull);
     });

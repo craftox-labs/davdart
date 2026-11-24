@@ -92,9 +92,38 @@ class HomeBoard extends StatelessWidget {
       onShowAll: () => publishBoardNav(state),
       onAccordion: (a) => state.nav.boardAccordion = a,
       wrap: (name, child) => _drop(name, context, child),
-      itemBuilder: (name, i, compact) =>
-          _Card(state: state, item: i, column: name, compact: compact),
+      itemBuilder: (name, i, compact) => _CardDrop(
+        // Phone accordion: no drag (stage 3). Done is ordered by time and
+        // Other is not a status, so only the other columns take a position.
+        enabled: !compact && name != 'done' && name != otherColumn,
+        accepts: (d) => _canDropOn(d, i, name),
+        onDrop: (d, after) => _dropAt(name, i.uid, d, after),
+        child: _Card(state: state, item: i, column: name, compact: compact),
+      ),
     );
+  }
+
+  /// Whether [d] can be dropped on the card [target] of [column]: same rules
+  /// as the column, but a card of its own column may be reordered.
+  bool _canDropOn(NoteDrag d, BoardItem target, String column) {
+    if (d.uid == target.uid) return false;
+    final item = state.findItem(d.uid);
+    if (item is Task) return state.tasksEditable;
+    return item is Note && state.editable && !AppState.isFolder(item);
+  }
+
+  /// Places the dragged card before or after the card [targetUid] of
+  /// [column] (a different column also changes its status).
+  void _dropAt(String column, String targetUid, NoteDrag d, bool after) {
+    final cards = [
+      for (final (name, items) in state.homeColumns(all: true))
+        if (name == column)
+          for (final i in items)
+            if (i.uid != d.uid) i.uid,
+    ];
+    final at = cards.indexOf(targetUid);
+    if (at < 0) return;
+    state.placeBoardItem(d.uid, column, index: after ? at + 1 : at);
   }
 
   /// A column is a drop target that sets the dropped item's status (a task
@@ -120,9 +149,7 @@ class HomeBoard extends StatelessWidget {
             !AppState.isFolder(item) &&
             PlanItem.fromNote(item).status != name;
       },
-      onDrop: (d) => state.findItem(d.uid) is Task
-          ? state.setTaskStatus(d.uid, name)
-          : state.setStatus(d.uid, name),
+      onDrop: (d) => state.placeBoardItem(d.uid, name),
       child: ActionContextMenu(
         groups: [
           if (state.editable && state.homeKind != HomeKind.tasks)
@@ -136,6 +163,68 @@ class HomeBoard extends StatelessWidget {
             ],
         ],
         child: column,
+      ),
+    );
+  }
+}
+
+/// A card as a drop target within its column: while a card is dragged over
+/// it, a line shows above or below it (upper or lower half) where the card
+/// would land.
+class _CardDrop extends StatefulWidget {
+  const _CardDrop({
+    required this.enabled,
+    required this.accepts,
+    required this.onDrop,
+    required this.child,
+  });
+  final bool enabled;
+  final bool Function(NoteDrag d) accepts;
+  final void Function(NoteDrag d, bool after) onDrop;
+  final Widget child;
+
+  @override
+  State<_CardDrop> createState() => _CardDropState();
+}
+
+class _CardDropState extends State<_CardDrop> {
+  bool _after = false;
+
+  bool _isAfter(Offset global) {
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return _after;
+    return box.globalToLocal(global).dy > box.size.height / 2;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.enabled) return widget.child;
+    final t = tokensOf(context);
+    return DragTarget<NoteDrag>(
+      onWillAcceptWithDetails: (d) => widget.accepts(d.data),
+      onMove: (d) {
+        final a = _isAfter(d.offset);
+        if (a != _after) setState(() => _after = a);
+      },
+      onAcceptWithDetails: (d) => widget.onDrop(d.data, _isAfter(d.offset)),
+      builder: (context, candidates, _) => Stack(
+        children: [
+          widget.child,
+          if (candidates.isNotEmpty)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: _after ? null : 0,
+              bottom: _after ? 0 : null,
+              child: IgnorePointer(
+                child: Container(
+                  key: Key(_after ? 'drop-line-after' : 'drop-line-before'),
+                  height: t.borders.focus,
+                  color: t.accent,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -247,6 +336,7 @@ class _Card extends StatelessWidget {
     final draggable = NoteDraggable(
       uid: item.uid,
       source: NoteDragSource.board,
+      atPointer: true,
       label: item.title,
       child: _keyRow(t, card),
     );
