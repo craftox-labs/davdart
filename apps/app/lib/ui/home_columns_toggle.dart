@@ -5,21 +5,16 @@ import '../state/app_state.dart';
 import 'parts.dart';
 import 'theme.dart';
 
-/// Header icon on Home Board and Tasks (wide only): a menu of the status
-/// columns to show, saved per Space and view. A badge counts hidden ones.
+/// Header icon on the Home Board (wide only): a menu of the status
+/// columns to show, saved per Space. A badge counts hidden ones.
 class HomeColumnsToggle extends StatelessWidget {
-  const HomeColumnsToggle({
-    super.key,
-    required this.state,
-    required this.focus,
-  });
+  const HomeColumnsToggle({super.key, required this.state});
   final AppState state;
-  final HomeFocus focus;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final (cols, _, hidden) = state.homeColumnChoices(focus);
+    final (cols, _, hidden) = state.homeColumnChoices();
     if (cols.length < 2) return const SizedBox.shrink();
     return FPopoverMenu(
       menuAnchor: Alignment.topRight,
@@ -34,7 +29,7 @@ class HomeColumnsToggle extends StatelessWidget {
                 suffix: hidden.contains(c)
                     ? null
                     : Icon(FLucideIcons.check, size: t.icons.md),
-                onPress: () => state.toggleHomeCol(focus, c),
+                onPress: () => state.toggleHomeCol(c),
               ),
           ],
         ),

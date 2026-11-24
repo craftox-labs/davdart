@@ -13,12 +13,12 @@ import '../state/app_state.dart';
 import '../state/note_draft.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
+import 'home_board.dart';
 import 'command_palette.dart';
 import 'key_nav_ui.dart';
 import '../state/key_nav.dart';
 import 'home_columns_toggle.dart';
 import 'home_day.dart';
-import 'task_board.dart';
 import 'detail_header.dart';
 import 'detail_view.dart';
 import 'first_run_view.dart';
@@ -338,12 +338,7 @@ class _ShellState extends State<Shell>
         publishBoardNav(state);
         state.nav.homeStacked = false;
         // The status columns (or accordions) alone, no overall header.
-        return BoardView(
-          state: state,
-          includeNoStatus: false,
-          keyboard: true,
-          embedded: embedded,
-        );
+        return HomeBoard(state: state, embedded: embedded);
       },
     );
 
@@ -365,8 +360,6 @@ class _ShellState extends State<Shell>
                 HomeSwitch(state: state),
                 if (state.homeFocus == HomeFocus.day)
                   Expanded(child: HomeDayFocus(state: state))
-                else if (state.homeFocus == HomeFocus.tasks)
-                  Expanded(child: TaskBoard(state: state))
                 else if (MediaQuery.sizeOf(context).width <
                     Tokens.stackBreakpoint)
                   // Phone: the board accordions in one scroll view.
@@ -942,7 +935,7 @@ class TopBar extends StatelessWidget {
               !showMenu &&
               state.activeTab == null &&
               state.homeFocus != HomeFocus.day)
-            HomeColumnsToggle(state: state, focus: state.homeFocus),
+            HomeColumnsToggle(state: state),
           refresh,
         ],
       ],

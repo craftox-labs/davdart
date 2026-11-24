@@ -8,7 +8,7 @@ import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/note_draft.dart';
 import 'package:davdart_app/state/tab_state.dart';
 import 'package:davdart_app/ui/app.dart';
-import 'package:davdart_app/ui/board_view.dart';
+import 'package:davdart_app/ui/home_board.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
@@ -244,7 +244,7 @@ void main() {
       final s = await _pump(t);
       s.setView(ViewMode.list);
       await t.pumpAndSettle();
-      expect(find.byType(BoardView), findsOneWidget);
+      expect(find.byType(HomeBoard), findsOneWidget);
       expect(_k('board-drop-notes'), findsNothing);
       final top = find.byKey(const Key('top-bar'));
       for (final w in ['Board', 'List']) {

@@ -131,7 +131,7 @@ void main() {
       s.setQuery('foo');
       await t.pumpAndSettle();
       final chip = t.getRect(_k('filter-chip-search'));
-      final sw = t.getRect(_k('home-focus'));
+      final sw = t.getRect(_k('home-strip'));
       expect(chip.height, lessThanOrEqualTo(28));
       expect(chip.left, greaterThan(sw.right));
       expect(chip.center.dy, closeTo(sw.center.dy, 8));
@@ -144,7 +144,7 @@ void main() {
       s.setQuery('foo');
       await t.pumpAndSettle();
       final chip = t.getRect(_k('filter-chip-search'));
-      final sw = t.getRect(_k('home-focus'));
+      final sw = t.getRect(_k('home-strip'));
       expect(chip.bottom, lessThanOrEqualTo(sw.top));
       expect(chip.height, lessThanOrEqualTo(28));
       expect(chip.left, closeTo(sw.left, 1));

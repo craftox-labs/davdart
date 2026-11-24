@@ -53,9 +53,6 @@ class KeyNav extends ChangeNotifier {
   bool boardAccordion = false;
   final Map<String, bool> boardOpen = {};
 
-  /// The same for the task board's phone sections.
-  final Map<String, bool> taskBoardOpen = {};
-
   /// Layout, set by the shell each build: which areas are on screen.
   final Set<NavArea> _visible = {NavArea.main};
   bool _mirror = false;

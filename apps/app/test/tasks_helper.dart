@@ -121,3 +121,13 @@ Event mkEvent(
   siblingLines: List.of(siblingLines),
   lastModified: DateTime.now().toUtc(),
 );
+
+/// Opens Home's Board narrowed to tasks (Board segment, then the kind menu).
+Future<void> showTasksBoard(WidgetTester t) async {
+  await t.tap(find.byKey(const Key('home-focus-board')));
+  await t.pumpAndSettle();
+  await t.tap(find.byKey(const Key('home-kind')));
+  await t.pumpAndSettle();
+  await t.tap(find.byKey(const Key('home-kind-tasks')));
+  await t.pumpAndSettle();
+}

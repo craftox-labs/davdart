@@ -9,7 +9,7 @@ import 'package:davdart_app/state/note_draft.dart';
 import 'package:davdart_app/state/note_drag.dart';
 import 'package:davdart_app/state/tab_state.dart';
 import 'package:davdart_app/ui/app.dart';
-import 'package:davdart_app/ui/board_view.dart';
+import 'package:davdart_app/ui/home_board.dart';
 import 'package:davdart_app/ui/list_view.dart';
 import 'package:davdart_app/ui/note_menu.dart';
 import 'package:flutter/gestures.dart';
@@ -98,7 +98,7 @@ void main() {
       s.setView(ViewMode.board);
       await t.pumpAndSettle();
       final card = find.descendant(
-        of: find.byType(BoardView),
+        of: find.byType(HomeBoard),
         matching: find.text('Alpha'),
       );
       await t.tap(card);
@@ -109,7 +109,7 @@ void main() {
       await _later(t);
       await t.tap(
         find.descendant(
-          of: find.byType(BoardView),
+          of: find.byType(HomeBoard),
           matching: find.text('Beta'),
         ),
       );
@@ -143,7 +143,7 @@ void main() {
     testWidgets('a quick second click promotes to main', (t) async {
       final s = await _pump(t);
       final row = find.descendant(
-        of: find.byType(BoardView),
+        of: find.byType(HomeBoard),
         matching: find.text('Alpha'),
       );
       await t.tap(row);
@@ -175,7 +175,7 @@ void main() {
           s.setOpenMode(mode);
           await t.pumpAndSettle();
           final card = find.descendant(
-            of: find.byType(BoardView),
+            of: find.byType(HomeBoard),
             matching: find.text('Beta'),
           );
           await t.tap(card, buttons: kSecondaryButton);
@@ -201,7 +201,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(
         find.descendant(
-          of: find.byType(BoardView),
+          of: find.byType(HomeBoard),
           matching: find.text('Alpha'),
         ),
         buttons: kSecondaryButton,
@@ -251,7 +251,7 @@ void main() {
       final s = await _pump(t);
       await t.tap(
         find.descendant(
-          of: find.byType(BoardView),
+          of: find.byType(HomeBoard),
           matching: find.text('Alpha'),
         ),
         buttons: kSecondaryButton,
@@ -342,7 +342,7 @@ void main() {
       final s = await _pump(t);
       await t.tap(
         find.descendant(
-          of: find.byType(BoardView),
+          of: find.byType(HomeBoard),
           matching: find.text('Beta'),
         ),
         buttons: kSecondaryButton,
@@ -365,7 +365,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(
         find.descendant(
-          of: find.byType(BoardView),
+          of: find.byType(HomeBoard),
           matching: find.text('Beta'),
         ),
         buttons: kSecondaryButton,
@@ -445,7 +445,7 @@ void main() {
       final s = await _pump(t);
       await t.tap(
         find.descendant(
-          of: find.byType(BoardView),
+          of: find.byType(HomeBoard),
           matching: find.text('Alpha'),
         ),
       );

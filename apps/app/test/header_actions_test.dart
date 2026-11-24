@@ -59,7 +59,7 @@ void main() {
       expect(m.right, lessThanOrEqualTo(r.left));
     });
 
-    testWidgets('Columns slot is stable across Board and Tasks', (t) async {
+    testWidgets('Columns slot is stable across Board kinds', (t) async {
       final s = await _app(t);
       final refresh = t.getRect(_refresh);
       s.setHomeFocus(HomeFocus.board);
@@ -67,7 +67,7 @@ void main() {
       final board = t.getRect(_k('home-cols'));
       expect(board.right, lessThanOrEqualTo(refresh.left));
       expect(refresh.left - board.right, lessThan(16));
-      s.setHomeFocus(HomeFocus.tasks);
+      s.setHomeKind(HomeKind.tasks);
       await t.pumpAndSettle();
       expect(t.getRect(_k('home-cols')), board);
       expect(t.getRect(_refresh), refresh);
@@ -80,7 +80,7 @@ void main() {
       s.setQuery('foo');
       await t.pumpAndSettle();
       final chip = t.getRect(_k('filter-chip-search'));
-      final sw = t.getRect(_k('home-focus'));
+      final sw = t.getRect(_k('home-strip'));
       expect(chip.left, closeTo(sw.left, 1));
       expect(chip.right, closeTo(sw.right, 1));
       final bar = t.getRect(_k('top-bar'));

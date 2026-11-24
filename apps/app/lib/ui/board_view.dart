@@ -3,10 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
-import '../state/key_nav.dart';
-import 'key_nav_ui.dart';
 import '../state/note_drag.dart';
-import '../theme/tokens.dart';
 import 'drag_drop.dart';
 import 'board_layout.dart';
 import 'new_note_dialog.dart';
@@ -14,39 +11,11 @@ import 'note_menu.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
-/// Publishes the Home board's cards (column by column) as the keyboard rows
-/// of the Home grid; a collapsed Board is skipped at move time.
-void publishBoardNav(AppState state) {
-  final cols = state.homeColumns();
-  final open = cols.isEmpty ? '' : boardDefaultOpen(cols);
-  state.nav.publishHome('board', [
-    for (final (name, notes) in cols)
-      for (final n in boardCapped(
-        name,
-        notes,
-        (n) => n.lastModified,
-        showAll: state.nav.boardOpen[boardDoneAllKey] ?? false,
-      ))
-        NavEntry(
-          'card-${n.uid}',
-          uid: n.uid,
-          block: 'col:$name',
-          open: (mode) async {
-            await state.openNote(n.uid, mode: mode);
-          },
-          hidden: () =>
-              state.nav.boardAccordion &&
-              !(state.nav.boardOpen[name] ?? name == open),
-        ),
-  ]);
-}
-
 class BoardView extends StatelessWidget {
   const BoardView({
     super.key,
     required this.state,
     this.includeNoStatus = true,
-    this.keyboard = false,
     this.embedded = false,
   });
   final AppState state;
@@ -54,9 +23,6 @@ class BoardView extends StatelessWidget {
   /// Phone Home: the accordion sizes to its content and does not scroll, so
   /// a parent scroll view carries it with the Today section.
   final bool embedded;
-
-  /// Home's board: the cards are rows of the keyboard grid.
-  final bool keyboard;
 
   /// Whether notes with no status get a column (off on Home).
   final bool includeNoStatus;
@@ -69,9 +35,7 @@ class BoardView extends StatelessWidget {
         child: Text(state.error!, style: TextStyle(color: t.muted)),
       );
     }
-    final cols = keyboard
-        ? state.homeColumns()
-        : state.columns(includeNoStatus: includeNoStatus);
+    final cols = state.columns(includeNoStatus: includeNoStatus);
     if (cols.isEmpty && !state.loading) {
       final hasNotes = state.filtered.isNotEmpty;
       return Center(
@@ -93,16 +57,9 @@ class BoardView extends StatelessWidget {
       modified: (n) => n.lastModified,
       embedded: embedded,
       dot: (n) => n == 'notes' || n == otherColumn ? null : n,
-      onShowAll: keyboard ? () => publishBoardNav(state) : null,
-      onAccordion: keyboard ? (a) => state.nav.boardAccordion = a : null,
       wrap: (name, child) => _drop(name, context, child),
-      itemBuilder: (name, n, compact) => _Card(
-        state: state,
-        note: n,
-        column: name,
-        home: keyboard,
-        compact: compact,
-      ),
+      itemBuilder: (name, n, compact) =>
+          _Card(state: state, note: n, column: name, compact: compact),
     );
   }
 
@@ -145,10 +102,8 @@ class _Card extends StatelessWidget {
     required this.state,
     required this.note,
     required this.column,
-    this.home = false,
     this.compact = false,
   });
-  final bool home;
 
   /// Narrow layout: the title alone, no id, description or owner line.
   final bool compact;
@@ -182,61 +137,56 @@ class _Card extends StatelessWidget {
           uid: note.uid,
           source: NoteDragSource.board,
           label: note.summary,
-          child: _keyRow(
-            t,
-            FTappable(
-              onPress: () => state.clickNote(note.uid),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: t.card,
-                  borderRadius: BorderRadius.circular(t.radii.card),
-                  border: Border.all(color: selected ? t.accent : t.cardBorder),
-                ),
-                child: Padding(
-                  padding: EdgeInsets.all(t.space.lg),
-                  child: compact
-                      ? Text(note.summary, style: t.type.semiboldStyle)
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              p.itemId ?? note.summary,
-                              style: t.type.semiboldStyle,
+          child: FTappable(
+            onPress: () => state.clickNote(note.uid),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: t.card,
+                borderRadius: BorderRadius.circular(t.radii.card),
+                border: Border.all(color: selected ? t.accent : t.cardBorder),
+              ),
+              child: Padding(
+                padding: EdgeInsets.all(t.space.lg),
+                child: compact
+                    ? Text(note.summary, style: t.type.semiboldStyle)
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            p.itemId ?? note.summary,
+                            style: t.type.semiboldStyle,
+                          ),
+                          if (p.itemId != null) ...[
+                            SizedBox(height: t.space.xxs),
+                            OverflowTip(
+                              note.summary,
+                              maxLines: 2,
+                              style: t.type.bodyStyle.copyWith(color: t.muted),
                             ),
-                            if (p.itemId != null) ...[
-                              SizedBox(height: t.space.xxs),
-                              OverflowTip(
-                                note.summary,
-                                maxLines: 2,
-                                style: t.type.bodyStyle.copyWith(
-                                  color: t.muted,
-                                ),
-                              ),
-                            ],
-                            if (p.priorityWord != null) ...[
-                              SizedBox(height: t.space.sm),
-                              Text(
-                                _label(p.priorityWord!),
-                                key: Key('card-priority-${note.uid}'),
-                                style: t.type.captionStyle.copyWith(
-                                  color: p.priorityWord == 'high'
-                                      ? t.accent
-                                      : t.muted,
-                                ),
-                              ),
-                            ],
-                            if (p.owner != null) ...[
-                              SizedBox(height: t.space.sm),
-                              Text(
-                                p.owner!,
-                                style: t.type.captionStyle.copyWith(
-                                  color: t.muted,
-                                ),
-                              ),
-                            ],
                           ],
-                        ),
-                ),
+                          if (p.priorityWord != null) ...[
+                            SizedBox(height: t.space.sm),
+                            Text(
+                              _label(p.priorityWord!),
+                              key: Key('card-priority-${note.uid}'),
+                              style: t.type.captionStyle.copyWith(
+                                color: p.priorityWord == 'high'
+                                    ? t.accent
+                                    : t.muted,
+                              ),
+                            ),
+                          ],
+                          if (p.owner != null) ...[
+                            SizedBox(height: t.space.sm),
+                            Text(
+                              p.owner!,
+                              style: t.type.captionStyle.copyWith(
+                                color: t.muted,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
               ),
             ),
           ),
@@ -246,15 +196,4 @@ class _Card extends StatelessWidget {
   }
 
   static String _label(String w) => '${w[0].toUpperCase()}${w.substring(1)}';
-
-  Widget _keyRow(Tokens t, Widget child) => home
-      ? NavRow(
-          key: ValueKey('nav-card-${note.uid}'),
-          nav: state.nav,
-          list: KeyNav.homeList,
-          id: 'card-${note.uid}',
-          radius: t.radii.card,
-          child: child,
-        )
-      : child;
 }

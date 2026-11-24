@@ -10,7 +10,9 @@ import '../state/event_rules.dart';
 import '../theme/tokens.dart';
 import 'content_grid.dart';
 import 'home_today.dart';
+import 'home_board.dart' show kindIcon;
 import 'mobile_nav.dart' show addEntries;
+import 'note_menu.dart' show NoteMenuItem, menuRows;
 import 'parts.dart';
 import 'scope_bar.dart' show FilterChips;
 import 'segmented.dart';
@@ -97,14 +99,21 @@ class HomeSwitch extends StatelessWidget {
     final full = narrowLayout(context);
     final control = Segmented<HomeFocus>(
       key: const Key('home-focus'),
-      fullWidth: full,
+      fullWidth: true,
       value: state.homeFocus,
       onChanged: state.setHomeFocus,
       segments: [
         Segment(HomeFocus.day, 'Day', 'home-focus-day'),
         Segment(HomeFocus.board, 'Board', 'home-focus-board'),
-        if (state.supportsTasks)
-          Segment(HomeFocus.tasks, 'Tasks', 'home-focus-tasks'),
+      ],
+    );
+    // Day (half) | Board (the rest) | the square kind filter, on every width.
+    final strip = Row(
+      key: const Key('home-strip'),
+      children: [
+        Expanded(child: control),
+        SizedBox(width: t.space.md),
+        _KindFilter(state: state),
       ],
     );
     return ContentCap(
@@ -119,7 +128,7 @@ class HomeSwitch extends StatelessWidget {
                     FilterChips(state: state, fullWidth: true),
                     SizedBox(height: t.space.lg),
                   ],
-                  control,
+                  strip,
                 ],
               )
             : Align(
@@ -127,7 +136,12 @@ class HomeSwitch extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    control,
+                    Flexible(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 320),
+                        child: strip,
+                      ),
+                    ),
                     SizedBox(width: t.space.md),
                     _HomeAdd(state: state),
                     if (state.query.trim().isNotEmpty) ...[
@@ -678,10 +692,85 @@ class _Cell extends StatelessWidget {
   Widget build(BuildContext context) => SizedBox(height: height, child: child);
 }
 
-/// Wide layouts: a split + beside the Day | Board | Tasks switch. Clicking +
+/// The small square at the strip's right end: narrows the Board to notes or
+/// tasks. It shows the active kind's glyph (a neutral filter icon for All) so
+/// a narrowed board never looks like missing items; dimmed and inactive on
+/// Day, where it keeps its place.
+class _KindFilter extends StatelessWidget {
+  const _KindFilter({required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final active = state.homeFocus == HomeFocus.board;
+    final kind = state.homeKind;
+    final side = narrowLayout(context)
+        ? t.sizes.touchTarget
+        : t.sizes.segmentHeight;
+    IconData iconOf(HomeKind k) => switch (k) {
+      HomeKind.all => FLucideIcons.listFilter,
+      HomeKind.notes => kindIcon(false),
+      HomeKind.tasks => kindIcon(true),
+    };
+    final choices = [
+      (HomeKind.all, 'All'),
+      (HomeKind.notes, 'Notes'),
+      if (state.supportsTasks) (HomeKind.tasks, 'Tasks'),
+    ];
+    Widget box(VoidCallback? onPress) => FTappable(
+      key: const Key('home-kind'),
+      behavior: HitTestBehavior.opaque,
+      semanticsLabel: 'Show: ${kind.name}',
+      onPress: onPress,
+      child: SizedBox(
+        width: side,
+        height: side,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border.all(color: t.cardBorder),
+            borderRadius: BorderRadius.circular(t.radii.card),
+          ),
+          child: Center(
+            child: Icon(
+              iconOf(kind),
+              key: Key('home-kind-icon-${kind.name}'),
+              size: t.icons.md,
+              color: kind == HomeKind.all ? t.muted : t.fg,
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!active) {
+      return Opacity(opacity: 0.4, child: IgnorePointer(child: box(null)));
+    }
+    return FPopoverMenu(
+      menuAnchor: Alignment.topRight,
+      childAnchor: Alignment.bottomRight,
+      menuBuilder: (ctx, controller, _) => [
+        FItemGroup(
+          children: menuRows(ctx, controller, [
+            for (final (k, label) in choices)
+              NoteMenuItem(
+                label,
+                iconOf(k),
+                () => state.setHomeKind(k),
+                key: Key('home-kind-${k.name}'),
+                selected: k == kind,
+              ),
+          ]),
+        ),
+      ],
+      builder: (ctx, controller, _) => box(controller.toggle),
+    );
+  }
+}
+
+/// Wide layouts: a split + beside the Day | Board switch. Clicking +
 /// adds the type the current focus leads with (Day: event, Board: note,
-/// Tasks: task); the chevron opens the menu of all three. The phone has the
-/// add button; both use [addEntries].
+/// Board narrowed to Tasks: task); the chevron opens the menu of all three. The
+/// phone has the add button; both use [addEntries].
 class _HomeAdd extends StatelessWidget {
   const _HomeAdd({required this.state});
   final AppState state;
@@ -697,8 +786,8 @@ class _HomeAdd extends StatelessWidget {
     final t = tokensOf(context);
     final lead = switch (state.homeFocus) {
       HomeFocus.day => 'add-event',
-      HomeFocus.board => 'add-note',
-      HomeFocus.tasks => 'add-task',
+      HomeFocus.board =>
+        state.homeKind == HomeKind.tasks ? 'add-task' : 'add-note',
     };
     final primary = entries.where((e) => e.key == lead).firstOrNull;
     return Row(

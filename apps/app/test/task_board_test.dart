@@ -1,6 +1,6 @@
 import 'package:davdart/davdart.dart';
-import 'package:davdart_app/ui/board_view.dart';
-import 'package:davdart_app/ui/task_board.dart';
+import 'package:davdart_app/ui/home_board.dart';
+import 'package:davdart_app/state/app_state.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -21,32 +21,31 @@ void main() {
         mkTask('c', summary: 'Fixed bug', status: 'COMPLETED'),
       ],
     );
-    expect(find.byType(TaskBoard), findsNothing);
-    await t.tap(_k('home-focus-tasks'));
+    expect(find.byType(HomeBoard), findsNothing);
+    await showTasksBoard(t);
     await t.pumpAndSettle();
-    expect(find.byType(TaskBoard), findsOneWidget);
-    expect(find.byType(BoardView), findsNothing);
+    expect(find.byType(HomeBoard), findsOneWidget);
     for (final c in ['todo', 'doing', 'done']) {
-      expect(_k('task-board-col-$c'), findsOneWidget);
+      expect(_k('board-drop-$c'), findsOneWidget);
     }
-    expect(_k('task-board-col-backlog'), findsNothing);
+    expect(_k('board-drop-backlog'), findsNothing);
     expect(
       find.descendant(
-        of: _k('task-board-col-todo'),
+        of: _k('board-drop-todo'),
         matching: find.text('Open bug'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
-        of: _k('task-board-col-doing'),
+        of: _k('board-drop-doing'),
         matching: find.text('Busy bug'),
       ),
       findsOneWidget,
     );
     expect(
       find.descendant(
-        of: _k('task-board-col-done'),
+        of: _k('board-drop-done'),
         matching: find.text('Fixed bug'),
       ),
       findsOneWidget,
@@ -64,15 +63,16 @@ void main() {
         ],
       );
       state.setTaskTagFilter('bug');
-      final cols = state.taskColumns();
+      state.setHomeKind(HomeKind.tasks);
+      final cols = state.homeColumns();
       expect([for (final c in cols) c.$1], ['todo', 'doing', 'done']);
-      expect([for (final x in cols[0].$2) x.summary], ['Tagged']);
+      expect([for (final x in cols[0].$2) x.title], ['Tagged']);
       expect(cols[1].$2, isEmpty);
     },
   );
 
   testWidgets(
-    'backlog and blocked tags get columns; cancelled folds into done',
+    'backlog and blocked tags get columns; canceled has its own column',
     (t) async {
       final state = await pumpTasksApp(
         t,
@@ -83,14 +83,15 @@ void main() {
           mkTask('r', summary: 'Shipped', tags: ['status-review']),
         ],
       );
-      expect([for (final c in state.taskColumns()) c.$1],
-          ['backlog', 'todo', 'doing', 'blocked', 'review', 'done']);
-      final cols = {for (final c in state.taskColumns()) c.$1: c.$2};
-      expect([for (final x in cols['review']!) x.summary], ['Shipped']);
-      expect([for (final x in cols['backlog']!) x.summary], ['Later']);
-      expect([for (final x in cols['blocked']!) x.summary], ['Stuck']);
-      expect([for (final x in cols['done']!) x.summary], ['Dropped']);
-      expect(cols.containsKey('cancelled'), isFalse);
+      state.setHomeKind(HomeKind.tasks);
+      expect([for (final c in state.homeColumns()) c.$1],
+          ['backlog', 'todo', 'doing', 'blocked', 'review', 'done', 'canceled']);
+      final cols = {for (final c in state.homeColumns()) c.$1: c.$2};
+      expect([for (final x in cols['review']!) x.title], ['Shipped']);
+      expect([for (final x in cols['backlog']!) x.title], ['Later']);
+      expect([for (final x in cols['blocked']!) x.title], ['Stuck']);
+      expect([for (final x in cols['canceled']!) x.title], ['Dropped']);
+      expect(cols['done'], isEmpty);
     },
   );
 
@@ -105,7 +106,7 @@ void main() {
         mkTask('b', summary: 'Open bug'),
       ],
     );
-    await t.tap(_k('home-focus-tasks'));
+    await showTasksBoard(t);
     await t.pumpAndSettle();
     expect(_k('board-accordion'), findsOneWidget);
     expect(find.text('Busy bug'), findsOneWidget); // doing starts open
@@ -133,7 +134,7 @@ void main() {
     );
     await t.tapAt(const Offset(5, 5));
     await t.pumpAndSettle();
-    await t.tap(_k('home-focus-tasks'));
+    await showTasksBoard(t);
     await t.pumpAndSettle();
     await t.tap(_k('home-add'));
     await t.pumpAndSettle();

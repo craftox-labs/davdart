@@ -94,7 +94,7 @@ void main() {
     testWidgets('Board focus: j k inside a column, h l across columns', (
       t,
     ) async {
-      final s = await _home(t, board: true);
+      final s = await _home(t, board: true, tasks: const []);
       expect(_cur(s), 'card-n1');
       await _press(t, _j);
       expect(_cur(s), 'card-n2');
@@ -121,7 +121,7 @@ void main() {
       await _press(t, LogicalKeyboardKey.keyG);
       await _press(t, LogicalKeyboardKey.keyG);
       expect(_cur(s), 'event-row-e1');
-      final b = await _home(t, board: true);
+      final b = await _home(t, board: true, tasks: const []);
       await _shift(t, LogicalKeyboardKey.keyG);
       expect(_cur(b), 'card-n3');
     });
@@ -194,7 +194,7 @@ void main() {
     testWidgets('Board accordion: opening todo makes its cards reachable', (
       t,
     ) async {
-      final s = await _home(t, size: const Size(500, 900), board: true);
+      final s = await _home(t, size: const Size(500, 900), board: true, tasks: const []);
       expect(_cur(s), 'card-n3'); // only the open (doing) section
       await t.tap(find.byKey(const Key('board-acc-todo-toggle')));
       await t.pumpAndSettle();

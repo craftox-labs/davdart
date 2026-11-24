@@ -110,22 +110,23 @@ void main() {
       t,
     ) async {
       final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      s.setHomeKind(HomeKind.tasks);
       expect(
-        [for (final c in s.taskColumns()) c.$1],
+        [for (final c in s.homeColumns()) c.$1],
         ['todo', 'doing', 'done'],
       );
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
-      expect(_k('task-board-col-backlog'), findsNothing);
+      expect(_k('board-drop-backlog'), findsNothing);
       await s.setTaskStatus('a', 'backlog');
       await t.pumpAndSettle();
-      expect(_k('task-board-col-backlog'), findsOneWidget);
-      expect(s.taskColumns().first.$1, 'backlog');
+      expect(_k('board-drop-backlog'), findsOneWidget);
+      expect(s.homeColumns().first.$1, 'backlog');
     });
 
     testWidgets('phone accordion has no empty backlog section', (t) async {
       await pumpTasksApp(t, size: const Size(400, 800), tasks: [mkTask('a')]);
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('board-acc-backlog'), findsNothing);
       expect(_k('board-acc-todo'), findsOneWidget);
@@ -160,7 +161,7 @@ void main() {
         size: const Size(1280, 1600),
         tasks: [for (var i = 0; i < 13; i++) _done(i)],
       );
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('board-done-show-all'), findsOneWidget);
       expect(find.text('Show all (13)'), findsOneWidget);
@@ -175,7 +176,7 @@ void main() {
 
     testWidgets('no control at or under the cap', (t) async {
       await pumpTasksApp(t, tasks: [for (var i = 0; i < 10; i++) _done(i)]);
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('board-done-show-all'), findsNothing);
     });
@@ -186,7 +187,7 @@ void main() {
         size: const Size(400, 1600),
         tasks: [for (var i = 0; i < 12; i++) _done(i)],
       );
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(find.text('Show all (12)'), findsOneWidget);
       await t.ensureVisible(_k('board-done-show-all'));
@@ -206,7 +207,7 @@ void main() {
           mkTask('bare'),
         ],
       );
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('card-priority-p'), findsOneWidget);
       expect(find.text('High'), findsOneWidget);
@@ -225,7 +226,7 @@ void main() {
           mkTask('fin', days: -2, status: 'COMPLETED'),
         ],
       );
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       Color col(String uid) => t
           .widget<Text>(
@@ -245,7 +246,7 @@ void main() {
         size: const Size(400, 800),
         tasks: [mkTask('a', priority: 5, days: 0)],
       );
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(find.text('Medium'), findsOneWidget);
       expect(_k('card-due-a'), findsOneWidget);
@@ -284,12 +285,12 @@ void main() {
     });
 
     testWidgets('Show fewer collapses the done column again', (t) async {
-      final s = await pumpTasksApp(
+      await pumpTasksApp(
         t,
         size: const Size(1280, 1600),
         tasks: [for (var i = 0; i < 12; i++) _done(i)],
       );
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       await t.tap(_k('board-done-show-all'));
       await t.pumpAndSettle();
@@ -297,7 +298,6 @@ void main() {
       await t.tap(_k('board-done-show-fewer'));
       await t.pumpAndSettle();
       expect(_k('task-card-d0'), findsNothing);
-      expect(s.nav.taskBoardOpen.containsKey(boardDoneAllKey), isFalse);
     });
 
     test('a Space change clears Show all', () async {
@@ -305,10 +305,8 @@ void main() {
       final c = catalogWithPlanning(prefs, planningSeed: SeedNotes(const []));
       final s = AppState(c.sourceFor(c.current!), prefs: prefs, catalog: c);
       await s.load();
-      s.nav.taskBoardOpen[boardDoneAllKey] = true;
       s.nav.boardOpen[boardDoneAllKey] = true;
       await s.createSpace('Inbox');
-      expect(s.nav.taskBoardOpen.containsKey(boardDoneAllKey), isFalse);
       expect(s.nav.boardOpen.containsKey(boardDoneAllKey), isFalse);
     });
 
@@ -326,7 +324,7 @@ void main() {
           ),
         ],
       );
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(t.takeException(), isNull);
       expect(t.getRect(_k('card-due-w')).right, lessThanOrEqualTo(320));
@@ -337,23 +335,23 @@ void main() {
     testWidgets('hidden columns are saved and the last one stays', (t) async {
       final prefs = MemoryStorage();
       final s = await pumpTasksApp(t, prefs: prefs, tasks: [mkTask('a')]);
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
-      expect(_k('task-board-col-doing'), findsOneWidget);
+      expect(_k('board-drop-doing'), findsOneWidget);
       await t.tap(_k('home-cols'));
       await t.pumpAndSettle();
       await t.tap(_k('home-col-doing'));
       await t.pumpAndSettle();
-      expect(_k('task-board-col-doing'), findsNothing);
-      expect(_k('task-board-col-todo'), findsOneWidget);
-      expect(s.homeHiddenCols(HomeFocus.tasks), {'doing'});
-      s.toggleHomeCol(HomeFocus.tasks, 'todo');
-      s.toggleHomeCol(HomeFocus.tasks, 'done');
-      expect(s.taskColumns().map((c) => c.$1), ['done']);
-      s.toggleHomeCol(HomeFocus.tasks, 'done'); // the last one stays
-      expect(s.taskColumns().map((c) => c.$1), ['done']);
-      s.toggleHomeCol(HomeFocus.tasks, 'doing');
-      expect(s.taskColumns().map((c) => c.$1), ['doing', 'done']);
+      expect(_k('board-drop-doing'), findsNothing);
+      expect(_k('board-drop-todo'), findsOneWidget);
+      expect(s.homeHiddenCols(), {'doing'});
+      s.toggleHomeCol('todo');
+      s.toggleHomeCol('done');
+      expect(s.homeColumns().map((c) => c.$1), ['done']);
+      s.toggleHomeCol('done'); // the last one stays
+      expect(s.homeColumns().map((c) => c.$1), ['done']);
+      s.toggleHomeCol('doing');
+      expect(s.homeColumns().map((c) => c.$1), ['doing', 'done']);
     });
 
     testWidgets('note board hides columns', (t) async {
@@ -375,7 +373,7 @@ void main() {
       await t.tap(_k('home-focus-board'));
       await t.pumpAndSettle();
       expect([for (final c in s.homeColumns()) c.$1], ['todo', 'doing']);
-      s.toggleHomeCol(HomeFocus.board, 'todo');
+      s.toggleHomeCol('todo');
       expect([for (final c in s.homeColumns()) c.$1], ['doing']);
     });
 
@@ -383,15 +381,16 @@ void main() {
       t,
     ) async {
       final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
-      s.toggleHomeCol(HomeFocus.tasks, 'blocked'); // absent: still saved
-      final (names, hidden, _) = s.homeColumnChoices(HomeFocus.tasks);
+      s.setHomeKind(HomeKind.tasks);
+      s.toggleHomeCol('blocked'); // absent: still saved
+      final (names, hidden, _) = s.homeColumnChoices();
       expect(names, ['todo', 'doing', 'done', 'blocked']);
       expect(hidden, isEmpty);
       for (final c in ['todo', 'doing', 'done']) {
-        s.toggleHomeCol(HomeFocus.tasks, c);
+        s.toggleHomeCol(c);
       }
-      expect(s.homeColumnChoices(HomeFocus.tasks).$2, {'todo', 'doing'});
-      expect(s.taskColumns().length, 1);
+      expect(s.homeColumnChoices().$2, {'todo', 'doing'});
+      expect(s.homeColumns().length, 1);
     });
 
     testWidgets('hidden columns survive a rebuilt state', (t) async {
@@ -403,7 +402,7 @@ void main() {
           mkTask('a', tags: ['red']),
         ],
       );
-      s.toggleHomeCol(HomeFocus.tasks, 'doing');
+      s.toggleHomeCol('doing');
       final s2 = await pumpTasksApp(
         t,
         prefs: prefs,
@@ -411,18 +410,18 @@ void main() {
           mkTask('a', tags: ['red']),
         ],
       );
-      expect(s2.homeHiddenCols(HomeFocus.tasks), {'doing'});
+      expect(s2.homeHiddenCols(), {'doing'});
     });
 
     testWidgets('toggle is a header icon: wide only, badge when hidden', (
       t,
     ) async {
       final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('home-cols'), findsOneWidget);
       expect(_k('home-cols-badge'), findsNothing);
-      s.toggleHomeCol(HomeFocus.tasks, 'doing');
+      s.toggleHomeCol('doing');
       await t.pumpAndSettle();
       expect(_k('home-cols-badge'), findsOneWidget);
       await t.tap(_k('home-focus-day'));
@@ -432,7 +431,7 @@ void main() {
 
     testWidgets('phone layout has no toggle', (t) async {
       await pumpTasksApp(t, size: const Size(320, 800), tasks: [mkTask('a')]);
-      await t.tap(_k('home-focus-tasks'));
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('home-cols'), findsNothing);
     });
@@ -441,8 +440,8 @@ void main() {
       t,
     ) async {
       final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
-      s.toggleHomeCol(HomeFocus.tasks, 'blocked');
-      await t.tap(_k('home-focus-tasks'));
+      s.toggleHomeCol('blocked');
+      await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(
         find.descendant(of: _k('home-cols-badge'), matching: find.text('1')),

@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart' show TextEditingController;
 import '../data/key_value_storage.dart';
 import '../data/note_source.dart';
 import '../data/space_catalog.dart';
+import 'board_item.dart';
 import 'chord_keymap.dart';
 import 'key_nav.dart';
 import 'note_draft.dart';
@@ -16,6 +17,8 @@ import 'event_draft.dart';
 import 'event_rules.dart';
 import 'task_draft.dart';
 import 'task_rules.dart';
+
+export 'board_item.dart' show BoardItem, HomeKind, compareBoardItems;
 
 enum ViewMode { board, list }
 
@@ -173,7 +176,7 @@ enum OpenMode { peek, main }
 enum TaskFilter { open, all, completed }
 
 /// The two halves of Home.
-enum HomeFocus { day, board, tasks }
+enum HomeFocus { day, board }
 
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
@@ -530,7 +533,6 @@ class AppState extends ChangeNotifier {
     final id = c.current;
     // A new Space starts with its done columns capped again.
     nav.boardOpen.remove('done#all');
-    nav.taskBoardOpen.remove('done#all');
     source = id == null ? const EmptyNoteSource() : c.sourceFor(id);
     notes = [];
     tasks = [];
@@ -713,9 +715,10 @@ class AppState extends ChangeNotifier {
     prefs?.remove('davdart.tabs.v1.$id');
     prefs?.remove('davdart.folders.collapsed.v1.$id');
     prefs?.remove('davdart.tags.open.v1.$id');
-    for (final f in HomeFocus.values) {
-      prefs?.remove('davdart.home.hidden.v1.${f.name}.$id');
+    for (final f in const ['board', 'tasks']) {
+      prefs?.remove('davdart.home.hidden.v1.$f.$id');
     }
+    prefs?.remove('davdart.home.kind.v1.$id');
     c.remove(id);
     if (next == null) await _openCurrent();
     notifyListeners();
@@ -3440,10 +3443,11 @@ class AppState extends ChangeNotifier {
   String get _homeFocusKey => 'davdart.home.focus.v1.$_spaceKey';
   String get _homeCalKey => 'davdart.home.cal.open.v1.$_spaceKey';
 
-  /// Which half of Home shows, remembered per Space; Day by default.
+  /// Which half of Home shows, remembered per Space; Day by default. A saved
+  /// 'tasks' (the old Tasks segment) now means Board with the Tasks kind.
   HomeFocus get homeFocus => switch (prefs?.read(_homeFocusKey)) {
     'board' => HomeFocus.board,
-    'tasks' => supportsTasks ? HomeFocus.tasks : HomeFocus.day,
+    'tasks' => supportsTasks ? HomeFocus.board : HomeFocus.day,
     'day' => HomeFocus.day,
     _ => debugDefaultFocus,
   };
@@ -3454,6 +3458,11 @@ class AppState extends ChangeNotifier {
 
   void setHomeFocus(HomeFocus f) {
     if (f == homeFocus) return;
+    // Pin the kind a legacy 'tasks' pref implied before it is overwritten.
+    if (prefs?.read(_homeFocusKey) == 'tasks' &&
+        prefs?.read(_homeKindKey) == null) {
+      prefs?.write(_homeKindKey, HomeKind.tasks.name);
+    }
     if (f == debugDefaultFocus) {
       prefs?.remove(_homeFocusKey);
     } else {
@@ -3462,28 +3471,57 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _homeHiddenKey(HomeFocus f) =>
-      'davdart.home.hidden.v1.${f.name}.$_spaceKey';
+  String get _homeKindKey => 'davdart.home.kind.v1.$_spaceKey';
 
-  /// Status columns hidden on the Home Board or Tasks view (per Space, saved).
-  Set<String> homeHiddenCols(HomeFocus f) => {
-    ...?prefs?.read(_homeHiddenKey(f))?.split(',').where((c) => c.isNotEmpty),
-  };
+  /// Which kinds the Home Board shows, remembered per Space; All by default.
+  /// Tasks fall back to All in a Space without tasks. A legacy 'tasks' focus
+  /// pref with no kind pref loads as Tasks.
+  HomeKind get homeKind {
+    final saved = prefs?.read(_homeKindKey);
+    final kind = switch (saved) {
+      'notes' => HomeKind.notes,
+      'tasks' => HomeKind.tasks,
+      'all' => HomeKind.all,
+      _ =>
+        prefs?.read(_homeFocusKey) == 'tasks' ? HomeKind.tasks : HomeKind.all,
+    };
+    return kind == HomeKind.tasks && !supportsTasks ? HomeKind.all : kind;
+  }
 
-  /// The Columns menu of [f]: every column now present, then saved hidden
-  /// names that are absent (so they can be shown again), and which of them
-  /// are hidden. Hidden is empty when everything would be (the board then
-  /// shows all). The third set is every name shown unchecked: those hidden
-  /// on the board plus absent saved ones (for the check marks and label).
-  (List<String>, Set<String>, Set<String>) homeColumnChoices(HomeFocus f) {
-    final present = [
-      for (final c
-          in f == HomeFocus.tasks
-              ? taskColumns(all: true)
-              : homeColumns(all: true))
-        c.$1,
-    ];
-    final saved = homeHiddenCols(f);
+  void setHomeKind(HomeKind k) {
+    if (k == homeKind) return;
+    // All is the default, but a legacy 'tasks' focus pref needs it written.
+    if (k == HomeKind.all && prefs?.read(_homeFocusKey) != 'tasks') {
+      prefs?.remove(_homeKindKey);
+    } else {
+      prefs?.write(_homeKindKey, k.name);
+    }
+    nav.boardOpen.remove('done#all');
+    notifyListeners();
+  }
+
+  String get _homeHiddenKey => 'davdart.home.hidden.v1.board.$_spaceKey';
+  String get _legacyTasksHiddenKey => 'davdart.home.hidden.v1.tasks.$_spaceKey';
+
+  /// Status columns hidden on the Home Board (per Space, saved). The old
+  /// Tasks view's hidden set is used until the first change when the board
+  /// has none and the Tasks kind is chosen.
+  Set<String> homeHiddenCols() {
+    var raw = prefs?.read(_homeHiddenKey);
+    if (raw == null && homeKind == HomeKind.tasks) {
+      raw = prefs?.read(_legacyTasksHiddenKey);
+    }
+    return {...?raw?.split(',').where((c) => c.isNotEmpty)};
+  }
+
+  /// The Columns menu: every column now present, then saved hidden names that
+  /// are absent (so they can be shown again), and which of them are hidden.
+  /// Hidden is empty when everything would be (the board then shows all). The
+  /// third set is every name shown unchecked: those hidden on the board plus
+  /// absent saved ones (for the check marks and label).
+  (List<String>, Set<String>, Set<String>) homeColumnChoices() {
+    final present = [for (final c in homeColumns(all: true)) c.$1];
+    final saved = homeHiddenCols();
     final names = [
       ...present,
       ...(saved.where((c) => !present.contains(c)).toList()..sort()),
@@ -3498,17 +3536,11 @@ class AppState extends ChangeNotifier {
   }
 
   /// Shows or hides a column; the last visible column cannot be hidden.
-  void toggleHomeCol(HomeFocus f, String name) {
-    final saved = homeHiddenCols(f);
+  void toggleHomeCol(String name) {
+    final saved = homeHiddenCols();
     if (!saved.remove(name)) {
-      final (names, hidden, _) = homeColumnChoices(f);
-      final present = [
-        for (final c
-            in f == HomeFocus.tasks
-                ? taskColumns(all: true)
-                : homeColumns(all: true))
-          c.$1,
-      ];
+      final (names, hidden, _) = homeColumnChoices();
+      final present = [for (final c in homeColumns(all: true)) c.$1];
       if (names.contains(name) &&
           present.every((c) => c == name || hidden.contains(c))) {
         return;
@@ -3516,12 +3548,13 @@ class AppState extends ChangeNotifier {
       saved.add(name);
     }
     if (saved.isEmpty) {
-      prefs?.remove(_homeHiddenKey(f));
+      // Explicit empty so a legacy tasks set does not come back.
+      prefs?.remove(_homeHiddenKey);
+      prefs?.remove(_legacyTasksHiddenKey);
     } else {
-      prefs?.write(_homeHiddenKey(f), (saved.toList()..sort()).join(','));
+      prefs?.write(_homeHiddenKey, (saved.toList()..sort()).join(','));
     }
     nav.boardOpen.remove('done#all');
-    nav.taskBoardOpen.remove('done#all');
     notifyListeners();
   }
 
@@ -3655,17 +3688,39 @@ class AppState extends ChangeNotifier {
     ]..sort(NoteTree.byCreated);
   }
 
-  /// Task board columns: todo, doing and done always, then backlog,
-  /// blocked and review when in use, and Other for words outside the fixed set.
-  /// Canceled tasks sit in done (the card is dimmed). Follows the Tasks
-  /// view's tag and folder filters, not its Open/Completed toggle.
-  List<(String, List<Task>)> taskColumns({bool all = false}) {
-    final by = <String, List<Task>>{'todo': [], 'doing': [], 'done': []};
-    for (final t in filteredTasks) {
-      final s = t.boardStatus;
-      (by[s == 'canceled' || s == 'cancelled' ? 'done' : statusColumn(s)] ??=
-              [])
-          .add(t);
+  /// The Home Board's cards: notes and tasks that have a status, under the
+  /// folder scope, the tag filters and the search, narrowed by [homeKind].
+  List<BoardItem> get homeItems {
+    final kind = homeKind;
+    final q = query.trim().toLowerCase();
+    return [
+      if (kind != HomeKind.tasks)
+        for (final n in filtered)
+          if (PlanItem.fromNote(n).status != null) BoardItem.note(n),
+      if (kind != HomeKind.notes && supportsTasks)
+        for (final t in filteredTasks)
+          if ((tag == null || t.categories.contains(tag)) &&
+              (q.isEmpty ||
+                  t.summary.toLowerCase().contains(q) ||
+                  t.description.toLowerCase().contains(q)))
+            BoardItem.task(t),
+    ];
+  }
+
+  /// Home board columns in board order: the fixed statuses in use, then
+  /// Other. With the Tasks kind todo, doing and done always show. Canceled
+  /// has its own column (its cards are dimmed). Each column is sorted by
+  /// [compareBoardItems]; the hidden columns are applied, [all] keeps them
+  /// (the toggle's list).
+  List<(String, List<BoardItem>)> homeColumns({bool all = false}) {
+    final by = <String, List<BoardItem>>{
+      if (homeKind == HomeKind.tasks) ...{'todo': [], 'doing': [], 'done': []},
+    };
+    for (final i in homeItems) {
+      final raw = i.isTask
+          ? i.task!.boardStatus
+          : PlanItem.fromNote(i.note!).status!;
+      (by[statusColumn(canonicalStatus(raw) ?? raw)] ??= []).add(i);
     }
     const always = ['todo', 'doing', 'done'];
     final keys = [
@@ -3674,22 +3729,15 @@ class AppState extends ChangeNotifier {
     ];
     final cols = [
       for (final k in keys)
-        if (by[k]!.isNotEmpty || always.contains(k)) (k, by[k]!),
+        if (by[k]!.isNotEmpty ||
+            (homeKind == HomeKind.tasks && always.contains(k)))
+          (k, by[k]!..sort(compareBoardItems)),
     ];
-    return all ? cols : _visibleCols(HomeFocus.tasks, cols);
+    return all ? cols : _visibleCols(cols);
   }
 
-  /// Home board columns (notes with a status): the hidden columns applied; [all] keeps the hidden ones (the toggle's list).
-  List<(String, List<Note>)> homeColumns({bool all = false}) {
-    final cols = columns(includeNoStatus: false);
-    return all ? cols : _visibleCols(HomeFocus.board, cols);
-  }
-
-  List<(String, List<T>)> _visibleCols<T>(
-    HomeFocus f,
-    List<(String, List<T>)> cols,
-  ) {
-    final hidden = homeHiddenCols(f);
+  List<(String, List<T>)> _visibleCols<T>(List<(String, List<T>)> cols) {
+    final hidden = homeHiddenCols();
     final shown = [
       for (final c in cols)
         if (!hidden.contains(c.$1)) c,

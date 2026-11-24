@@ -2,7 +2,7 @@ import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/theme/tokens.dart';
-import 'package:davdart_app/ui/board_view.dart';
+import 'package:davdart_app/ui/home_board.dart';
 import 'package:davdart_app/ui/home_day.dart';
 import 'package:davdart_app/ui/theme.dart';
 import 'package:flutter/widgets.dart';
@@ -31,10 +31,10 @@ void main() {
     );
     expect(_k('home-focus'), findsOneWidget);
     expect(_k('home-calendar'), findsOneWidget);
-    expect(find.byType(BoardView), findsNothing);
+    expect(find.byType(HomeBoard), findsNothing);
     await t.tap(_k('home-focus-board'));
     await t.pumpAndSettle();
-    expect(find.byType(BoardView), findsOneWidget);
+    expect(find.byType(HomeBoard), findsOneWidget);
     expect(_k('home-calendar'), findsNothing);
     expect(_k('home-today'), findsNothing);
     await t.tap(_k('home-focus-day'));
@@ -57,7 +57,7 @@ void main() {
     await t.pumpWidget(const SizedBox());
     final again = await pumpTasksApp(t, prefs: prefs);
     expect(again.homeFocus, HomeFocus.board);
-    expect(find.byType(BoardView), findsOneWidget);
+    expect(find.byType(HomeBoard), findsOneWidget);
     // Back to Day clears it.
     await t.tap(_k('home-focus-day'));
     await t.pumpAndSettle();
@@ -313,11 +313,14 @@ void main() {
     final box = t.getRect(_k('home-focus'));
     final a = t.getRect(_k('home-focus-day'));
     final b = t.getRect(_k('home-focus-board'));
-    final c = t.getRect(_k('home-focus-tasks'));
+    final k = t.getRect(_k('home-kind'));
+    expect(_k('home-focus-tasks'), findsNothing);
+    // Day and Board share the width; the square kind filter sits at the far
+    // right, outside the segmented box.
     expect(a.width, closeTo(b.width, 0.5));
-    expect(a.width, closeTo(c.width, 0.5));
-    expect(box.width, greaterThan(400 - 2 * 12 - 2));
-    expect(a.width + b.width + c.width, closeTo(box.width, 1));
+    expect(a.width + b.width, closeTo(box.width, 1));
+    expect(k.width, closeTo(k.height, 0.5));
+    expect(k.left, greaterThanOrEqualTo(box.right));
     await pumpTasksApp(t, size: const Size(1280, 800));
     expect(t.getRect(_k('home-focus')).width, lessThan(300));
   });
