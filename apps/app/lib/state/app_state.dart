@@ -1298,7 +1298,17 @@ class AppState extends ChangeNotifier {
   // [ProjectIndex]. Opening a project is the ordinary folder scope.
 
   /// Projects, counts and progress of the open Space, derived on demand.
-  ProjectIndex get projectIndex => ProjectIndex(notes, tasks, events);
+  ///
+  /// Cached until the next notification, so a rebuild reads it once.
+  ProjectIndex get projectIndex =>
+      _projectIndexCache ??= ProjectIndex(notes, tasks, events);
+  ProjectIndex? _projectIndexCache;
+
+  @override
+  void notifyListeners() {
+    _projectIndexCache = null;
+    super.notifyListeners();
+  }
 
   /// Adds a project folder under the Space's Projects container and opens
   /// it. The container (title "Projects") is created first when the Space
