@@ -1,4 +1,5 @@
 import 'note.dart';
+import 'status.dart';
 
 final _headerLine = RegExp(r'^([a-z][a-z0-9_]*):[ \t]*(.*)$');
 
@@ -47,6 +48,26 @@ class PlanItem {
   String? get githubRef => fields['github_ref'];
   String? get created => fields['created'];
   String? get updated => fields['updated'];
+
+  /// Priority word (`high`, `medium`, `low`) of the `priority` field, or null.
+  String? get priorityWord {
+    final v = fields['priority']?.trim().split(RegExp(r'[\s(;,]')).first;
+    final w = v?.toLowerCase();
+    return notePriorities.containsKey(w) ? w : null;
+  }
+
+  /// The priority as a task-style number (1, 5 or 9), or null.
+  int? get priority => notePriorities[priorityWord];
+
+  /// Sets the `priority` field to [word] (`high`, `medium`, `low`); null
+  /// removes it.
+  void setPriority(String? word) {
+    if (word == null) {
+      fields.remove('priority');
+    } else {
+      fields['priority'] = word;
+    }
+  }
 
   /// Raw status line, for example `backlog (proposed; tm's go moves it)`.
   String? get statusLine => fields['status'];

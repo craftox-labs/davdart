@@ -83,7 +83,7 @@ class EditBar extends StatelessWidget {
   }
 }
 
-/// The fields of an open edit: title, status, tags, Inside, body.
+/// The fields of an open edit: title, status, priority, tags, Inside, body.
 class NoteEditor extends StatelessWidget {
   const NoteEditor({
     super.key,
@@ -157,6 +157,26 @@ class NoteEditor extends StatelessWidget {
                   ),
                   for (final s in boardOrder)
                     FSelectItem<String>(title: Text(s), value: s),
+                ],
+              ),
+            ),
+          if (!AppState.isFolder(note))
+            TrackPopover(
+              builder: (_, pc) => FSelect<String>.rich(
+                popoverControl: pc,
+                key: const Key('edit-note-priority'),
+                label: const Text('Priority'),
+                format: (v) => v.isEmpty ? 'none' : v,
+                hint: 'none',
+                control: FSelectControl.lifted(
+                  value: draft.priority ?? '',
+                  onChange: (v) =>
+                      draft.setPriority(v == null || v.isEmpty ? null : v),
+                ),
+                children: [
+                  const FSelectItem<String>(title: Text('none'), value: ''),
+                  for (final p in notePriorities.keys)
+                    FSelectItem<String>(title: Text(p), value: p),
                 ],
               ),
             ),

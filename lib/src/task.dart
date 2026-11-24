@@ -229,7 +229,7 @@ class Task {
   bool get isRecurring => rrule != null && rrule!.isNotEmpty;
 
   /// The board status word (`backlog`, `todo`, `doing`, `blocked`, `done`,
-  /// `cancelled`): a `status-*` tag wins, else derived from [status].
+  /// `canceled`): a `status-*` tag wins, else derived from [status].
   String get boardStatus {
     for (final c in categories) {
       if (c.startsWith('status-')) return c.substring(7);
@@ -237,7 +237,7 @@ class Task {
     return switch (status) {
       'COMPLETED' => 'done',
       'IN-PROCESS' => 'doing',
-      'CANCELLED' => 'cancelled',
+      'CANCELLED' => 'canceled',
       _ => 'todo',
     };
   }
@@ -269,6 +269,7 @@ class Task {
         status = 'COMPLETED';
         percentComplete = 100;
         completed = now.toUtc();
+      case 'canceled':
       case 'cancelled':
         status = 'CANCELLED';
         completed = null;
@@ -287,7 +288,7 @@ class Task {
   void _retag(String word) {
     final had = categories.any((c) => c.startsWith('status-'));
     categories.removeWhere((c) => c.startsWith('status-'));
-    const rfc = {'todo', 'doing', 'done', 'cancelled'};
+    const rfc = {'todo', 'doing', 'done', 'canceled', 'cancelled'};
     if (had || !rfc.contains(word)) categories.add('status-$word');
   }
 

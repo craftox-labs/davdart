@@ -25,7 +25,7 @@ const _statusWords = [
   ('doing', 'in-process'),
   ('blocked', 'blocked'),
   ('done', 'completed'),
-  ('cancelled', 'cancelled'),
+  ('canceled', 'canceled'),
 ];
 
 /// Priority as the three buckets the editor offers (RFC 5545: 1-4 high,

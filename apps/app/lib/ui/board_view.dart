@@ -92,7 +92,7 @@ class BoardView extends StatelessWidget {
       openMap: state.nav.boardOpen,
       modified: (n) => n.lastModified,
       embedded: embedded,
-      dot: (n) => n == 'notes' ? null : n,
+      dot: (n) => n == 'notes' || n == otherColumn ? null : n,
       onShowAll: keyboard ? () => publishBoardNav(state) : null,
       onAccordion: keyboard ? (a) => state.nav.boardAccordion = a : null,
       wrap: (name, child) => _drop(name, context, child),
@@ -109,6 +109,8 @@ class BoardView extends StatelessWidget {
   /// Makes a column a drop target that sets the dropped note's status, and
   /// gives it a right-click menu to add a note in that status.
   Widget _drop(String name, BuildContext context, Widget column) {
+    // Other holds words outside the fixed set: it is not a status to drop on.
+    if (name == otherColumn) return column;
     final status = name == 'notes' ? null : name;
     return NoteDropTarget(
       key: Key('board-drop-$name'),
@@ -153,7 +155,8 @@ class _Card extends StatelessWidget {
   final AppState state;
   final Note note;
 
-  /// The column this card sits in ('notes' is the no-status column).
+  /// The column this card sits in ('notes' is the no-status column, 'other'
+  /// the one for words outside the fixed set).
   final String column;
 
   @override
@@ -167,7 +170,7 @@ class _Card extends StatelessWidget {
         state: state,
         uid: note.uid,
         items: [
-          if (state.editable && column != 'notes')
+          if (state.editable && column != 'notes' && column != otherColumn)
             NoteMenuItem(
               'New note in $column…',
               FLucideIcons.filePlus,
@@ -210,6 +213,18 @@ class _Card extends StatelessWidget {
                                 ),
                               ),
                             ],
+                            if (p.priorityWord != null) ...[
+                              SizedBox(height: t.space.sm),
+                              Text(
+                                _label(p.priorityWord!),
+                                key: Key('card-priority-${note.uid}'),
+                                style: t.type.captionStyle.copyWith(
+                                  color: p.priorityWord == 'high'
+                                      ? t.accent
+                                      : t.muted,
+                                ),
+                              ),
+                            ],
                             if (p.owner != null) ...[
                               SizedBox(height: t.space.sm),
                               Text(
@@ -229,6 +244,8 @@ class _Card extends StatelessWidget {
       ),
     );
   }
+
+  static String _label(String w) => '${w[0].toUpperCase()}${w.substring(1)}';
 
   Widget _keyRow(Tokens t, Widget child) => home
       ? NavRow(

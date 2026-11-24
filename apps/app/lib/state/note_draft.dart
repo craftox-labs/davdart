@@ -29,11 +29,13 @@ class NoteDraft extends ChangeNotifier {
     required String tags,
     required this.originalParent,
     required this.originalStatus,
+    this.originalPriority,
   }) : originalTitle = title,
        originalBody = body,
        originalTags = tags,
        parent = originalParent,
        status = originalStatus,
+       priority = originalPriority,
        titleController = TextEditingController(text: title),
        bodyController = TextEditingController(text: body),
        tagsController = TextEditingController(text: tags) {
@@ -44,11 +46,14 @@ class NoteDraft extends ChangeNotifier {
 
   final String uid;
   String originalTitle, originalBody, originalTags;
-  String? originalParent, originalStatus;
+  String? originalParent, originalStatus, originalPriority;
   final TextEditingController titleController, bodyController, tagsController;
 
   String? parent;
   String? status;
+
+  /// `high`, `medium`, `low` or null (none).
+  String? priority;
 
   void setParent(String? v) {
     parent = v;
@@ -60,6 +65,11 @@ class NoteDraft extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setPriority(String? v) {
+    priority = v;
+    notifyListeners();
+  }
+
   /// Records that the given values were saved: the draft is dirty only for
   /// what was typed or changed after them.
   void markSaved({
@@ -68,12 +78,14 @@ class NoteDraft extends ChangeNotifier {
     required String tags,
     required String? parent,
     required String? status,
+    String? priority,
   }) {
     originalTitle = title;
     originalBody = body;
     originalTags = tags;
     originalParent = parent;
     originalStatus = status;
+    originalPriority = priority;
     notifyListeners();
   }
 
@@ -104,7 +116,8 @@ class NoteDraft extends ChangeNotifier {
       bodyController.text != originalBody ||
       tagsController.text != originalTags ||
       parent != originalParent ||
-      status != originalStatus;
+      status != originalStatus ||
+      priority != originalPriority;
 
   List<String> get tagList => [
     for (final t in tagsController.text.split(','))

@@ -331,6 +331,36 @@ void main() {
       expect(page['total'], 0);
     });
 
+    test('status is a fixed set; note priority through update', () async {
+      var (err, m) = await call(
+          c, 'create', {'kind': 'note', 'title': 'N', 'status': 'in_progress'});
+      expect(err, isFalse, reason: '$m');
+      var (_, g) = await call(c, 'get', {'id': 'N'});
+      expect(g['status'], 'doing');
+      (err, m) = await call(c, 'update', {'id': 'N', 'status': 'review'});
+      expect(err, isTrue);
+      expect(m,
+          contains('allowed: backlog, todo, doing, blocked, done, canceled'));
+      (err, m) = await call(c, 'update', {'id': 'N', 'status': 'wontfix'});
+      expect(err, isFalse);
+      (_, g) = await call(c, 'get', {'id': 'N'});
+      expect(g['status'], 'canceled');
+      (err, m) = await call(c, 'update', {'id': 'N', 'priority': 1});
+      expect(err, isFalse, reason: '$m');
+      (_, g) = await call(c, 'get', {'id': 'N'});
+      expect(g['priority'], 1);
+      expect(g['body'], startsWith('priority: high'));
+      (err, _) = await call(c, 'update', {'id': 'N', 'priority': -1});
+      expect(err, isFalse);
+      (_, g) = await call(c, 'get', {'id': 'N'});
+      expect(g.containsKey('priority'), isFalse);
+      (err, m) = await call(
+          c, 'create', {'kind': 'event', 'title': 'E', 'start': '2026-12-01'});
+      (err, m) = await call(c, 'update', {'id': 'E', 'priority': 1});
+      expect(err, isTrue);
+      expect(m, contains('tasks and notes only'));
+    });
+
     test('pagination', () async {
       for (var i = 0; i < 3; i++) {
         await call(c, 'create', {'kind': 'note', 'title': 'n$i'});

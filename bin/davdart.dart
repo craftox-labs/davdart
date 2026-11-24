@@ -24,7 +24,7 @@ generic commands (a "kind" is note, task or event; ID is a uid, href or exact ti
   tag ID [--add a,b] [--remove a,b] [--set a,b]
   status ID STATUS|none
   due ID DATE|none            (tasks)
-  priority ID N|none          (tasks)
+  priority ID N|none          (tasks and notes; notes: high|medium|low or 1/5/9)
   delete ID [--kind K] [--no-adopt]
   collections list | probe [ID] | create NAME [--components VJOURNAL,VTODO,VEVENT]
               | rename ID NAME | delete ID --confirm NAME [--non-empty] [--allow-unreadable] [--backup-dir DIR]
@@ -565,10 +565,14 @@ class _Ctx {
         final c = await svc.setDue(it.uid, v == 'none' ? null : v, dryRun: dry);
         done(c, '${it.title}: due ${c.item.due ?? '-'}');
       case 'priority':
-        final it = await resolve(_need(rest, 0, 'an ID'), kind: ItemKind.task);
-        final v = _need(rest, 1, 'a number 0-9 (or "none")');
+        final it = await resolve(_need(rest, 0, 'an ID'), kind: kind);
+        final v = _need(rest, 1, 'a number 0-9, high|medium|low (or "none")');
         final c = await svc.setPriority(
-            it.uid, v == 'none' ? null : _int(v, 0, 'priority'),
+            it.uid,
+            v == 'none'
+                ? null
+                : (notePriorities[v.toLowerCase()] ?? _int(v, 0, 'priority')),
+            kind: it.kind,
             dryRun: dry);
         done(c, '${it.title}: priority ${c.item.priority ?? '-'}');
       case 'delete':
@@ -593,7 +597,12 @@ class _Ctx {
         done(c, 'created ${c.item.uid}');
       case 'new':
         final body = await readStdin();
-        final status = p.opt('status');
+        final rawStatus = p.opt('status');
+        final status = rawStatus == null ? null : canonicalStatus(rawStatus);
+        if (rawStatus != null && status == null) {
+          throw ItemServiceException('unknown status "$rawStatus"; '
+              'allowed: ${allowedStatuses.join(', ')}');
+        }
         final under = p.opt('under');
         final parent = under == null ? null : (await resolve(under)).uid;
         final tmp =
@@ -669,7 +678,7 @@ class _Ctx {
               categories: List.of(i.tags)));
           (cols[pi.status ?? 'no status'] ??= []).add(pi);
         }
-        const order = ['backlog', 'todo', 'doing', 'blocked', 'done'];
+        const order = allowedStatuses;
         final keys = [
           ...order.where(cols.containsKey),
           ...cols.keys.where((k) => !order.contains(k)),

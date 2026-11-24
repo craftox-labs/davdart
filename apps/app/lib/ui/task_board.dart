@@ -34,14 +34,18 @@ class TaskBoard extends StatelessWidget {
         embedded: embedded,
         wrap: (name, child) => NoteDropTarget(
           key: Key('task-board-col-$name'),
-          // Drop a task on a column to set its status (cancelled counts as
-          // done: it shares that column).
+          // Drop a task on a column to set its status (canceled counts as
+          // done: it shares that column). Other is not a status.
           accepts: (d) {
             final item = state.findItem(d.uid);
             return state.tasksEditable &&
+                name != otherColumn &&
                 item is Task &&
                 !(name == 'done' && taskCompletionBlocker(item) != null) &&
-                (item.boardStatus == 'cancelled' ? 'done' : item.boardStatus) !=
+                (item.boardStatus == 'canceled' ||
+                            item.boardStatus == 'cancelled'
+                        ? 'done'
+                        : item.boardStatus) !=
                     name;
           },
           onDrop: (d) => state.setTaskStatus(d.uid, name),

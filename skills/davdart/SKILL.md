@@ -28,7 +28,7 @@ due, priority, start, end, body). Lists leave out bodies.
   [--under FOLDER] [--folder] [--due D] [--priority 0-9] [--start W --end W --location L]`
 - `update ID [--title] [--body|--stdin] [--location --start --end]`
 - `move ID TARGET|top` (refuses loops), `tag ID --add a,b --remove c --set a,b`,
-  `status ID WORD|none`, `due ID DATE|none`, `priority ID N|none`, `delete ID [--no-adopt]`.
+  `status ID WORD|none`, `due ID DATE|none`, `priority ID N|high|medium|low|none`, `delete ID [--no-adopt]`.
 - Dates: `YYYY-MM-DD` or `YYYY-MM-DDTHH:MM[:SS][Z]`.
 - Put long text on stdin (`--stdin`), not in shell arguments.
 - Preview any write first with `--dry-run`: it prints what would change and writes nothing.
@@ -40,11 +40,20 @@ due, priority, start, end, body). Lists leave out bodies.
 - Folders are notes tagged `kind-folder` (`create --folder`). They hold items of any kind.
 - Parent links are the iCalendar RELATED-TO property; `--under` and `move` set it. Do not
   put structure in titles.
-- Status is a word: `backlog`, `todo`, `doing`, `blocked`, `done` (others allowed, reuse
-  existing ones, see `overview` byStatus). Notes and events carry it as a `status-<word>`
+- Status is one of a fixed set: `backlog`, `todo`, `doing`, `blocked`, `done`, `canceled`.
+  Aliases are accepted and stored as the canonical word: `in_progress`, `in-progress` ->
+  `doing`; `cancelled`, `duplicate`, `wontfix` -> `canceled`; `draft` -> `backlog`. Any other
+  word is refused with an error listing the allowed ones (CLI and MCP alike). Old items with
+  other words are never rewritten silently; the board shows them in an Other column, so
+  re-status them with `status`. Notes and events carry it as a `status-<word>`
   tag; tasks also keep VTODO STATUS, percent and completion in step, so always use
   `status`, never edit the tag or STATUS by hand. Plan notes (body header `status:` line)
   are updated by the same command.
+- Priority: tasks use 0-9 (1 highest). Notes take `high`, `medium` or `low` as a
+  `priority: <word>` line in the body header (`priority ID high|medium|low|none`, or a number:
+  1-4 high, 5 medium, 6-9 low; `create --priority` and MCP `update` priority work on notes too).
+  Always set it with the command, not by editing the body. Events have no priority. `get --json`
+  shows a note's priority as 1, 5 or 9.
 - Tags are free words without commas. `tag --set` keeps status and folder tags.
 - Saved-view notes are hidden from listings; leave them alone.
 - Search before creating: look for an existing item or folder first to avoid duplicates.
@@ -72,7 +81,7 @@ due, priority, start, end, body). Lists leave out bodies.
 - Before any delete of more than one item, any `collections` change, or any move that
   reorganises a whole folder: show the `--dry-run` result and ask.
 - When two items match an ID (the error lists them) and you cannot tell which one is meant.
-- When a status word, folder or tag you would need does not exist yet.
+- When a folder or tag you would need does not exist yet, or a status outside the fixed set seems needed.
 - When the server refuses (rights, a collection that does not hold that kind): report it,
   do not work around it with another credential or another collection.
 - Rights and sharing cannot be changed through CalDAV: tell the user to ask the server admin.

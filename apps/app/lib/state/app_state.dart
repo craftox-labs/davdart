@@ -24,7 +24,17 @@ enum ViewMode { board, list }
 /// Spaces is a popup on the rail, not a section.
 enum Section { notes, tasks, events, views, search, account, settings }
 
-const boardOrder = ['backlog', 'todo', 'doing', 'blocked', 'done'];
+/// The fixed status set, in board order.
+const boardOrder = allowedStatuses;
+
+/// The board column for notes (or tasks) whose status word is not in
+/// [boardOrder]: nothing is rewritten, so nothing disappears.
+const otherColumn = 'other';
+
+/// The column a status word belongs in: itself when it is in the fixed set,
+/// else [otherColumn].
+String statusColumn(String status) =>
+    boardOrder.contains(status) ? status : otherColumn;
 
 String _clock() {
   final n = DateTime.now();
@@ -1559,6 +1569,16 @@ class AppState extends ChangeNotifier {
     await _save(p.apply());
   }
 
+  /// Sets a note's priority (`high`, `medium`, `low`; null clears it) in its
+  /// body header; the other header lines stay.
+  Future<void> setNotePriority(String uid, String? priority) async {
+    final n = tree.find(uid)?.note;
+    if (n == null) return;
+    final copy = n.copyWith();
+    final p = PlanItem.fromNote(copy)..setPriority(priority);
+    await _save(p.apply());
+  }
+
   /// Changes a note's title and/or body text (the header lines stay).
   Future<void> updateNote(
     String uid, {
@@ -2844,9 +2864,10 @@ class AppState extends ChangeNotifier {
           .join(', '),
       originalParent: tree.find(n.uid)?.parent?.note.uid,
       originalStatus: boardOrder.contains(p.status) ? p.status : null,
+      originalPriority: p.priorityWord,
     );
     final d = _drafts[uid]!;
-    _watchDraft(uid, d, () => (d.parent, d.status));
+    _watchDraft(uid, d, () => (d.parent, d.status, d.priority));
     _focusEditor(uid);
     notifyListeners();
   }
@@ -2871,6 +2892,7 @@ class AppState extends ChangeNotifier {
     final tagText = d.tagsController.text;
     final parent = d.parent;
     final status = d.status;
+    final priority = d.priority;
     await updateNote(
       d.uid,
       title: title,
@@ -2882,6 +2904,9 @@ class AppState extends ChangeNotifier {
     if (error == null && status != null && status != d.originalStatus) {
       await setStatus(d.uid, status);
     }
+    if (error == null && priority != d.originalPriority) {
+      await setNotePriority(d.uid, priority);
+    }
     if (error != null) return false;
     if (_drafts[key] == d) {
       d.markSaved(
@@ -2890,6 +2915,7 @@ class AppState extends ChangeNotifier {
         tags: tagText,
         parent: parent,
         status: status ?? d.originalStatus,
+        priority: priority,
       );
       // Nothing typed meanwhile: the edit is done. Otherwise the newer text
       // stays as the draft, still dirty.
@@ -3511,18 +3537,21 @@ class AppState extends ChangeNotifier {
   }
 
   /// Task board columns: todo, doing and done always, then backlog and
-  /// blocked when in use. Cancelled tasks sit in done (the card is dimmed). Follows
-  /// the Tasks view's tag and folder filters, not its Open/Completed toggle.
+  /// blocked when in use, and Other for words outside the fixed set.
+  /// Canceled tasks sit in done (the card is dimmed). Follows the Tasks
+  /// view's tag and folder filters, not its Open/Completed toggle.
   List<(String, List<Task>)> taskColumns({bool all = false}) {
     final by = <String, List<Task>>{'todo': [], 'doing': [], 'done': []};
     for (final t in filteredTasks) {
       final s = t.boardStatus;
-      (by[s == 'cancelled' ? 'done' : s] ??= []).add(t);
+      (by[s == 'canceled' || s == 'cancelled' ? 'done' : statusColumn(s)] ??=
+              [])
+          .add(t);
     }
     const always = ['todo', 'doing', 'done'];
     final keys = [
       ...boardOrder.where(by.containsKey),
-      ...by.keys.where((k) => !boardOrder.contains(k)),
+      if (by.containsKey(otherColumn)) otherColumn,
     ];
     final cols = [
       for (final k in keys)
@@ -3549,20 +3578,33 @@ class AppState extends ChangeNotifier {
     return shown.isEmpty ? cols : shown;
   }
 
-  /// Board columns in a stable order; notes with no status go last, and are
+  /// Board columns in a stable order: the fixed statuses that are in use,
+  /// then Other (words outside the set), then notes with no status, which are
   /// left out when [includeNoStatus] is false (Home shows work items only).
+  /// Within a column notes sort by priority (high first, none last), then
+  /// creation.
   List<(String, List<Note>)> columns({bool includeNoStatus = true}) {
     final by = <String, List<Note>>{};
     for (final n in filtered) {
       final s = PlanItem.fromNote(n).status;
       if (s == null && !includeNoStatus) continue;
-      (by[s ?? 'notes'] ??= []).add(n);
+      (by[s == null ? 'notes' : statusColumn(s)] ??= []).add(n);
     }
     final keys = [
       ...boardOrder.where(by.containsKey),
-      ...by.keys.where((k) => !boardOrder.contains(k) && k != 'notes'),
+      if (by.containsKey(otherColumn)) otherColumn,
       if (by.containsKey('notes')) 'notes',
     ];
-    return [for (final k in keys) (k, by[k]!)];
+    return [
+      for (final k in keys) (k, [...by[k]!]..sort(byPriority)),
+    ];
+  }
+
+  /// Priority first (high, medium, low, none), then creation: the order of a
+  /// note column.
+  static int byPriority(Note a, Note b) {
+    int rank(Note n) => PlanItem.fromNote(n).priority ?? 10;
+    final c = rank(a).compareTo(rank(b));
+    return c != 0 ? c : NoteTree.byCreated(a, b);
   }
 }

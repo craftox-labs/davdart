@@ -48,6 +48,10 @@ const _kinds = ['note', 'task', 'event'];
 const _collNote = ' Pass collection (href or exact name from the collections '
     'tool, action list; call it first) to work in another collection.';
 
+final _statusNote = 'one of ${allowedStatuses.join(', ')}; '
+    'in_progress and in-progress mean doing, cancelled, duplicate and wontfix '
+    'mean canceled, draft means backlog; any other word is refused';
+
 String _slash(String p) => p.endsWith('/') ? p : '$p/';
 
 /// True when [want] (an href, absolute or relative to [home]) names [c]. Only
@@ -304,7 +308,8 @@ McpServer buildMcpServer({
     tool(
         'list',
         'Page through items (without bodies), oldest first. Filter by kind, '
-            'tag, status or subtree. Use get for the body.$_collNote',
+            'tag, status ($_statusNote) or subtree. Use get for the body.'
+            '$_collNote',
         {
           'collection': collS,
           'kind': kindS,
@@ -375,9 +380,10 @@ McpServer buildMcpServer({
     tool(
         'create',
         'Create a note, task or event. Folders are notes with folder=true. '
-            'due and priority are for tasks; start, end and location for events '
-            '(an event needs start). Dates: YYYY-MM-DD or YYYY-MM-DDTHH:MM[:SS][Z].'
-            '$_collNote',
+            'due is for tasks; priority for tasks and notes (1-4 high, 5 medium, '
+            '6-9 low); start, end and location for events (an event needs '
+            'start). status: $_statusNote. Dates: YYYY-MM-DD or '
+            'YYYY-MM-DDTHH:MM[:SS][Z].$_collNote',
         {
           'collection': collS,
           'kind': kindS,
@@ -420,10 +426,11 @@ McpServer buildMcpServer({
     tool(
         'update',
         'Change fields of one item; only the fields you pass change. Tags: '
-            'tags_add, tags_remove or tags_set. status (empty string clears it '
-            'on notes and events). due and priority are for tasks (empty due '
-            'clears, priority -1 clears); start, end and location for events.'
-            '$_collNote',
+            'tags_add, tags_remove or tags_set. status ($_statusNote; empty '
+            'string clears it on notes and events). due is for tasks (empty '
+            'clears); priority for tasks and notes (1-4 high, 5 medium, 6-9 '
+            'low; -1 clears; a note keeps it as a "priority: high|medium|low" '
+            'body line); start, end and location for events.$_collNote',
         {
           'collection': collS,
           'id': idS,
@@ -595,9 +602,13 @@ Future<Object?> _update(ItemService items, _A a, String? writer) async {
   final id = item.uid;
   final kind = item.kind;
   bool has(String k) => a.has(k);
-  if (kind != ItemKind.task && (has('due') || has('priority'))) {
-    throw ItemServiceException('due and priority apply to tasks only; '
+  if (kind != ItemKind.task && has('due')) {
+    throw ItemServiceException('due applies to tasks only; '
         '"${item.title}" is a ${kind.name}');
+  }
+  if (kind == ItemKind.event && has('priority')) {
+    throw ItemServiceException('priority applies to tasks and notes only; '
+        '"${item.title}" is an event');
   }
   if (kind != ItemKind.event &&
       (has('start') || has('end') || has('location'))) {
@@ -648,7 +659,7 @@ Future<Object?> _update(ItemService items, _A a, String? writer) async {
   if (has('priority')) {
     final p = a.integer('priority')!;
     take(await items.setPriority(id, p < 0 ? null : p,
-        writer: writer, dryRun: dry));
+        kind: kind, writer: writer, dryRun: dry));
   }
   return ItemChange('update', dry, changes, last).toJson();
 }

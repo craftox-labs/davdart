@@ -415,11 +415,13 @@ class NoteContextMenu extends StatelessWidget {
   }
 
   /// The actions every note surface shares: new inside a folder, move to a
-  /// folder or Space, set the status, copy the id.
+  /// folder or Space, set the status or priority, copy the id.
   List<NoteMenuItem> _manage(BuildContext context, Note note) {
     final folder = AppState.isFolder(note);
     final edit = state.editable;
-    final status = PlanItem.fromNote(note).status;
+    final plan = PlanItem.fromNote(note);
+    final status = plan.status;
+    final priority = plan.priorityWord;
     return [
       if (edit && folder)
         NoteMenuItem(
@@ -477,6 +479,30 @@ class NoteContextMenu extends StatelessWidget {
                 () => state.setStatus(note.uid, s),
                 key: Key('menu-status-$s'),
                 selected: s == status,
+              ),
+          ],
+        ),
+      if (edit && !folder)
+        NoteMenuItem(
+          'Set priority',
+          FLucideIcons.flag,
+          () {},
+          key: const Key('menu-priority'),
+          children: [
+            NoteMenuItem(
+              'No priority',
+              FLucideIcons.circle,
+              () => state.setNotePriority(note.uid, null),
+              key: const Key('menu-priority-none'),
+              selected: priority == null,
+            ),
+            for (final p in notePriorities.keys)
+              NoteMenuItem(
+                p,
+                FLucideIcons.flag,
+                () => state.setNotePriority(note.uid, p),
+                key: Key('menu-priority-$p'),
+                selected: p == priority,
               ),
           ],
         ),

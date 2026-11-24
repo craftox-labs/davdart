@@ -133,6 +133,72 @@ void main() {
     expect((await svc.get(n)).status, isNull);
   });
 
+  test('status is a fixed set: aliases map, unknown words are refused',
+      () async {
+    final n = await mk(ItemKind.note, 'N');
+    final t = await mk(ItemKind.task, 'T');
+    for (final (word, want) in [
+      ('in_progress', 'doing'),
+      ('In-Progress', 'doing'),
+      ('cancelled', 'canceled'),
+      ('duplicate', 'canceled'),
+      ('wontfix', 'canceled'),
+      ('draft', 'backlog'),
+      ('blocked', 'blocked'),
+    ]) {
+      expect((await svc.setStatus(n, word)).item.status, want, reason: word);
+      expect((await svc.setStatus(t, word)).item.status, want, reason: word);
+    }
+    await svc.setStatus(t, 'cancelled');
+    expect((await client.listTasks()).single.status, 'CANCELLED');
+    await svc.setStatus(t, 'done');
+    await svc.setStatus(n, 'doing');
+    await expectLater(
+        svc.setStatus(n, 'review'),
+        throwsA(isA<ItemServiceException>().having(
+            (e) => e.message,
+            'message',
+            contains(
+                'allowed: backlog, todo, doing, blocked, done, canceled'))));
+    expect((await svc.get(n)).status, 'doing', reason: 'unchanged');
+    expect(() => svc.create(ItemKind.note, 'X', status: 'wip'),
+        throwsA(isA<ItemServiceException>()));
+    expect(
+        (await svc.create(ItemKind.note, 'Y', status: 'in_progress'))
+            .item
+            .status,
+        'doing');
+    expect((await svc.list(status: 'in_progress')).items.map((i) => i.uid),
+        containsAll([n]));
+  });
+
+  test('note priority is a body line; sets, reads, clears', () async {
+    final n = await mk(ItemKind.note, 'N');
+    final c = await svc.setPriority(n, 1);
+    expect(c.changes, ['priority: - -> 1']);
+    var g = await svc.get(n);
+    expect(g.priority, 1);
+    expect(g.body, startsWith('priority: high'));
+    expect((await svc.setPriority(n, 4)).changes, isEmpty,
+        reason: '4 is also high');
+    await svc.setPriority(n, 5);
+    expect((await svc.get(n)).body, startsWith('priority: medium'));
+    await svc.setPriority(n, 9);
+    expect((await svc.get(n)).priority, 9);
+    await svc.setStatus(n, 'doing');
+    expect((await svc.get(n)).priority, 9, reason: 'status keeps the header');
+    await svc.setPriority(n, null);
+    g = await svc.get(n);
+    expect(g.priority, isNull);
+    expect(g.body, isNot(contains('priority')));
+    final e = await mk(ItemKind.event, 'E');
+    expect(() => svc.setPriority(e, 1), throwsA(isA<ItemServiceException>()));
+    final made =
+        await svc.create(ItemKind.note, 'P', body: 'text', priority: 5);
+    expect(made.item.priority, 5);
+    expect(made.item.body, 'priority: medium\n\ntext');
+  });
+
   test('update and delete adopt children', () async {
     final f = await mk(ItemKind.note, 'F', folder: true);
     final c = await mk(ItemKind.note, 'C', parent: f);

@@ -173,6 +173,39 @@ void main() {
       expect((await jcli(['list', '--kind', 'task']))['total'], 0);
     });
 
+    test('status aliases and unknown words', () async {
+      final n = await jcli(['create', 'N', '--kind', 'note']);
+      final id = (n['item'] as Map)['uid'] as String;
+      final s = await jcli(['status', id, 'in_progress']);
+      expect((s['item'] as Map)['status'], 'doing');
+      out.clear();
+      err.clear();
+      expect(await cli(['status', id, 'review']), 1);
+      expect(err.toString(),
+          contains('allowed: backlog, todo, doing, blocked, done, canceled'));
+      err.clear();
+      expect(await cli(['new', 'W', '--status', 'wip']), 1);
+      expect(err.toString(), contains('unknown status "wip"'));
+      expect(await cli(['task', 'T', '--status', 'review'], stdinText: 'd'), 1);
+    });
+
+    test('priority on notes: words and numbers', () async {
+      final n = await jcli(['create', 'N', '--kind', 'note']);
+      final id = (n['item'] as Map)['uid'] as String;
+      var p = await jcli(['priority', id, 'high']);
+      expect((p['item'] as Map)['priority'], 1);
+      p = await jcli(['priority', id, '6']);
+      expect((p['item'] as Map)['priority'], 9);
+      out.clear();
+      expect(await cli(['get', id]), 0);
+      expect(out.toString(), contains('priority: 9'));
+      p = await jcli(['priority', id, 'none']);
+      expect((p['item'] as Map).containsKey('priority'), isFalse);
+      final c =
+          await jcli(['create', 'M', '--kind', 'note', '--priority', '5']);
+      expect((c['item'] as Map)['priority'], 5);
+    });
+
     test('--dry-run changes nothing', () async {
       final c = await jcli(['create', 'T', '--kind', 'note', '--dry-run']);
       expect(c['dryRun'], isTrue);

@@ -97,7 +97,7 @@ class TaskContextMenu extends StatelessWidget {
               'doing',
               'blocked',
               'done',
-              'cancelled',
+              'canceled',
             ])
               NoteMenuItem(
                 s,

@@ -7,6 +7,7 @@ import 'note.dart';
 import 'note_tree.dart';
 import 'plan_item.dart';
 import 'saved_view.dart';
+import 'status.dart';
 import 'task.dart';
 
 /// Which resource type an item is stored as.
@@ -382,6 +383,7 @@ class _Ref {
             status: status,
             parentUid: n.parentUid,
             isFolder: isFolderNote(n),
+            priority: PlanItem.fromNote(n).priority,
             created: n.created,
             modified: n.lastModified);
       case Task t:
@@ -595,7 +597,8 @@ class ItemService {
           .map((n) => n.uid)
           .toSet();
     }
-    final low = status?.toLowerCase();
+    final low =
+        status == null ? null : canonicalStatus(status) ?? status.toLowerCase();
     final hits = refs.where((r) {
       if (!includeFolders && r.raw is Note && isFolderNote(r.raw as Note)) {
         return false;
@@ -649,8 +652,11 @@ class ItemService {
     if (folder && kind != ItemKind.note) {
       throw ItemServiceException('only notes can be folders');
     }
-    if (kind != ItemKind.task && (due != null || priority != null)) {
-      throw ItemServiceException('due and priority apply to tasks only');
+    if (kind != ItemKind.task && due != null) {
+      throw ItemServiceException('due applies to tasks only');
+    }
+    if (kind == ItemKind.event && priority != null) {
+      throw ItemServiceException('priority applies to tasks and notes only');
     }
     if (kind != ItemKind.event &&
         (start != null || end != null || location != null)) {
@@ -675,6 +681,7 @@ class ItemService {
             lastModified: now);
         ref = _Ref(n);
         if (status != null) _setStatus(ref, status, now);
+        if (priority != null) _setNotePriority(n, priority);
       case ItemKind.task:
         final t = Task(
             uid: uid,
@@ -827,7 +834,14 @@ class ItemService {
       a.length == b.length && a.toSet().containsAll(b);
 
   void _setStatus(_Ref e, String? word, DateTime now) {
-    final w = word?.trim().toLowerCase();
+    var w = word?.trim().toLowerCase();
+    if (w != null && w.isNotEmpty) {
+      w = canonicalStatus(w);
+      if (w == null) {
+        throw ItemServiceException('unknown status "${word!.trim()}"; '
+            'allowed: ${allowedStatuses.join(', ')}');
+      }
+    }
     switch (e.raw) {
       case Task t:
         if (w == null || w.isEmpty) {
@@ -880,18 +894,38 @@ class ItemService {
         return ch;
       }, writer);
 
-  /// Sets the priority of a task (1 highest .. 9 lowest; null clears it).
+  /// Sets a note's `priority` body field from a task-style number (1-4 high,
+  /// 5 medium, 6-9 low; null or 0 clears it).
+  static void _setNotePriority(Note n, int? priority) {
+    final p = PlanItem.fromNote(n)..setPriority(priorityWordOf(priority));
+    p.apply();
+  }
+
+  /// Sets the priority of a task or note (1 highest .. 9 lowest; null clears
+  /// it). A note keeps it as a `priority: high|medium|low` body line (1-4 high,
+  /// 5 medium, 6-9 low; 1, 5 and 9 are what it reads back as).
   Future<ItemChange> setPriority(String id, int? priority,
-      {String? writer, bool dryRun = false}) {
+      {ItemKind? kind, String? writer, bool dryRun = false}) {
     if (priority != null && (priority < 0 || priority > 9)) {
       throw ItemServiceException('priority is 0..9');
     }
-    return _edit(id, 'priority', ItemKind.task, dryRun, (e, _) {
-      final t = e.raw as Task;
-      if (t.priority == priority) return [];
-      final ch = ['priority: ${t.priority ?? '-'} -> ${priority ?? '-'}'];
-      t.priority = priority;
-      return ch;
+    return _edit(id, 'priority', kind, dryRun, (e, _) {
+      switch (e.raw) {
+        case Task t:
+          if (t.priority == priority) return [];
+          final ch = ['priority: ${t.priority ?? '-'} -> ${priority ?? '-'}'];
+          t.priority = priority;
+          return ch;
+        case Note n:
+          final before = PlanItem.fromNote(n).priority;
+          final after = notePriorities[priorityWordOf(priority)];
+          if (before == after) return [];
+          _setNotePriority(n, priority);
+          return ['priority: ${before ?? '-'} -> ${after ?? '-'}'];
+        default:
+          throw ItemServiceException(
+              'priority applies to tasks and notes only; "${e.title}" is an event');
+      }
     }, writer);
   }
 
