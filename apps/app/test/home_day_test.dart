@@ -310,7 +310,7 @@ void main() {
 
   testWidgets('Segmented fills the width on a phone, not on wide', (t) async {
     await pumpTasksApp(t, size: const Size(400, 800));
-    final box = t.getRect(_k('home-focus'));
+    final box = t.getRect(_k('home-strip'));
     final a = t.getRect(_k('home-focus-day'));
     final b = t.getRect(_k('home-focus-board'));
     final k = t.getRect(_k('home-kind'));
@@ -321,9 +321,9 @@ void main() {
     expect(b.left, greaterThanOrEqualTo(a.right - 0.5));
     expect(k.right, closeTo(box.right, 1.5));
     expect(k.left, greaterThanOrEqualTo(b.right - 0.5));
-    expect(b.width + k.width, closeTo(box.width / 2, 1.5));
+    expect(b.width + k.width, closeTo(box.width / 2, 3));
     await pumpTasksApp(t, size: const Size(1280, 800));
-    expect(t.getRect(_k('home-focus')).width, lessThanOrEqualTo(320));
+    expect(t.getRect(_k('home-strip')).width, lessThanOrEqualTo(320));
   });
 
   testWidgets('section collapse is remembered per Space key', (t) async {

@@ -96,19 +96,25 @@ class HomeSwitch extends StatelessWidget {
 
   Widget _build(BuildContext context, Tokens t) {
     final full = narrowLayout(context);
-    // One outlined box, Day (half) | Board (the other half), the kind filter
-    // inside the Board half so it reads as the Board's own filter.
+    // Day (half) | Board (the other half) | the kind filter: three outlined
+    // pieces that read as one rounded control. Day and Board share an edge;
+    // a small gap separates the filter, which keeps square joining corners.
     final side = full ? t.sizes.touchTarget : t.sizes.segmentHeight;
     final onDay = state.homeFocus == HomeFocus.day;
-    Widget half(Widget child, bool on, {Key? key}) => Expanded(
-      child: DecoratedBox(
-        key: key,
-        decoration: BoxDecoration(
-          color: on ? t.selected : null,
-          borderRadius: BorderRadius.circular(t.radii.card),
-        ),
-        child: child,
+    final r = Radius.circular(t.radii.card);
+    final line = BorderSide(color: t.cardBorder);
+    Widget piece(
+      Widget child, {
+      required bool on,
+      required BorderRadius radius,
+      required Border border,
+    }) => DecoratedBox(
+      decoration: BoxDecoration(
+        color: on ? t.selected : null,
+        borderRadius: radius,
+        border: border,
       ),
+      child: child,
     );
     Widget label(String text, bool on, String key, HomeFocus f) => FTappable(
       key: Key(key),
@@ -128,39 +134,55 @@ class HomeSwitch extends StatelessWidget {
         ),
       ),
     );
-    final strip = DecoratedBox(
+    final strip = Row(
       key: const Key('home-strip'),
-      decoration: BoxDecoration(
-        border: Border.all(color: t.cardBorder),
-        borderRadius: BorderRadius.circular(t.radii.card),
-      ),
-      child: Row(
-        key: const Key('home-focus'),
-        children: [
-          half(label('Day', onDay, 'home-focus-day', HomeFocus.day), onDay),
-          half(
-            Row(
-              children: [
-                Expanded(
-                  child: label(
-                    'Board',
-                    !onDay,
-                    'home-focus-board',
-                    HomeFocus.board,
-                  ),
+      children: [
+        Expanded(
+          child: Row(
+            key: const Key('home-focus'),
+            children: [
+              Expanded(
+                child: piece(
+                  label('Day', onDay, 'home-focus-day', HomeFocus.day),
+                  on: onDay,
+                  radius: BorderRadius.horizontal(left: r),
+                  border: Border.fromBorderSide(line),
                 ),
-                SizedBox(
-                  width: t.borders.hairline,
-                  height: side * 0.5,
-                  child: ColoredBox(color: t.cardBorder),
+              ),
+              Expanded(
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: piece(
+                        label(
+                          'Board',
+                          !onDay,
+                          'home-focus-board',
+                          HomeFocus.board,
+                        ),
+                        on: !onDay,
+                        radius: BorderRadius.zero,
+                        border: Border(
+                          top: line,
+                          bottom: line,
+                          right: line,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: t.space.xxs),
+                    piece(
+                      _KindFilter(state: state, side: side),
+                      on: false,
+                      radius: BorderRadius.horizontal(right: r),
+                      border: Border.fromBorderSide(line),
+                    ),
+                  ],
                 ),
-                _KindFilter(state: state, side: side),
-              ],
-            ),
-            !onDay,
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
     return ContentCap(
       child: Padding(
