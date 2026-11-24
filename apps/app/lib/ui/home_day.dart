@@ -162,11 +162,7 @@ class HomeSwitch extends StatelessWidget {
                         ),
                         on: !onDay,
                         radius: BorderRadius.zero,
-                        border: Border(
-                          top: line,
-                          bottom: line,
-                          right: line,
-                        ),
+                        border: Border(top: line, bottom: line, right: line),
                       ),
                     ),
                     SizedBox(width: t.space.xxs),

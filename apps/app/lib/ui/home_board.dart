@@ -104,10 +104,9 @@ class HomeBoard extends StatelessWidget {
       onAccordion: (a) => state.nav.boardAccordion = a,
       wrap: (name, child) => _drop(name, context, child),
       itemBuilder: (name, i, compact) => _CardDrop(
-        // Phone accordion: a long-press drag drops on a section (status
-        // change) only, no position. Done is ordered by time and Other is not
-        // a status, so only the other wide columns take a position.
-        enabled: !compact && name != 'done' && name != otherColumn,
+        // Done is ordered by time and Other is not a status, so only the
+        // other columns take a position (phone sections included).
+        enabled: name != 'done' && name != otherColumn,
         accepts: (d) => _canDropOn(d, i, name),
         onDrop: (d, after) => _dropAt(name, i.uid, d, after),
         child: _Card(state: state, item: i, column: name, compact: compact),
@@ -289,8 +288,9 @@ class _Card extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Expanded(child: title),
             Padding(
-              padding: EdgeInsets.only(top: t.space.xxs, right: t.space.md),
+              padding: EdgeInsets.only(top: t.space.xxs, left: t.space.md),
               child: Icon(
                 kindIcon(item.isTask),
                 key: Key('card-kind-${item.uid}'),
@@ -298,7 +298,6 @@ class _Card extends StatelessWidget {
                 color: t.muted,
               ),
             ),
-            Expanded(child: title),
           ],
         ),
         if (note != null && !compact && plan!.itemId != null) ...[
@@ -396,10 +395,16 @@ class _Card extends StatelessWidget {
       child: Opacity(
         opacity: item.canceled || column == 'canceled' ? 0.5 : 1,
         child: task != null
-            ? TaskContextMenu(state: state, uid: task.uid, child: draggable)
+            ? TaskContextMenu(
+                state: state,
+                uid: task.uid,
+                touchMenu: !compact,
+                child: draggable,
+              )
             : NoteContextMenu(
                 state: state,
                 uid: item.uid,
+                touchMenu: !compact,
                 items: [
                   if (state.editable && column != otherColumn)
                     NoteMenuItem(

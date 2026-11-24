@@ -109,6 +109,7 @@ class ExclusiveContextMenu extends StatefulWidget {
     super.key,
     required this.menuBuilder,
     required this.child,
+    this.touchMenu = true,
   });
   final List<FItemGroupMixin> Function(
     BuildContext context,
@@ -117,6 +118,11 @@ class ExclusiveContextMenu extends StatefulWidget {
   )
   menuBuilder;
   final Widget child;
+
+  /// Narrow layouts open the sheet on a long press. Off where the child
+  /// uses the long press for something else (board cards drag); a mouse
+  /// right-click still opens the popup.
+  final bool touchMenu;
 
   @override
   State<ExclusiveContextMenu> createState() => _ExclusiveContextMenuState();
@@ -219,7 +225,7 @@ class _ExclusiveContextMenuState extends State<ExclusiveContextMenu>
       menuBuilder: widget.menuBuilder,
       child: widget.child,
     );
-    if (sheet) {
+    if (sheet && widget.touchMenu) {
       menu = GestureDetector(
         onLongPress: () => showMenuSheet(
           context,
@@ -277,6 +283,7 @@ class NoteContextMenu extends StatelessWidget {
     this.items = const [],
     this.onOpen,
     this.hit,
+    this.touchMenu = true,
   });
   final AppState state;
   final String uid;
@@ -285,12 +292,16 @@ class NoteContextMenu extends StatelessWidget {
   final List<NoteMenuItem> items;
   final VoidCallback? onOpen;
 
+  /// See [ExclusiveContextMenu.touchMenu].
+  final bool touchMenu;
+
   /// A search result, possibly in another Space: the open actions go through
   /// [AppState.openHit] and Edit and Delete are left out.
   final SpaceHit? hit;
 
   @override
   Widget build(BuildContext context) => ExclusiveContextMenu(
+    touchMenu: touchMenu,
     menuBuilder: (ctx, controller, _) => _groups(context, ctx, controller),
     child: child,
   );

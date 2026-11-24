@@ -84,8 +84,10 @@ Section visibleSection(AppState state) {
       section != Section.settings) {
     final tops = topSections(state);
     // Projects leads the rail but is a scope picker, not a landing page.
-    section = tops.firstWhere((o) => o != Section.projects,
-        orElse: () => tops.first);
+    section = tops.firstWhere(
+      (o) => o != Section.projects,
+      orElse: () => tops.first,
+    );
   }
   return section;
 }

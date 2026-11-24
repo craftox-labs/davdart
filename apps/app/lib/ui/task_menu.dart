@@ -21,7 +21,9 @@ class TaskContextMenu extends StatelessWidget {
     required this.child,
     this.surface = NoteSurface.entry,
     this.onOpen,
+    this.touchMenu = true,
   });
+  final bool touchMenu;
   final AppState state;
   final String uid;
   final Widget child;
@@ -30,6 +32,7 @@ class TaskContextMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ExclusiveContextMenu(
+    touchMenu: touchMenu,
     menuBuilder: (ctx, controller, _) => _groups(context, ctx, controller),
     child: child,
   );

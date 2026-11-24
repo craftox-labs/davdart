@@ -124,4 +124,50 @@ void main() {
     await t.pumpAndSettle();
     expect(PlanItem.fromNote(s.findItem('n') as Note).status, 'doing');
   });
+
+  testWidgets('phone: a held card drags, no menu sheet; drop on a card ranks', (
+    t,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    AppState.debugDefaultFocus = HomeFocus.board;
+    final s = await pumpTasksApp(
+      t,
+      notes: [
+        Note(
+          uid: 'a',
+          summary: 'Aaa',
+          description: 'status: todo\n\nx',
+          lastModified: DateTime.utc(2026, 1, 1),
+        ),
+        Note(
+          uid: 'b',
+          summary: 'Bbb',
+          description: 'status: todo\n\nx',
+          lastModified: DateTime.utc(2026, 1, 2),
+        ),
+      ],
+      size: const Size(390, 844),
+    );
+    if (_k('card-kind-a').evaluate().isEmpty) {
+      await t.tap(_k('board-acc-todo-toggle'));
+      await t.pumpAndSettle();
+    }
+    final from = t.getCenter(_k('card-kind-a'));
+    final bRect = t.getRect(_k('nav-card-b'));
+    final g = await t.startGesture(from);
+    await t.pump(const Duration(milliseconds: 700));
+    expect(_k('menu-sheet'), findsNothing);
+    final to = Offset(bRect.center.dx, bRect.bottom - 3);
+    await g.moveTo(to);
+    await t.pump();
+    await g.moveTo(to + const Offset(0, 1));
+    await t.pump();
+    await g.up();
+    await t.pumpAndSettle();
+    final a = s.findItem('a') as Note;
+    final b = s.findItem('b') as Note;
+    expect(a.rank, isNotNull);
+    expect(b.rank == null || a.rank! > b.rank!, isTrue);
+  });
 }
