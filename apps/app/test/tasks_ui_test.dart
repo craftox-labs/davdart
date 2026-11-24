@@ -715,7 +715,7 @@ void main() {
       expect(
         find.descendant(
           of: _k('hit-$uid'),
-          matching: find.byIcon(FLucideIcons.listTodo),
+          matching: find.byIcon(FLucideIcons.listChecks),
         ),
         findsOneWidget,
       );

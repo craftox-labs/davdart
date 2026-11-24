@@ -216,7 +216,7 @@ class _ReorderableTab extends StatelessWidget {
       icon: tab.kind == TabKind.view
           ? FLucideIcons.bookmark
           : tab.kind == TabKind.task
-          ? FLucideIcons.listTodo
+          ? FLucideIcons.listChecks
           : tab.kind == TabKind.event
           ? FLucideIcons.calendarDays
           : state.tabIsFolder(tab)

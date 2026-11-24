@@ -612,7 +612,7 @@ class _SearchSectionState extends State<SearchSection> {
                 prefix: h.isTask || h.isEvent
                     ? Icon(
                         h.isTask
-                            ? FLucideIcons.listTodo
+                            ? FLucideIcons.listChecks
                             : FLucideIcons.calendarDays,
                         size: t.icons.md,
                         color: t.muted,

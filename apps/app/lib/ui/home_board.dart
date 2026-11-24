@@ -17,10 +17,10 @@ import 'task_menu.dart';
 import 'task_parts.dart';
 import 'theme.dart';
 
-/// The glyph of a card's kind: a document for a note, a check-circle for a
+/// The glyph of a card's kind: a document for a note, a checklist (the rail icon) for a
 /// task (also the kind-filter menu's icons).
 IconData kindIcon(bool isTask) =>
-    isTask ? FLucideIcons.circleCheck : FLucideIcons.fileText;
+    isTask ? FLucideIcons.listChecks : FLucideIcons.fileText;
 
 /// Publishes the Home board's cards (column by column) as the keyboard rows
 /// of the Home grid; a collapsed Board is skipped at move time.

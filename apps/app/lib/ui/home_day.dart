@@ -152,7 +152,7 @@ class HomeSwitch extends StatelessWidget {
                 SizedBox(
                   width: t.borders.hairline,
                   height: side * 0.5,
-                  child: ColoredBox(color: t.divider),
+                  child: ColoredBox(color: t.cardBorder),
                 ),
                 _KindFilter(state: state, side: side),
               ],

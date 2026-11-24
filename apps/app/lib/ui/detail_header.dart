@@ -51,7 +51,7 @@ class DetailHeader extends StatelessWidget {
             builder: (context, c) {
               final w = math.min(c.maxWidth, t.sizes.tabMax);
               final icon = task != null
-                  ? FLucideIcons.listTodo
+                  ? FLucideIcons.listChecks
                   : event != null
                   ? FLucideIcons.calendarDays
                   : note != null && AppState.isFolder(note)
