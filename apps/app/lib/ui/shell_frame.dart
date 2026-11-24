@@ -165,10 +165,10 @@ class ShellFrame extends StatelessWidget {
 /// group. Account only
 /// appears when the app can sign in.
 List<Section> topSections([AppState? state]) => [
+  if (state?.supportsSection(Section.projects) ?? true) Section.projects,
   if (state?.supportsNotes ?? true) Section.notes,
   if (state?.supportsTasks ?? true) Section.tasks,
   if (state?.supportsEvents ?? true) Section.events,
-  if (state?.supportsSection(Section.projects) ?? true) Section.projects,
   Section.views,
   Section.search,
 ];

@@ -358,10 +358,10 @@ void main() {
         final ys = [
           for (final k in [
             'filter-spaces',
+            'filter-projects',
             'filter-notes',
             'filter-tasks',
             'filter-events',
-            'filter-projects',
             'filter-views',
             'filter-search',
             'menu-settings',

@@ -82,7 +82,10 @@ Section visibleSection(AppState state) {
   if (!topSections(state).contains(section) &&
       section != Section.account &&
       section != Section.settings) {
-    section = topSections(state).first;
+    final tops = topSections(state);
+    // Projects leads the rail but is a scope picker, not a landing page.
+    section = tops.firstWhere((o) => o != Section.projects,
+        orElse: () => tops.first);
   }
   return section;
 }
