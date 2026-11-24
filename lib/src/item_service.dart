@@ -597,14 +597,14 @@ class ItemService {
           .map((n) => n.uid)
           .toSet();
     }
-    final low =
-        status == null ? null : canonicalStatus(status) ?? status.toLowerCase();
+    final raw = status?.toLowerCase();
+    final low = status == null ? null : canonicalStatus(status) ?? raw;
     final hits = refs.where((r) {
       if (!includeFolders && r.raw is Note && isFolderNote(r.raw as Note)) {
         return false;
       }
       if (tag != null && !r.tags.contains(tag)) return false;
-      if (low != null && r.status != low) return false;
+      if (low != null && r.status != low && r.status != raw) return false;
       if (below != null && !below.contains(r.uid)) return false;
       return true;
     }).toList()
