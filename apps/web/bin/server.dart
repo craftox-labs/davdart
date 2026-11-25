@@ -38,6 +38,11 @@ Future<void> main(List<String> args) async {
   final appDir = Directory('../app/build/web'); // relative to apps/web
   final app = appDir.existsSync()
       ? const Pipeline()
+          // no-cache = revalidate (the files carry ETags), so a deploy shows
+          // up on the next load instead of after heuristic cache expiry.
+          .addMiddleware(createMiddleware(
+              responseHandler: (r) =>
+                  r.change(headers: {'cache-control': 'no-cache'})))
           .addMiddleware(gzipStatic())
           .addHandler(createStaticHandler(appDir.path,
               defaultDocument: 'index.html'))

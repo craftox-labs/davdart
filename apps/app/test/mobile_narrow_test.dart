@@ -40,13 +40,20 @@ void main() {
         isNull,
         reason: ex is FlutterError ? ex.toStringDeep() : '$ex',
       );
-      // Folder actions sit in one overflow button on narrow bars.
-      expect(find.byKey(const Key('scope-more')), findsOneWidget);
-      expect(find.byKey(const Key('scope-delete')), findsNothing);
-      await t.tap(find.byKey(const Key('scope-more')));
+      // The folder path moved into the content's thin row; the bar keeps one
+      // pill, and the folder's actions are in the pill's sheet.
+      expect(find.byKey(const Key('scope-more')), findsNothing);
+      expect(find.byKey(const Key('content-crumbs')), findsOneWidget);
+      await t.tap(find.byKey(const Key('space-chip')));
       await t.pumpAndSettle();
       expect(find.byKey(const Key('scope-delete')), findsOneWidget);
       expect(find.byKey(const Key('scope-close')), findsOneWidget);
+      final sheetEx = t.takeException();
+      expect(
+        sheetEx,
+        isNull,
+        reason: sheetEx is FlutterError ? sheetEx.toStringDeep() : '$sheetEx',
+      );
     });
 
     testWidgets('Home with Today has no overflow at $size', (t) async {
@@ -177,7 +184,7 @@ void main() {
     await t.pumpWidget(DavdartApp(state: s));
     await t.pumpAndSettle();
     expect(s.scope, isNotNull);
-    await t.tap(find.byKey(const Key('scope-more')));
+    await t.tap(find.byKey(const Key('space-chip')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const Key('scope-close')));
     await t.pumpAndSettle();

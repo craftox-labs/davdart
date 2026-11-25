@@ -1089,13 +1089,48 @@ void main() {
       await s.load();
       await s.createSpace('Inbox');
       await s.addNote('Loose idea about decisions');
-      final hits = await s.searchAllSpaces('DECISIONS');
+      final hits = await s.searchAllSpaces('DECISIONS', allSpaces: true);
       expect(hits.map((h) => h.space.name).toSet(), {'Planning', 'Inbox'});
       expect(await s.searchAllSpaces('  '), isEmpty);
       final planning = hits.firstWhere((h) => h.space.id == 'planning');
       await s.openHit(planning);
       expect(s.currentSpaceName, 'Planning');
       expect(s.peekUid, planning.note.uid);
+    });
+
+    testWidgets('rail Search lists the open Space only', (t) async {
+      t.view.physicalSize = const Size(1400, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      final storage = MemoryStorage();
+      final c = catalogWithPlanning(storage, planningSeed: FakeSource(sample));
+      final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
+      await s.load();
+      await s.createSpace('Inbox');
+      await s.addNote('Loose idea about decisions');
+      await t.pumpWidget(DavdartApp(state: s));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('rail-search')));
+      await t.pumpAndSettle();
+      await t.enterText(find.byKey(const Key('search-all-field')), 'decisions');
+      await t.pumpAndSettle();
+      // Only the open Space's hit: "Build decisions" is in Planning.
+      expect(find.text('Loose idea about decisions'), findsWidgets);
+      expect(find.textContaining('Build decisions'), findsNothing);
+    });
+
+    test('searchAllSpaces defaults to the open Space only', () async {
+      final storage = MemoryStorage();
+      final c = catalogWithPlanning(storage, planningSeed: FakeSource(sample));
+      final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
+      await s.load();
+      await s.createSpace('Inbox');
+      await s.addNote('Loose idea about decisions');
+      expect(s.currentSpaceName, 'Inbox');
+      final here = await s.searchAllSpaces('DECISIONS');
+      expect(here.map((h) => h.space.name).toSet(), {'Inbox'});
+      final all = await s.searchAllSpaces('DECISIONS', allSpaces: true);
+      expect(all.map((h) => h.space.name).toSet(), {'Planning', 'Inbox'});
     });
 
     testWidgets('search narrows the list', (t) async {

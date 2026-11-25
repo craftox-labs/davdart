@@ -45,9 +45,13 @@ void main() {
       expect(text.right, lessThanOrEqualTo(bar.right));
       expect(find.byKey(const Key('scope-bar')), findsNothing);
       expect(find.byKey(const Key('crumb-space')), findsOneWidget);
-      final top = find.byKey(const Key('top-bar'));
+      // Narrow: the path sits in the content's thin row, the bar keeps the
+      // pill; wide: it is the bar's lead.
+      final host = w < 880
+          ? find.byKey(const Key('content-crumbs'))
+          : find.byKey(const Key('top-bar'));
       expect(
-        find.descendant(of: top, matching: find.byIcon(FLucideIcons.house)),
+        find.descendant(of: host, matching: find.byIcon(FLucideIcons.house)),
         findsOneWidget,
       );
       expect(
@@ -78,11 +82,13 @@ void main() {
       await t.pumpWidget(DavdartApp(state: s));
       await t.pumpAndSettle();
       final crumb = t.getRect(find.byKey(const Key('crumb-space'))).center.dy;
-      // The folder actions are folded into one menu button at every width.
-      final keys = ['scope-more'];
-      for (final k in keys) {
-        final c = t.getRect(find.byKey(Key(k))).center.dy;
-        expect((c - crumb).abs(), lessThanOrEqualTo(1), reason: '$k vs crumb');
+      if (w < 880) {
+        // Narrow: the folder actions are in the pill's sheet, not the bar.
+        expect(find.byKey(const Key('scope-more')), findsNothing);
+      } else {
+        // The folder actions are folded into one menu button at every width.
+        final c = t.getRect(find.byKey(const Key('scope-more'))).center.dy;
+        expect((c - crumb).abs(), lessThanOrEqualTo(1));
       }
     });
   }

@@ -525,7 +525,7 @@ class ViewsSection extends _Section {
   ];
 }
 
-/// Search: one field; matches from every Space listed here. Tapping a hit
+/// Search: one field; matches from the open Space listed here. Tapping a hit
 /// opens the note (switching Space when needed). The text also narrows the
 /// Board and List of the open Space.
 class SearchSection extends StatefulWidget {
@@ -586,7 +586,7 @@ class _SearchSectionState extends State<SearchSection> {
           key: const Key('search-all-field'),
           focusNode: state.nav.searchNode,
           controller: state.searchController,
-          hint: 'Search all spaces',
+          hint: 'Search this space',
           prefixIcon: FLucideIcons.search,
           onChange: (v) {
             state.setQuery(v);

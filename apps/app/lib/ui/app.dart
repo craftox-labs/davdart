@@ -29,6 +29,7 @@ import 'mobile_nav.dart';
 import 'parts.dart';
 import 'resize_handle.dart';
 import 'scope_bar.dart';
+import 'scope_pill.dart';
 import 'shell_frame.dart';
 import 'sidebar.dart';
 import 'tab_strip.dart';
@@ -94,8 +95,7 @@ class DavdartApp extends StatelessWidget {
                   ? FToastAlignment.bottomCenter
                   : FToastAlignment.topRight,
               // On a phone the toast clears the bottom tab bar.
-              padding:
-                  MediaQuery.sizeOf(context).width < Tokens.wideBreakpoint
+              padding: MediaQuery.sizeOf(context).width < Tokens.wideBreakpoint
                   ? .value(
                       EdgeInsets.fromLTRB(
                         const SpaceTokens().xl,
@@ -399,6 +399,9 @@ class _ShellState extends State<Shell>
           )
         : Column(
             children: [
+              // Narrow: the thin row above the content carries what the pill
+              // cannot: the folders below a project, and a saved view's name.
+              if (!wide) NarrowCrumbs(state: state),
               ScopeText(state: state),
               if (state.activeTab == null) ...[
                 HomeSwitch(state: state),
@@ -882,20 +885,11 @@ class TopBar extends StatelessWidget {
     );
   }
 
-  /// Narrow title, centred: a folder's or view's crumbs, else the Space chip
-  /// (Home, lists and open items alike).
-  Widget _title(Tokens t) {
-    if (state.scope != null || state.activeViewName != null) {
-      return Center(
-        child: ScopeCrumbs(
-          state: state,
-          label: state.activeViewName,
-          compact: true,
-        ),
-      );
-    }
-    return SpaceChip(state: state);
-  }
+  /// Narrow: one stable pill (the Space and its project), whatever the screen
+  /// shows; folder crumbs and a view's name live in the content's thin row
+  /// instead ([AppShell]'s narrow crumb row), so the bar never swaps its
+  /// title.
+  Widget _title(Tokens t) => ScopePill(state: state);
 
   /// Left side of the row: the breadcrumb on Home and view tabs, nothing
   /// where a note fills the main area (it has its own header).
@@ -967,7 +961,6 @@ class TopBar extends StatelessWidget {
         Expanded(child: showMenu ? _title(t) : _lead(t)),
         SizedBox(width: t.space.md),
         if (narrow) ...[
-          if (home) ScopeActions(state: state),
           viewControl,
           refresh,
         ] else ...[

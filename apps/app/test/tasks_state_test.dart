@@ -61,7 +61,7 @@ void main() {
       expect(s.completedTasks(), isEmpty);
       expect(s.tasksByParent(null), isEmpty);
       expect(s.taskTags, isEmpty);
-      expect(await s.searchAllSpaces('alpha'), hasLength(1));
+      expect(await s.searchAllSpaces('alpha', allSpaces: true), hasLength(1));
       expect(m.keys.where((k) => k.contains('tasks')), isEmpty);
       expect(s.notes.map((n) => n.uid), ['a']);
     });
@@ -426,21 +426,24 @@ void main() {
       expect(m.read('sp.$sub.tasks.v1'), contains('Sub'));
     });
 
-    test('search covers tasks in every Space', () async {
+    test('search covers every Space with allSpaces', () async {
       final m = MemoryStorage();
       final s = await _open(m, seed: _Seed());
       await s.addTask('Buy Milk', description: 'whole');
       await s.createSpace('Other');
       await s.addTask('Call dentist', description: 'about MILK teeth');
-      final hits = await s.searchAllSpaces('milk');
+      final hits = await s.searchAllSpaces('milk', allSpaces: true);
       expect(hits.map((h) => h.isTask), [true, true]);
       expect(hits.map((h) => h.task!.summary).toSet(), {
         'Buy Milk',
         'Call dentist',
       });
       expect(hits.first.note.uid, hits.first.task!.uid);
-      expect(await s.searchAllSpaces('alpha'), hasLength(1));
-      expect((await s.searchAllSpaces('alpha')).single.isTask, isFalse);
+      expect(await s.searchAllSpaces('alpha', allSpaces: true), hasLength(1));
+      expect(
+        (await s.searchAllSpaces('alpha', allSpaces: true)).single.isTask,
+        isFalse,
+      );
       // opening a task hit switches Space and remembers the task
       final far = hits.firstWhere((h) => h.space.id == SpaceCatalog.planningId);
       await s.openHit(far);

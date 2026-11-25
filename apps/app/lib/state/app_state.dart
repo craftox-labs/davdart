@@ -235,6 +235,7 @@ class AppState extends ChangeNotifier {
         : OpenMode.peek;
     vimKeys = prefs?.read(_vimKeysKey) != 'false';
     vimEditor = prefs?.read(_vimEditorKey) != 'false';
+    _readScopePrefs();
   }
 
   static const _vimKeysKey = 'davdart.vim.keys.v1';
@@ -606,6 +607,7 @@ class AppState extends ChangeNotifier {
     scopeUid = null;
     savedViews.clear();
     _resetTabs();
+    _restoreScopePending = true;
     await load();
   }
 
@@ -767,15 +769,26 @@ class AppState extends ChangeNotifier {
       prefs?.remove('davdart.home.hidden.v1.$f.$id');
     }
     prefs?.remove('davdart.home.kind.v1.$id');
+    // Its scope and recents go with it.
+    if (_scopes.remove(id) != null) {
+      prefs?.write(_scopeKey, jsonEncode(_scopes));
+    }
+    if (_recents.remove(id) != null) {
+      prefs?.write(_recentsKey, jsonEncode(_recents));
+    }
     c.remove(id);
     if (next == null) await _openCurrent();
     notifyListeners();
   }
 
-  /// Notes, tasks and events in any Space whose title or text contain [q]
-  /// (case-insensitive). Task hits have [SpaceHit.task] set, event hits
-  /// [SpaceHit.event].
-  Future<List<SpaceHit>> searchAllSpaces(String q) async {
+  /// Notes, tasks and events whose title or text contain [q]
+  /// (case-insensitive), in the open Space only, or in every Space with
+  /// [allSpaces] (tm 2026-11-25: Search is per Space for now). Task hits have
+  /// [SpaceHit.task] set, event hits [SpaceHit.event].
+  Future<List<SpaceHit>> searchAllSpaces(
+    String q, {
+    bool allSpaces = false,
+  }) async {
     final needle = q.trim().toLowerCase();
     final c = catalog;
     if (needle.isEmpty || c == null) return const [];
@@ -785,6 +798,7 @@ class AppState extends ChangeNotifier {
     final curTasks = List.of(tasks);
     final curEvents = List.of(events);
     for (final sp in List.of(c.spaces)) {
+      if (!allSpaces && sp.id != cur) continue;
       List<Note> list = const [];
       List<Task> taskList = const [];
       List<Event> eventList = const [];
@@ -1071,12 +1085,104 @@ class AppState extends ChangeNotifier {
   String? scopeUid;
   Note? get scope => scopeUid == null ? null : tree.find(scopeUid!)?.note;
 
-  /// Shows only what is inside folder [uid] (null: the whole Space).
+  /// Shows only what is inside folder [uid] (null: the whole Space). The
+  /// scope is kept per Space, and a project opened this way is remembered as
+  /// a recent one.
   void openFolder(String? uid) {
     scopeUid = uid;
+    _persistScope();
+    if (uid != null && projectIndex.isProject(uid)) _rememberProject(uid);
     final a = _activeViewTab;
     if (a != null && a.kind == TabKind.note) _activeViewTab = null;
     notifyListeners();
+  }
+
+  static const _scopeKey = 'davdart.scope.v1';
+  static const _recentsKey = 'davdart.recents.v1';
+
+  /// How many projects a Space remembers as recent.
+  static const recentsLimit = 5;
+
+  /// The saved folder scope per Space id.
+  final Map<String, String> _scopes = {};
+
+  /// The projects opened most recently per Space id, newest first.
+  final Map<String, List<String>> _recents = {};
+
+  /// Set on app start and on a Space switch: the next load brings back that
+  /// Space's saved scope. A plain reload leaves the scope alone.
+  bool _restoreScopePending = true;
+
+  /// The project uids opened most recently in this Space, newest first (at
+  /// most [recentsLimit]); the scope picker lists them first.
+  List<String> get recentProjects =>
+      List.unmodifiable(_recents[_spaceKey] ?? const <String>[]);
+
+  /// The Space id the per-Space prefs are keyed by ('default' without a
+  /// catalog: folders, tags, Home focus and the scope share it).
+  String get _spaceKey => catalog?.current ?? 'default';
+
+  void _readScopePrefs() {
+    final scopes = _jsonMap(prefs?.read(_scopeKey));
+    _scopes
+      ..clear()
+      ..addAll({for (final e in scopes.entries) e.key: '${e.value}'});
+    _recents.clear();
+    for (final e in _jsonMap(prefs?.read(_recentsKey)).entries) {
+      final v = e.value;
+      if (v is! List) continue;
+      _recents[e.key] = [
+        for (final u in v)
+          if (u is String && u.isNotEmpty) u,
+      ];
+    }
+  }
+
+  static Map<String, Object?> _jsonMap(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return const {};
+    try {
+      final m = jsonDecode(raw);
+      return m is Map
+          ? {for (final e in m.entries) '${e.key}': e.value}
+          : const {};
+    } catch (_) {
+      return const {};
+    }
+  }
+
+  /// Writes this Space's folder scope (nothing when it is the whole Space).
+  void _persistScope() {
+    final uid = scopeUid;
+    final key = _spaceKey;
+    if (uid == null) {
+      if (_scopes.remove(key) != null) {
+        prefs?.write(_scopeKey, jsonEncode(_scopes));
+      }
+      return;
+    }
+    if (_scopes[key] == uid) return;
+    _scopes[key] = uid;
+    prefs?.write(_scopeKey, jsonEncode(_scopes));
+  }
+
+  /// Brings back the Space's saved folder scope once its notes are loaded:
+  /// the saved folder when it is still there, else Everything (null).
+  void _restoreScope() {
+    final saved = _scopes[_spaceKey];
+    if (scopeUid != null && tree.find(scopeUid!) != null) {
+      if (saved != scopeUid) _persistScope();
+      return;
+    }
+    scopeUid = saved != null && tree.find(saved) != null ? saved : null;
+    _persistScope();
+  }
+
+  void _rememberProject(String uid) {
+    final list = List<String>.of(_recents[_spaceKey] ?? const []);
+    list.remove(uid);
+    list.insert(0, uid);
+    _recents[_spaceKey] = list.take(recentsLimit).toList();
+    prefs?.write(_recentsKey, jsonEncode(_recents));
   }
 
   /// Moves note, task or event [uid] and everything under it to Space [targetId],
@@ -1476,6 +1582,10 @@ class AppState extends ChangeNotifier {
       _taskTagsOpen = prefs?.read(_taskTagsOpenKey) == 'true';
       _eventTagsOpen = prefs?.read(_eventTagsOpenKey) == 'true';
       _restoreTabs();
+      if (_restoreScopePending) {
+        _restoreScopePending = false;
+        _restoreScope();
+      }
     } catch (e) {
       if (src != source) return;
       error = '$e';
@@ -3837,7 +3947,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  String get _spaceKey => catalog?.current ?? 'default';
   String get _foldersKey => 'davdart.folders.collapsed.v1.$_spaceKey';
   String get _tagsOpenKey => 'davdart.tags.open.v1.$_spaceKey';
 

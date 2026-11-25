@@ -186,15 +186,20 @@ Future<void> _dropOnSpace(
 
 /// The Spaces popup's groups: every Space (the current one first, marked)
 /// with its sync state, then the manage actions (new, rename, delete).
-/// Picking a Space switches to it and keeps Tasks or Events, else shows Notes; [onPick] runs only before a
-/// manage action opens a dialog.
+/// Picking a Space switches to it and keeps Tasks or Events, else shows Notes;
+/// [onPick] runs only before a manage action opens a dialog. Dialogs launch
+/// from [host] when given (the widget that opened the sheet): a sheet's own
+/// context is gone by the time a row's action runs, so its `mounted` check
+/// would swallow the dialog.
 List<FItemGroup> spaceMenuGroups(
   BuildContext context,
   AppState state,
   FPopoverController controller, {
   VoidCallback? onPick,
+  BuildContext? host,
 }) {
   final t = tokensOf(context);
+  final dialogs = host ?? context;
   if (state.catalog == null) {
     return [
       FItemGroup(
@@ -245,7 +250,7 @@ List<FItemGroup> spaceMenuGroups(
                     NoteMenuItem('Rename…', FLucideIcons.pencil, () {
                       onPick?.call();
                       showRenameSpaceDialog(
-                        context,
+                        dialogs,
                         state,
                         id: sp.id,
                         currentName: sp.name,
@@ -259,8 +264,8 @@ List<FItemGroup> spaceMenuGroups(
                           onPick?.call();
                           // Opens it first: the dialog acts on the open Space.
                           if (!await state.switchSpace(sp.id)) return;
-                          if (!context.mounted) return;
-                          showDeleteFromServerDialog(context, state);
+                          if (!dialogs.mounted) return;
+                          showDeleteFromServerDialog(dialogs, state);
                         },
                         key: Key('menu-space-server-delete-${sp.id}'),
                       ),
@@ -295,18 +300,18 @@ List<FItemGroup> spaceMenuGroups(
         FItem(
           prefix: Icon(FLucideIcons.plus, size: t.icons.md, color: t.muted),
           title: const Text('New space…'),
-          onPress: () => manage(() => showNewSpaceDialog(context, state)),
+          onPress: () => manage(() => showNewSpaceDialog(dialogs, state)),
         ),
         if (state.currentSpaceId != null) ...[
           FItem(
             prefix: Icon(FLucideIcons.pencil, size: t.icons.md, color: t.muted),
             title: const Text('Rename this space…'),
-            onPress: () => manage(() => showRenameSpaceDialog(context, state)),
+            onPress: () => manage(() => showRenameSpaceDialog(dialogs, state)),
           ),
           FItem(
             prefix: Icon(FLucideIcons.trash2, size: t.icons.md, color: t.muted),
             title: const Text('Delete this space…'),
-            onPress: () => manage(() => showDeleteSpaceDialog(context, state)),
+            onPress: () => manage(() => showDeleteSpaceDialog(dialogs, state)),
           ),
           if (state.currentOnServer)
             FItem(
@@ -318,7 +323,7 @@ List<FItemGroup> spaceMenuGroups(
               ),
               title: const Text('Delete from server…'),
               onPress: () =>
-                  manage(() => showDeleteFromServerDialog(context, state)),
+                  manage(() => showDeleteFromServerDialog(dialogs, state)),
             ),
         ],
       ],

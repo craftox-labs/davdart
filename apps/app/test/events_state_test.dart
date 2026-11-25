@@ -748,13 +748,13 @@ void main() {
   });
 
   group('search and moves', () {
-    test('search covers events in every Space, location too', () async {
+    test('search covers every Space with allSpaces, location too', () async {
       final m = MemoryStorage();
       final s = await _open(m, seed: _Seed());
       await s.addEvent('Lunch with Anna', start: _day, location: 'Cafe Milk');
       await s.createSpace('Other');
       await s.addEvent('Review', start: _day, description: 'about MILK');
-      final hits = await s.searchAllSpaces('milk');
+      final hits = await s.searchAllSpaces('milk', allSpaces: true);
       expect(hits.map((h) => h.isEvent), [true, true]);
       expect(hits.map((h) => h.isTask), [false, false]);
       expect(hits.map((h) => h.event!.summary).toSet(), {
@@ -762,7 +762,10 @@ void main() {
         'Review',
       });
       expect(hits.first.note.uid, hits.first.event!.uid);
-      expect((await s.searchAllSpaces('alpha')).single.isEvent, isFalse);
+      expect(
+        (await s.searchAllSpaces('alpha', allSpaces: true)).single.isEvent,
+        isFalse,
+      );
       final far = hits.firstWhere((h) => h.space.id == SpaceCatalog.planningId);
       await s.openHit(far);
       expect(s.currentSpaceId, SpaceCatalog.planningId);
