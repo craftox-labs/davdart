@@ -8,6 +8,8 @@ import 'package:davdart_app/state/palette_model.dart';
 import 'package:davdart_app/state/palette_recents.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:davdart_app/ui/app_actions.dart';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -204,6 +206,88 @@ void main() {
       expect(s.activeTab, isNull);
       await _end(t);
     });
+  });
+
+  group('phone', () {
+    for (final size in [const Size(320, 568), const Size(390, 844)]) {
+      testWidgets('long press on the bar Search opens the palette at $size', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(t, size: size);
+        expect(_k('palette'), findsNothing);
+        await t.longPress(_k('bar-search'));
+        await t.pumpAndSettle();
+        expect(_k('palette'), findsOneWidget);
+        await t.sendKeyEvent(LogicalKeyboardKey.escape);
+        await t.pumpAndSettle();
+        expect(_k('palette'), findsNothing);
+        expect(s.section, isNot(Section.search), reason: 'no plain tap');
+        await _end(t);
+      });
+
+      testWidgets('a drag then hold does not open the palette at $size', (
+        t,
+      ) async {
+        await pumpTasksApp(t, size: size);
+        final g = await t.startGesture(t.getCenter(_k('bar-search')));
+        await t.pump(const Duration(milliseconds: 50));
+        // Past the slop, then held past the long-press deadline.
+        await g.moveBy(const Offset(0, -60));
+        await t.pump(kLongPressTimeout + kPressTimeout);
+        expect(_k('palette'), findsNothing);
+        await g.up();
+        await t.pumpAndSettle();
+        expect(_k('palette'), findsNothing);
+        await _end(t);
+      });
+
+      testWidgets('the bar Search announces the long press at $size', (
+        t,
+      ) async {
+        final sem = t.ensureSemantics();
+        await pumpTasksApp(t, size: size);
+        final node = t.getSemantics(
+          find.bySemanticsLabel('Search, long press for commands'),
+        );
+        // ignore: deprecated_member_use
+        t.binding.pipelineOwner.semanticsOwner!.performAction(
+          node.id,
+          SemanticsAction.longPress,
+        );
+        await t.pumpAndSettle();
+        expect(_k('palette'), findsOneWidget);
+        await t.sendKeyEvent(LogicalKeyboardKey.escape);
+        await t.pumpAndSettle();
+        sem.dispose();
+        await _end(t);
+      });
+
+      testWidgets('the Search panel Commands button opens it at $size', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(t, size: size);
+        await t.tap(_k('bar-search'));
+        await t.pumpAndSettle();
+        expect(s.section, Section.search);
+        expect(_k('search-commands'), findsOneWidget);
+        await t.tap(_k('search-commands'));
+        await t.pumpAndSettle();
+        expect(_k('palette'), findsOneWidget);
+        await t.sendKeyEvent(LogicalKeyboardKey.escape);
+        await t.pumpAndSettle();
+        expect(_k('palette'), findsNothing);
+        await _end(t);
+      });
+    }
+  });
+
+  testWidgets('the wide Search panel has no Commands button', (t) async {
+    await pumpTasksApp(t);
+    await t.tap(_k('rail-search'));
+    await t.pumpAndSettle();
+    expect(_k('search-all-field'), findsOneWidget);
+    expect(_k('search-commands'), findsNothing);
+    await _end(t);
   });
 
   group('go to project', () {

@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:davdart/davdart.dart';
+import 'package:flutter/gestures.dart' show kLongPressTimeout, kTouchSlop;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../state/key_nav.dart';
 import '../state/tab_state.dart';
+import 'command_palette.dart';
 import 'event_menu.dart';
 import 'key_nav_ui.dart';
 import 'new_note_dialog.dart';
@@ -102,6 +106,95 @@ void showAddMenu(
   });
 }
 
+/// The bar's Search button: a tap shows the Search panel, a long press the
+/// command palette. forui's button claims the tap at once, so a nested
+/// [GestureDetector] never sees the long press: the press is timed from raw
+/// pointer events instead, and the tap after a long press is dropped.
+class _SearchButton extends StatefulWidget {
+  const _SearchButton({required this.onSearch, required this.state});
+  final VoidCallback onSearch;
+  final AppState state;
+
+  @override
+  State<_SearchButton> createState() => _SearchButtonState();
+}
+
+class _SearchButtonState extends State<_SearchButton> {
+  Timer? _timer;
+
+  /// The pointer whose press is being timed; null when none is.
+  int? _pointer;
+  Offset _downAt = Offset.zero;
+  var _fired = false;
+
+  @override
+  void dispose() {
+    _cancel();
+    super.dispose();
+  }
+
+  void _openPalette() => showCommandPalette(context, widget.state);
+
+  void _cancel() {
+    _pointer = null;
+    _timer?.cancel();
+    _timer = null;
+  }
+
+  void _down(PointerDownEvent e) {
+    // A second finger neither re-arms nor restarts the clock.
+    if (_pointer != null) return;
+    _pointer = e.pointer;
+    _downAt = e.position;
+    _fired = false;
+    _timer = Timer(kLongPressTimeout, () {
+      _fired = true;
+      _openPalette();
+    });
+  }
+
+  void _move(PointerMoveEvent e) {
+    // Dragged away: it is a scroll or a drag, not a long press.
+    if (e.pointer == _pointer && (e.position - _downAt).distance > kTouchSlop) {
+      _cancel();
+    }
+  }
+
+  void _up(PointerEvent e) {
+    if (e.pointer == _pointer) _cancel();
+  }
+
+  void _press() {
+    // The tap that ends a long press was already answered.
+    if (_fired) {
+      _fired = false;
+      return;
+    }
+    widget.onSearch();
+  }
+
+  @override
+  Widget build(BuildContext context) => Listener(
+    onPointerDown: _down,
+    onPointerMove: _move,
+    onPointerUp: _up,
+    onPointerCancel: _up,
+    child: Semantics(
+      container: true,
+      label: 'Search, long press for commands',
+      excludeSemantics: true,
+      onTap: _press,
+      onLongPress: _openPalette,
+      child: IconAction(
+        key: const Key('bar-search'),
+        tooltip: 'Search',
+        icon: FLucideIcons.search,
+        onPress: _press,
+      ),
+    ),
+  );
+}
+
 /// The bottom bar: Menu, Back, Home, Search and the open-items counter, directly
 /// under a hairline (no pill or card). New items come from [AddFab].
 class MobileBar extends StatelessWidget {
@@ -158,12 +251,9 @@ class MobileBar extends StatelessWidget {
               icon: FLucideIcons.house,
               onPress: onHome,
             ),
-            IconAction(
-              key: const Key('bar-search'),
-              tooltip: 'Search',
-              icon: FLucideIcons.search,
-              onPress: onSearch,
-            ),
+            // A tap opens Search, a long press the command palette (the
+            // phone has no Ctrl+K).
+            _SearchButton(onSearch: onSearch, state: state),
             FTappable(
               key: const Key('bar-count'),
               semanticsLabel: 'Open items: $count',

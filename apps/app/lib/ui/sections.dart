@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../state/key_nav.dart';
 import '../state/note_drag.dart';
 import 'account_dialog.dart';
+import 'command_palette.dart';
 import 'connect_dialog.dart';
 import 'drag_drop.dart';
 import 'key_nav_ui.dart';
@@ -605,6 +606,17 @@ class _SearchSectionState extends State<SearchSection> {
         ),
     ]);
     final scoped = state.scopeUid != null;
+    final searchField = field(
+      key: const Key('search-all-field'),
+      focusNode: state.nav.searchNode,
+      controller: state.searchController,
+      hint: scoped && _inProject ? 'Search this project' : 'Search this space',
+      prefixIcon: FLucideIcons.search,
+      onChange: (v) {
+        state.setQuery(v);
+        _search(v);
+      },
+    );
     return _Panel(
       heading: _title('Search'),
       pinned: Padding(
@@ -634,18 +646,20 @@ class _SearchSectionState extends State<SearchSection> {
                   _search(state.searchController.text);
                 },
               ),
-            field(
-              key: const Key('search-all-field'),
-              focusNode: state.nav.searchNode,
-              controller: state.searchController,
-              hint: scoped && _inProject
-                  ? 'Search this project'
-                  : 'Search this space',
-              prefixIcon: FLucideIcons.search,
-              onChange: (v) {
-                state.setQuery(v);
-                _search(v);
-              },
+            Row(
+              children: [
+                Expanded(child: searchField),
+                // Phone: no Ctrl+K, so the palette gets a button here.
+                if (narrowLayout(context)) ...[
+                  SizedBox(width: t.space.sm),
+                  IconAction(
+                    key: const Key('search-commands'),
+                    tooltip: 'Commands',
+                    icon: FLucideIcons.command,
+                    onPress: () => showCommandPalette(context, widget.state),
+                  ),
+                ],
+              ],
             ),
           ],
         ),
