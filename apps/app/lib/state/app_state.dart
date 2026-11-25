@@ -1010,7 +1010,7 @@ class AppState extends ChangeNotifier {
     if (_tabsLoaded) _pruneTabs();
     if (peekUid != null && findItem(peekUid!) == null) peekUid = null;
     if (peekUid == null) peekCollapsed = false;
-    _drafts.removeWhere((u, _) => tree.find(u) == null);
+    _drafts.removeWhere((u, d) => !d.dirty && tree.find(u) == null);
   }
 
   /// Notes with this tag are folders: containers that may carry text (for
@@ -1240,7 +1240,7 @@ class AppState extends ChangeNotifier {
       if (peekUid != null && findItem(peekUid!) == null) {
         _setPeek(null);
       }
-      _drafts.removeWhere((u, _) => tree.find(u) == null);
+      _drafts.removeWhere((u, d) => !d.dirty && tree.find(u) == null);
       error = null;
       notifyListeners();
       if (connected) sync();
@@ -2404,9 +2404,43 @@ class AppState extends ChangeNotifier {
     if (eventTagFilter != null && !eventTags.contains(eventTagFilter)) {
       eventTagFilter = null;
     }
-    _eventDrafts.removeWhere((u, _) => !events.any((e) => e.uid == u));
+    // An edit with unsaved text outlives its event (deleted elsewhere, e.g.
+    // by a sync): it stays, and [orphanDraftNotice] says so.
+    _eventDrafts.removeWhere(
+      (u, d) => !d.dirty && !events.any((e) => e.uid == u),
+    );
     if (peekUid != null && findItem(peekUid!) == null) _setPeek(null);
     if (_tabsLoaded) _pruneTabs();
+  }
+
+  static const _goneNote =
+      'This note was deleted elsewhere. Your edit is kept.';
+
+  bool _noteGone(NoteDraft d) => tree.find(d.uid) == null;
+  bool _eventGone(EventDraft d) => !events.any((e) => e.uid == d.uid);
+
+  /// Dirty note and event edits whose item is gone (deleted elsewhere, e.g.
+  /// by a sync). They are kept so the text is not lost; saving one returns
+  /// false and [discardOrphanDrafts] drops them.
+  int get orphanDraftCount =>
+      _drafts.values.where((d) => d.dirty && _noteGone(d)).length +
+      _eventDrafts.values.where((d) => d.dirty && _eventGone(d)).length;
+
+  /// A notice while [orphanDraftCount] is above zero; null otherwise.
+  String? get orphanDraftNotice {
+    final n = orphanDraftCount;
+    if (n == 0) return null;
+    return n == 1
+        ? 'An item you are editing was deleted elsewhere. Your unsaved edit is kept.'
+        : '$n items you are editing were deleted elsewhere. Your unsaved edits are kept.';
+  }
+
+  /// Drops the kept edits of deleted items.
+  void discardOrphanDrafts() {
+    _drafts.removeWhere((_, d) => _noteGone(d));
+    _eventDrafts.removeWhere((_, d) => _eventGone(d));
+    if (error == _goneNote) error = null;
+    notifyListeners();
   }
 
   Event? _eventById(String uid) {
@@ -3079,6 +3113,7 @@ class AppState extends ChangeNotifier {
     // The fields may still be on screen until the next frame, so the
     // controllers are left to the garbage collector, not disposed.
     _drafts.remove(uid ?? peekUid);
+    if (error == _goneNote) error = null;
     notifyListeners();
   }
 
@@ -3089,6 +3124,13 @@ class AppState extends ChangeNotifier {
     final key = uid ?? peekUid;
     final d = key == null ? null : _drafts[key];
     if (d == null || d.titleEmpty) return false;
+    // The note is gone (deleted meanwhile, e.g. by a sync): nothing to save
+    // to. The draft stays, so the text is not lost.
+    if (tree.find(d.uid) == null) {
+      error = _goneNote;
+      notifyListeners();
+      return false;
+    }
     // What this save sends; text typed while it runs is newer than this.
     final title = d.titleController.text;
     final body = d.bodyController.text;
@@ -3111,6 +3153,14 @@ class AppState extends ChangeNotifier {
       await setNotePriority(d.uid, priority);
     }
     if (error != null) return false;
+    // Deleted while this save ran: updateNote did nothing. Keep the draft.
+    if (tree.find(d.uid) == null) {
+      _drafts[key!] = d;
+      error = _goneNote;
+      notifyListeners();
+      return false;
+    }
+    if (error == _goneNote) error = null;
     if (_drafts[key] == d) {
       d.markSaved(
         title: title,

@@ -523,6 +523,26 @@ void main() {
       expect(await s.unsyncedInCurrent(), greaterThanOrEqualTo(1));
     });
 
+    test('a dirty draft outlives its deleted event, with a notice', () async {
+      final s = await _open(MemoryStorage(), seed: _Seed());
+      final a = (await s.addEvent('A', start: _day))!;
+      final b = (await s.addEvent('B', start: _day))!;
+      s.startEventEdit(a);
+      s.startEventEdit(b);
+      s.eventDraftFor(a)!.titleController.text = 'A typed';
+      final src = s.source as SpaceNoteSource;
+      await src.deleteEvent(a);
+      await src.deleteEvent(b);
+      await s.addEvent('C', start: _day); // reloads events
+      expect(s.eventDraftFor(a), isNotNull); // dirty: kept
+      expect(s.eventDraftFor(b), isNull); // clean: dropped
+      expect(s.orphanDraftNotice, contains('deleted elsewhere'));
+      expect(await s.saveEventDraft(a), isFalse);
+      s.discardOrphanDrafts();
+      expect(s.eventDraftFor(a), isNull);
+      expect(s.orphanDraftNotice, isNull);
+    });
+
     test('a read-only feed gives no draft', () async {
       final s = AppState(_ReadOnly());
       await s.load();

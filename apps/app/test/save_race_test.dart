@@ -23,6 +23,16 @@ class _SlowSource extends SpaceNoteSource {
   }
 }
 
+/// A source where the note is deleted (as by a sync) while the save runs.
+class _VanishSource extends SpaceNoteSource {
+  _VanishSource(super.space, {super.seed});
+  @override
+  Future<Note> save(Note note) async {
+    await delete(note.uid);
+    return note;
+  }
+}
+
 void main() {
   test('text typed while a save is in flight stays as the draft', () async {
     final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
@@ -60,4 +70,59 @@ void main() {
     expect(await s.saveDraft('a'), isTrue);
     expect(s.draftFor('a'), isNull);
   });
+
+  test('a save of a note deleted meanwhile fails, keeps the draft', () async {
+    final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+    final s = AppState(_VanishSource(space, seed: _Seed()));
+    await s.load();
+    s.select('a');
+    s.startEdit('a');
+    final d = s.draftFor('a')!;
+    d.bodyController.text = 'typed';
+    expect(await s.saveDraft('a'), isFalse);
+    expect(s.draftFor('a'), same(d));
+    expect(d.bodyController.text, 'typed');
+    expect(s.error, contains('deleted elsewhere'));
+  });
+
+  test(
+    'dirty drafts survive a sync that removes the note; discard clears',
+    () async {
+      final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+      final src = SpaceNoteSource(space, seed: _Seed());
+      final s = AppState(src);
+      await s.load();
+      s.select('a');
+      s.startEdit('a');
+      final d = s.draftFor('a')!;
+      // Clean draft: dropped, no notice.
+      await src.delete('a');
+      await s.load();
+      expect(s.draftFor('a'), isNull);
+      expect(s.orphanDraftNotice, isNull);
+      // Dirty draft: kept, counted, saving fails, discard clears it.
+      final src2 = SpaceNoteSource(
+        Space(SpaceConfig(id: 't', name: 'T'), MemoryNoteStore()),
+        seed: _Seed(),
+      );
+      final s2 = AppState(src2);
+      await s2.load();
+      s2.select('a');
+      s2.startEdit('a');
+      final d2 = s2.draftFor('a')!;
+      d2.bodyController.text = 'typed';
+      await src2.delete('a');
+      await s2.load();
+      expect(s2.draftFor('a'), same(d2));
+      expect(s2.orphanDraftCount, 1);
+      expect(s2.orphanDraftNotice, isNotNull);
+      expect(await s2.saveDraft('a'), isFalse);
+      expect(s2.error, isNotNull);
+      s2.discardOrphanDrafts();
+      expect(s2.draftFor('a'), isNull);
+      expect(s2.orphanDraftNotice, isNull);
+      expect(s2.error, isNull);
+      expect(d.dirty, isFalse);
+    },
+  );
 }

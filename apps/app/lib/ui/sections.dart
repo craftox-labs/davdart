@@ -632,9 +632,31 @@ class _SearchSectionState extends State<SearchSection> {
   }
 }
 
-Widget _syncMessage(AppState state) => state.syncMessage == null
-    ? const SizedBox.shrink()
-    : _Muted(state.syncMessage!, key: const Key('sync-message'));
+Widget _syncMessage(AppState state) => Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    if (state.syncMessage != null)
+      _Muted(state.syncMessage!, key: const Key('sync-message')),
+    if (state.orphanDraftNotice != null) ...[
+      _Muted(state.orphanDraftNotice!, key: const Key('orphan-draft-notice')),
+      Builder(
+        builder: (context) => Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: tokensOf(context).space.sm,
+          ),
+          child: FButton(
+            key: const Key('orphan-draft-discard'),
+            variant: FButtonVariant.outline,
+            size: FButtonSizeVariant.xs,
+            mainAxisSize: MainAxisSize.min,
+            onPress: state.discardOrphanDrafts,
+            child: const Text('Discard'),
+          ),
+        ),
+      ),
+    ],
+  ],
+);
 
 /// Account: who is signed in, sign in or out, sync status and Sync now.
 class AccountSection extends _Section {
