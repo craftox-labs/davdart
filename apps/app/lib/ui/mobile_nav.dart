@@ -272,11 +272,12 @@ class _SpaceChipState extends State<SpaceChip> with TickerProviderStateMixin {
                 child: Padding(
                   padding: EdgeInsets.symmetric(horizontal: t.space.lg),
                   child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     spacing: t.space.sm,
                     children: [
                       // Same size as the logo.
                       Icon(spacesIcon, size: t.icons.lg, color: t.fg),
-                      Expanded(
+                      Flexible(
                         child: Text(
                           name,
                           overflow: TextOverflow.ellipsis,
