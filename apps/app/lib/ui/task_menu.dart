@@ -34,7 +34,7 @@ class TaskContextMenu extends StatelessWidget {
   Widget build(BuildContext context) => ExclusiveContextMenu(
     touchMenu: touchMenu,
     menuBuilder: (ctx, controller, _) => _groups(context, ctx, controller),
-    child: middleClickOpensMain(state, uid, surface, child),
+    child: child,
   );
 
   /// The actions of the open item's own page (the narrow header's ⋯

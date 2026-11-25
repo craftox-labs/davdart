@@ -13,6 +13,7 @@ import 'package:davdart_app/ui/home_board.dart';
 import 'package:davdart_app/ui/list_view.dart';
 import 'package:davdart_app/ui/note_menu.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -305,9 +306,29 @@ void main() {
       expect(prefs.data.values.any((v) => v.contains('n:c')), isTrue);
     });
 
-    testWidgets('middle-click on a board card opens it in a new tab', (
-      t,
-    ) async {
+    for (final reversed in [false, true]) {
+      testWidgets('ctrl+click opens ${reversed ? 'in peek' : 'in main'}', (
+        t,
+      ) async {
+        final s = await _pump(t);
+        if (reversed) s.setOpenMode(OpenMode.main);
+        s.setView(ViewMode.board);
+        await t.pumpAndSettle();
+        await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+        await t.tap(
+          find.descendant(
+            of: find.byType(HomeBoard),
+            matching: find.text('Alpha'),
+          ),
+        );
+        await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+        await t.pumpAndSettle();
+        expect(s.tabs, hasLength(reversed ? 0 : 1));
+        expect(s.peekUid, reversed ? isNotNull : isNull);
+      });
+    }
+
+    testWidgets('plain click on a board card opens in the peek', (t) async {
       final s = await _pump(t);
       s.setView(ViewMode.board);
       await t.pumpAndSettle();
@@ -316,10 +337,10 @@ void main() {
           of: find.byType(HomeBoard),
           matching: find.text('Alpha'),
         ),
-        buttons: kMiddleMouseButton,
       );
       await t.pumpAndSettle();
-      expect(s.tabs, hasLength(1));
+      expect(s.tabs, isEmpty);
+      expect(s.peekUid, isNotNull);
     });
 
     testWidgets('middle-click closes a tab', (t) async {

@@ -622,7 +622,7 @@ class _SearchSectionState extends State<SearchSection> {
                 subtitle: Text(h.space.name),
                 onPress: () {
                   widget.onPick();
-                  state.openHit(h);
+                  state.openHit(h, mode: state.modifierOpenMode);
                 },
               ),
             ),
@@ -641,9 +641,7 @@ Widget _syncMessage(AppState state) => Column(
       _Muted(state.orphanDraftNotice!, key: const Key('orphan-draft-notice')),
       Builder(
         builder: (context) => Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: tokensOf(context).space.sm,
-          ),
+          padding: EdgeInsets.symmetric(horizontal: tokensOf(context).space.sm),
           child: FButton(
             key: const Key('orphan-draft-discard'),
             variant: FButtonVariant.outline,

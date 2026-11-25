@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:davdart/davdart.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart' show HardwareKeyboard;
 import 'package:flutter/widgets.dart' show TextEditingController;
 
 import '../data/key_value_storage.dart';
@@ -339,13 +340,27 @@ class AppState extends ChangeNotifier {
       ? openEventTab(uid)
       : openNoteTab(uid);
 
+  /// Ctrl or Cmd held during a click: the opposite of [openMode]; else null.
+  OpenMode? get modifierOpenMode {
+    final kb = HardwareKeyboard.instance;
+    if (!kb.isControlPressed && !kb.isMetaPressed) return null;
+    return openMode == OpenMode.peek ? OpenMode.main : OpenMode.peek;
+  }
+
   String? _clickUid;
   String? _clickSurface;
   DateTime? _clickAt;
 
-  /// A plain click on a note entry: opens it per [openMode], and a second
+  /// A click on a note entry: opens it per [openMode] (the opposite with
+  /// Ctrl or Cmd held), and a second
   /// click on the same note within [doubleClickWindow] promotes it to main.
   Future<void> clickNote(String uid) {
+    final opposite = modifierOpenMode;
+    if (opposite != null) {
+      _clickUid = null;
+      _clickAt = null;
+      return openNote(uid, mode: opposite);
+    }
     final now = DateTime.now();
     final dbl =
         _clickUid == uid &&
