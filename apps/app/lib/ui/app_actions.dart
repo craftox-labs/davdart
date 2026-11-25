@@ -172,8 +172,14 @@ List<AppAction> buildActions(AppState state) {
     shortcuts: ['g $key'],
     enabled: yes,
     run: (c) {
-      c.state.setSection(sec);
+      // Search opens on its field (and, on the phone, in the side menu).
+      if (sec == Section.search) {
+        c.state.openSearchPanel();
+      } else {
+        c.state.setSection(sec);
+      }
       focusPanel(c.state);
+      if (sec == Section.search) c.state.nav.focusSearch();
     },
   );
   AppAction key(
@@ -565,11 +571,9 @@ List<AppAction> buildActions(AppState state) {
       listed: false,
       enabled: yes,
       run: (c) {
-        c.state.setSection(Section.search);
+        c.state.openSearchPanel();
         focusPanel(c.state);
-        WidgetsBinding.instance.addPostFrameCallback(
-          (_) => c.state.nav.searchNode.requestFocus(),
-        );
+        c.state.nav.focusSearch();
       },
     ),
     AppAction(

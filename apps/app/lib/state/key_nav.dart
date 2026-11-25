@@ -75,8 +75,30 @@ class KeyNav extends ChangeNotifier {
   /// scrolling the row into view.
   int lastDir = 0;
 
-  /// The search field, focused by `/`.
+  /// The search field, focused by `/` and whenever the Search section is
+  /// opened by hand.
   final FocusNode searchNode = FocusNode(debugLabel: 'search');
+
+  /// Focuses the search field once its panel is built, for a user action that
+  /// opens Search (a rail or bar press, the palette): the panel may mount a
+  /// frame later (the narrow side menu opens in the same setState), so a node
+  /// without a context is retried once on the next frame. Nothing happens when
+  /// the field already has the focus, so it is never stolen back.
+  void focusSearch() {
+    void tryFocus(int attempt) {
+      if (searchNode.hasFocus) return;
+      if (searchNode.context != null) {
+        searchNode.requestFocus();
+        return;
+      }
+      if (attempt >= 1) return;
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => tryFocus(attempt + 1),
+      );
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) => tryFocus(0));
+  }
 
   /// The shell's key catcher; Esc in a text field returns here.
   final FocusNode node = FocusNode(debugLabel: 'key-nav', skipTraversal: true);

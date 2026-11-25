@@ -508,6 +508,8 @@ class IconRail extends StatelessWidget {
           open: (_) async {
             state.setSection(s);
             focusPanel(state);
+            // Search opens on its field, like the bar's button and `/`.
+            if (s == Section.search) state.nav.focusSearch();
           },
         ),
     ]);
@@ -524,7 +526,10 @@ class IconRail extends StatelessWidget {
         tabMargin: (t.sizes.rail - t.sizes.railItem) / 2,
         tipRight: true,
         mirror: mirror,
-        onPress: () => state.pressRail(s),
+        onPress: () {
+          state.pressRail(s);
+          if (s == Section.search) state.nav.focusSearch();
+        },
       ),
     );
     final gap = t.space.xs;

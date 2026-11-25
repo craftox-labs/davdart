@@ -3358,6 +3358,7 @@ class AppState extends ChangeNotifier {
   /// Shows the Tasks list in the side panel (opens the panel if folded).
   void openTasksPanel() => _openPanel(Section.tasks);
   void openEventsPanel() => _openPanel(Section.events);
+  void openSearchPanel() => _openPanel(Section.search);
 
   /// Narrow: opens the side menu (set by the shell), the only place the
   /// panels show there.

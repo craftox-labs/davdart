@@ -414,6 +414,11 @@ void main() {
       expect(s.section, Section.views);
       await go(LogicalKeyboardKey.keyS);
       expect(s.section, Section.search);
+      // Search opens on its field; Esc hands the keys back.
+      expect(s.nav.searchNode.hasFocus, isTrue);
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pump(const Duration(milliseconds: 50));
+      expect(s.nav.searchNode.hasFocus, isFalse);
       await go(LogicalKeyboardKey.keyN);
       expect(s.section, Section.notes);
       s.openNoteTab('n');

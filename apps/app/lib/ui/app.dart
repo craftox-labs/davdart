@@ -558,6 +558,9 @@ class _ShellState extends State<Shell>
               onSearch: () {
                 state.setSection(Section.search);
                 setState(() => _menuOpen = true);
+                // The menu mounts the panel: the field takes the focus once
+                // it is there.
+                state.nav.focusSearch();
               },
               onGrid: () => setState(() => _gridOpen = true),
               onHome: () {
