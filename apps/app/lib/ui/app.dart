@@ -253,7 +253,8 @@ class _ShellState extends State<Shell>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    widget.state.openMenu = null;
+    widget.state.onNotSaved = null;
+    widget.state.onBoardUndo = null;
     widget.state.onNotSaved = null;
     _dock.dispose();
     _peek.dispose();
