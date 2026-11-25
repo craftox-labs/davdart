@@ -224,6 +224,39 @@ void main() {
     expect(col('late'), isNot(col('soon')));
   });
 
+  for (final (name, size) in [
+    ('wide', const Size(1280, 900)),
+    ('phone', const Size(390, 800)),
+  ]) {
+    testWidgets('$name: a plan item card is titled by its summary, not slug', (
+      t,
+    ) async {
+      AppState.debugDefaultFocus = HomeFocus.board;
+      await pumpTasksApp(
+        t,
+        notes: [
+          Note(
+            uid: 'n',
+            summary: 'my-slug: Readable title here',
+            description: 'item_id: my-slug\nstatus: todo\n\nbody',
+            categories: const ['status-todo'],
+            lastModified: DateTime.utc(2026, 1, 2),
+          ),
+        ],
+        size: size,
+      );
+      final card = _k('nav-card-n');
+      expect(
+        find.descendant(of: card, matching: find.text('Readable title here')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.textContaining('my-slug')),
+        findsNothing,
+      );
+    });
+  }
+
   testWidgets('owner and decided-by are not on cards', (t) async {
     AppState.debugDefaultFocus = HomeFocus.board;
     await pumpTasksApp(

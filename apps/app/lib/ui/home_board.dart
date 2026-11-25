@@ -34,6 +34,18 @@ String noteSnippet(String body) => body
     .replaceAll(RegExp(r'\s+'), ' ')
     .trim();
 
+/// A plan item's card title: its summary without the leading `item_id: `
+/// slug (the slug is in the item view); the whole summary when it has none.
+String _cardTitle(Note note, PlanItem plan) {
+  final id = plan.itemId;
+  final s = note.summary;
+  if (id != null && s.startsWith('$id:')) {
+    final rest = s.substring(id.length + 1).trim();
+    if (rest.isNotEmpty) return rest;
+  }
+  return s;
+}
+
 /// Publishes the Home board's cards (column by column) as the keyboard rows
 /// of the Home grid; a collapsed Board is skipped at move time.
 void publishBoardNav(AppState state) {
@@ -283,7 +295,7 @@ class _Card extends StatelessWidget {
     final title = task != null
         ? OverflowTip(task.summary, maxLines: 3, style: titleStyle)
         : Text(
-            compact ? note!.summary : (plan!.itemId ?? note!.summary),
+            _cardTitle(note!, plan!),
             style: titleStyle,
           );
     final bucket = task != null
@@ -306,12 +318,6 @@ class _Card extends StatelessWidget {
     // Items inside the body sit close (xs); the title and the footer stand
     // off from the body by the card padding (lg).
     final bodyItems = <Widget>[
-      if (note != null && !compact && plan!.itemId != null)
-        OverflowTip(
-          note.summary,
-          maxLines: 1,
-          style: t.type.bodyStyle.copyWith(color: t.muted),
-        ),
       if (snippet.isNotEmpty)
         Text(
           snippet,
