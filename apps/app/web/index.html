@@ -46,20 +46,25 @@
 
   <title>davdart</title>
   <style>
-    /* Shown until the app paints over it, so a slow load is not a blank page. */
-    html, body { margin: 0; height: 100%; background: #f6f6f4; }
-    @media (prefers-color-scheme: dark) { html, body { background: #161616; } }
-    #boot {
-      position: fixed; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 16px;
-      font: 14px system-ui, sans-serif; color: #888;
+    /* Shown until the app paints over it, so a slow load is not a blank page.
+       It repeats the phone's own splash (manifest background, the icon
+       centred, the name at the bottom) so the hand-over is seamless: the
+       icon never moves, the spinner appears below it. */
+    html, body { margin: 0; height: 100%; background: #111111; }
+    #boot { position: fixed; inset: 0; color: #e6e6e6; }
+    #boot img {
+      position: absolute; left: 50%; top: 50%; width: 128px; height: 128px;
+      margin: -64px 0 0 -64px;
     }
-    #boot svg { width: 36px; height: auto; color: #222; }
-    @media (prefers-color-scheme: dark) { #boot svg { color: #eee; } }
     #boot i {
-      width: 18px; height: 18px; border-radius: 50%;
-      border: 2px solid #8884; border-top-color: #888;
+      position: absolute; left: 50%; top: 50%; width: 20px; height: 20px;
+      margin: 112px 0 0 -10px; border-radius: 50%;
+      border: 2px solid #ffffff33; border-top-color: #e6e6e6;
       animation: boot-spin 0.9s linear infinite;
+    }
+    #boot span {
+      position: absolute; left: 0; right: 0; bottom: 48px; text-align: center;
+      font: 16px system-ui, sans-serif; color: #e6e6e6;
     }
     @keyframes boot-spin { to { transform: rotate(360deg); } }
   </style>
@@ -74,7 +79,7 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
-  <div id="boot"><svg viewBox="0 0 539.32 566.93" fill="currentColor" aria-label="davdart"><path d="M539.32,283.46C539.32,287.74 95.86,326.60 94.49,330.71L2.06,514.19C-2.02,526.41 0.03,539.84 7.56,550.29C15.10,560.74 27.19,566.93 40.07,566.93L296.42,566.93C308.31,566.93 319.59,561.65 327.20,552.51L530.03,309.12C536.22,301.69 539.32,292.58 539.32,283.46Z"/><path d="M539.32,283.47C539.32,279.18 95.86,240.33 94.49,236.22L2.06,52.74C-2.02,40.52 0.03,27.09 7.56,16.64C15.10,6.19 27.19,0.00 40.07,0.00L296.42,0.00C308.31,0.00 319.59,5.28 327.20,14.42L530.03,257.81C536.22,265.24 539.32,274.35 539.32,283.47Z"/></svg><i></i></div>
+  <div id="boot"><img src="icons/Icon-192.png" alt=""><i></i><span>davdart</span></div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
