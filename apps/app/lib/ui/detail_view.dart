@@ -127,7 +127,6 @@ class DetailView extends StatelessWidget {
             ],
           ],
         ),
-        if (draft != null && !mobile) EditBar(state: state, draft: draft),
         Expanded(
           child: SingleChildScrollView(
             controller: state.nav.pageScroll(area),

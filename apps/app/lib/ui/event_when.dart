@@ -99,7 +99,7 @@ class EventWhenFields extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: t.space.lg,
       children: [
-        FSwitch(
+        FCheckbox(
           key: Key('$keys-allday'),
           label: const Text('All day'),
           semanticsLabel: 'All day',

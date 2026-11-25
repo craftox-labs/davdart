@@ -581,7 +581,7 @@ void main() {
       await t.pump(_ms);
       await t.enterText(_k('edit-title'), 'Renamed');
       await t.pump(_ms);
-      await t.tap(_k('edit-save'));
+      await t.tap(_k('edit-save-action'));
       await t.pumpAndSettle();
       expect(_k('edit-title'), findsNothing);
       s.nav.pointerIn(NavArea.panel);

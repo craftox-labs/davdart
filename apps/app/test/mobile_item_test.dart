@@ -345,7 +345,7 @@ void main() {
       await t.enterText(_k('edit-body'), 'Typed');
       await t.pump(const Duration(seconds: 3));
       expect(_body(s), 'Body of Alpha');
-      expect(_k('edit-save'), findsOneWidget);
+      expect(_k('edit-save-action'), findsOneWidget);
       expect(_k('item-mode'), findsNothing);
     });
   });

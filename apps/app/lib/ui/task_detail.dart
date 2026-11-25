@@ -46,78 +46,6 @@ int? priorityOfBucket(String? b) => switch (b) {
   _ => null,
 };
 
-/// The unsaved-edits bar of a task edit.
-class TaskEditBar extends StatelessWidget {
-  const TaskEditBar({super.key, required this.state, required this.draft});
-  final AppState state;
-  final TaskDraft draft;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return ListenableBuilder(
-      listenable: draft,
-      builder: (context, _) {
-        final dirty = draft.dirty;
-        return Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: t.space.lg,
-            vertical: t.space.sm,
-          ),
-          child: Row(
-            children: [
-              if (dirty) ...[
-                Container(
-                  key: const Key('dirty-indicator'),
-                  width: t.sizes.statusDot,
-                  height: t.sizes.statusDot,
-                  decoration: BoxDecoration(
-                    color: t.accent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                SizedBox(width: t.space.sm),
-                Flexible(
-                  child: Text(
-                    'Unsaved changes',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: t.type.captionStyle.copyWith(color: t.muted),
-                  ),
-                ),
-              ] else
-                Text(
-                  'Editing',
-                  style: t.type.captionStyle.copyWith(color: t.muted),
-                ),
-              const Spacer(),
-              SizedBox(width: t.space.sm),
-              FButton(
-                key: const Key('edit-discard'),
-                variant: FButtonVariant.outline,
-                size: FButtonSizeVariant.sm,
-                mainAxisSize: MainAxisSize.min,
-                onPress: () => state.discardTaskDraft(draft.uid),
-                child: Text(dirty ? 'Discard' : 'Done'),
-              ),
-              SizedBox(width: t.space.sm),
-              FButton(
-                key: const Key('edit-save'),
-                size: FButtonSizeVariant.sm,
-                mainAxisSize: MainAxisSize.min,
-                onPress: dirty && !draft.titleEmpty
-                    ? () => state.saveTaskDraft(draft.uid)
-                    : null,
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
 /// The fields of an open task edit: title, due date, priority, tags, parent
 /// and description.
 class TaskEditor extends StatelessWidget {
@@ -417,7 +345,6 @@ class TaskDetail extends StatelessWidget {
             ],
           ],
         ),
-        if (draft != null && !mobile) TaskEditBar(state: state, draft: draft),
         Expanded(
           child: SingleChildScrollView(
             controller: state.nav.pageScroll(area),

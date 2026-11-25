@@ -1005,7 +1005,7 @@ void main() {
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('edit-title')), 'Renamed');
       await t.pump();
-      await t.tap(find.byKey(const Key('edit-save')));
+      await t.tap(find.byKey(const Key('edit-save-action')));
       await t.pumpAndSettle();
       expect((await space.notes()).map((n) => n.summary), contains('Renamed'));
       await t.tap(find.byKey(const Key('delete-note')));

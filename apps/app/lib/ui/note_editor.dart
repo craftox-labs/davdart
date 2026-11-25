@@ -10,79 +10,6 @@ import 'popover_track.dart';
 import 'theme.dart';
 import 'vim_field.dart';
 
-/// The unsaved-edits bar: an indicator while anything differs, plus Discard
-/// and Save.
-class EditBar extends StatelessWidget {
-  const EditBar({super.key, required this.state, required this.draft});
-  final AppState state;
-  final NoteDraft draft;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return ListenableBuilder(
-      listenable: draft,
-      builder: (context, _) {
-        final dirty = draft.dirty;
-        return Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: t.space.lg,
-            vertical: t.space.sm,
-          ),
-          child: Row(
-            children: [
-              if (dirty) ...[
-                Container(
-                  key: const Key('dirty-indicator'),
-                  width: t.sizes.statusDot,
-                  height: t.sizes.statusDot,
-                  decoration: BoxDecoration(
-                    color: t.accent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                SizedBox(width: t.space.sm),
-                Flexible(
-                  child: Text(
-                    'Unsaved changes',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: t.type.captionStyle.copyWith(color: t.muted),
-                  ),
-                ),
-              ] else
-                Text(
-                  'Editing',
-                  style: t.type.captionStyle.copyWith(color: t.muted),
-                ),
-              const Spacer(),
-              SizedBox(width: t.space.sm),
-              FButton(
-                key: const Key('edit-discard'),
-                variant: FButtonVariant.outline,
-                size: FButtonSizeVariant.sm,
-                mainAxisSize: MainAxisSize.min,
-                onPress: () => state.discardDraft(draft.uid),
-                child: Text(dirty ? 'Discard' : 'Done'),
-              ),
-              SizedBox(width: t.space.sm),
-              FButton(
-                key: const Key('edit-save'),
-                size: FButtonSizeVariant.sm,
-                mainAxisSize: MainAxisSize.min,
-                onPress: dirty && !draft.titleEmpty
-                    ? () => state.saveDraft(draft.uid)
-                    : null,
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
 /// The fields of an open edit: title, status, priority, tags, Inside, body.
 class NoteEditor extends StatelessWidget {
   const NoteEditor({
@@ -275,7 +202,8 @@ class EditKeys extends StatelessWidget {
 }
 
 /// The edit-mode icons of a detail header: Cancel (Esc) and Save and close
-/// (Ctrl+Enter).
+/// (Ctrl+Enter). The Save icon carries a dot while anything is unsaved, and
+/// is off while the draft cannot be saved (empty title, end before start).
 List<Widget> editIcons(AppState state, String uid) => [
   IconAction(
     key: const Key('edit-cancel-action'),
@@ -283,10 +211,56 @@ List<Widget> editIcons(AppState state, String uid) => [
     icon: FLucideIcons.x,
     onPress: () => state.leaveEdit(uid),
   ),
-  IconAction(
-    key: const Key('edit-save-action'),
-    tooltip: 'Save and close (Ctrl+Enter)',
-    icon: FLucideIcons.check,
-    onPress: () => state.saveAndLeave(uid),
-  ),
+  _SaveIcon(state: state, uid: uid),
 ];
+
+class _SaveIcon extends StatelessWidget {
+  const _SaveIcon({required this.state, required this.uid});
+  final AppState state;
+  final String uid;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final Listenable draft =
+        state.draftFor(uid) ??
+        state.taskDraftFor(uid) ??
+        state.eventDraftFor(uid) ??
+        state;
+    return ListenableBuilder(
+      listenable: draft,
+      builder: (context, _) {
+        final dirty = state.dirtyItem(uid);
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconAction(
+              key: const Key('edit-save-action'),
+              tooltip: 'Save and close (Ctrl+Enter)',
+              icon: FLucideIcons.check,
+              onPress: state.editBlocked(uid)
+                  ? null
+                  : () => state.saveAndLeave(uid),
+            ),
+            if (dirty)
+              Positioned(
+                top: t.space.xs,
+                right: t.space.xs,
+                child: IgnorePointer(
+                  child: Container(
+                    key: const Key('dirty-indicator'),
+                    width: t.sizes.statusDot,
+                    height: t.sizes.statusDot,
+                    decoration: BoxDecoration(
+                      color: t.accent,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}

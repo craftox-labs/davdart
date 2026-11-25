@@ -3514,6 +3514,16 @@ class AppState extends ChangeNotifier {
       ? dirtyEventFor(uid)
       : dirtyFor(uid);
 
+  /// Whether the open edit of [uid] cannot be saved as it is (empty title,
+  /// event end before start).
+  bool editBlocked(String uid) {
+    final n = _drafts[uid], k = _taskDrafts[uid], e = _eventDrafts[uid];
+    if (e != null) return e.titleEmpty || e.endBeforeStart;
+    if (k != null) return k.titleEmpty;
+    if (n != null) return n.titleEmpty;
+    return false;
+  }
+
   /// Saves [uid] when [draft] changes (narrow only): at once when [choices]
   /// (the selector values) changed, else after the typing pause.
   void _watchDraft(String uid, Listenable draft, Object Function() choices) {

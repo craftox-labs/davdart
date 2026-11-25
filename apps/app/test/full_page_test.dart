@@ -326,7 +326,7 @@ void main() {
       await _type(t, 'edit-tags', 'x, y');
       await _type(t, 'edit-body', 'New body');
       expect(_k('dirty-indicator'), findsOneWidget);
-      await t.tap(_k('edit-save'));
+      await t.tap(_k('edit-save-action'));
       await _settle(t);
       expect(s.activeDraft, isNull);
       final n = (await space.notes()).firstWhere((n) => n.uid == 'a');
@@ -355,7 +355,9 @@ void main() {
       await t.tap(_k('edit-note'));
       await _settle(t);
       await _type(t, 'edit-title', 'Nope');
-      await t.tap(_k('edit-discard'));
+      await t.tap(_k('edit-cancel-action'));
+      await _settle(t);
+      await t.tap(find.text('Discard'));
       await _settle(t);
       expect(s.activeDraft, isNull);
       expect(await _titles(), isNot(contains('Nope')));
@@ -369,7 +371,7 @@ void main() {
       await _type(t, 'edit-title', '  ');
       await _settle(t);
       expect(find.text('A title is required'), findsOneWidget);
-      await t.tap(_k('edit-save'));
+      await t.tap(_k('edit-save-action'));
       await _settle(t);
       expect(await _titles(), contains('Alpha'));
     });

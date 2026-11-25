@@ -7,6 +7,7 @@ import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
+import 'package:davdart_app/ui/parts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 
@@ -430,7 +431,7 @@ void main() {
       await t.tap(_k('edit-note'));
       await t.pumpAndSettle();
       expect(s.taskDraftFor('k'), isNotNull);
-      expect(t.widget<FButton>(_k('edit-save')).onPress, isNull);
+      expect(_k('dirty-indicator'), findsNothing);
       await t.enterText(_k('edit-title'), 'Edited');
       await t.pump();
       expect(_k('dirty-indicator'), findsOneWidget);
@@ -438,7 +439,7 @@ void main() {
         ..setDue(dueIn(2))
         ..setPriority(5);
       await t.pump();
-      await t.tap(_k('edit-save'));
+      await t.tap(_k('edit-save-action'));
       await t.pumpAndSettle();
       final k = s.taskById('k')!;
       expect(k.summary, 'Edited');
@@ -475,7 +476,7 @@ void main() {
       await t.pumpAndSettle();
       await t.enterText(_k('edit-title'), '  ');
       await t.pump();
-      expect(t.widget<FButton>(_k('edit-save')).onPress, isNull);
+      expect(t.widget<IconAction>(_k('edit-save-action')).onPress, isNull);
     });
 
     testWidgets('dirty guard: keep editing, discard, save', (t) async {
@@ -541,7 +542,7 @@ void main() {
       await t.tap(find.textContaining('Parent  (task)').last);
       await t.pumpAndSettle();
       expect(s.taskDraftFor('k')!.parent, 'p');
-      await t.tap(_k('edit-save'));
+      await t.tap(_k('edit-save-action'));
       await t.pumpAndSettle();
       expect(s.taskById('k')!.parentUid, 'p');
     });

@@ -83,8 +83,6 @@ void main() {
         await open(t, k);
         expect(_k('edit-cancel-action'), findsOneWidget);
         expect(_k('edit-save-action'), findsOneWidget);
-        expect(_k('edit-discard'), findsOneWidget);
-        expect(_k('edit-save'), findsOneWidget);
         final tips = t
             .widgetList<FButton>(find.byType(FButton))
             .map((b) => b.semanticsLabel)

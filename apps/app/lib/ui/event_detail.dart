@@ -31,78 +31,6 @@ String _statusName(String? s) => _statusWords
     .firstWhere((e) => e.$1 == (s ?? ''), orElse: () => (s ?? '', s ?? ''))
     .$2;
 
-/// The unsaved-edits bar of an event edit.
-class EventEditBar extends StatelessWidget {
-  const EventEditBar({super.key, required this.state, required this.draft});
-  final AppState state;
-  final EventDraft draft;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return ListenableBuilder(
-      listenable: draft,
-      builder: (context, _) {
-        final dirty = draft.dirty;
-        return Padding(
-          padding: EdgeInsets.symmetric(
-            horizontal: t.space.lg,
-            vertical: t.space.sm,
-          ),
-          child: Row(
-            children: [
-              if (dirty) ...[
-                Container(
-                  key: const Key('dirty-indicator'),
-                  width: t.sizes.statusDot,
-                  height: t.sizes.statusDot,
-                  decoration: BoxDecoration(
-                    color: t.accent,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                SizedBox(width: t.space.sm),
-                Flexible(
-                  child: Text(
-                    'Unsaved changes',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: t.type.captionStyle.copyWith(color: t.muted),
-                  ),
-                ),
-              ] else
-                Text(
-                  'Editing',
-                  style: t.type.captionStyle.copyWith(color: t.muted),
-                ),
-              const Spacer(),
-              SizedBox(width: t.space.sm),
-              FButton(
-                key: const Key('edit-discard'),
-                variant: FButtonVariant.outline,
-                size: FButtonSizeVariant.sm,
-                mainAxisSize: MainAxisSize.min,
-                onPress: () => state.discardEventDraft(draft.uid),
-                child: Text(dirty ? 'Discard' : 'Done'),
-              ),
-              SizedBox(width: t.space.sm),
-              FButton(
-                key: const Key('edit-save'),
-                size: FButtonSizeVariant.sm,
-                mainAxisSize: MainAxisSize.min,
-                onPress: dirty && !draft.titleEmpty && !draft.endBeforeStart
-                    ? () => state.saveEventDraft(draft.uid)
-                    : null,
-                child: const Text('Save'),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
 /// The fields of an open event edit: title, when, location, status, tags and
 /// description, with a note when the event repeats.
 class EventEditor extends StatelessWidget {
@@ -302,7 +230,6 @@ class EventDetail extends StatelessWidget {
             ],
           ],
         ),
-        if (draft != null && !mobile) EventEditBar(state: state, draft: draft),
         Expanded(
           child: SingleChildScrollView(
             controller: state.nav.pageScroll(area),

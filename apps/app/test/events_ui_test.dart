@@ -5,6 +5,7 @@ import 'package:davdart_app/state/note_draft.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
+import 'package:davdart_app/ui/parts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 
@@ -453,7 +454,7 @@ void main() {
       await t.tap(_k('edit-note'));
       await t.pumpAndSettle();
       expect(s.eventDraftFor('k'), isNotNull);
-      expect(t.widget<FButton>(_k('edit-save')).onPress, isNull);
+      expect(_k('dirty-indicator'), findsNothing);
       expect(_k('event-series-note'), findsNothing);
       await t.enterText(_k('edit-title'), 'Edited');
       await t.enterText(_k('edit-location'), 'Pub');
@@ -468,7 +469,7 @@ void main() {
       await t.pumpAndSettle();
       expect(_k('edit-start-time'), findsNothing);
       expect(s.eventDraftFor('k')!.allDay, isTrue);
-      await t.tap(_k('edit-save'));
+      await t.tap(_k('edit-save-action'));
       await t.pumpAndSettle();
       final e = s.eventById('k')!;
       expect(e.summary, 'Edited');
@@ -501,11 +502,11 @@ void main() {
       d.setEnd(minutes: 13 * 60);
       await t.pumpAndSettle();
       expect(_k('edit-error'), findsOneWidget);
-      expect(t.widget<FButton>(_k('edit-save')).onPress, isNull);
+      expect(t.widget<IconAction>(_k('edit-save-action')).onPress, isNull);
       d.setEnd(minutes: 16 * 60);
       await t.pumpAndSettle();
       expect(_k('edit-error'), findsNothing);
-      expect(t.widget<FButton>(_k('edit-save')).onPress, isNotNull);
+      expect(t.widget<IconAction>(_k('edit-save-action')).onPress, isNotNull);
       await _end(t);
     });
 
@@ -544,7 +545,7 @@ void main() {
       await t.pumpAndSettle();
       final r = RepeatRule.parse(s.eventDraftFor('k')!.rrule)!;
       expect(r.weekdays, contains(1));
-      await t.tap(_k('edit-save'));
+      await t.tap(_k('edit-save-action'));
       await t.pumpAndSettle();
       expect(s.eventById('k')!.rrule, startsWith('FREQ=WEEKLY'));
       await _end(t);
@@ -586,7 +587,7 @@ void main() {
       await t.pumpAndSettle();
       await t.enterText(_k('edit-title'), '  ');
       await t.pump();
-      expect(t.widget<FButton>(_k('edit-save')).onPress, isNull);
+      expect(t.widget<IconAction>(_k('edit-save-action')).onPress, isNull);
       await _end(t);
     });
 
