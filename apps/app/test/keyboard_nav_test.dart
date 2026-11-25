@@ -1020,6 +1020,24 @@ void main() {
       await _press(t, LogicalKeyboardKey.escape);
     });
 
+    testWidgets('the Spaces panel has its own cursor list', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        size: const Size(390, 800),
+        tasks: [mkTask('a')],
+      );
+      s.setSection(Section.spaces);
+      await t.pumpAndSettle();
+      // The cursor moves in the Spaces panel's own list, not a stale one.
+      expect(navListId(s, NavArea.panel), 'spaces');
+      await t.tap(_k('menu'));
+      await t.pumpAndSettle();
+      await _press(t, LogicalKeyboardKey.keyH);
+      await _press(t, LogicalKeyboardKey.keyL);
+      expect(s.nav.area, NavArea.panel);
+      await _press(t, LogicalKeyboardKey.escape);
+    });
+
     testWidgets('the drawer strip is the rail area', (t) async {
       final s = await pumpTasksApp(
         t,

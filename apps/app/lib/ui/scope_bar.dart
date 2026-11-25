@@ -231,12 +231,6 @@ class NarrowCrumbs extends StatelessWidget {
   }
 }
 
-/// The actions a folder offers in a menu or a sheet, in row order: a folder
-/// that exists offers some only.
-/// The actions a folder offers in a menu or a sheet, in row order: a folder
-/// that exists offers some only. [includeClose] adds "Show the whole space",
-/// which the wide bar's menu offers beside the breadcrumb; the narrow picker
-/// leaves it out, its first row already goes back to the whole Space.
 /// The folder's path below the Space: its name and its ancestors', with the
 /// Projects container level skipped.
 String folderPath(AppState state, String uid) {
@@ -248,6 +242,9 @@ String folderPath(AppState state, String uid) {
   return names.join(' › ');
 }
 
+/// The actions a folder offers, in row order. [includeClose] adds "Show the
+/// whole space": the wide bar's menu and the Projects panel's row menu offer
+/// it.
 List<NoteMenuItem> scopeActionItems(
   BuildContext context,
   AppState state,

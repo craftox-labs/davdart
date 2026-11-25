@@ -547,6 +547,27 @@ void main() {
     });
   }
 
+  testWidgets('a lone real Space is not called a fixed source', (t) async {
+    t.view.physicalSize = const Size(390, 844);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final storage = MemoryStorage();
+    final c = catalogWithPlanning(storage);
+    final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
+    await s.load();
+    await t.pumpWidget(DavdartApp(state: s));
+    await t.pumpAndSettle();
+    await t.tap(_k('menu'));
+    await t.pumpAndSettle();
+    await t.tap(_k('rail-spaces'));
+    await t.pumpAndSettle();
+    // Readable, writable and switchable: only a catalog-less source is a
+    // fixed one.
+    expect(_k('space-${SpaceCatalog.planningId}'), findsOneWidget);
+    expect(find.text('One fixed notes source'), findsNothing);
+    _noError(t);
+  });
+
   testWidgets('the Spaces panel switches Space, on the phone too', (t) async {
     t.view.physicalSize = const Size(390, 844);
     t.view.devicePixelRatio = 1;

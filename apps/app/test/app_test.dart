@@ -1482,12 +1482,23 @@ void main() {
       },
     );
 
-    test('a saved Spaces selection restores the Spaces panel', () {
+    test('a saved picker selection falls back to a list', () {
+      // Spaces and Projects lead the rail but are not landing pages.
+      for (final saved in ['spaces', 'projects']) {
+        final storage = MemoryStorage();
+        storage.write('davdart.section.v1', saved);
+        expect(
+          AppState(FakeSource(sample), prefs: storage).section,
+          Section.notes,
+          reason: saved,
+        );
+      }
+      // A list section still restores as itself.
       final storage = MemoryStorage();
-      storage.write('davdart.section.v1', 'spaces');
+      storage.write('davdart.section.v1', 'tasks');
       expect(
         AppState(FakeSource(sample), prefs: storage).section,
-        Section.spaces,
+        Section.tasks,
       );
     });
 

@@ -512,6 +512,7 @@ class KeyNav extends ChangeNotifier {
 String? navListId(AppState s, NavArea a) => switch (a) {
   NavArea.rail => KeyNav.railList,
   NavArea.panel => switch (s.section) {
+    Section.spaces => 'spaces',
     Section.notes => 'notes',
     Section.tasks => 'tasks',
     Section.events => 'events',

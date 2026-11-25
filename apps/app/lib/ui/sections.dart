@@ -247,17 +247,6 @@ class SpacesSection extends _Section {
               ),
               key: Key('menu-space-rename-${sp.id}'),
             ),
-            if (sp.onServer)
-              NoteMenuItem(
-                'Delete from server…',
-                FLucideIcons.trash2,
-                () async {
-                  if (!await state.switchSpace(sp.id)) return;
-                  if (!context.mounted) return;
-                  showDeleteFromServerDialog(context, state);
-                },
-                key: Key('menu-space-server-delete-${sp.id}'),
-              ),
           ],
         ],
         child: rowWidget,
@@ -267,10 +256,12 @@ class SpacesSection extends _Section {
     return _Panel(
       heading: _title(spacesLabel),
       children: [
-        if (other)
-          const _Muted('A Space holds its own notes, tasks and events.')
-        else
-          const _Muted('One fixed notes source'),
+        // Only a source with no catalog is a single fixed Space; a real one
+        // that happens to be alone says nothing extra.
+        if (state.catalog == null)
+          const _Muted('One fixed notes source')
+        else if (other)
+          const _Muted('A Space holds its own notes, tasks and events.'),
         for (final sp in [
           ...state.spaces.where((s) => s.id == state.currentSpaceId),
           ...state.spaces.where((s) => s.id != state.currentSpaceId),

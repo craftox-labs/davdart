@@ -25,7 +25,8 @@ enum ViewMode { board, list }
 
 /// The section the side panel shows, chosen with the icon rail.
 /// `notes` is shown as "Notes"; the ids stay so saved selections still load.
-/// Spaces is a popup on the rail, not a section.
+/// Spaces leads the rail and Projects is the scope picker: neither is a
+/// landing page, so neither opens on start.
 enum Section {
   /// The Spaces list: switch, add and manage. On the rail in place of a popup.
   spaces,
@@ -220,9 +221,11 @@ class AppState extends ChangeNotifier {
     prefs?.remove('davdart.home.board.collapsed.v1');
     prefs?.remove('davdart.home.today.collapsed.v1');
     final saved = prefs?.read(_sectionKey);
-    section = Section.values.firstWhere(
-      (v) => v.name == saved,
-      orElse: () => Section.notes,
+    section = _landing(
+      Section.values.firstWhere(
+        (v) => v.name == saved,
+        orElse: () => Section.notes,
+      ),
     );
     sidebarCollapsed = prefs?.read(_collapsedKey) == 'true';
     final w = double.tryParse(prefs?.read(_widthKey) ?? '');
@@ -518,6 +521,12 @@ class AppState extends ChangeNotifier {
     Section.projects => supportsNotes,
     _ => true,
   };
+
+  /// The section to open on: the rail's pickers (Spaces, Projects) lead the
+  /// rail but are not landing pages, so a saved one falls back to a list.
+  Section _landing(Section s) => s == Section.spaces || s == Section.projects
+      ? _supportedSection(Section.notes)
+      : s;
 
   /// [s], or the first list section the Space supports (Views when none).
   Section _supportedSection(Section s) {

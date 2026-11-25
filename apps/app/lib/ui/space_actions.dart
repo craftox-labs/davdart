@@ -5,7 +5,7 @@ import '../data/space_catalog.dart';
 import '../state/app_state.dart';
 import 'parts.dart';
 
-/// Sync state line of a Space in the Spaces panel and popup.
+/// Sync state line of a Space in the Spaces panel.
 String spaceSyncLabel(AppState state, SpaceInfo sp) =>
     sp.id == state.currentSpaceId && state.syncing
     ? 'Syncing…'
@@ -15,7 +15,8 @@ String spaceSyncLabel(AppState state, SpaceInfo sp) =>
 
 /// Moves note [uid] (with everything under it) to Space [sp]. A folder is
 /// confirmed first; a failure or the success is shown as a toast. [hide] runs
-/// as the move starts (a popup closes itself).
+/// as the move starts, for a caller that closes itself (the rail's drop
+/// target has nothing to close and passes null).
 Future<void> moveNoteToSpace(
   BuildContext context,
   AppState state,
