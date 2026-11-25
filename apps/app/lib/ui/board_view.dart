@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../state/note_drag.dart';
 import 'drag_drop.dart';
 import 'board_layout.dart';
+import 'chips.dart' show priorityColorOf;
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
 import 'theme.dart';
@@ -170,9 +171,10 @@ class _Card extends StatelessWidget {
                               _label(p.priorityWord!),
                               key: Key('card-priority-${note.uid}'),
                               style: t.type.captionStyle.copyWith(
-                                color: p.priorityWord == 'high'
-                                    ? t.accent
-                                    : t.muted,
+                                color: priorityColorOf(
+                                  t,
+                                  p.priorityWord ?? 'none',
+                                ),
                               ),
                             ),
                           ],

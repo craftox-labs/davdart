@@ -9,6 +9,7 @@ import '../state/task_rules.dart';
 import '../theme/tokens.dart';
 import 'drag_drop.dart';
 import 'parts.dart';
+import 'chips.dart' show priorityColorOf;
 import 'task_detail.dart' show priorityBucket;
 import 'task_menu.dart';
 import 'theme.dart';
@@ -135,9 +136,7 @@ class TaskCardMeta extends StatelessWidget {
             p,
             key: Key('card-priority-${task.uid}'),
             style: t.type.captionStyle.copyWith(
-              color: priorityBucket(task.priority) == 'high'
-                  ? t.accent
-                  : t.muted,
+              color: priorityColorOf(t, priorityBucket(task.priority)),
             ),
           ),
         if (task.due != null)

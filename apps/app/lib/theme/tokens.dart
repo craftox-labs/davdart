@@ -368,9 +368,12 @@ class Tokens {
     required this.muted,
     required this.accent,
     required this.onAccent,
+    required this.statusDoing,
     required this.statusDone,
     required this.statusTodo,
     required this.statusBlocked,
+    required this.warning,
+    required this.priorityLow,
     required this.barrier,
     required this.destructive,
     required this.onDestructive,
@@ -441,10 +444,18 @@ class Tokens {
   /// Text on [accent].
   final Color onAccent;
 
-  /// Status dot colours (doing uses [accent], other statuses use [muted]).
+  /// Status colours: doing is green ([statusDoing]), done is blue ([statusDone]),
+  /// todo is amber, blocked is red-orange; other statuses use [muted]. Done
+  /// progress (a project bar) uses [statusDone] too.
+  final Color statusDoing;
   final Color statusDone;
   final Color statusTodo;
   final Color statusBlocked;
+
+  /// Priority colours on cards: high uses [error], medium [warning], low
+  /// [priorityLow]; no priority uses [muted].
+  final Color warning;
+  final Color priorityLow;
 
   /// Scrim behind dialogs and sheets.
   final Color barrier;
@@ -503,9 +514,12 @@ class Tokens {
     muted: muted,
     accent: accent ?? this.accent,
     onAccent: onAccent,
+    statusDoing: statusDoing,
     statusDone: statusDone,
     statusTodo: statusTodo,
     statusBlocked: statusBlocked,
+    warning: warning,
+    priorityLow: priorityLow,
     barrier: barrier,
     destructive: destructive,
     onDestructive: onDestructive,
@@ -542,9 +556,12 @@ class Tokens {
     muted: Color(0xFF6E6E6E),
     accent: Color(0xFF2F5FD0),
     onAccent: Color(0xFFFFFFFF),
-    statusDone: Color(0xFF3FA37A),
+    statusDoing: Color(0xFF3FA37A),
+    statusDone: Color(0xFF2F5FD0),
     statusTodo: Color(0xFFD8A23A),
     statusBlocked: Color(0xFFD9694F),
+    warning: Color(0xFFC25A00),
+    priorityLow: Color(0xFF56708C),
     barrier: Color(0x33000000),
     destructive: Color(0xFFE7000B),
     onDestructive: Color(0xFFFAFAFA),
@@ -573,9 +590,12 @@ class Tokens {
     muted: Color(0xFF8E8E8E),
     accent: Color(0xFF8FB0FF),
     onAccent: Color(0xFF111111),
-    statusDone: Color(0xFF3FA37A),
+    statusDoing: Color(0xFF3FA37A),
+    statusDone: Color(0xFF8FB0FF),
     statusTodo: Color(0xFFD8A23A),
     statusBlocked: Color(0xFFD9694F),
+    warning: Color(0xFFFF9A4A),
+    priorityLow: Color(0xFF9AB0C8),
     barrier: Color(0x7A000000),
     destructive: Color(0xFFFF6467),
     onDestructive: Color(0xFFFAFAFA),

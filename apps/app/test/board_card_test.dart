@@ -1,5 +1,7 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/theme/tokens.dart';
+import 'package:davdart_app/ui/chips.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -92,7 +94,9 @@ void main() {
     expect(t.getTopLeft(kind).dy, greaterThan(t.getBottomLeft(title).dy));
   });
 
-  testWidgets('priority is coloured only for high', (t) async {
+  testWidgets('each priority has its own colour: red, orange, cool', (
+    t,
+  ) async {
     AppState.debugDefaultFocus = HomeFocus.board;
     await pumpTasksApp(
       t,
@@ -100,6 +104,7 @@ void main() {
         mkTask('h', priority: 1),
         mkTask('m', priority: 5),
         mkTask('l', priority: 7),
+        mkTask('n'),
       ],
       size: const Size(1280, 900),
     );
@@ -113,9 +118,90 @@ void main() {
           ),
         )
         .color!;
-    expect(col('m'), col('l'));
-    expect(col('h'), isNot(col('m')));
+    final tokens = Tokens.light;
+    expect(col('h'), tokens.error);
+    expect(col('m'), tokens.warning);
+    expect(col('l'), tokens.priorityLow);
+    expect({col('h'), col('m'), col('l')}, hasLength(3));
+    // Low must not read as muted text, nor as the doing (green) or done (blue)
+    // status colours.
+    for (final c in [tokens.muted, tokens.statusDoing, tokens.statusDone]) {
+      expect(col('l'), isNot(c));
+    }
     expect(find.text('Low'), findsOneWidget);
+    expect(_k('card-priority-n'), findsNothing);
+  });
+
+  testWidgets('phone: the flag shows for every priority, without its word', (
+    t,
+  ) async {
+    AppState.debugDefaultFocus = HomeFocus.board;
+    await pumpTasksApp(
+      t,
+      tasks: [
+        mkTask('h', priority: 1),
+        mkTask('m', priority: 5),
+        mkTask('l', priority: 7),
+      ],
+      size: const Size(390, 844),
+    );
+    if (_k('card-priority-h').evaluate().isEmpty) {
+      await t.tap(_k('board-acc-todo-toggle'));
+      await t.pumpAndSettle();
+    }
+    for (final uid in ['h', 'm', 'l']) {
+      expect(_k('card-priority-$uid'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: _k('card-priority-$uid'),
+          matching: find.byType(Text),
+        ),
+        findsNothing,
+      );
+    }
+    final flag = t.widget<Icon>(
+      find.descendant(of: _k('card-priority-h'), matching: find.byType(Icon)),
+    );
+    expect(flag.color, Tokens.light.error);
+    expect(find.text('Medium'), findsNothing);
+    expect(find.text('High'), findsNothing);
+  });
+
+  testWidgets('doing is green and done is blue on the column dots', (t) async {
+    AppState.debugDefaultFocus = HomeFocus.board;
+    await pumpTasksApp(
+      t,
+      notes: [
+        Note(
+          uid: 'k',
+          summary: 'Busy',
+          description: 'status: doing\n\nx',
+          categories: const ['status-doing'],
+        ),
+        Note(
+          uid: 'd',
+          summary: 'Shipped',
+          description: 'status: done\n\nx',
+          categories: const ['status-done'],
+        ),
+      ],
+      size: const Size(1280, 900),
+    );
+    Color dot(String label) {
+      final header = find
+          .ancestor(of: find.text(label), matching: find.byType(Row))
+          .first;
+      final box = find.descendant(
+        of: find.descendant(of: header, matching: find.byType(StatusDot)),
+        matching: find.byType(Container),
+      );
+      return (t.widget<Container>(box.first).decoration! as BoxDecoration)
+          .color!;
+    }
+
+    expect(dot('DOING'), Tokens.light.statusDoing);
+    expect(dot('DONE'), Tokens.light.statusDone);
+    expect(Tokens.light.statusDoing, isNot(Tokens.light.statusDone));
   });
 
   testWidgets('overdue due uses the error colour, a future one does not', (

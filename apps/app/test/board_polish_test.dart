@@ -240,7 +240,9 @@ void main() {
       expect(col('late'), isNot(col('fin')));
     });
 
-    testWidgets('phone cards show the meta line too', (t) async {
+    testWidgets('phone cards show the meta line too, flag without word', (
+      t,
+    ) async {
       await pumpTasksApp(
         t,
         size: const Size(400, 800),
@@ -249,7 +251,7 @@ void main() {
       await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(find.text('Medium'), findsNothing);
-      expect(_k('card-priority-a'), findsNothing);
+      expect(_k('card-priority-a'), findsOneWidget);
       expect(_k('card-due-a'), findsOneWidget);
     });
   });

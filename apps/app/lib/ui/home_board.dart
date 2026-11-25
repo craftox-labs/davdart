@@ -8,6 +8,7 @@ import '../state/note_drag.dart';
 import '../state/task_rules.dart';
 import '../theme/tokens.dart';
 import 'board_layout.dart';
+import 'chips.dart' show priorityColorOf;
 import 'task_detail.dart' show priorityBucket;
 import 'drag_drop.dart';
 import 'key_nav_ui.dart';
@@ -252,7 +253,8 @@ class _Card extends StatelessWidget {
   final BoardItem item;
   final String column;
 
-  /// Narrow layout: smaller title; footer keeps kind, high priority, due, tag count.
+  /// Narrow layout: no snippet or tag names; the footer keeps kind, the
+  /// priority flag (no word), due and tag count.
   final bool compact;
 
   @override
@@ -275,7 +277,9 @@ class _Card extends StatelessWidget {
         ? null
         : state.folderNameOf(item.uid);
     final snippet = note == null || compact ? '' : noteSnippet(plan!.text);
-    final titleStyle = compact ? t.type.bodyStrong : t.type.titleStyle;
+    // Phone and desktop share one title size (one step under the old desktop
+    // title).
+    final titleStyle = t.type.bodyStrong;
     final title = task != null
         ? OverflowTip(task.summary, maxLines: 3, style: titleStyle)
         : Text(
@@ -285,13 +289,12 @@ class _Card extends StatelessWidget {
     final bucket = task != null
         ? priorityBucket(task.priority)
         : (plan!.priorityWord ?? 'none');
-    final showPriority = bucket != 'none' && (!compact || bucket == 'high');
     final now = DateTime.now();
     final due = task == null ? '' : dueLabel(task, now);
     final late = task != null && !task.isClosed && isTaskOverdue(task, now);
     final footer = _footer(
       t,
-      bucket: showPriority ? bucket : null,
+      bucket: bucket == 'none' ? null : bucket,
       due: due,
       late: late,
       tags: shownTags,
@@ -305,7 +308,7 @@ class _Card extends StatelessWidget {
       children: [
         title,
         if (note != null && !compact && plan!.itemId != null) ...[
-          SizedBox(height: t.space.xxs),
+          SizedBox(height: t.space.xs),
           OverflowTip(
             note.summary,
             maxLines: 1,
@@ -313,7 +316,7 @@ class _Card extends StatelessWidget {
           ),
         ],
         if (snippet.isNotEmpty) ...[
-          SizedBox(height: t.space.xxs),
+          SizedBox(height: t.space.xs),
           Text(
             snippet,
             key: Key('card-snippet-${item.uid}'),
@@ -322,7 +325,7 @@ class _Card extends StatelessWidget {
             style: t.type.bodyStyle.copyWith(color: t.muted),
           ),
         ],
-        SizedBox(height: t.space.sm),
+        SizedBox(height: t.space.md),
         footer,
       ],
     );
@@ -377,8 +380,8 @@ class _Card extends StatelessWidget {
   }
 
   /// The footer row, left-aligned with the title: kind, priority, due, tags,
-  /// and the folder at the right end. Phones drop medium/low priority, list
-  /// tags as an icon with the count.
+  /// and the folder at the right end. Phones show the priority flag without
+  /// its word, and list tags as an icon with the count.
   Widget _footer(
     Tokens t, {
     required String? bucket,
@@ -409,7 +412,6 @@ class _Card extends StatelessWidget {
       style: small.copyWith(color: c),
     );
     final gap = SizedBox(width: t.space.md);
-    final high = bucket == 'high';
     final parts = <Widget>[
       Icon(
         kindIcon(item.isTask),
@@ -419,14 +421,25 @@ class _Card extends StatelessWidget {
       ),
       if (bucket != null) ...[
         gap,
-        pair(
-          FLucideIcons.flag,
-          txt(
-            '${bucket[0].toUpperCase()}${bucket.substring(1)}',
-            high ? t.accent : t.muted,
-          ),
-          high ? t.accent : t.muted,
+        Row(
           key: Key('card-priority-$uid'),
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              FLucideIcons.flag,
+              size: t.icons.sm,
+              color: priorityColorOf(t, bucket),
+            ),
+            if (!compact) ...[
+              SizedBox(width: t.space.xs),
+              Flexible(
+                child: txt(
+                  '${bucket[0].toUpperCase()}${bucket.substring(1)}',
+                  priorityColorOf(t, bucket),
+                ),
+              ),
+            ],
+          ],
         ),
       ],
       if (due.isNotEmpty) ...[

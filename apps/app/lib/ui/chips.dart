@@ -2,7 +2,17 @@ import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import '../theme/tokens.dart';
 import 'theme.dart';
+
+/// The colour of a priority bucket ('high', 'medium', 'low'; anything else is
+/// no priority): red, orange, cool slate. Shared by every card's priority mark.
+Color priorityColorOf(Tokens t, String bucket) => switch (bucket) {
+  'high' => t.error,
+  'medium' => t.warning,
+  'low' => t.priorityLow,
+  _ => t.muted,
+};
 
 Color statusColor(String? status, BuildContext context) {
   final t = tokensOf(context);
@@ -10,7 +20,7 @@ Color statusColor(String? status, BuildContext context) {
     case 'done':
       return t.statusDone;
     case 'doing':
-      return t.accent;
+      return t.statusDoing;
     case 'blocked':
       return t.statusBlocked;
     case 'todo':
