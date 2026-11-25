@@ -1559,7 +1559,9 @@ void main() {
       await pump(t, size: const Size(420, 800));
       await t.tap(find.byKey(const Key('space-chip')));
       await t.pumpAndSettle();
-      expect(find.text('One fixed notes source'), findsOneWidget);
+      // The picker's first row is the open Space itself; with one fixed
+      // source there is no other Space to list.
+      expect(find.byKey(const Key('scope-pick-all')), findsOneWidget);
       await t.tapAt(const Offset(5, 5));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('menu')));

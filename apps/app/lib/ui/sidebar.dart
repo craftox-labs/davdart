@@ -190,13 +190,15 @@ Future<void> _dropOnSpace(
 /// [onPick] runs only before a manage action opens a dialog. Dialogs launch
 /// from [host] when given (the widget that opened the sheet): a sheet's own
 /// context is gone by the time a row's action runs, so its `mounted` check
-/// would swallow the dialog.
+/// would swallow the dialog. [othersOnly] leaves out the open Space (the
+/// narrow picker lists the other Spaces).
 List<FItemGroup> spaceMenuGroups(
   BuildContext context,
   AppState state,
   FPopoverController controller, {
   VoidCallback? onPick,
   BuildContext? host,
+  bool othersOnly = false,
 }) {
   final t = tokensOf(context);
   final dialogs = host ?? context;
@@ -218,7 +220,7 @@ List<FItemGroup> spaceMenuGroups(
   });
 
   final spaces = [
-    ...state.spaces.where((s) => s.id == state.currentSpaceId),
+    if (!othersOnly) ...state.spaces.where((s) => s.id == state.currentSpaceId),
     ...state.spaces.where((s) => s.id != state.currentSpaceId),
   ];
   return [

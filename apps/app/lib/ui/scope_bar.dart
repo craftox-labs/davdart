@@ -231,54 +231,70 @@ class NarrowCrumbs extends StatelessWidget {
   }
 }
 
-/// The open folder's actions as sheet groups, for the narrow scope picker:
-/// the same rows as [ScopeActions]. Empty when no folder is open.
+/// The actions a folder offers in a menu or a sheet, in row order: a folder
+/// that exists offers some only.
+/// The actions a folder offers in a menu or a sheet, in row order: a folder
+/// that exists offers some only. [includeClose] adds "Show the whole space",
+/// which the wide bar's menu offers beside the breadcrumb; the narrow picker
+/// leaves it out, its first row already goes back to the whole Space.
+List<NoteMenuItem> scopeActionItems(
+  BuildContext context,
+  AppState state,
+  Note folder, {
+  bool includeClose = false,
+}) => [
+  if (state.editable) ...[
+    if (state.spaces.length > 1)
+      NoteMenuItem(
+        'Move to another space',
+        FLucideIcons.folderInput,
+        () => showMoveSpaceDialog(context, state, folder),
+        key: const Key('scope-move'),
+      ),
+    NoteMenuItem(
+      'Edit folder',
+      FLucideIcons.pencil,
+      () => showEditNoteDialog(context, state, folder),
+      key: const Key('scope-edit'),
+    ),
+    NoteMenuItem(
+      'Delete folder',
+      FLucideIcons.trash2,
+      () => confirmDeleteNote(context, state, folder),
+      key: const Key('scope-delete'),
+    ),
+  ],
+  if (includeClose)
+    NoteMenuItem(
+      'Show the whole space',
+      FLucideIcons.x,
+      () => state.openFolder(null),
+      key: const Key('scope-close'),
+    ),
+];
+
+/// Folder [folder]'s actions as a menu group.
 List<FItemGroupMixin> scopeActionsGroup(
   BuildContext context,
   AppState state,
   FPopoverController controller,
-) {
-  final folder = state.scope;
-  if (folder == null) return const [];
-  return [
-    FItemGroup(
-      children: menuRows(context, controller, [
-        if (state.editable) ...[
-          if (state.spaces.length > 1)
-            NoteMenuItem(
-              'Move to another space',
-              FLucideIcons.folderInput,
-              () => showMoveSpaceDialog(context, state, folder),
-              key: const Key('scope-move'),
-            ),
-          NoteMenuItem(
-            'Edit folder',
-            FLucideIcons.pencil,
-            () => showEditNoteDialog(context, state, folder),
-            key: const Key('scope-edit'),
-          ),
-          NoteMenuItem(
-            'Delete folder',
-            FLucideIcons.trash2,
-            () => confirmDeleteNote(context, state, folder),
-            key: const Key('scope-delete'),
-          ),
-        ],
-        NoteMenuItem(
-          'Show the whole space',
-          FLucideIcons.x,
-          () => state.openFolder(null),
-          key: const Key('scope-close'),
-        ),
-      ]),
+  Note folder, {
+  bool includeClose = false,
+}) => [
+  FItemGroup(
+    children: menuRows(
+      context,
+      controller,
+      scopeActionItems(context, state, folder, includeClose: includeClose),
     ),
-  ];
-}
+  ),
+];
 
 /// Folder actions (move, edit, delete, close) for the right end of the top
 /// bar, folded into one "more" menu on every width; empty when no folder is
-/// open. The narrow layout puts the same rows in the scope picker sheet,
-/// see [scopeActionsGroup].
+/// open. The narrow layout puts the same rows in the scope picker, behind the
+/// selected project's (or loose folder's) ⋯ and a long press, see
+/// [scopeActionItems].
 class ScopeActions extends StatelessWidget {
   const ScopeActions({super.key, required this.state});
   final AppState state;
@@ -295,8 +311,13 @@ extension on ScopeActions {
   Widget _menu(BuildContext context, Note folder) => FPopoverMenu(
     menuAnchor: Alignment.topRight,
     childAnchor: Alignment.bottomRight,
-    menuBuilder: (ctx, controller, _) =>
-        scopeActionsGroup(context, state, controller),
+    menuBuilder: (ctx, controller, _) => scopeActionsGroup(
+      context,
+      state,
+      controller,
+      folder,
+      includeClose: true,
+    ),
     builder: (ctx, controller, _) => IconAction(
       key: const Key('scope-more'),
       compact: true,

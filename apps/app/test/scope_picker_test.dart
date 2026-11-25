@@ -1,9 +1,13 @@
 import 'package:davdart/davdart.dart';
+import 'package:davdart_app/data/key_value_storage.dart';
+import 'package:davdart_app/data/space_catalog.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 
+import 'catalog_helper.dart';
 import 'tasks_helper.dart';
 
 const _sizes = [Size(320, 568), Size(390, 844)];
@@ -139,23 +143,35 @@ void main() {
         _noError(t);
       });
 
-      testWidgets('the pill sheet: Everything, projects, then Spaces', (
+      testWidgets('the sheet: the Space itself first, then the projects', (
         t,
       ) async {
         final s = await _app(t, size);
         await t.tap(_k('space-chip'));
         await t.pumpAndSettle();
         expect(_k('menu-sheet'), findsOneWidget);
-        // Everything, then the projects, then the Space sheet's own rows
-        // (one fixed source here).
-        final sheetSpaces = find.text('One fixed notes source');
-        expect(sheetSpaces, findsOneWidget);
-        expect(_k('scope-pick-all'), findsOneWidget);
+        // The first row is the open Space itself (no project), then the
+        // projects. With one fixed source there is no other Space to list.
+        expect(
+          find.descendant(
+            of: _k('scope-pick-all'),
+            matching: find.text('Spaces'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: _k('scope-pick-all'),
+            matching: find.text('No project'),
+          ),
+          findsOneWidget,
+        );
+        expect(find.text('One fixed notes source'), findsNothing);
         expect(_k('scope-pick-p1'), findsOneWidget);
         expect(_k('scope-pick-p2'), findsOneWidget);
         expect(
           t.getRect(_k('scope-pick-all')).top,
-          lessThan(t.getRect(sheetSpaces).top),
+          lessThan(t.getRect(_k('scope-pick-p1')).top),
         );
         // One tap on a project scopes to it and closes the sheet.
         await t.tap(_k('scope-pick-p2'));
@@ -163,7 +179,7 @@ void main() {
         expect(_k('menu-sheet'), findsNothing);
         expect(s.scopeUid, 'p2');
         expect(_text(t, 'scope-pill-project'), 'Beta');
-        // Everything clears the scope.
+        // The Space's own row clears the scope again.
         await t.tap(_k('space-chip'));
         await t.pumpAndSettle();
         await t.tap(_k('scope-pick-all'));
@@ -264,12 +280,17 @@ void main() {
         _noError(t);
       });
 
-      testWidgets('the sheet\'s folder dialogs open from the pill', (t) async {
+      testWidgets('the ⋯ opens that folder\'s dialogs from the pill', (
+        t,
+      ) async {
         final s = await _app(t, size);
         s.openFolder('p1');
         await t.pumpAndSettle();
-        // Edit folder: the sheet closes and its dialog opens.
+        // Edit folder, from the selected row's ⋯.
         await t.tap(_k('space-chip'));
+        await t.pumpAndSettle();
+        expect(_k('scope-edit'), findsNothing, reason: 'behind the ⋯');
+        await t.tap(_k('scope-more-p1'));
         await t.pumpAndSettle();
         await t.tap(_k('scope-edit'));
         await t.pumpAndSettle();
@@ -277,16 +298,80 @@ void main() {
         expect(find.text('Edit folder'), findsOneWidget);
         await t.tap(find.text('Cancel'));
         await t.pumpAndSettle();
-        // Delete folder: the confirm dialog opens.
+        // Delete folder, same route: the confirm dialog, for this folder.
         await t.tap(_k('space-chip'));
+        await t.pumpAndSettle();
+        await t.tap(_k('scope-more-p1'));
         await t.pumpAndSettle();
         await t.tap(_k('scope-delete'));
         await t.pumpAndSettle();
         expect(find.text('Delete note?'), findsOneWidget);
+        expect(
+          find.textContaining('Alpha project'),
+          findsWidgets,
+          reason: 'the confirm names the folder',
+        );
         expect(_k('delete-confirm'), findsOneWidget);
         await t.tap(find.text('Cancel'));
         await t.pumpAndSettle();
         expect(s.scopeUid, 'p1');
+        _noError(t);
+      });
+
+      testWidgets('a long press on a project row opens its actions', (t) async {
+        final s = await _app(t, size);
+        await t.tap(_k('space-chip'));
+        await t.pumpAndSettle();
+        // Beta is not the scope: no ⋯, but a long press still offers them.
+        expect(_k('scope-more-p2'), findsNothing);
+        await t.longPress(_k('scope-pick-p2'));
+        await t.pumpAndSettle();
+        expect(_k('scope-edit'), findsOneWidget);
+        expect(_k('scope-delete'), findsOneWidget);
+        await t.tap(_k('scope-delete'));
+        await t.pumpAndSettle();
+        expect(_k('menu-sheet'), findsNothing);
+        expect(find.text('Delete note?'), findsOneWidget);
+        expect(find.textContaining('Beta'), findsWidgets);
+        await t.tap(find.text('Cancel'));
+        await t.pumpAndSettle();
+        expect(s.scopeUid, isNull, reason: 'the long press picked nothing');
+        _noError(t);
+      });
+
+      testWidgets('the + menu adds inside the open project', (t) async {
+        final s = await _app(t, size);
+        s.openFolder('p1');
+        await t.pumpAndSettle();
+        Future<void> add(String entry, String titleKey, String addKey) async {
+          await t.tap(_k('bar-add'));
+          await t.pumpAndSettle();
+          await t.tap(_k(entry));
+          await t.pumpAndSettle();
+          await t.enterText(_k(titleKey), 'In the project');
+          await t.pumpAndSettle();
+          await t.tap(_k(addKey));
+          await t.pumpAndSettle();
+          // A note or event opens as its page; back out for the next add.
+          await t.tap(_k('bar-back'));
+          await t.pumpAndSettle();
+        }
+
+        await add('add-task', 'new-task-title', 'new-task-add');
+        expect(
+          s.tasks.firstWhere((e) => e.summary == 'In the project').parentUid,
+          'p1',
+        );
+        await add('add-event', 'new-event-title', 'new-event-add');
+        expect(
+          s.events.firstWhere((e) => e.summary == 'In the project').parentUid,
+          'p1',
+        );
+        await add('add-note', 'new-note-title', 'new-note-add');
+        expect(
+          s.notes.firstWhere((e) => e.summary == 'In the project').parentUid,
+          'p1',
+        );
         _noError(t);
       });
 
@@ -314,18 +399,31 @@ void main() {
         _noError(t);
       });
 
-      testWidgets('the folder actions are in the sheet, not the top bar', (
+      testWidgets('the folder actions are behind the ⋯, not in the top bar', (
         t,
       ) async {
         final s = await _app(t, size);
         s.openFolder('p1');
         await t.pumpAndSettle();
+        // The wide bar's folder menu is not on the phone bar.
         expect(_k('scope-more'), findsNothing);
         await t.tap(_k('space-chip'));
         await t.pumpAndSettle();
+        // No rows of its own: the actions live behind the selected row's ⋯.
+        expect(_k('scope-edit'), findsNothing);
+        expect(_k('scope-close'), findsNothing);
+        expect(_k('scope-more-p1'), findsOneWidget);
+        await t.tap(_k('scope-more-p1'));
+        await t.pumpAndSettle();
         expect(_k('scope-edit'), findsOneWidget);
         expect(_k('scope-delete'), findsOneWidget);
-        await t.tap(_k('scope-close'));
+        // "Show the whole space" belongs to the wide bar's menu only: the
+        // picker's first row already goes back to the whole Space.
+        expect(_k('scope-close'), findsNothing);
+        await t.tap(_k('menu-back'));
+        await t.pumpAndSettle();
+        expect(_k('scope-edit'), findsNothing);
+        await t.tap(_k('scope-pick-all'));
         await t.pumpAndSettle();
         expect(_k('menu-sheet'), findsNothing);
         expect(s.scopeUid, isNull);
@@ -333,4 +431,28 @@ void main() {
       });
     });
   }
+
+  testWidgets('the picker lists the other Spaces only', (t) async {
+    t.view.physicalSize = const Size(390, 844);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.reset);
+    final storage = MemoryStorage();
+    final c = catalogWithPlanning(storage);
+    final inbox = c.add('Inbox').id;
+    final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
+    await s.load();
+    await s.switchSpace(inbox);
+    await t.pumpWidget(DavdartApp(state: s));
+    await t.pumpAndSettle();
+    await t.tap(_k('space-chip'));
+    await t.pumpAndSettle();
+    // The open Space is the picker's own first row, not a switcher row.
+    expect(_k('space-$inbox'), findsNothing);
+    expect(_k('space-${SpaceCatalog.planningId}'), findsOneWidget);
+    await t.tap(_k('space-${SpaceCatalog.planningId}'));
+    await t.pumpAndSettle();
+    expect(_k('menu-sheet'), findsNothing);
+    expect(s.currentSpaceId, SpaceCatalog.planningId);
+    _noError(t);
+  });
 }

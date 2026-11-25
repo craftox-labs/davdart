@@ -41,13 +41,16 @@ void main() {
         reason: ex is FlutterError ? ex.toStringDeep() : '$ex',
       );
       // The folder path moved into the content's thin row; the bar keeps one
-      // pill, and the folder's actions are in the pill's sheet.
+      // pill, and the folder's actions are behind the loose folder's ⋯.
       expect(find.byKey(const Key('scope-more')), findsNothing);
       expect(find.byKey(const Key('content-crumbs')), findsOneWidget);
       await t.tap(find.byKey(const Key('space-chip')));
       await t.pumpAndSettle();
+      final loose = s.scopeUid!;
+      await t.tap(find.byKey(Key('scope-more-$loose')));
+      await t.pumpAndSettle();
       expect(find.byKey(const Key('scope-delete')), findsOneWidget);
-      expect(find.byKey(const Key('scope-close')), findsOneWidget);
+      expect(find.byKey(const Key('scope-close')), findsNothing);
       final sheetEx = t.takeException();
       expect(
         sheetEx,
@@ -167,7 +170,7 @@ void main() {
     expect(r.height, lessThan(44));
   });
 
-  testWidgets('scope-more menu items act', (t) async {
+  testWidgets("the loose folder's ⋯ actions act", (t) async {
     t.view.physicalSize = const Size(320, 568);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
@@ -186,7 +189,13 @@ void main() {
     expect(s.scope, isNotNull);
     await t.tap(find.byKey(const Key('space-chip')));
     await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('scope-close')));
+    await t.tap(find.byKey(Key('scope-more-${s.scopeUid}')));
+    await t.pumpAndSettle();
+    // The sheet has no "Show the whole space"; the picker's Space row does it.
+    expect(find.byKey(const Key('scope-close')), findsNothing);
+    await t.tap(find.byKey(const Key('menu-back')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('scope-pick-all')));
     await t.pumpAndSettle();
     expect(s.scope, isNull);
     expect(t.takeException(), isNull);

@@ -23,19 +23,21 @@ String folderPath(AppState state, String uid) {
   return names.join(' › ');
 }
 
-/// The scope picker's sheet groups: this Space's projects with Everything
-/// first (the scope is the common change) and the projects opened most
-/// recently ahead of the rest, then the open folder's actions, then the
-/// Spaces (the Space sheet's own rows). Picking a project or Everything sets the folder scope and closes
+/// The scope picker's sheet groups: the open Space's own row (Everything) and
+/// its projects, the projects opened most recently ahead of the rest, with the
+/// selected one carrying a ⋯ for its actions (a long press opens them on any
+/// row); then the other Spaces. Picking a row sets the folder scope and closes
 /// the sheet. [host] is the widget that opened the sheet: dialogs launch from
 /// it, since the sheet's own context is gone by the time a row acts.
 List<FItemGroupMixin> scopePickerGroups(
   BuildContext host,
+  BuildContext sheet,
   AppState state,
   FPopoverController c,
 ) {
-  final t = tokensOf(host);
+  final t = tokensOf(sheet);
   final ix = state.projectIndex;
+  final nav = SheetMenuScope.navOf(sheet);
   // Recent projects first (newest first), then the rest in listed order.
   final rest = [...ix.projects()];
   final projects = <Note>[];
@@ -46,45 +48,77 @@ List<FItemGroupMixin> scopePickerGroups(
   projects.addAll(rest);
   final scope = state.scopeUid;
   final current = scope == null ? null : ix.projectOf(scope)?.uid;
+  final space = state.currentSpaceName ?? 'Spaces';
 
   void pick(String? uid) {
     c.hide();
     unawaited(state.guarded(() => state.openFolder(uid)));
   }
 
+  /// The folder's actions, drilled into the sheet under the folder's name.
+  void actions(Note folder) => nav?.open(
+    NoteMenuItem(
+      folder.summary.isEmpty ? 'Untitled' : folder.summary,
+      FLucideIcons.folder,
+      () {},
+      children: scopeActionItems(host, state, folder),
+    ),
+  );
+
+  /// The ⋯ of a row: opens [actions] without picking the row.
+  Widget more(Note folder) => FTappable(
+    key: Key('scope-more-${folder.uid}'),
+    semanticsLabel: 'Folder actions',
+    behavior: HitTestBehavior.opaque,
+    onPress: () => actions(folder),
+    builder: (_, _, _) => Padding(
+      padding: EdgeInsets.all(t.space.sm),
+      child: Icon(FLucideIcons.ellipsis, size: t.icons.md, color: t.muted),
+    ),
+  );
+
   // A folder that belongs to no project: its own path is the scope, shown as
   // a selected row (there is no project row to mark).
-  final loose = scope != null && current == null
-      ? FItem(
+  final looseNote = scope == null || current != null
+      ? null
+      : state.tree.find(scope)?.note;
+  final loose = looseNote == null
+      ? null
+      : FItem(
           key: const Key('scope-pick-path'),
           selected: true,
           prefix: Icon(FLucideIcons.folder, size: t.icons.md, color: t.muted),
           title: Text(
-            folderPath(state, scope),
+            folderPath(state, scope!),
             overflow: TextOverflow.ellipsis,
           ),
-          subtitle: const Text('The folder in scope'),
+          suffix: more(looseNote),
           onPress: () => pick(scope),
-        )
-      : null;
+          onLongPress: () => actions(looseNote),
+        );
 
-  // The row for a project: name, derived counts.
+  // The row for a project: name, derived counts, and its actions behind a
+  // long press (and a ⋯ while it is the scope).
   FItem project(Note p) {
     final s = ix.statsOf(p.uid);
     final name = p.summary.isEmpty ? 'Untitled' : p.summary;
+    final on = current == p.uid;
     return FItem(
       key: Key('scope-pick-${p.uid}'),
-      selected: current == p.uid,
+      selected: on,
       prefix: Icon(FLucideIcons.folderKanban, size: t.icons.md, color: t.muted),
       title: Text(name, overflow: TextOverflow.ellipsis),
       subtitle: Text(projectCounts(s)),
+      suffix: on ? more(p) : null,
       onPress: () => pick(p.uid),
+      onLongPress: () => actions(p),
     );
   }
 
   return [
     FItemGroup(
       children: [
+        // The open Space itself is the "no project" row.
         FItem(
           key: const Key('scope-pick-all'),
           selected: scope == null,
@@ -93,8 +127,8 @@ List<FItemGroupMixin> scopePickerGroups(
             size: t.icons.md,
             color: t.muted,
           ),
-          title: const Text('Everything'),
-          subtitle: const Text('The whole space, no project'),
+          title: Text(space, overflow: TextOverflow.ellipsis),
+          subtitle: const Text('No project'),
           onPress: () => pick(null),
         ),
         ?loose,
@@ -107,14 +141,14 @@ List<FItemGroupMixin> scopePickerGroups(
               color: t.muted,
             ),
             title: const Text('No projects yet'),
-            subtitle: const Text('Add one from the Projects panel'),
           )
         else
           for (final p in projects) project(p),
       ],
     ),
-    ...scopeActionsGroup(host, state, c),
-    ...spaceMenuGroups(host, state, c, host: host),
+    // Only the other Spaces: with one (or none) there is nothing to list.
+    if (state.spaces.length > 1)
+      ...spaceMenuGroups(host, state, c, host: host, othersOnly: true),
   ];
 }
 
@@ -160,7 +194,7 @@ class _ScopePillState extends State<ScopePill> with TickerProviderStateMixin {
             onPress: () => showMenuSheet(
               context,
               this,
-              (ctx, c) => scopePickerGroups(context, state, c),
+              (ctx, c) => scopePickerGroups(context, ctx, state, c),
             ),
             // The tab takes the whole header height (it is its own hit box)
             // and its content sits on the logo's centre line.
