@@ -119,8 +119,15 @@ class Event {
     return allDay ? const Duration(days: 1) : Duration.zero;
   }
 
-  /// End as local wall-clock fields: [startWall] plus [length]; null without start.
-  DateTime? get endWall => startWall?.add(length);
+  /// End as local wall-clock fields: the DTEND's own wall fields when written,
+  /// else [startWall] plus [length]; null without start. Adding [length] to
+  /// the start would cross a DST change wrongly (two real hours can be three
+  /// or one wall hours), so a written DTEND is what the viewer sees.
+  DateTime? get endWall {
+    final s = startWall;
+    if (s == null) return null;
+    return dtend?.localWall ?? s.add(length);
+  }
 
   Event copyWith({
     String? summary,
