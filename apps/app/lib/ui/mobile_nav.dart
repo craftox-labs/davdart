@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:davdart/davdart.dart';
 import 'package:flutter/gestures.dart' show kLongPressTimeout, kTouchSlop;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -318,200 +317,73 @@ class _AddFabState extends State<AddFab> with TickerProviderStateMixin {
   }
 }
 
-/// How many notes (not folders) the current Space holds.
-int _noteCount(AppState state) {
-  var n = 0;
-  void walk(List<NoteNode> nodes) {
-    for (final x in nodes) {
-      if (!AppState.isFolder(x.note)) n++;
-      walk(x.children);
-    }
-  }
-
-  walk(state.tree.roots);
-  return n;
-}
-
-/// The sections the side menu's filter offers for [state]'s Space.
-List<Section> filterSections(AppState state) => topSections(state);
-
-/// The full-screen side menu: a filter pill choosing the panel (bound to
-/// [AppState.section]) and that panel (with its toolbar and tags drawer).
-/// Account and Settings are in the filter pill's list. [onClose] closes it;
-/// picking an item runs it too.
-class SideMenuPage extends StatefulWidget {
+/// The full-screen side menu: the desktop rail as a strip beside that
+/// section's panel (with its toolbar and tags drawer), so switching section is
+/// one tap beside the panel instead of a sheet. [onClose] closes it; picking an
+/// item runs it too.
+class SideMenuPage extends StatelessWidget {
   const SideMenuPage({super.key, required this.state, required this.onClose});
   final AppState state;
   final VoidCallback onClose;
 
   @override
-  State<SideMenuPage> createState() => _SideMenuPageState();
-}
-
-class _SideMenuPageState extends State<SideMenuPage>
-    with TickerProviderStateMixin {
-  int? _count(Section s) => switch (s) {
-    Section.notes => _noteCount(widget.state),
-    Section.tasks => widget.state.tasks.where(widget.state.taskInScope).length,
-    Section.events =>
-      widget.state.events.where(widget.state.eventInScope).length,
-    Section.projects => widget.state.projectIndex.projects().length,
-    _ => null,
-  };
-
-  String _label(Section s) {
-    final name = sectionMeta(s).$2;
-    final n = _count(s);
-    return n == null ? name : '$name · $n';
-  }
-
-  void _pickFilter() {
-    final state = widget.state;
-    final t = tokensOf(context);
-    showMenuSheet(context, this, (ctx, c) {
-      return [
-        FItemGroup(
-          children: [
-            // As on the desktop rail, Spaces comes first and opens the Space
-            // switcher (the top chip's sheet).
-            FItem(
-              key: const Key('filter-spaces'),
-              prefix: Icon(spacesIcon, size: t.icons.md, color: t.muted),
-              title: Text(spacesLabel),
-              onPress: () {
-                c.hide();
-                showMenuSheet(
-                  context,
-                  this,
-                  (ctx, c) => spaceMenuGroups(context, state, c),
-                );
-              },
-            ),
-            for (final s in filterSections(state))
-              FItem(
-                key: Key('filter-${s.name}'),
-                prefix: Icon(
-                  sectionMeta(s).$1,
-                  size: t.icons.md,
-                  color: t.muted,
-                ),
-                title: Text(_label(s)),
-                suffix: visibleSection(state) == s
-                    ? Icon(
-                        FLucideIcons.check,
-                        size: t.icons.md,
-                        color: t.accent,
-                      )
-                    : null,
-                onPress: () {
-                  c.hide();
-                  state.setSection(s);
-                },
-              ),
-          ],
-        ),
-        // As at the foot of the desktop rail, below Spaces and the sections: Account (when signing in is
-        // possible) and Settings, set apart by the group divider.
-        FItemGroup(
-          children: [
-            for (final s in bottomSections(state))
-              FItem(
-                key: Key('menu-${s.name}'),
-                prefix: Icon(
-                  sectionMeta(s).$1,
-                  size: t.icons.md,
-                  color: t.muted,
-                ),
-                title: Text(sectionMeta(s).$2),
-                suffix: visibleSection(state) == s
-                    ? Icon(
-                        FLucideIcons.check,
-                        size: t.icons.md,
-                        color: t.accent,
-                      )
-                    : null,
-                onPress: () {
-                  c.hide();
-                  state.setSection(s);
-                },
-              ),
-          ],
-        ),
-      ];
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final state = widget.state;
-    final section = visibleSection(state);
-    final inFilter = filterSections(state).contains(section);
     return GestureDetector(
       key: const Key('side-menu'),
       behavior: HitTestBehavior.translucent,
       // Swiping left closes it (rows swipe only to the right).
       onHorizontalDragEnd: (d) {
-        if ((d.primaryVelocity ?? 0) < -400) widget.onClose();
+        if ((d.primaryVelocity ?? 0) < -400) onClose();
       },
       child: FScaffold(
         childPad: false,
         // Inside the shell's scaffold, which already makes room for the
         // keyboard: resizing again would squeeze the panel to nothing.
         resizeToAvoidBottomInset: false,
-        child: Column(
+        child: Row(
           children: [
+            // The desktop rail, without its logo: Spaces, the sections and
+            // Settings, one tap each.
+            IconRail(state: state, strip: true),
             Expanded(
-              child: AreaMark(
-                nav: state.nav,
-                area: NavArea.panel,
-                child: sectionBody(state, section, widget.onClose),
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(
-                t.space.lg,
-                t.space.xs,
-                t.space.lg,
-                t.space.xs,
-              ),
-              child: touchBox(
-                context,
-                // Full width, space between: icon and label left, count and
-                // chevron right.
-                FTappable(
-                  key: const Key('menu-filter'),
-                  semanticsLabel: 'Filter',
-                  behavior: HitTestBehavior.opaque,
-                  onPress: _pickFilter,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: t.space.md),
-                    decoration: BoxDecoration(
-                      color: context.theme.colors.secondary,
-                      borderRadius: BorderRadius.circular(t.radii.control),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(sectionMeta(section).$1, size: t.icons.md),
-                        SizedBox(width: t.space.sm),
-                        Expanded(
-                          child: Text(
-                            sectionMeta(section).$2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (inFilter && _count(section) != null) ...[
-                          Text(
-                            '${_count(section)}',
-                            style: t.type.captionStyle.copyWith(color: t.muted),
-                          ),
-                          SizedBox(width: t.space.sm),
-                        ],
-                        Icon(FLucideIcons.chevronDown, size: t.icons.md),
-                      ],
+              child: Column(
+                children: [
+                  Expanded(
+                    child: AreaMark(
+                      nav: state.nav,
+                      area: NavArea.panel,
+                      child: sectionBody(state, visibleSection(state), onClose),
                     ),
                   ),
-                ),
+                  // Back inside the drawer as well: on a phone the bottom
+                  // bar's button is out of thumb reach, and Safari's own back
+                  // swipe is history, not the drawer.
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      t.space.lg,
+                      t.space.xs,
+                      t.space.lg,
+                      t.space.xs,
+                    ),
+                    child: touchBox(
+                      context,
+                      FButton(
+                        key: const Key('side-menu-back'),
+                        variant: FButtonVariant.outline,
+                        onPress: onClose,
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(FLucideIcons.arrowLeft, size: 16),
+                            SizedBox(width: 8),
+                            Text('Back'),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],

@@ -3355,19 +3355,20 @@ class AppState extends ChangeNotifier {
     _show(t);
   }
 
-  /// Shows the Tasks list in the side panel (opens the panel if folded).
-  void openTasksPanel() => _openPanel(Section.tasks);
-  void openEventsPanel() => _openPanel(Section.events);
-  void openSearchPanel() => _openPanel(Section.search);
-
   /// Narrow: opens the side menu (set by the shell), the only place the
   /// panels show there.
   VoidCallback? openMenu;
 
-  void _openPanel(Section s) {
+  /// Shows [s] in the side panel; on the phone it opens the side menu too,
+  /// the only place the panels show there.
+  void openPanel(Section s) {
     setSection(s);
     if (narrow) openMenu?.call();
   }
+
+  void openTasksPanel() => openPanel(Section.tasks);
+  void openEventsPanel() => openPanel(Section.events);
+  void openSearchPanel() => openPanel(Section.search);
 
   /// Opens (or focuses) the main tab of note [uid]. A peek of the same note
   /// closes (one place per note). The "+" button's new note opens this way.

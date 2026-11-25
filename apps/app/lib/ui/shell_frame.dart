@@ -328,6 +328,7 @@ class RailButton extends StatelessWidget {
     required this.onPress,
     this.tab = false,
     this.tabMargin = 0,
+    this.size,
     this.tipRight = false,
     this.mirror = false,
   });
@@ -337,6 +338,9 @@ class RailButton extends StatelessWidget {
   final VoidCallback onPress;
   final bool tab;
   final double tabMargin;
+
+  /// The button's side; [SizeTokens.railItem] by default.
+  final double? size;
   final bool tipRight;
 
   /// The rail is on the right edge: the tab opens leftwards and the tooltip
@@ -346,6 +350,7 @@ class RailButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
+    final side = size ?? t.sizes.railItem;
     final asTab = active && tab;
     return FTooltip(
       tipAnchor: tipRight
@@ -368,8 +373,8 @@ class RailButton extends StatelessWidget {
           );
           if (asTab) {
             return SizedBox(
-              width: t.sizes.railItem,
-              height: t.sizes.railItem,
+              width: side,
+              height: side,
               child: CustomPaint(
                 key: const Key('rail-tab'),
                 painter: RailTabPainter(
@@ -385,8 +390,8 @@ class RailButton extends StatelessWidget {
             );
           }
           return Container(
-            width: t.sizes.railItem,
-            height: t.sizes.railItem,
+            width: side,
+            height: side,
             decoration: BoxDecoration(
               color: active
                   ? t.activeItem
@@ -412,6 +417,7 @@ class SectionButton extends StatelessWidget {
     required this.onPress,
     this.tab = false,
     this.tabMargin = 0,
+    this.size,
     this.tipRight = false,
     this.mirror = false,
   });
@@ -420,6 +426,9 @@ class SectionButton extends StatelessWidget {
   final VoidCallback onPress;
   final bool tab;
   final double tabMargin;
+
+  /// The tap target's side; [SizeTokens.railItem] by default.
+  final double? size;
   final bool tipRight;
   final bool mirror;
 
@@ -433,6 +442,7 @@ class SectionButton extends StatelessWidget {
       onPress: onPress,
       tab: tab,
       tabMargin: tabMargin,
+      size: size,
       tipRight: tipRight,
       mirror: mirror,
     );
@@ -449,6 +459,7 @@ class SpacesMenuButton extends StatelessWidget {
     required this.state,
     this.below = false,
     this.mirror = false,
+    this.size,
     this.onPick,
   });
   final AppState state;
@@ -456,6 +467,9 @@ class SpacesMenuButton extends StatelessWidget {
 
   /// The rail is on the right edge: the menu opens to the left of the icon.
   final bool mirror;
+
+  /// The button's side; [SizeTokens.railItem] by default.
+  final double? size;
 
   /// Runs before a manage action opens a dialog (closes the narrow sheet).
   final VoidCallback? onPick;
@@ -484,6 +498,7 @@ class SpacesMenuButton extends StatelessWidget {
         active: false,
         tipRight: !below,
         mirror: mirror,
+        size: size,
         onPress: controller.toggle,
       ),
     ),
@@ -492,14 +507,27 @@ class SpacesMenuButton extends StatelessWidget {
 
 /// A slim vertical rail: the logo slot, the Spaces popup, then Notes, Tasks, Events,
 /// Views and Search at the top, Account and Settings at the bottom.
+///
+/// [strip] is the phone's version, inside the side menu: no logo, the
+/// touch-target size (44dp) and a press that only sets the section.
 class IconRail extends StatelessWidget {
-  const IconRail({super.key, required this.state});
+  const IconRail({super.key, required this.state, this.strip = false});
   final AppState state;
+
+  /// Phone: the strip in the side menu. No logo; [SizeTokens.touchTarget] tap
+  /// targets; the active section is always on a tab (the phone never folds
+  /// the panel); a press only sets the section, as [AppState.pressRail] would
+  /// fold the desktop panel and write its shared pref.
+  final bool strip;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final mirror = state.layoutSide == LayoutSide.end;
+    final mirror = !strip && state.layoutSide == LayoutSide.end;
+    final item = strip ? t.sizes.touchTarget : t.sizes.railItem;
+    // The strip marks the section the panel shows, which is not
+    // [AppState.section] when the Space cannot hold the stored one.
+    final active = strip ? visibleSection(state) : state.section;
     final sections = [...topSections(state), ...bottomSections(state)];
     state.nav.publish(KeyNav.railList, [
       for (final s in sections)
@@ -513,6 +541,15 @@ class IconRail extends StatelessWidget {
           },
         ),
     ]);
+    void open(Section s) {
+      if (strip) {
+        state.setSection(s);
+      } else {
+        state.pressRail(s);
+      }
+      if (s == Section.search) state.nav.focusSearch();
+    }
+
     Widget button(Section s) => NavRow(
       nav: state.nav,
       list: KeyNav.railList,
@@ -521,17 +558,49 @@ class IconRail extends StatelessWidget {
       child: SectionButton(
         key: Key('rail-${s.name}'),
         section: s,
-        active: state.section == s,
-        tab: !state.sidebarCollapsed,
-        tabMargin: (t.sizes.rail - t.sizes.railItem) / 2,
-        tipRight: true,
+        active: active == s,
+        tab: strip || !state.sidebarCollapsed,
+        tabMargin: (t.sizes.rail - item) / 2,
+        size: item,
+        tipRight: !strip,
         mirror: mirror,
-        onPress: () {
-          state.pressRail(s);
-          if (s == Section.search) state.nav.focusSearch();
-        },
+        onPress: () => open(s),
       ),
     );
+    if (strip) {
+      return SizedBox(
+        key: const Key('icon-rail'),
+        width: t.sizes.rail,
+        child: ColoredBox(
+          color: t.frame,
+          child: Padding(
+            padding: EdgeInsets.only(bottom: t.space.lg),
+            child: LayoutBuilder(
+              builder: (context, box) => SingleChildScrollView(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: box.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Column(
+                      spacing: t.space.xs,
+                      children: [
+                        SpacesMenuButton(
+                          key: const Key('rail-spaces'),
+                          state: state,
+                          size: item,
+                        ),
+                        for (final s in topSections(state)) button(s),
+                        const Spacer(),
+                        for (final s in bottomSections(state)) button(s),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final gap = t.space.xs;
     final tabMid = math.max(0.0, t.sizes.frameInset + t.sizes.tabStrip / 2);
     final logoBand = tabMid + t.sizes.railItem / 2;

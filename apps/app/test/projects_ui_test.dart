@@ -255,9 +255,7 @@ void main() {
       final s = await _app(t, size: const Size(390, 800));
       await t.tap(_k('menu'));
       await t.pumpAndSettle();
-      await t.tap(_k('menu-filter'));
-      await t.pumpAndSettle();
-      await t.tap(_k('filter-projects'));
+      await t.tap(_k('rail-projects'));
       await t.pumpAndSettle();
       expect(s.section, Section.projects);
       expect(_k('project-a'), findsOneWidget);

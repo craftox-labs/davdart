@@ -172,12 +172,9 @@ List<AppAction> buildActions(AppState state) {
     shortcuts: ['g $key'],
     enabled: yes,
     run: (c) {
-      // Search opens on its field (and, on the phone, in the side menu).
-      if (sec == Section.search) {
-        c.state.openSearchPanel();
-      } else {
-        c.state.setSection(sec);
-      }
+      // On the phone this opens the side menu too (nothing else would show);
+      // Search goes on to focus its field.
+      c.state.openPanel(sec);
       focusPanel(c.state);
       if (sec == Section.search) c.state.nav.focusSearch();
     },

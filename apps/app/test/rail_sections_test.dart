@@ -102,9 +102,7 @@ void main() {
           if (w < 880) {
             await t.tap(_k('menu'));
             await t.pumpAndSettle();
-            await t.tap(_k('menu-filter'));
-            await t.pumpAndSettle();
-            await t.tap(_k('filter-$sec'));
+            await t.tap(_k('rail-$sec'));
           } else {
             await t.tap(_k('rail-$sec'));
           }

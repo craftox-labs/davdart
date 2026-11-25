@@ -225,6 +225,22 @@ void main() {
         await _end(t);
       });
 
+      testWidgets('"Go to Notes" opens the menu at $size', (t) async {
+        final s = await pumpTasksApp(t, size: size);
+        await t.longPress(_k('bar-search'));
+        await t.pumpAndSettle();
+        await t.enterText(_k('palette-field'), 'go to notes');
+        await t.pump(const Duration(milliseconds: 50));
+        await t.tap(_k('palette-row-go.notes'));
+        await t.pumpAndSettle();
+        expect(_k('palette'), findsNothing);
+        // The section alone would show nothing: the side menu opens.
+        expect(s.section, Section.notes);
+        expect(_k('side-menu'), findsOneWidget);
+        expect(_k('rail-notes'), findsOneWidget);
+        await _end(t);
+      });
+
       testWidgets('a drag then hold does not open the palette at $size', (
         t,
       ) async {

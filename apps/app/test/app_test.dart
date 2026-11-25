@@ -1566,14 +1566,10 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('menu')));
       await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('menu-filter')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('filter-views')));
+      await t.tap(find.byKey(const Key('rail-views')));
       await t.pumpAndSettle();
       expect(find.text('No saved views yet'), findsOneWidget);
-      await t.tap(find.byKey(const Key('menu-filter')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('filter-notes')));
+      await t.tap(find.byKey(const Key('rail-notes')));
       await t.pumpAndSettle();
       expect(find.text('Core slice'), findsWidgets);
       sem.dispose();

@@ -44,10 +44,10 @@ Future<void> _openMenu(WidgetTester t) async {
   await t.pumpAndSettle();
 }
 
-Future<void> _filter(WidgetTester t, String name) async {
-  await t.tap(_k('menu-filter'));
-  await t.pumpAndSettle();
-  await t.tap(_k('filter-$name'));
+/// Picks [name] on the menu's rail strip, opening the menu first if need be.
+Future<void> _section(WidgetTester t, String name) async {
+  if (_k('rail-$name').evaluate().isEmpty) await _openMenu(t);
+  await t.tap(_k('rail-$name'));
   await t.pumpAndSettle();
 }
 
@@ -122,7 +122,7 @@ void main() {
       );
 
       testWidgets(
-        'side menu: button, panel, filter at the bottom, gear, logo',
+        'side menu: button, rail strip beside the panel, gear, logo',
         (t) async {
           final s = await pumpTasksApp(
             t,
@@ -134,12 +134,21 @@ void main() {
           expect(_k('side-menu'), findsOneWidget);
           expect(_k('space-chip'), findsWidgets);
           expect(find.text('Alpha'), findsWidgets);
-          // The filter is the rail's section: it persists in AppState.
-          // The filter pill is full width and sits below the panel.
-          final pill = t.getRect(_k('menu-filter'));
-          expect(pill.width, greaterThan(size.width - 48));
+          // The rail strip is a column on the left edge, one tap per
+          // section, with a Back button under the panel.
+          final strip = t.getRect(_k('icon-rail'));
+          expect(strip.left, 0);
+          expect(strip.width, lessThan(60));
           expect(
-            pill.top,
+            t.getRect(_k('rail-notes')).left,
+            greaterThanOrEqualTo(strip.left),
+          );
+          expect(
+            t.getRect(_k('rail-notes')).right,
+            lessThanOrEqualTo(strip.right),
+          );
+          expect(
+            t.getRect(_k('side-menu-back')).top,
             greaterThan(t.getRect(find.text('Alpha').first).bottom),
           );
           expect(_k('menu-fold'), findsOneWidget);
@@ -153,22 +162,14 @@ void main() {
             find.descendant(of: _k('side-menu'), matching: _k('space-chip')),
             findsNothing,
           );
-          // The pill is space-between: label left, chevron right.
-          final labelX = t.getRect(find.text('Notes').last).left;
-          expect(labelX, lessThan(size.width / 3));
-          await _filter(t, 'tasks');
+          await _section(t, 'tasks');
           expect(s.section, Section.tasks);
           expect(_k('menu-fold'), findsNothing);
           expect(_k('tasks-view'), findsOneWidget);
-          await _filter(t, 'events');
+          await _section(t, 'events');
           expect(_k('events-panel'), findsOneWidget);
-          // Account and Settings are in the filter pill's list, not at the
-          // bottom of the menu.
-          expect(_k('menu-settings'), findsNothing);
-          expect(_k('menu-account'), findsNothing);
-          await t.tap(_k('menu-filter'));
-          await t.pumpAndSettle();
-          await t.tap(_k('menu-settings'));
+          // Account and Settings are on the strip, below the sections.
+          await t.tap(_k('rail-settings'));
           await t.pumpAndSettle();
           expect(s.section, Section.settings);
           expect(_k('side-menu'), findsOneWidget);
@@ -347,24 +348,20 @@ void main() {
         _noError(t);
       });
 
-      testWidgets('the filter list ends with Settings below a divider', (
-        t,
-      ) async {
+      testWidgets('the strip ends with Settings below a gap', (t) async {
         final s = await pumpTasksApp(t, size: size);
         await _openMenu(t);
-        await t.tap(_k('menu-filter'));
-        await t.pumpAndSettle();
         // The sections in rail order, then Settings (no sign-in here).
         final ys = [
           for (final k in [
-            'filter-spaces',
-            'filter-projects',
-            'filter-notes',
-            'filter-tasks',
-            'filter-events',
-            'filter-views',
-            'filter-search',
-            'menu-settings',
+            'rail-spaces',
+            'rail-projects',
+            'rail-notes',
+            'rail-tasks',
+            'rail-events',
+            'rail-views',
+            'rail-search',
+            'rail-settings',
           ])
             t.getRect(_k(k)).top,
         ];
@@ -373,22 +370,78 @@ void main() {
         final gap = ys.last - ys[ys.length - 2];
         final step = ys[2] - ys[1];
         expect(gap, greaterThan(step));
+        // The strip is 44dp targets.
+        expect(t.getRect(_k('rail-notes')).height, 44);
         // Spaces opens the Space switcher, as the top chip does.
-        await t.tap(_k('filter-spaces'));
+        await t.tap(_k('rail-spaces'));
         await t.pumpAndSettle();
         expect(find.text('One fixed notes source'), findsOneWidget);
-        expect(await t.binding.handlePopRoute(), isTrue);
+        // A tap outside the popover closes it (Back would close the drawer).
+        await t.tapAt(const Offset(300, 400));
         await t.pumpAndSettle();
-        await t.tap(_k('menu-filter'));
-        await t.pumpAndSettle();
-        await t.tap(_k('menu-settings'));
+        await t.tap(_k('rail-settings'));
         await t.pumpAndSettle();
         expect(s.section, Section.settings);
         expect(_k('side-menu'), findsOneWidget);
         // The Space chip sheet has none of it.
         await t.tap(_k('space-chip'));
         await t.pumpAndSettle();
-        expect(_k('menu-settings'), findsNothing);
+        expect(_k('menu-sheet'), findsOneWidget);
+        expect(
+          find.descendant(of: _k('menu-sheet'), matching: _k('rail-settings')),
+          findsNothing,
+        );
+        _noError(t);
+      });
+
+      testWidgets(
+        'a stored section the Space cannot hold marks the one shown',
+        (t) async {
+          final s = await _pumpState(t, (src) => _NoNotes(src), size);
+          // A restored section the Space cannot hold (Notes here): the panel
+          // shows another, and the strip marks that one.
+          s.section = Section.notes;
+          await t.pumpAndSettle();
+          await _openMenu(t);
+          expect(_k('rail-notes'), findsNothing);
+          expect(
+            find.descendant(of: _k('rail-tasks'), matching: _k('rail-tab')),
+            findsOneWidget,
+          );
+          _noError(t);
+        },
+      );
+
+      testWidgets('Search on the strip focuses the field', (t) async {
+        final s = await pumpTasksApp(t, size: size);
+        await _openMenu(t);
+        await t.tap(_k('rail-search'));
+        await t.pumpAndSettle();
+        expect(s.section, Section.search);
+        expect(s.nav.searchNode.hasFocus, isTrue);
+        _noError(t);
+      });
+
+      testWidgets('Back over the Spaces popup closes the drawer', (t) async {
+        await pumpTasksApp(t, size: size);
+        await _openMenu(t);
+        await t.tap(_k('rail-spaces'));
+        await t.pumpAndSettle();
+        expect(find.text('One fixed notes source'), findsOneWidget);
+        expect(await t.binding.handlePopRoute(), isTrue);
+        await t.pumpAndSettle();
+        // The popup is no route of its own: Back reaches the drawer's PopScope
+        // and closes the drawer, popup and all.
+        expect(_k('side-menu'), findsNothing);
+        _noError(t);
+      });
+
+      testWidgets('the drawer Back closes the menu', (t) async {
+        await pumpTasksApp(t, size: size);
+        await _openMenu(t);
+        await t.tap(_k('side-menu-back'));
+        await t.pumpAndSettle();
+        expect(_k('side-menu'), findsNothing);
         _noError(t);
       });
 
@@ -478,9 +531,12 @@ void main() {
           size: size,
         );
         await _openMenu(t);
-        await _filter(t, 'tasks');
-        final y = t.getCenter(_k('task-row-k1')).dy;
-        await t.dragFrom(Offset(60, y), const Offset(220, 0));
+        await _section(t, 'tasks');
+        final row = t.getRect(_k('task-row-k1'));
+        await t.dragFrom(
+          Offset(row.left + 4, row.center.dy),
+          const Offset(220, 0),
+        );
         await t.pumpAndSettle();
         expect(s.taskById('k1')!.isClosed, isTrue);
         _noError(t);
@@ -537,7 +593,7 @@ void main() {
 
         // With the Tasks filter, task comes first.
         await _openMenu(t);
-        await _filter(t, 'tasks');
+        await _section(t, 'tasks');
         await t.tap(_k('menu'));
         await t.pumpAndSettle();
         await t.tap(_k('bar-add'));
@@ -568,10 +624,8 @@ void main() {
         await t.tapAt(const Offset(5, 5));
         await t.pumpAndSettle();
         await _openMenu(t);
-        await t.tap(_k('menu-filter'));
-        await t.pumpAndSettle();
-        expect(_k('filter-tasks'), findsNothing);
-        expect(_k('filter-notes'), findsOneWidget);
+        expect(_k('rail-tasks'), findsNothing);
+        expect(_k('rail-notes'), findsOneWidget);
         expect(s.supportsTasks, isFalse);
         _noError(t);
       });
@@ -588,13 +642,11 @@ void main() {
         await t.tapAt(const Offset(5, 5));
         await t.pumpAndSettle();
         await _openMenu(t);
-        // The filter falls back to a section the Space holds.
+        // The strip shows only the sections the Space holds.
         expect(s.section, isNot(Section.notes));
-        await t.tap(_k('menu-filter'));
-        await t.pumpAndSettle();
-        expect(_k('filter-notes'), findsNothing);
-        expect(_k('filter-tasks'), findsOneWidget);
-        expect(_k('filter-events'), findsOneWidget);
+        expect(_k('rail-notes'), findsNothing);
+        expect(_k('rail-tasks'), findsOneWidget);
+        expect(_k('rail-events'), findsOneWidget);
         _noError(t);
       });
 
@@ -683,7 +735,11 @@ void main() {
         expect(s.activeTab, isNotNull);
         await _openMenu(t);
         // A sheet above the menu closes before the menu.
-        await t.tap(_k('menu-filter'));
+        await t.longPress(
+          find
+              .descendant(of: _k('side-menu'), matching: find.text('Alpha'))
+              .first,
+        );
         await t.pumpAndSettle();
         expect(_k('menu-sheet'), findsOneWidget);
         expect(await t.binding.handlePopRoute(), isTrue);
@@ -717,7 +773,7 @@ void main() {
         expect(_k('menu-sheet'), findsOneWidget);
         await t.tapAt(const Offset(5, 5));
         await t.pumpAndSettle();
-        await _filter(t, 'tasks');
+        await _section(t, 'tasks');
         // Swipe from the middle: the edge zone is not in the way.
         await t.drag(_k('task-row-k1'), const Offset(300, 0));
         await t.pumpAndSettle();

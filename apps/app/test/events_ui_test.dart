@@ -782,9 +782,7 @@ void main() {
         if (narrow) {
           await t.tap(_k('menu'));
           await t.pumpAndSettle();
-          await t.tap(_k('menu-filter'));
-          await t.pumpAndSettle();
-          await t.tap(_k('filter-events'));
+          await t.tap(_k('rail-events'));
         } else {
           await t.tap(_k('rail-events'));
         }

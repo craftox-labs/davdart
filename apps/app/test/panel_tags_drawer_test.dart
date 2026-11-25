@@ -276,9 +276,7 @@ void main() {
       expect(s.section, Section.notes);
       await t.tap(_k('menu'));
       await t.pumpAndSettle();
-      await t.tap(_k('menu-filter'));
-      await t.pumpAndSettle();
-      await t.tap(_k('filter-events'));
+      await t.tap(_k('rail-events'));
       await t.pumpAndSettle();
       await t.tap(find.text('Tags (2)'));
       await t.pumpAndSettle();
