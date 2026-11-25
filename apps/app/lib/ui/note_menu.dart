@@ -1,5 +1,6 @@
 import 'package:davdart/davdart.dart';
-import 'package:flutter/gestures.dart' show kSecondaryButton;
+import 'package:flutter/gestures.dart'
+    show kMiddleMouseButton, kSecondaryButton;
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -25,6 +26,28 @@ enum NoteSurface {
   /// A main strip tab.
   mainTab,
 }
+
+/// Middle-click on an item row (not a tab, which closes on middle-click)
+/// opens it in a new main tab, like "Open in main".
+Widget middleClickOpensMain(
+  AppState state,
+  String uid,
+  NoteSurface surface,
+  Widget child, {
+  SpaceHit? hit,
+}) => surface != NoteSurface.entry
+    ? child
+    : Listener(
+        onPointerDown: (e) {
+          if (e.buttons != kMiddleMouseButton) return;
+          if (hit != null) {
+            state.openHit(hit, mode: OpenMode.main);
+          } else {
+            state.openNote(uid, mode: OpenMode.main);
+          }
+        },
+        child: child,
+      );
 
 /// One extra row of a [NoteContextMenu]. Surfaces pass these in [items]
 /// (batch 2 adds per-surface actions this way); the menu hides itself first.
@@ -303,7 +326,7 @@ class NoteContextMenu extends StatelessWidget {
   Widget build(BuildContext context) => ExclusiveContextMenu(
     touchMenu: touchMenu,
     menuBuilder: (ctx, controller, _) => _groups(context, ctx, controller),
-    child: child,
+    child: middleClickOpensMain(state, uid, surface, child, hit: hit),
   );
 
   /// [context] is the surface's own (it outlives the popup, so dialogs and

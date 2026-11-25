@@ -305,6 +305,23 @@ void main() {
       expect(prefs.data.values.any((v) => v.contains('n:c')), isTrue);
     });
 
+    testWidgets('middle-click on a board card opens it in a new tab', (
+      t,
+    ) async {
+      final s = await _pump(t);
+      s.setView(ViewMode.board);
+      await t.pumpAndSettle();
+      await t.tap(
+        find.descendant(
+          of: find.byType(HomeBoard),
+          matching: find.text('Alpha'),
+        ),
+        buttons: kMiddleMouseButton,
+      );
+      await t.pumpAndSettle();
+      expect(s.tabs, hasLength(1));
+    });
+
     testWidgets('middle-click closes a tab', (t) async {
       final s = await _pump(t);
       s.openNoteTab('a');

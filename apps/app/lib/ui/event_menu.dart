@@ -32,7 +32,7 @@ class EventContextMenu extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ExclusiveContextMenu(
     menuBuilder: (ctx, controller, _) => _groups(context, ctx, controller),
-    child: child,
+    child: middleClickOpensMain(state, uid, surface, child),
   );
 
   /// The actions of the open item's own page (the narrow header's ⋯
