@@ -467,6 +467,36 @@ void main() {
     });
 
     test(
+      'repeat rule: set, change, clear; an untouched custom rule stays',
+      () async {
+        final s = await _open(MemoryStorage(), seed: _Seed());
+        final uid = (await s.addEvent(
+          'Standup',
+          start: DateTime.utc(2026, 12, 1, 9),
+          end: DateTime.utc(2026, 12, 1, 10),
+        ))!;
+        s.startEventEdit(uid);
+        var d = s.eventDraftFor(uid)!;
+        expect(d.rrule, isNull);
+        d.setRrule('FREQ=WEEKLY;BYDAY=TU');
+        expect(d.dirty, isTrue);
+        expect(await s.saveEventDraft(uid), isTrue);
+        expect(s.eventById(uid)!.rrule, 'FREQ=WEEKLY;BYDAY=TU');
+        s.startEventEdit(uid);
+        d = s.eventDraftFor(uid)!;
+        expect(d.dirty, isFalse);
+        d.setRrule('FREQ=WEEKLY;BYDAY=TU,TH;COUNT=4');
+        expect(await s.saveEventDraft(uid), isTrue);
+        expect(s.eventById(uid)!.rrule, 'FREQ=WEEKLY;BYDAY=TU,TH;COUNT=4');
+        s.startEventEdit(uid);
+        s.eventDraftFor(uid)!.setRrule(null);
+        expect(await s.saveEventDraft(uid), isTrue);
+        expect(s.eventById(uid)!.rrule, isNull);
+        expect(s.eventById(uid)!.isRecurring, isFalse);
+      },
+    );
+
+    test(
       'all-day draft shows the last day, an unchanged save keeps it',
       () async {
         final s = await _open(MemoryStorage(), seed: _Seed());
@@ -543,8 +573,7 @@ void main() {
       expect(s.orphanDraftNotice, isNull);
     });
 
-    test('saving the draft of a deleted event says why and keeps it',
-        () async {
+    test('saving the draft of a deleted event says why and keeps it', () async {
       final s = await _open(MemoryStorage(), seed: _Seed());
       final a = (await s.addEvent('A', start: _day))!;
       s.startEventEdit(a);

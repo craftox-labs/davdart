@@ -2862,6 +2862,8 @@ class AppState extends ChangeNotifier {
     bool allDay = false,
     DateTime? start,
     DateTime? end,
+    bool setRrule = false,
+    String? rrule,
   }) async {
     final e = _eventById(uid);
     if (e == null) return false;
@@ -2873,6 +2875,12 @@ class AppState extends ChangeNotifier {
       location: location?.trim(),
       status: setStatus ? status : null,
       clearStatus: setStatus && status == null,
+      rrule: setRrule ? rrule : null,
+      clearRrule: setRrule && (rrule == null || rrule.isEmpty),
+      // No rule left: its exceptions and changed occurrences go with it.
+      exdates: setRrule && (rrule == null || rrule.isEmpty) ? [] : null,
+      rdates: setRrule && (rrule == null || rrule.isEmpty) ? [] : null,
+      siblingLines: setRrule && (rrule == null || rrule.isEmpty) ? [] : null,
     );
     if (setWhen && start != null) {
       final first = allDay ? wallDay(start) : start;
@@ -2881,9 +2889,9 @@ class AppState extends ChangeNotifier {
       final from = eventDate(first, allDay: allDay, like: e.dtstart);
       final old = e.startWall;
       final hasExtras =
-          e.exdates.isNotEmpty ||
-          e.rdates.isNotEmpty ||
-          e.siblingLines.isNotEmpty;
+          copy.exdates.isNotEmpty ||
+          copy.rdates.isNotEmpty ||
+          copy.siblingLines.isNotEmpty;
       if (hasExtras && old != null) {
         if (allDay != e.allDay) {
           error =
@@ -2897,9 +2905,9 @@ class AppState extends ChangeNotifier {
         final delta = first.difference(old);
         if (delta != Duration.zero) {
           copy = copy.copyWith(
-            exdates: [for (final l in e.exdates) shiftDateLine(l, delta)],
-            rdates: [for (final l in e.rdates) shiftDateLine(l, delta)],
-            siblingLines: shiftSiblingLines(e.siblingLines, delta),
+            exdates: [for (final l in copy.exdates) shiftDateLine(l, delta)],
+            rdates: [for (final l in copy.rdates) shiftDateLine(l, delta)],
+            siblingLines: shiftSiblingLines(copy.siblingLines, delta),
           );
         }
       }
@@ -3004,9 +3012,10 @@ class AppState extends ChangeNotifier {
       start: start,
       end: end,
       status: e.status,
+      rrule: e.rrule,
     );
     final d = _eventDrafts[uid]!;
-    _watchDraft(uid, d, () => (d.allDay, d.start, d.end, d.status));
+    _watchDraft(uid, d, () => (d.allDay, d.start, d.end, d.status, d.rrule));
     _focusEditor(uid);
     notifyListeners();
   }
@@ -3037,6 +3046,7 @@ class AppState extends ChangeNotifier {
     final start = d.start;
     final end = d.end;
     final status = d.status;
+    final rrule = d.rrule;
     final ok = await updateEvent(
       uid,
       title: title,
@@ -3049,6 +3059,8 @@ class AppState extends ChangeNotifier {
       allDay: allDay,
       start: start,
       end: end,
+      setRrule: rrule != d.originalRrule,
+      rrule: rrule,
     );
     if (!ok) return false;
     // Deleted while this save ran: the reload has no event, so nothing was
@@ -3068,6 +3080,7 @@ class AppState extends ChangeNotifier {
         start: start,
         end: end,
         status: status,
+        rrule: rrule,
       );
       if (!d.dirty && !stay) _eventDrafts.remove(uid);
     }
@@ -3622,7 +3635,9 @@ class AppState extends ChangeNotifier {
           allDay == d.originalAllDay &&
           start == d.originalStart &&
           end == d.originalEnd &&
-          e.status == d.originalStatus) {
+          e.status == d.originalStatus &&
+          (e.rrule == null || e.rrule!.isEmpty ? null : e.rrule) ==
+              d.originalRrule) {
         continue;
       }
       d.rebase(
@@ -3634,6 +3649,7 @@ class AppState extends ChangeNotifier {
         start: start,
         end: end,
         status: e.status,
+        rrule: e.rrule,
       );
     }
   }

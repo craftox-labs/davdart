@@ -22,6 +22,7 @@ export 'src/calendar_days.dart';
 export 'src/collection_service.dart';
 export 'src/event.dart';
 export 'src/event_recurrence.dart';
+export 'src/repeat_rule.dart';
 export 'src/event_store.dart';
 export 'src/event_sync_engine.dart';
 export 'src/item_service.dart';

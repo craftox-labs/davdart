@@ -525,6 +525,46 @@ void main() {
       await _end(t);
     });
 
+    testWidgets('the repeat section sets weekly days and saves', (t) async {
+      final s = await pumpTasksApp(t, events: [mkEvent('k', days: 1, hour: 9)]);
+      s.select('k');
+      await t.pumpAndSettle();
+      await t.tap(_k('edit-note'));
+      await t.pumpAndSettle();
+      expect(_k('edit-interval'), findsNothing);
+      await t.tap(_k('edit-repeat'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Weekly').last);
+      await t.pumpAndSettle();
+      expect(s.eventDraftFor('k')!.rrule, startsWith('FREQ=WEEKLY;BYDAY='));
+      expect(_k('edit-interval'), findsOneWidget);
+      await t.tap(_k('edit-weekday-1'));
+      await t.pumpAndSettle();
+      await t.tap(_k('edit-weekday-3'));
+      await t.pumpAndSettle();
+      final r = RepeatRule.parse(s.eventDraftFor('k')!.rrule)!;
+      expect(r.weekdays, contains(1));
+      await t.tap(_k('edit-save'));
+      await t.pumpAndSettle();
+      expect(s.eventById('k')!.rrule, startsWith('FREQ=WEEKLY'));
+      await _end(t);
+    });
+
+    testWidgets('a custom repeat rule is shown and kept', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        events: [mkEvent('k', days: 1, rrule: 'FREQ=MONTHLY;BYDAY=-1FR')],
+      );
+      s.select('k');
+      await t.pumpAndSettle();
+      await t.tap(_k('edit-note'));
+      await t.pumpAndSettle();
+      expect(_k('edit-custom'), findsOneWidget);
+      expect(_k('edit-interval'), findsNothing);
+      expect(s.eventDraftFor('k')!.dirty, isFalse);
+      await _end(t);
+    });
+
     testWidgets('an unsupported repeat rule is flagged', (t) async {
       final s = await pumpTasksApp(
         t,

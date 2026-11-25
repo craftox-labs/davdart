@@ -1,4 +1,5 @@
 import 'popover_track.dart';
+import 'repeat_fields.dart';
 
 import 'package:davdart/davdart.dart';
 import 'package:flutter/services.dart';
@@ -142,6 +143,13 @@ class EventEditor extends StatelessWidget {
                 draft.moveStart(date: date, minutes: minutes),
             onEnd: (date, minutes) =>
                 draft.setEnd(date: date, minutes: minutes),
+          ),
+          RepeatFields(
+            keys: 'edit',
+            rrule: draft.rrule,
+            start: draft.start,
+            allDay: draft.allDay,
+            onChange: draft.setRrule,
           ),
           if (event.isRecurring)
             Text(
@@ -361,7 +369,7 @@ class EventDetail extends StatelessWidget {
                                 Text(
                                   event.rrule == null || event.rrule!.isEmpty
                                       ? 'on chosen dates (edit in another app)'
-                                      : '${event.rrule} (edit in another app)',
+                                      : event.rrule!,
                                   key: const Key('event-rrule'),
                                   style: t.type.bodyStyle,
                                 ),

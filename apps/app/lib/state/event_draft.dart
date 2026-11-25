@@ -17,6 +17,7 @@ class EventDraft extends ChangeNotifier {
     required DateTime start,
     required DateTime end,
     required String? status,
+    String? rrule,
   }) : originalTitle = title,
        originalBody = body,
        originalTags = tags,
@@ -25,6 +26,8 @@ class EventDraft extends ChangeNotifier {
        originalStart = start,
        originalEnd = end,
        originalStatus = status,
+       originalRrule = _norm(rrule),
+       rrule = _norm(rrule),
        allDay = allDay,
        start = start,
        end = end,
@@ -44,6 +47,12 @@ class EventDraft extends ChangeNotifier {
   bool originalAllDay;
   DateTime originalStart, originalEnd;
   String? originalStatus;
+
+  /// The raw RRULE value (null: does not repeat), as loaded and as edited.
+  String? originalRrule, rrule;
+
+  static String? _norm(String? r) =>
+      r == null || r.trim().isEmpty ? null : r.trim();
   final TextEditingController titleController,
       bodyController,
       tagsController,
@@ -96,6 +105,11 @@ class EventDraft extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setRrule(String? v) {
+    rrule = _norm(v);
+    notifyListeners();
+  }
+
   void markSaved({
     required String title,
     required String body,
@@ -105,6 +119,7 @@ class EventDraft extends ChangeNotifier {
     required DateTime start,
     required DateTime end,
     required String? status,
+    String? rrule,
   }) {
     originalTitle = title;
     originalBody = body;
@@ -114,6 +129,7 @@ class EventDraft extends ChangeNotifier {
     originalStart = start;
     originalEnd = end;
     originalStatus = status;
+    originalRrule = _norm(rrule);
     notifyListeners();
   }
 
@@ -135,6 +151,7 @@ class EventDraft extends ChangeNotifier {
     required DateTime start,
     required DateTime end,
     required String? status,
+    String? rrule,
   }) {
     // One change for the listeners: no half-way "dirty" in between.
     _quiet = true;
@@ -142,6 +159,7 @@ class EventDraft extends ChangeNotifier {
     this.start = start;
     this.end = end;
     this.status = status;
+    this.rrule = _norm(rrule);
     markSaved(
       title: title,
       body: body,
@@ -151,6 +169,7 @@ class EventDraft extends ChangeNotifier {
       start: start,
       end: end,
       status: status,
+      rrule: rrule,
     );
     setText(titleController, title);
     setText(bodyController, body);
@@ -174,6 +193,7 @@ class EventDraft extends ChangeNotifier {
       tagsController.text != originalTags ||
       locationController.text != originalLocation ||
       status != originalStatus ||
+      rrule != originalRrule ||
       whenChanged;
 
   List<String> get tagList => [
