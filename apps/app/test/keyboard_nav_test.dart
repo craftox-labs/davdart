@@ -565,6 +565,25 @@ void main() {
       expect(FocusManager.instance.primaryFocus, s.nav.node);
     });
 
+    testWidgets('a click on selectable text keeps its focus (copy works)', (
+      t,
+    ) async {
+      final s = await pumpTasksApp(
+        t,
+        tasks: [Task(uid: 'a', summary: 'A', description: 'some words here')],
+      );
+      s.select('a');
+      await t.pumpAndSettle();
+      await t.tap(find.textContaining('some words here'));
+      await t.pump(const Duration(milliseconds: 300));
+      final f = FocusManager.instance.primaryFocus;
+      expect(f, isNot(s.nav.node));
+      expect(
+        f?.context?.findAncestorWidgetOfExactType<SelectableRegion>(),
+        isNotNull,
+      );
+    });
+
     testWidgets('finishing an edit leaves keys working', (t) async {
       final s = await pumpTasksApp(
         t,

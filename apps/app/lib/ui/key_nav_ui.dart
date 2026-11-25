@@ -140,6 +140,8 @@ class _KeyNavHandlerState extends State<KeyNavHandler> {
     if (c == null || c.findAncestorWidgetOfExactType<OverlayPortal>() != null) {
       return;
     }
+    // Selectable text keeps the focus, so Ctrl/Cmd+C copies the selection.
+    if (c.findAncestorWidgetOfExactType<SelectableRegion>() != null) return;
     if (nav.node.context != null && nav.node.canRequestFocus) {
       nav.node.requestFocus();
     }

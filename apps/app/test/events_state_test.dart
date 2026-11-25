@@ -458,7 +458,7 @@ void main() {
       expect(s.eventDraftFor(uid)!.dirty, isTrue);
       s.eventDraftFor(uid)!.setAllDay(false);
       expect(s.eventDraftFor(uid)!.start.hour, 9);
-      s.discardEventDraft(uid);
+      s.discardEdit(uid);
       expect(s.eventDraftFor(uid), isNull);
       // an empty title cannot be saved
       s.startEventEdit(uid);

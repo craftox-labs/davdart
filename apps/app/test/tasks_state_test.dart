@@ -304,7 +304,7 @@ void main() {
       expect(t.categories, ['a', 'b']);
       s.startTaskEdit(uid);
       s.taskDraftFor(uid)!.titleController.text = 'Nope';
-      s.discardTaskDraft(uid);
+      s.discardEdit(uid);
       expect(s.taskById(uid)!.summary, 'Two');
     });
 

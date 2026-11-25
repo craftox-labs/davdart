@@ -2604,11 +2604,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void discardTaskDraft(String uid) {
-    _taskDrafts.remove(uid);
-    notifyListeners();
-  }
-
   /// Saves the edit of task [uid]. Text typed while the save runs stays as
   /// the draft, still dirty. False if nothing was saved.
   Future<bool> saveTaskDraft(String uid, {bool stay = false}) async {
@@ -3020,11 +3015,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void discardEventDraft(String uid) {
-    _eventDrafts.remove(uid);
-    notifyListeners();
-  }
-
   /// Saves the edit of event [uid]. Text typed while the save runs stays as
   /// the draft, still dirty. False if nothing was saved.
   Future<bool> saveEventDraft(String uid, {bool stay = false}) async {
@@ -3422,14 +3412,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void discardDraft([String? uid]) {
-    // The fields may still be on screen until the next frame, so the
-    // controllers are left to the garbage collector, not disposed.
-    _drafts.remove(uid ?? peekUid);
-    if (error == _goneNote) error = null;
-    notifyListeners();
-  }
-
   /// Saves the edit of note [uid] (the peek note by default) through
   /// [updateNote] (and [setStatus] when the status changed). False if
   /// nothing was saved (empty title, failure).
@@ -3674,6 +3656,8 @@ class AppState extends ChangeNotifier {
     _drafts.remove(uid);
     _taskDrafts.remove(uid);
     _eventDrafts.remove(uid);
+    // Leaving the edit of a note deleted elsewhere clears that notice.
+    if (error == _goneNote) error = null;
     notifyListeners();
   }
 
