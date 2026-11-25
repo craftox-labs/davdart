@@ -253,43 +253,38 @@ class _SpaceChipState extends State<SpaceChip> with TickerProviderStateMixin {
         offset: Offset(0, t.borders.hairline),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: flare),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: t.sizes.spaceChipMax),
-            child: FTappable(
-              key: const Key('space-chip'),
-              semanticsLabel: name,
-              behavior: HitTestBehavior.opaque,
-              onPress: () => showMenuSheet(
-                context,
-                this,
-                (ctx, c) => spaceMenuGroups(context, state, c),
-              ),
-              // The tab takes the whole header height (it is its own hit box)
-              // and its content sits on the logo's centre line.
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                widthFactor: 1,
-                child: JoinedTab(
-                  active: true,
-                  height: t.sizes.paneHeader,
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: t.space.lg),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      spacing: t.space.sm,
-                      children: [
-                        // Same size as the logo.
-                        Icon(spacesIcon, size: t.icons.lg, color: t.fg),
-                        Flexible(
-                          child: Text(
-                            name,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                            style: t.type.captionStyle.copyWith(color: t.fg),
-                          ),
+          child: FTappable(
+            key: const Key('space-chip'),
+            semanticsLabel: name,
+            behavior: HitTestBehavior.opaque,
+            onPress: () => showMenuSheet(
+              context,
+              this,
+              (ctx, c) => spaceMenuGroups(context, state, c),
+            ),
+            // The tab takes the whole header height (it is its own hit box)
+            // and its content sits on the logo's centre line.
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: JoinedTab(
+                active: true,
+                height: t.sizes.paneHeader,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+                  child: Row(
+                    spacing: t.space.sm,
+                    children: [
+                      // Same size as the logo.
+                      Icon(spacesIcon, size: t.icons.lg, color: t.fg),
+                      Expanded(
+                        child: Text(
+                          name,
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          style: t.type.captionStyle.copyWith(color: t.fg),
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
               ),

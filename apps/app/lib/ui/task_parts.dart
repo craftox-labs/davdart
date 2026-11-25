@@ -367,10 +367,12 @@ class TaskQuickAdd extends StatefulWidget {
     required this.state,
     this.parentUid,
     this.hint = 'Add a task…',
+    this.focusNode,
   });
   final AppState state;
   final String? parentUid;
   final String hint;
+  final FocusNode? focusNode;
 
   @override
   State<TaskQuickAdd> createState() => _TaskQuickAddState();
@@ -402,6 +404,7 @@ class _TaskQuickAddState extends State<TaskQuickAdd> {
             : 'task-quick-add-${widget.parentUid}',
       ),
       controller: _controller,
+      focusNode: widget.focusNode,
       hint: widget.hint,
       prefixIcon: FLucideIcons.plus,
       onSubmit: _submit,

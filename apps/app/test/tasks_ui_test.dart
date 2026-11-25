@@ -79,13 +79,14 @@ void main() {
       expect(s.mainTaskUid, 'nodate');
     });
 
-    testWidgets('New task adds a task and opens it', (t) async {
+    testWidgets('New task focuses the quick-add field', (t) async {
       final s = await _tab(t);
       final before = s.tasks.length;
       await t.tap(_k('new-task'));
       await t.pumpAndSettle();
-      expect(s.tasks.length, before + 1);
-      expect(s.peekUid, isNotNull);
+      expect(s.tasks.length, before);
+      final field = t.widget<FTextField>(_k('task-quick-add'));
+      expect(field.focusNode!.hasFocus, isTrue);
     });
 
     testWidgets('groups, open filter hides Completed, All shows it', (t) async {

@@ -22,13 +22,31 @@ import 'theme.dart';
 /// top and filters for status, tag and parent folder. A row opens the task
 /// like a note (peek or main, per the open setting). [onPick] runs after an
 /// open, to close the narrow sheet.
-class TasksPanel extends StatelessWidget {
+class TasksPanel extends StatefulWidget {
   const TasksPanel({super.key, required this.state, this.onPick, this.now});
   final AppState state;
   final VoidCallback? onPick;
 
   /// Clock override for tests.
   final DateTime? now;
+
+  @override
+  State<TasksPanel> createState() => _TasksPanelState();
+}
+
+class _TasksPanelState extends State<TasksPanel> {
+  /// The quick-add field, which the New task button focuses.
+  final _quickAdd = FocusNode(debugLabel: 'task-quick-add');
+
+  @override
+  void dispose() {
+    _quickAdd.dispose();
+    super.dispose();
+  }
+
+  AppState get state => widget.state;
+  VoidCallback? get onPick => widget.onPick;
+  DateTime? get now => widget.now;
 
   @override
   Widget build(BuildContext context) {
@@ -105,12 +123,7 @@ class TasksPanel extends StatelessWidget {
                   key: const Key('new-task'),
                   tooltip: 'New task',
                   icon: FLucideIcons.plus,
-                  onPress: () async {
-                    final uid = await state.addTask('New task');
-                    if (uid == null) return;
-                    await state.clickTask(uid);
-                    onPick?.call();
-                  },
+                  onPress: _quickAdd.requestFocus,
                 )
               : null,
           body: PanelTagsDrawer(
@@ -135,7 +148,7 @@ class TasksPanel extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     spacing: t.space.md,
                     children: [
-                      TaskQuickAdd(state: state),
+                      TaskQuickAdd(state: state, focusNode: _quickAdd),
                       _Filters(state: state),
                     ],
                   ),
@@ -252,17 +265,22 @@ class _Filters extends StatelessWidget {
 
     walk(state.tree.roots, 0);
     final folder = state.scopeUid;
+    final narrow = narrowLayout(context);
+    final toggles = [
+      toggle('Open', TaskFilter.open),
+      toggle('All', TaskFilter.all),
+      toggle('Completed', TaskFilter.completed),
+    ];
     return Wrap(
       spacing: t.space.md,
       runSpacing: t.space.md,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        toggle('Open', TaskFilter.open),
-        toggle('All', TaskFilter.all),
-        toggle('Completed', TaskFilter.completed),
+        ...toggles,
         if (folders.isNotEmpty)
           SizedBox(
-            width: t.sizes.statusField,
+            // Phones: the folder selector spans the content width.
+            width: narrow ? double.infinity : t.sizes.statusField,
             child: TrackPopover(
               builder: (_, pc) => FSelect<String>.rich(
                 popoverControl: pc,
