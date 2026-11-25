@@ -273,6 +273,33 @@ void main() {
       await cli(['task', 'T', '--status', 'doing'], stdinText: 'd');
       expect(out.toString(), startsWith('created task '));
     });
+
+    test('board: Other column for unknown words, board order inside',
+        () async {
+      for (final n in ['a', 'b', 'c']) {
+        await jcli(['create', n, '--kind', 'note', '--status', 'todo']);
+      }
+      await jcli(['rank', 'c', 'top']);
+      expect(
+          await cli(['create', 'W', '--kind', 'note', '--body',
+              'status: waiting\n\nx']),
+          0);
+      expect(
+          await cli(['create', 'V', '--kind', 'note', '--body',
+              'status: someday\n\nx']),
+          0);
+      out.clear();
+      expect(await cli(['board']), 0);
+      final text = out.toString();
+      expect(text, contains('== todo (3)'));
+      expect(text, contains('\n== other (2)'));
+      expect(text, isNot(contains('== waiting')));
+      expect(text, isNot(contains('== someday')));
+      expect(text.indexOf('== todo'), lessThan(text.indexOf('== other')));
+      final col = text.substring(
+          text.indexOf('== todo'), text.indexOf('== other'));
+      expect(col.indexOf('\n  c\n'), lessThan(col.indexOf('\n  b\n')));
+    });
   });
 
   group('rank', () {

@@ -398,6 +398,67 @@ void main() {
       await bad(svc.rankItem('a', before: 'nope'), 'no item matches');
     });
   });
+
+  group('board columns', () {
+    // A note whose body header carries a status word outside the fixed set:
+    // set-status refuses those, but the app writes them, so the board must
+    // group them.
+    Future<String> raw(String title, String word) async => (await svc.create(
+            ItemKind.note, title, body: 'status: $word\n\nbody'))
+        .item
+        .uid;
+
+    test('unknown words share one Other column, after the fixed ones',
+        () async {
+      await svc.create(ItemKind.note, 'Todo one', status: 'todo');
+      await raw('Waiter', 'waiting');
+      await raw('Someday', 'someday');
+      await svc.create(ItemKind.note, 'Plain one');
+      final cols = await svc.board();
+      expect([for (final c in cols) c.$1], ['todo', 'other', 'no status']);
+      expect({for (final p in cols[1].$2) p.title}, {'Waiter', 'Someday'});
+      expect(cols[2].$2.single.title, 'Plain one');
+    });
+
+    test('the fixed statuses come in board order', () async {
+      await svc.create(ItemKind.note, 'D', status: 'done');
+      await svc.create(ItemKind.note, 'B', status: 'backlog');
+      await svc.create(ItemKind.note, 'G', status: 'doing');
+      expect([for (final c in await svc.board()) c.$1],
+          ['backlog', 'doing', 'done']);
+    });
+
+    test('an alias lands in its canonical column', () async {
+      await raw('C', 'cancelled');
+      await raw('P', 'in-progress');
+      final cols = await svc.board();
+      expect([for (final c in cols) c.$1], ['doing', 'canceled']);
+      expect(cols[0].$2.single.title, 'P');
+      expect(cols[1].$2.single.title, 'C');
+    });
+
+    test('a column is in board order, the same as a status list', () async {
+      for (final n in ['a', 'b', 'c']) {
+        await svc.create(ItemKind.note, n, status: 'todo');
+      }
+      await svc.rankItem('c', top: true);
+      await svc.rankItem('a', top: true);
+      final cols = await svc.board();
+      final order = [for (final p in cols.single.$2) p.title];
+      expect(order, ['a', 'c', 'b']);
+      expect(order, [
+        for (final i in (await svc.list(status: 'todo')).items) i.title,
+      ]);
+    });
+
+    test('folders are left out', () async {
+      await svc.create(ItemKind.note, 'Fold', folder: true, status: 'todo');
+      await svc.create(ItemKind.note, 'N', status: 'todo');
+      expect([
+        for (final p in (await svc.board()).single.$2) p.title,
+      ], ['N']);
+    });
+  });
 }
 
 /// Runs [before] ahead of each PUT, then lets the fake server answer.

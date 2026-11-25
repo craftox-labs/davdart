@@ -761,25 +761,9 @@ class _Ctx {
             dryRun: dry);
         done(c, 'folder ${c.item.uid}');
       case 'board':
-        final page = await svc.list(
-            kind: ItemKind.note, includeFolders: false, limit: 500);
-        final cols = <String, List<PlanItem>>{};
-        for (final i in page.items) {
-          final pi = PlanItem.fromNote(Note(
-              uid: i.uid,
-              summary: i.title,
-              description: i.body,
-              categories: List.of(i.tags)));
-          (cols[pi.status ?? 'no status'] ??= []).add(pi);
-        }
-        const order = allowedStatuses;
-        final keys = [
-          ...order.where(cols.containsKey),
-          ...cols.keys.where((k) => !order.contains(k)),
-        ];
-        for (final k in keys) {
-          o.writeln('\n== $k (${cols[k]!.length})');
-          for (final pi in cols[k]!) {
+        for (final (k, items) in await svc.board(limit: 500)) {
+          o.writeln('\n== $k (${items.length})');
+          for (final pi in items) {
             final who = pi.owner == null ? '' : '  [${pi.owner}]';
             o.writeln('  ${pi.itemId ?? pi.title}$who');
           }

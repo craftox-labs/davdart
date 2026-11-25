@@ -39,6 +39,10 @@ class ItemServiceException implements Exception {
   String toString() => 'ItemServiceException: $message';
 }
 
+/// The board column for notes that carry no status word at all; it comes
+/// after [otherStatusColumn].
+const noStatusColumn = 'no status';
+
 /// Plain, JSON-ready view of one item. Dates are raw iCalendar text
 /// (`20261225`, `20261225T090000Z`) for due, start and end, ISO 8601 for
 /// created and modified.
@@ -814,6 +818,53 @@ class ItemService {
   /// One item by uid, href or exact title.
   Future<ItemData> get(String id, {ItemKind? kind}) async =>
       _find(await _load(kind), id, kind: kind).toData();
+
+  /// The board columns of the open collection's notes, the same as the app's
+  /// board: the fixed statuses in use ([allowedStatuses] order, aliases
+  /// resolved), then one [otherStatusColumn] column for words outside the
+  /// set, then the notes with no status at all. Each column is in board order
+  /// ([compareBoardItems]), so the manual rank decides before priority and
+  /// creation.
+  Future<List<(String, List<PlanItem>)>> board({int limit = 500}) async {
+    final page =
+        await list(kind: ItemKind.note, includeFolders: false, limit: limit);
+    final by = <String, List<(PlanItem, BoardItem)>>{};
+    for (final i in page.items) {
+      final n = _noteOf(i);
+      final pi = PlanItem.fromNote(n);
+      final raw = pi.status;
+      final key = raw == null ? noStatusColumn : statusColumnOf(raw);
+      (by[key] ??= []).add((pi, BoardItem.note(n)));
+    }
+    final keys = [
+      ...allowedStatuses.where(by.containsKey),
+      if (by.containsKey(otherStatusColumn)) otherStatusColumn,
+      if (by.containsKey(noStatusColumn)) noStatusColumn,
+    ];
+    return [
+      for (final k in keys)
+        (
+          k,
+          ([...by[k]!]..sort((a, b) => compareBoardItems(a.$2, b.$2)))
+              .map((e) => e.$1)
+              .toList(),
+        ),
+    ];
+  }
+
+  /// The note behind [i]: [list] leaves out the body's header lines but keeps
+  /// the rank line in [ItemData.rank], which [compareBoardItems] needs.
+  static Note _noteOf(ItemData i) {
+    final n = Note(
+        uid: i.uid,
+        summary: i.title,
+        description: i.body,
+        categories: List.of(i.tags),
+        created: i.created,
+        lastModified: i.modified);
+    if (i.rank != null) n.rank = i.rank;
+    return n;
+  }
 
   String _newUid() =>
       '${_now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32).toRadixString(16)}@davdart';

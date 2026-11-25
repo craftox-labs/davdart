@@ -31,6 +31,15 @@ String? canonicalStatus(String word) {
   return statusAliases[w];
 }
 
+/// The board's catch-all column: every status word outside [allowedStatuses]
+/// (for example `waiting`) lands there, always last.
+const otherStatusColumn = 'other';
+
+/// The board column of a status [word]: its canonical status when it is one
+/// of [allowedStatuses] (aliases resolved), else [otherStatusColumn].
+String statusColumnOf(String word) =>
+    canonicalStatus(word) ?? otherStatusColumn;
+
 /// The note priority words, highest first, with the task priority each maps to
 /// (RFC 5545: 1-4 high, 5 medium, 6-9 low).
 const notePriorities = {'high': 1, 'medium': 5, 'low': 9};
