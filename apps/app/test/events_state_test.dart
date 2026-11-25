@@ -543,6 +543,24 @@ void main() {
       expect(s.orphanDraftNotice, isNull);
     });
 
+    test('saving the draft of a deleted event says why and keeps it',
+        () async {
+      final s = await _open(MemoryStorage(), seed: _Seed());
+      final a = (await s.addEvent('A', start: _day))!;
+      s.startEventEdit(a);
+      final d = s.eventDraftFor(a)!;
+      d.titleController.text = 'Typed';
+      final src = s.source as SpaceNoteSource;
+      await src.deleteEvent(a);
+      await s.addEvent('C', start: _day); // reloads events
+      expect(s.error, isNull);
+      expect(await s.saveEventDraft(a), isFalse);
+      expect(s.error, contains('deleted elsewhere'));
+      expect(s.eventDraftFor(a), same(d), reason: 'the text is kept');
+      expect(d.titleController.text, 'Typed');
+      expect(d.dirty, isTrue);
+    });
+
     test('a read-only feed gives no draft', () async {
       final s = AppState(_ReadOnly());
       await s.load();

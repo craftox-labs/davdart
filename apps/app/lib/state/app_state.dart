@@ -2749,8 +2749,16 @@ class AppState extends ChangeNotifier {
   /// Saves the edit of event [uid]. Text typed while the save runs stays as
   /// the draft, still dirty. False if nothing was saved.
   Future<bool> saveEventDraft(String uid, {bool stay = false}) async {
+    const gone = 'This event was deleted elsewhere. Your edit is kept.';
     final d = _eventDrafts[uid];
     if (d == null || d.titleEmpty || d.endBeforeStart) return false;
+    // The event is gone (deleted meanwhile, e.g. by a sync): nothing to save
+    // to. The draft stays, so the text is not lost.
+    if (_eventGone(d)) {
+      error = gone;
+      notifyListeners();
+      return false;
+    }
     final title = d.titleController.text;
     final body = d.bodyController.text;
     final tagText = d.tagsController.text;
@@ -2773,6 +2781,13 @@ class AppState extends ChangeNotifier {
       end: end,
     );
     if (!ok) return false;
+    // Deleted while this save ran: the reload has no event, so nothing was
+    // written. Keep the draft, so the text is not lost.
+    if (_eventGone(d)) {
+      error = gone;
+      notifyListeners();
+      return false;
+    }
     if (_eventDrafts[uid] == d) {
       d.markSaved(
         title: title,

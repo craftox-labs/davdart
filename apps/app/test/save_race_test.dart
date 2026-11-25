@@ -33,6 +33,21 @@ class _VanishSource extends SpaceNoteSource {
   }
 }
 
+/// A source where the event is deleted (as by a sync) while the save runs.
+class _VanishEventSource extends SpaceNoteSource {
+  _VanishEventSource(super.space, {super.seed});
+
+  /// Set once the event exists, so creating it still works.
+  bool armed = false;
+
+  @override
+  Future<Event> saveEvent(Event e) async {
+    if (!armed) return super.saveEvent(e);
+    await deleteEvent(e.uid);
+    return e;
+  }
+}
+
 void main() {
   test('text typed while a save is in flight stays as the draft', () async {
     final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
@@ -125,4 +140,21 @@ void main() {
       expect(d.dirty, isFalse);
     },
   );
+
+  test('a save of an event deleted meanwhile fails, keeps the draft',
+      () async {
+    final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+    final s = AppState(_VanishEventSource(space, seed: _Seed()));
+    await s.load();
+    final uid = (await s.addEvent('E', start: DateTime.utc(2026, 12, 1, 9)))!;
+    s.startEventEdit(uid);
+    final d = s.eventDraftFor(uid)!;
+    d.titleController.text = 'typed';
+    (s.source as _VanishEventSource).armed = true;
+    expect(await s.saveEventDraft(uid), isFalse);
+    expect(s.eventById(uid), isNull, reason: 'it went away mid-save');
+    expect(s.eventDraftFor(uid), same(d));
+    expect(d.titleController.text, 'typed');
+    expect(s.error, contains('deleted elsewhere'));
+  });
 }
