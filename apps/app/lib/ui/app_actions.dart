@@ -250,6 +250,25 @@ List<AppAction> buildActions(AppState state) {
       'filters',
     ], 'v'),
     go('go.search', 'Go to Search', Section.search, const ['find'], 's'),
+    // The open Space's projects, the recent ones first, then the way back to
+    // the whole Space.
+    for (final p in state.projectsByRecent)
+      AppAction(
+        id: 'project.go.${p.uid}',
+        title: 'Go to project: ${p.summary.isEmpty ? 'Untitled' : p.summary}',
+        group: 'Go to',
+        keywords: const ['project', 'folder', 'scope', 'open'],
+        enabled: (s) => s.scopeUid != p.uid,
+        run: (c) => c.state.guarded(() => c.state.openFolder(p.uid)),
+      ),
+    AppAction(
+      id: 'project.go.all',
+      title: 'Go to project: the whole Space',
+      group: 'Go to',
+      keywords: const ['project', 'folder', 'scope', 'everything', 'back'],
+      enabled: (s) => s.scopeUid != null,
+      run: (c) => c.state.guarded(() => c.state.openFolder(null)),
+    ),
     AppAction(
       id: 'note.new',
       title: 'New note',

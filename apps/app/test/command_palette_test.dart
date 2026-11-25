@@ -206,6 +206,87 @@ void main() {
     });
   });
 
+  group('go to project', () {
+    Note folder(
+      String uid,
+      String name, {
+      String? parent,
+      bool container = false,
+    }) => Note(
+      uid: uid,
+      summary: name,
+      parentUid: parent,
+      categories: [folderTag, if (container) projectsTag],
+    );
+
+    final notes = [
+      folder('c', 'Projects', container: true),
+      folder('p1', 'Alpha', parent: 'c'),
+      folder('p2', 'Beta', parent: 'c'),
+      Note(uid: 'n1', summary: 'Loose', description: 'x'),
+    ];
+
+    testWidgets('lists the projects; picking one scopes to it', (t) async {
+      final s = await pumpTasksApp(t, notes: notes);
+      await _open(t);
+      await _type(t, 'go to project');
+      expect(_k('palette-row-project.go.p1'), findsOneWidget);
+      expect(_k('palette-row-project.go.p2'), findsOneWidget);
+      // Nothing to go back to yet.
+      expect(_k('palette-row-project.go.all'), findsNothing);
+      await t.tap(_k('palette-row-project.go.p2'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(s.scopeUid, 'p2');
+      // The open project drops out; the whole Space row appears.
+      await _open(t);
+      await _type(t, 'go to project');
+      expect(_k('palette-row-project.go.p2'), findsNothing);
+      await t.tap(_k('palette-row-project.go.all'));
+      await t.pump(const Duration(milliseconds: 50));
+      expect(s.scopeUid, isNull);
+      await _end(t);
+    });
+
+    testWidgets('a dirty edit is asked about before the scope moves', (
+      t,
+    ) async {
+      final s = await pumpTasksApp(t, notes: notes);
+      await s.openNote('n1', mode: OpenMode.peek);
+      await t.pumpAndSettle();
+      s.startEdit('n1');
+      await t.pumpAndSettle();
+      s.draftFor('n1')!.titleController.text = 'Edited';
+      await t.pumpAndSettle();
+      expect(s.dirtyFor('n1'), isTrue);
+      await _open(t);
+      await _type(t, 'go to project');
+      await t.tap(_k('palette-row-project.go.p1'));
+      await t.pumpAndSettle();
+      // Guarded like go.home: the leave dialog first, scope still unset.
+      expect(find.text('Unsaved changes'), findsOneWidget);
+      await t.tap(find.text('Keep editing'));
+      await t.pumpAndSettle();
+      expect(s.scopeUid, isNull);
+      expect(s.dirtyFor('n1'), isTrue);
+      await _end(t);
+    });
+
+    testWidgets('recent projects lead', (t) async {
+      final s = await pumpTasksApp(t, notes: notes);
+      s.openFolder('p1');
+      s.openFolder('p2');
+      s.openFolder(null);
+      await t.pump(const Duration(milliseconds: 50));
+      await _open(t);
+      await _type(t, 'go to project');
+      expect(
+        t.getTopLeft(_k('palette-row-project.go.p2')).dy,
+        lessThan(t.getTopLeft(_k('palette-row-project.go.p1')).dy),
+      );
+      await _end(t);
+    });
+  });
+
   group('palette', () {
     for (final (name, mod) in [
       ('Ctrl+K', LogicalKeyboardKey.controlLeft),

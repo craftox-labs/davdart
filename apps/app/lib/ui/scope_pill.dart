@@ -26,9 +26,10 @@ String folderPath(AppState state, String uid) {
 /// The scope picker's sheet groups: the open Space's own row (Everything) and
 /// its projects, the projects opened most recently ahead of the rest, with the
 /// selected one carrying a ⋯ for its actions (a long press opens them on any
-/// row); then the other Spaces. Picking a row sets the folder scope and closes
-/// the sheet. [host] is the widget that opened the sheet: dialogs launch from
-/// it, since the sheet's own context is gone by the time a row acts.
+/// row); inside a project, its folders one level at a time; then the other
+/// Spaces. Picking a row sets the folder scope and closes the sheet. [host] is
+/// the widget that opened the sheet: dialogs launch from it, since the
+/// sheet's own context is gone by the time a row acts.
 List<FItemGroupMixin> scopePickerGroups(
   BuildContext host,
   BuildContext sheet,
@@ -39,13 +40,7 @@ List<FItemGroupMixin> scopePickerGroups(
   final ix = state.projectIndex;
   final nav = SheetMenuScope.navOf(sheet);
   // Recent projects first (newest first), then the rest in listed order.
-  final rest = [...ix.projects()];
-  final projects = <Note>[];
-  for (final uid in state.recentProjects) {
-    final i = rest.indexWhere((p) => p.uid == uid);
-    if (i >= 0) projects.add(rest.removeAt(i));
-  }
-  projects.addAll(rest);
+  final projects = state.projectsByRecent;
   final scope = state.scopeUid;
   final current = scope == null ? null : ix.projectOf(scope)?.uid;
   final space = state.currentSpaceName ?? 'Spaces';
@@ -115,6 +110,52 @@ List<FItemGroupMixin> scopePickerGroups(
     );
   }
 
+  // The folders inside the open project, a level at a time: the parent row
+  // goes up one, the folder in scope is marked, the children go down one.
+  final inside = scope == null || current == null
+      ? null
+      : state.tree.find(scope);
+  List<FItem> folderRows(NoteNode here) {
+    final up = here.parent;
+    // Only reached inside a project, so the project is always found.
+    final atProject = ix.projectOf(here.note.uid)?.uid == here.note.uid;
+    String name(Note n) => n.summary.isEmpty ? 'Untitled' : n.summary;
+    return [
+      if (!atProject && up != null)
+        FItem(
+          key: const Key('scope-pick-up'),
+          prefix: Icon(
+            FLucideIcons.cornerLeftUp,
+            size: t.icons.md,
+            color: t.muted,
+          ),
+          title: Text(name(up.note), overflow: TextOverflow.ellipsis),
+          onPress: () => pick(up.note.uid),
+        ),
+      if (!atProject)
+        FItem(
+          key: const Key('scope-pick-here'),
+          selected: true,
+          prefix: Icon(FLucideIcons.folder, size: t.icons.md, color: t.muted),
+          title: Text(name(here.note), overflow: TextOverflow.ellipsis),
+          suffix: more(here.note),
+          onPress: () => pick(here.note.uid),
+          onLongPress: () => actions(here.note),
+        ),
+      for (final child in here.children)
+        if (isFolderNote(child.note))
+          FItem(
+            key: Key('scope-pick-folder-${child.note.uid}'),
+            selected: child.note.uid == scope,
+            prefix: Icon(FLucideIcons.folder, size: t.icons.md, color: t.muted),
+            title: Text(name(child.note), overflow: TextOverflow.ellipsis),
+            suffix: child.note.uid == scope ? more(child.note) : null,
+            onPress: () => pick(child.note.uid),
+            onLongPress: () => actions(child.note),
+          ),
+    ];
+  }
+
   return [
     FItemGroup(
       children: [
@@ -146,6 +187,8 @@ List<FItemGroupMixin> scopePickerGroups(
           for (final p in projects) project(p),
       ],
     ),
+    // Inside a project: the folders one level down at a time.
+    if (inside != null) FItemGroup(children: folderRows(inside)),
     // Only the other Spaces: with one (or none) there is nothing to list.
     if (state.spaces.length > 1)
       ...spaceMenuGroups(host, state, c, host: host, othersOnly: true),

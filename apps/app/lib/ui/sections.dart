@@ -15,6 +15,7 @@ import 'note_menu.dart';
 import 'parts.dart';
 import 'save_view_dialog.dart';
 import 'side_panel.dart';
+import 'segmented.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 import 'panel_tags_drawer.dart';
@@ -525,9 +526,10 @@ class ViewsSection extends _Section {
   ];
 }
 
-/// Search: one field; matches from the open Space listed here. Tapping a hit
-/// opens the note (switching Space when needed). The text also narrows the
-/// Board and List of the open Space.
+/// Search: one field, and inside a folder scope a toggle between that folder's
+/// subtree and the whole Space; matches from the open Space listed here.
+/// Tapping a hit opens the note (switching Space when needed). The text also
+/// narrows the Board and List of the open Space.
 class SearchSection extends StatefulWidget {
   const SearchSection({super.key, required this.state, required this.onPick});
   final AppState state;
@@ -541,19 +543,48 @@ class _SearchSectionState extends State<SearchSection> {
   List<SpaceHit>? _hits;
   var _run = 0;
 
+  /// Inside a folder scope: search that folder's subtree, not the whole
+  /// Space (the toggle offers both; nothing is saved).
+  var _inProject = true;
+
+  /// The scope the hits belong to.
+  String? _lastScope;
+
   AppState get state => widget.state;
 
   @override
   void initState() {
     super.initState();
+    _lastScope = state.scopeUid;
     if (state.searchController.text.trim().isNotEmpty) {
       _search(state.searchController.text);
     }
   }
 
+  @override
+  void didUpdateWidget(SearchSection old) {
+    super.didUpdateWidget(old);
+    _followScope();
+  }
+
+  /// The folder scope changed (or went) while the panel is open: search again
+  /// under the new scope, back on "This project", so the hits always match the
+  /// hint.
+  void _followScope() {
+    final scope = state.scopeUid;
+    if (scope == _lastScope) return;
+    _lastScope = scope;
+    _inProject = true;
+    final q = state.searchController.text;
+    if (q.trim().isNotEmpty) _search(q);
+  }
+
+  /// The folder the search is narrowed to, or null for the whole Space.
+  String? get _scopeUid => _inProject ? state.scopeUid : null;
+
   Future<void> _search(String text) async {
     final mine = ++_run;
-    final found = await state.searchAllSpaces(text);
+    final found = await state.searchAllSpaces(text, scopeUid: _scopeUid);
     if (!mounted || mine != _run) return; // a newer search is running
     setState(() => _hits = text.trim().isEmpty ? null : found);
   }
@@ -573,6 +604,7 @@ class _SearchSectionState extends State<SearchSection> {
           },
         ),
     ]);
+    final scoped = state.scopeUid != null;
     return _Panel(
       heading: _title('Search'),
       pinned: Padding(
@@ -582,16 +614,40 @@ class _SearchSectionState extends State<SearchSection> {
           t.space.lg + t.space.xs,
           t.space.md,
         ),
-        child: field(
-          key: const Key('search-all-field'),
-          focusNode: state.nav.searchNode,
-          controller: state.searchController,
-          hint: 'Search this space',
-          prefixIcon: FLucideIcons.search,
-          onChange: (v) {
-            state.setQuery(v);
-            _search(v);
-          },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: t.space.sm,
+          children: [
+            // Only a folder scope has something to narrow to.
+            if (scoped)
+              Segmented<bool>(
+                key: const Key('search-scope-toggle'),
+                fullWidth: true,
+                value: _inProject,
+                segments: const [
+                  Segment(true, 'This project', 'search-scope-project'),
+                  Segment(false, 'Whole space', 'search-scope-space'),
+                ],
+                onChanged: (v) {
+                  if (v == _inProject) return;
+                  setState(() => _inProject = v);
+                  _search(state.searchController.text);
+                },
+              ),
+            field(
+              key: const Key('search-all-field'),
+              focusNode: state.nav.searchNode,
+              controller: state.searchController,
+              hint: scoped && _inProject
+                  ? 'Search this project'
+                  : 'Search this space',
+              prefixIcon: FLucideIcons.search,
+              onChange: (v) {
+                state.setQuery(v);
+                _search(v);
+              },
+            ),
+          ],
         ),
       ),
       children: [

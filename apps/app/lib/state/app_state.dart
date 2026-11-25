@@ -783,11 +783,15 @@ class AppState extends ChangeNotifier {
 
   /// Notes, tasks and events whose title or text contain [q]
   /// (case-insensitive), in the open Space only, or in every Space with
-  /// [allSpaces] (tm 2026-11-25: Search is per Space for now). Task hits have
-  /// [SpaceHit.task] set, event hits [SpaceHit.event].
+  /// [allSpaces] (tm 2026-11-25: Search is per Space for now). With
+  /// [scopeUid] the open Space's matches are narrowed to that folder's
+  /// subtree: notes inside it, tasks and events whose folder chain leads into
+  /// it (loose ones are left out). Task hits have [SpaceHit.task] set, event
+  /// hits [SpaceHit.event].
   Future<List<SpaceHit>> searchAllSpaces(
     String q, {
     bool allSpaces = false,
+    String? scopeUid,
   }) async {
     final needle = q.trim().toLowerCase();
     final c = catalog;
@@ -797,6 +801,9 @@ class AppState extends ChangeNotifier {
     final curNotes = List.of(notes);
     final curTasks = List.of(tasks);
     final curEvents = List.of(events);
+    final scoped = scopeUid == null
+        ? null
+        : {for (final n in tree.descendants(scopeUid)) n.uid};
     for (final sp in List.of(c.spaces)) {
       if (!allSpaces && sp.id != cur) continue;
       List<Note> list = const [];
@@ -826,18 +833,27 @@ class AppState extends ChangeNotifier {
       }
       for (final n in list) {
         if (isViewNote(n)) continue;
+        if (sp.id == cur && scoped != null && !scoped.contains(n.uid)) {
+          continue;
+        }
         if (n.summary.toLowerCase().contains(needle) ||
             n.description.toLowerCase().contains(needle)) {
           hits.add(SpaceHit(sp, n));
         }
       }
       for (final t in taskList) {
+        if (sp.id == cur && scopeUid != null && !taskIsUnder(t, scopeUid)) {
+          continue;
+        }
         if (t.summary.toLowerCase().contains(needle) ||
             t.description.toLowerCase().contains(needle)) {
           hits.add(SpaceHit.forTask(sp, t));
         }
       }
       for (final e in eventList) {
+        if (sp.id == cur && scopeUid != null && !eventIsUnder(e, scopeUid)) {
+          continue;
+        }
         if (e.summary.toLowerCase().contains(needle) ||
             e.description.toLowerCase().contains(needle) ||
             e.location.toLowerCase().contains(needle)) {
@@ -1117,6 +1133,18 @@ class AppState extends ChangeNotifier {
   /// Set on app start and on a Space switch: the next load brings back that
   /// Space's saved scope. A plain reload leaves the scope alone.
   bool _restoreScopePending = true;
+
+  /// The Space's projects, the ones opened most recently first: the scope
+  /// picker and the palette list them in this order.
+  List<Note> get projectsByRecent {
+    final rest = [...projectIndex.projects()];
+    final recent = <Note>[];
+    for (final uid in recentProjects) {
+      final i = rest.indexWhere((p) => p.uid == uid);
+      if (i >= 0) recent.add(rest.removeAt(i));
+    }
+    return [...recent, ...rest];
+  }
 
   /// The project uids opened most recently in this Space, newest first (at
   /// most [recentsLimit]); the scope picker lists them first. Projects that

@@ -36,6 +36,7 @@ final _seed = [
   _folder('p1', 'Alpha project', parent: 'c'),
   _folder('p2', 'Beta', parent: 'c'),
   _folder('sub', 'Design', parent: 'p1'),
+  _folder('deep', 'Details', parent: 'sub'),
   _folder('loose', 'Loose notes'),
   Note(uid: 'in-p1', summary: 'Inside note', parentUid: 'p1'),
   Note(uid: 'outside', summary: 'Outside note'),
@@ -58,6 +59,20 @@ Future<AppState> _app(WidgetTester t, Size size) async {
 }
 
 String _text(WidgetTester t, String key) => t.widget<Text>(_k(key)).data!;
+
+/// The app over a real catalog Space (Search needs one), with [_seed].
+Future<AppState> _catalogApp(WidgetTester t, Size size) async {
+  t.view.physicalSize = size;
+  t.view.devicePixelRatio = 1;
+  addTearDown(t.view.reset);
+  final storage = MemoryStorage();
+  final c = catalogWithPlanning(storage, planningSeed: SeedNotes(_seed));
+  final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
+  await s.load();
+  await t.pumpWidget(DavdartApp(state: s));
+  await t.pumpAndSettle();
+  return s;
+}
 
 void main() {
   for (final size in _sizes) {
@@ -219,6 +234,52 @@ void main() {
         _noError(t);
       });
 
+      testWidgets('the picker drills into a project\'s folders', (t) async {
+        final s = await _app(t, size);
+        s.openFolder('p1');
+        await t.pumpAndSettle();
+        await t.tap(_k('space-chip'));
+        await t.pumpAndSettle();
+        // At the project: its own folders, one level, nothing to go up to.
+        expect(_k('scope-pick-folder-sub'), findsOneWidget);
+        expect(_k('scope-pick-folder-deep'), findsNothing);
+        expect(_k('scope-pick-up'), findsNothing);
+        expect(_k('scope-pick-here'), findsNothing);
+        await t.tap(_k('scope-pick-folder-sub'));
+        await t.pumpAndSettle();
+        expect(s.scopeUid, 'sub');
+        // One level down: the way up, the folder in scope (marked), and its
+        // own folders.
+        await t.tap(_k('space-chip'));
+        await t.pumpAndSettle();
+        expect(
+          find.descendant(
+            of: _k('scope-pick-up'),
+            matching: find.text('Alpha project'),
+          ),
+          findsOneWidget,
+        );
+        final here = _k('scope-pick-here');
+        expect(t.widget<FItem>(here).selected, isTrue);
+        expect(
+          find.descendant(of: here, matching: find.text('Design')),
+          findsOneWidget,
+        );
+        expect(_k('scope-pick-folder-deep'), findsOneWidget);
+        // The marked folder's ⋯ offers its own actions.
+        await t.tap(_k('scope-more-sub'));
+        await t.pumpAndSettle();
+        expect(_k('scope-edit'), findsOneWidget);
+        await t.tap(_k('menu-back'));
+        await t.pumpAndSettle();
+        // Up one level goes back to the project.
+        await t.tap(_k('scope-pick-up'));
+        await t.pumpAndSettle();
+        expect(_k('menu-sheet'), findsNothing);
+        expect(s.scopeUid, 'p1');
+        _noError(t);
+      });
+
       testWidgets('the sheet lists recent projects first', (t) async {
         final s = await _app(t, size);
         await t.tap(_k('space-chip'));
@@ -371,6 +432,78 @@ void main() {
         expect(
           s.notes.firstWhere((e) => e.summary == 'In the project').parentUid,
           'p1',
+        );
+        _noError(t);
+      });
+
+      testWidgets('Search stays inside the project until told otherwise', (
+        t,
+      ) async {
+        final s = await _catalogApp(t, size);
+        s.openFolder('p1');
+        await t.pumpAndSettle();
+        await t.tap(_k('bar-search'));
+        await t.pumpAndSettle();
+        // Inside a folder scope the toggle sits above the field.
+        expect(_k('search-scope-toggle'), findsOneWidget);
+        expect(
+          find.text('Search this project'),
+          findsOneWidget,
+          reason: 'hint follows the choice',
+        );
+        await t.enterText(_k('search-all-field'), 'note');
+        await t.pumpAndSettle();
+        final results = _k('side-menu');
+        expect(
+          find.descendant(of: results, matching: find.text('Inside note')),
+          findsWidgets,
+        );
+        expect(
+          find.descendant(of: results, matching: find.text('Outside note')),
+          findsNothing,
+        );
+        // Whole space: the loose note is found too.
+        await t.tap(_k('search-scope-space'));
+        await t.pumpAndSettle();
+        expect(find.text('Search this space'), findsOneWidget);
+        expect(
+          find.descendant(of: results, matching: find.text('Outside note')),
+          findsWidgets,
+        );
+        expect(
+          find.descendant(of: results, matching: find.text('Inside note')),
+          findsWidgets,
+        );
+        // Back to the project narrows it again.
+        await t.tap(_k('search-scope-project'));
+        await t.pumpAndSettle();
+        expect(
+          find.descendant(of: results, matching: find.text('Outside note')),
+          findsNothing,
+        );
+        // The scope changes under the open panel: the search follows it, and
+        // the choice goes back to This project.
+        await t.tap(_k('search-scope-space'));
+        await t.pumpAndSettle();
+        s.openFolder('p2');
+        await t.pumpAndSettle();
+        expect(find.text('Search this project'), findsOneWidget);
+        expect(find.text('No matches'), findsOneWidget);
+        expect(
+          find.descendant(of: results, matching: find.text('Inside note')),
+          findsNothing,
+        );
+        // The state call behind it does the same.
+        expect(
+          (await s.searchAllSpaces(
+            'note',
+            scopeUid: 'p1',
+          )).map((h) => h.note.uid),
+          ['in-p1'],
+        );
+        expect(
+          (await s.searchAllSpaces('note')).map((h) => h.note.uid),
+          containsAll(['in-p1', 'outside']),
         );
         _noError(t);
       });
