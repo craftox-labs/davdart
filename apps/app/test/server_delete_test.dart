@@ -109,7 +109,7 @@ void main() {
     );
   });
 
-  testWidgets('the narrow pill sheet opens the dialog too', (t) async {
+  testWidgets('the narrow Spaces panel opens the dialog too', (t) async {
     final (s, seen, tmp) = await _setup();
     addTearDown(() => tmp.deleteSync(recursive: true));
     t.view.physicalSize = const Size(600, 900);
@@ -117,13 +117,13 @@ void main() {
     addTearDown(t.view.reset);
     await t.pumpWidget(DavdartApp(state: s));
     await t.pumpAndSettle();
-    // The pill's sheet is popped before the row acts: the dialog must still
-    // open, from the pill's own context.
-    await t.tap(find.byKey(const Key('space-chip')));
+    // From the drawer's Spaces panel, next to the strip.
+    await t.tap(find.byKey(const Key('menu')));
+    await t.pumpAndSettle();
+    await t.tap(find.byKey(const Key('rail-spaces')));
     await t.pumpAndSettle();
     await t.tap(find.byKey(const Key('space-server-delete')));
     await t.pumpAndSettle();
-    expect(find.byKey(const Key('menu-sheet')), findsNothing);
     expect(
       find.textContaining('removes the space from the server for everyone'),
       findsOneWidget,

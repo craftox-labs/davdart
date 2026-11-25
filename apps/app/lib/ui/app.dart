@@ -368,7 +368,8 @@ class _ShellState extends State<Shell>
     if (wide) _menuOpen = _gridOpen = false;
     final mirror = state.layoutSide == LayoutSide.end;
     state.nav.setLayout(
-      rail: wide,
+      // The phone's rail is the drawer's strip: an area only while it is open.
+      rail: wide || _menuOpen,
       panel: (wide && _dockOpen) || _menuOpen,
       // Narrow: the page is covered while the menu or grid is open.
       main: wide ? (split || !hasDetail) : !(_menuOpen || _gridOpen),

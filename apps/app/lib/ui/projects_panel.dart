@@ -5,9 +5,11 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/key_nav.dart';
 import 'edit_note_dialog.dart';
-import 'key_nav_ui.dart';
 import 'new_folder_dialog.dart';
+import 'key_nav_ui.dart';
 import 'note_menu.dart';
+import 'move_space_dialog.dart';
+import 'scope_bar.dart';
 import 'overflow_tip.dart';
 import 'parts.dart';
 import 'side_panel.dart';
@@ -90,11 +92,13 @@ class ProjectProgressBar extends StatelessWidget {
   }
 }
 
-/// The Projects side panel section: All, one row per project with derived
-/// counts and a progress bar, then "Everything else" (a count only: the
-/// folder scope cannot express "outside every project", so it is not
-/// tappable). Tapping a project opens it as the folder scope. [onPick] runs
-/// after a pick, to close the narrow sheet.
+/// The Projects panel: the scope picker. "All" is the whole Space; the
+/// projects follow, opened in the most recent first order. Inside a project
+/// the panel drills down a folder level at a time: the parent to go up to,
+/// the folder in scope (marked, with its actions behind a ⋯ and a long press)
+/// and its own folders. A loose folder (outside every project) is a path row
+/// of its own. Tapping a row sets the folder scope. [onPick] runs after a
+/// pick, to close the narrow sheet.
 class ProjectsPanel extends StatelessWidget {
   const ProjectsPanel({super.key, required this.state, this.onPick});
   final AppState state;
@@ -107,20 +111,41 @@ class ProjectsPanel extends StatelessWidget {
       listenable: state,
       builder: (context, _) {
         final ix = state.projectIndex;
-        final projects = ix.projects();
-        final current = state.scopeUid == null
-            ? null
-            : ix.projectOf(state.scopeUid!)?.uid;
+        // Recent projects first (newest first), then the rest in listed
+        // order.
+        final projects = state.projectsByRecent;
+        final scope = state.scopeUid;
+        final current = scope == null ? null : ix.projectOf(scope)?.uid;
+        final here = scope == null ? null : state.tree.find(scope);
         Future<void> open(String? uid) async {
           await state.guarded(() => state.openFolder(uid));
           onPick?.call();
         }
 
-        state.nav.publish('projects', [
+        final rows = <NavEntry>[
           NavEntry('all', open: (_) => open(null)),
           for (final p in projects)
             NavEntry(p.uid, uid: p.uid, open: (_) => open(p.uid)),
-        ]);
+        ];
+        // At a project's own level there is nothing above it to go to (the
+        // projects container is not a place).
+        final atProject =
+            here != null && ix.projectOf(here.note.uid)?.uid == here.note.uid;
+        final up = atProject ? null : here?.parent;
+        if (here != null) {
+          rows.addAll([
+            if (up != null) NavEntry('up', open: (_) => open(up.note.uid)),
+            NavEntry('here', uid: here.note.uid, open: (_) => open(scope)),
+            for (final c in here.children)
+              if (isFolderNote(c.note))
+                NavEntry(
+                  'folder:${c.note.uid}',
+                  uid: c.note.uid,
+                  open: (_) => open(c.note.uid),
+                ),
+          ]);
+        }
+        state.nav.publish('projects', rows);
 
         Widget row({
           required Key key,
@@ -150,69 +175,122 @@ class ProjectsPanel extends StatelessWidget {
           ),
         );
 
+        /// [folder]'s actions, behind its ⋯ (a long press or a right click
+        /// opens them on any row too).
+        Widget more(Note folder) => FPopoverMenu(
+          menuAnchor: Alignment.topRight,
+          childAnchor: Alignment.bottomRight,
+          menuBuilder: (ctx, controller, _) => scopeActionsGroup(
+            context,
+            state,
+            controller,
+            folder,
+            includeClose: true,
+          ),
+          builder: (ctx, controller, _) => IconAction(
+            key: Key('scope-more-${folder.uid}'),
+            compact: true,
+            tooltip: 'Folder actions',
+            icon: FLucideIcons.ellipsis,
+            onPress: controller.toggle,
+          ),
+        );
+
+        /// [folder]'s actions: a project keeps its own (rename, a folder
+        /// inside, a move, delete); any other folder gets the scope actions
+        /// (edit, delete, and back to the whole space).
+        Widget withActions(Note folder, Widget child) => ActionContextMenu(
+          groups: [
+            if (ix.projectOf(folder.uid)?.uid == folder.uid && state.editable)
+              [
+                NoteMenuItem(
+                  'Rename…',
+                  FLucideIcons.pencil,
+                  () => showEditNoteDialog(context, state, folder),
+                  key: Key('menu-project-rename-${folder.uid}'),
+                ),
+                NoteMenuItem(
+                  'New folder inside…',
+                  FLucideIcons.folderPlus,
+                  () => showNewFolderDialog(context, state, under: folder),
+                  key: Key('menu-project-new-folder-${folder.uid}'),
+                ),
+                if (state.spaces.length > 1)
+                  NoteMenuItem(
+                    'Move to another space',
+                    FLucideIcons.folderInput,
+                    () => showMoveSpaceDialog(context, state, folder),
+                    key: const Key('scope-move'),
+                  ),
+                NoteMenuItem(
+                  'Delete…',
+                  FLucideIcons.trash2,
+                  () => confirmDeleteNote(context, state, folder),
+                  key: Key('menu-project-delete-${folder.uid}'),
+                ),
+              ]
+            else
+              scopeActionItems(context, state, folder, includeClose: true),
+          ],
+          child: child,
+        );
+
+        Widget label(IconData icon, String text, {Color? color}) => Row(
+          children: [
+            Icon(icon, size: t.icons.tree, color: color ?? t.muted),
+            SizedBox(width: t.space.sm),
+            Expanded(child: OverflowTip(text, style: t.type.bodyStyle)),
+          ],
+        );
+
+        String name(Note n) => n.summary.isEmpty ? 'Untitled' : n.summary;
+
         Widget project(Note p) {
           final s = ix.statsOf(p.uid);
-          final name = p.summary.isEmpty ? 'Untitled' : p.summary;
-          return ActionContextMenu(
-            groups: [
-              if (state.editable)
-                [
-                  NoteMenuItem(
-                    'Rename…',
-                    FLucideIcons.pencil,
-                    () => showEditNoteDialog(context, state, p),
-                    key: Key('menu-project-rename-${p.uid}'),
-                  ),
-                  NoteMenuItem(
-                    'New folder inside…',
-                    FLucideIcons.folderPlus,
-                    () => showNewFolderDialog(context, state, under: p),
-                    key: Key('menu-project-new-folder-${p.uid}'),
-                  ),
-                ],
-              if (state.editable)
-                [
-                  NoteMenuItem(
-                    'Delete…',
-                    FLucideIcons.trash2,
-                    () => confirmDeleteNote(context, state, p),
-                    key: Key('menu-project-delete-${p.uid}'),
-                  ),
-                ],
-            ],
-            child: row(
-              key: Key('project-${p.uid}'),
-              id: p.uid,
-              on: current == p.uid,
-              onPress: () => open(p.uid),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: t.space.xs,
+          final on = current == p.uid;
+          final body = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: t.space.xs,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(
-                        FLucideIcons.folderKanban,
-                        size: t.icons.tree,
-                        color: t.muted,
-                      ),
-                      SizedBox(width: t.space.sm),
-                      Expanded(
-                        child: OverflowTip(name, style: t.type.bodyStyle),
-                      ),
-                    ],
+                  Icon(
+                    FLucideIcons.folderKanban,
+                    size: t.icons.tree,
+                    color: t.muted,
                   ),
-                  Text(
-                    projectCounts(s),
-                    key: Key('project-counts-${p.uid}'),
-                    style: t.type.captionStyle.copyWith(color: t.muted),
+                  SizedBox(width: t.space.sm),
+                  Expanded(
+                    child: OverflowTip(name(p), style: t.type.bodyStyle),
                   ),
-                  KeyedSubtree(
-                    key: Key('project-progress-${p.uid}'),
-                    child: ProjectProgressBar(s.progress),
-                  ),
+                  if (on) more(p),
                 ],
               ),
+              Padding(
+                padding: EdgeInsets.only(right: on ? t.sizes.touchTarget : 0),
+                child: Text(
+                  projectCounts(s),
+                  key: Key('project-counts-${p.uid}'),
+                  style: t.type.captionStyle.copyWith(color: t.muted),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(right: on ? t.sizes.touchTarget : 0),
+                child: KeyedSubtree(
+                  key: Key('project-progress-${p.uid}'),
+                  child: ProjectProgressBar(s.progress),
+                ),
+              ),
+            ],
+          );
+          return withActions(
+            p,
+            row(
+              key: Key('project-${p.uid}'),
+              id: p.uid,
+              on: on,
+              onPress: () => open(p.uid),
+              child: body,
             ),
           );
         }
@@ -240,7 +318,7 @@ class ProjectsPanel extends StatelessWidget {
               row(
                 key: const Key('projects-all'),
                 id: 'all',
-                on: state.scopeUid == null,
+                on: scope == null,
                 onPress: () => open(null),
                 child: Row(
                   children: [
@@ -250,10 +328,85 @@ class ProjectsPanel extends StatelessWidget {
                       color: t.muted,
                     ),
                     SizedBox(width: t.space.sm),
-                    Expanded(child: Text('All', style: t.type.bodyStyle)),
+                    Expanded(
+                      child: Text(
+                        state.currentSpaceName ?? 'Spaces',
+                        style: t.type.bodyStyle,
+                      ),
+                    ),
+                    if (scope == null)
+                      Text(
+                        'No project',
+                        style: t.type.captionStyle.copyWith(color: t.muted),
+                      ),
                   ],
                 ),
               ),
+              // Inside a project (or a loose folder): one level at a time.
+              if (here != null) ...[
+                if (up != null)
+                  row(
+                    key: const Key('projects-up'),
+                    id: 'up',
+                    onPress: () => open(up.note.uid),
+                    child: label(FLucideIcons.cornerLeftUp, name(up.note)),
+                  ),
+                if (current == null)
+                  // A loose folder has no project row to mark: its own path is
+                  // the scope.
+                  withActions(
+                    here.note,
+                    row(
+                      key: const Key('projects-path'),
+                      id: 'here',
+                      on: true,
+                      onPress: () => open(scope),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: label(
+                              FLucideIcons.folder,
+                              folderPath(state, here.note.uid),
+                            ),
+                          ),
+                          more(here.note),
+                        ],
+                      ),
+                    ),
+                  )
+                else if (!atProject)
+                  // Below a project: the folder in scope, marked, its children
+                  // under it. At the project's own level its row carries the
+                  // mark instead.
+                  withActions(
+                    here.note,
+                    row(
+                      key: const Key('projects-here'),
+                      id: 'here',
+                      on: true,
+                      onPress: () => open(scope),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: label(FLucideIcons.folder, name(here.note)),
+                          ),
+                          more(here.note),
+                        ],
+                      ),
+                    ),
+                  ),
+                for (final c in here.children)
+                  if (isFolderNote(c.note))
+                    withActions(
+                      c.note,
+                      row(
+                        key: Key('projects-folder-${c.note.uid}'),
+                        id: 'folder:${c.note.uid}',
+                        onPress: () => open(c.note.uid),
+                        child: label(FLucideIcons.folder, name(c.note)),
+                      ),
+                    ),
+              ],
               if (projects.isEmpty)
                 Padding(
                   key: const Key('projects-empty'),

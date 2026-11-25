@@ -44,7 +44,8 @@ void _clean(WidgetTester t, String screen, double w) {
   expect(
     ex,
     isNull,
-    reason: '$screen @${_px(w)}px threw: '
+    reason:
+        '$screen @${_px(w)}px threw: '
         '${ex is FlutterError ? ex.message : ex}',
   );
 }
@@ -73,7 +74,8 @@ void _spans(
   expect(
     (c.width - r.width).abs() <= 1,
     isTrue,
-    reason: '$screen @${_px(w)}px: control ${_px(c.left)}..${_px(c.right)} '
+    reason:
+        '$screen @${_px(w)}px: control ${_px(c.left)}..${_px(c.right)} '
         '(w ${_px(c.width)}) does not span the content width of '
         '${_box(t, ref)}',
   );
@@ -103,7 +105,8 @@ List<Note> _notes() => [
     uid: 'n1',
     summary: '$_long, note one',
     parentUid: 'f2',
-    description: 'status: todo\npriority: high\n\nA long body paragraph. '
+    description:
+        'status: todo\npriority: high\n\nA long body paragraph. '
         'It keeps going for a while so the card snippet and the list row '
         'have something to show.\n\nAnd a second paragraph.',
     categories: ['status-todo', ..._tags],
@@ -139,14 +142,22 @@ List<Task> _tasks() => [
     description: 'Task body that runs on a bit to fill a row.',
   ),
   mkTask('t2', summary: '$_long, task two', days: 0, tags: _tags),
-  mkTask('t3', summary: 'A third task, undated and long enough to wrap',
-      tags: const ['one', 'two']),
+  mkTask(
+    't3',
+    summary: 'A third task, undated and long enough to wrap',
+    tags: const ['one', 'two'],
+  ),
 ];
 
 List<Event> _events() => [
   mkEvent('e1', summary: '$_long, event one', days: 0, location: 'Room 4'),
-  mkEvent('e2', summary: 'A second event with a long summary as well',
-      days: 2, hour: 15, tags: _tags),
+  mkEvent(
+    'e2',
+    summary: 'A second event with a long summary as well',
+    days: 2,
+    hour: 15,
+    tags: _tags,
+  ),
 ];
 
 Future<AppState> _pump(
@@ -240,13 +251,7 @@ void main() {
       // The accordion sections all span the same content width.
       if (_k('board-acc-todo').evaluate().isNotEmpty &&
           _k('board-acc-doing').evaluate().isNotEmpty) {
-        _spans(
-          t,
-          'home board',
-          w,
-          _k('board-acc-todo'),
-          'board-acc-doing',
-        );
+        _spans(t, 'home board', w, _k('board-acc-todo'), 'board-acc-doing');
       }
     });
 
@@ -360,11 +365,11 @@ void main() {
       _clean(t, 'event detail', w);
     });
 
-    testWidgets('space chip sheet $at', (t) async {
+    testWidgets('space chip opens the picker $at', (t) async {
       await _pump(t, w);
       await t.tap(_k('space-chip'));
       await t.pumpAndSettle();
-      _present(t, 'space chip', w, _k('menu-sheet'));
+      _present(t, 'space chip', w, _k('projects-view'));
       _clean(t, 'space chip', w);
     });
 

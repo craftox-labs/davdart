@@ -50,7 +50,7 @@ void main() {
       await t.tap(find.byKey(Key('scope-more-$loose')));
       await t.pumpAndSettle();
       expect(find.byKey(const Key('scope-delete')), findsOneWidget);
-      expect(find.byKey(const Key('scope-close')), findsNothing);
+      expect(find.byKey(const Key('scope-close')), findsOneWidget);
       final sheetEx = t.takeException();
       expect(
         sheetEx,
@@ -189,13 +189,12 @@ void main() {
     expect(s.scope, isNotNull);
     await t.tap(find.byKey(const Key('space-chip')));
     await t.pumpAndSettle();
+    // The panel shows the loose folder as a path row, its actions behind the
+    // ⋯; "Show the whole space" is in that menu, and the Space's own row.
+    expect(find.byKey(const Key('projects-path')), findsOneWidget);
     await t.tap(find.byKey(Key('scope-more-${s.scopeUid}')));
     await t.pumpAndSettle();
-    // The sheet has no "Show the whole space"; the picker's Space row does it.
-    expect(find.byKey(const Key('scope-close')), findsNothing);
-    await t.tap(find.byKey(const Key('menu-back')));
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('scope-pick-all')));
+    await t.tap(find.byKey(const Key('scope-close')));
     await t.pumpAndSettle();
     expect(s.scope, isNull);
     expect(t.takeException(), isNull);

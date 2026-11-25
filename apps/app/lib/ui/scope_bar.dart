@@ -237,6 +237,17 @@ class NarrowCrumbs extends StatelessWidget {
 /// that exists offers some only. [includeClose] adds "Show the whole space",
 /// which the wide bar's menu offers beside the breadcrumb; the narrow picker
 /// leaves it out, its first row already goes back to the whole Space.
+/// The folder's path below the Space: its name and its ancestors', with the
+/// Projects container level skipped.
+String folderPath(AppState state, String uid) {
+  final names = <String>[];
+  for (var n = state.tree.find(uid); n != null; n = n.parent) {
+    if (isProjectsContainer(n.note)) continue;
+    names.insert(0, n.note.summary.isEmpty ? 'Untitled' : n.note.summary);
+  }
+  return names.join(' › ');
+}
+
 List<NoteMenuItem> scopeActionItems(
   BuildContext context,
   AppState state,

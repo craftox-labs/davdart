@@ -1019,5 +1019,30 @@ void main() {
       expect(t.takeException(), isNull);
       await _press(t, LogicalKeyboardKey.escape);
     });
+
+    testWidgets('the drawer strip is the rail area', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        size: const Size(390, 800),
+        tasks: [mkTask('a')],
+      );
+      // No rail on a phone until the drawer shows one.
+      expect(s.nav.ring, isNot(contains(NavArea.rail)));
+      await t.tap(_k('menu'));
+      await t.pumpAndSettle();
+      expect(s.nav.ring, contains(NavArea.rail));
+      await _press(t, LogicalKeyboardKey.keyH);
+      expect(s.nav.area, NavArea.rail);
+      expect(s.nav.cursorId(KeyNav.railList), 'spaces');
+      await _press(t, _j);
+      await _press(t, _j);
+      await _press(t, _j);
+      expect(s.nav.cursorId(KeyNav.railList), 'tasks');
+      await _press(t, LogicalKeyboardKey.enter);
+      await t.pumpAndSettle();
+      expect(s.section, Section.tasks);
+      expect(_k('side-menu'), findsOneWidget);
+      await _press(t, LogicalKeyboardKey.escape);
+    });
   });
 }

@@ -289,9 +289,11 @@ void main() {
         // The tab takes the full header height and is its own hit box.
         final box = t.getRect(_k('space-chip'));
         expect(box.height, closeTo(bar.height, 1.5));
+        // Tapping it opens the Projects panel: the scope picker.
         await t.tapAt(Offset(box.center.dx, box.top + 3));
         await t.pumpAndSettle();
-        expect(_k('menu-sheet'), findsOneWidget);
+        expect(_k('side-menu'), findsOneWidget);
+        expect(_k('projects-view'), findsOneWidget);
         _noError(t);
       });
 
@@ -335,10 +337,10 @@ void main() {
           expect(_k('top-bar'), findsOneWidget, reason: uid);
           expect(_k('space-chip'), findsOneWidget, reason: uid);
           expect(find.byIcon(FLucideIcons.refreshCw), findsOneWidget);
-          // Tapping the chip still opens the Space sheet.
+          // Tapping the chip still opens the scope picker.
           await t.tap(_k('space-chip'));
           await t.pumpAndSettle();
-          expect(_k('menu-sheet'), findsOneWidget);
+          expect(_k('projects-view'), findsOneWidget);
           expect(await t.binding.handlePopRoute(), isTrue);
           await t.pumpAndSettle();
         }
@@ -369,25 +371,21 @@ void main() {
         expect(gap, greaterThan(step));
         // The strip is 44dp targets.
         expect(t.getRect(_k('rail-notes')).height, 44);
-        // Spaces opens the Space switcher, as the top chip does.
+        // Spaces is a section of its own, like the others (one fixed source
+        // here: nothing to switch to, so no row and no manage actions).
         await t.tap(_k('rail-spaces'));
         await t.pumpAndSettle();
         expect(find.text('One fixed notes source'), findsOneWidget);
-        // A tap outside the popover closes it (Back would close the drawer).
-        await t.tapAt(const Offset(300, 400));
-        await t.pumpAndSettle();
+        expect(find.text('MANAGE'), findsNothing);
         await t.tap(_k('rail-settings'));
         await t.pumpAndSettle();
         expect(s.section, Section.settings);
         expect(_k('side-menu'), findsOneWidget);
-        // The Space chip sheet has none of it.
+        // The chip's picker shows the Projects panel, not the strip.
         await t.tap(_k('space-chip'));
         await t.pumpAndSettle();
-        expect(_k('menu-sheet'), findsOneWidget);
-        expect(
-          find.descendant(of: _k('menu-sheet'), matching: _k('rail-settings')),
-          findsNothing,
-        );
+        expect(_k('projects-view'), findsOneWidget);
+        expect(_k('rail-settings'), findsOneWidget);
         _noError(t);
       });
 
@@ -416,20 +414,6 @@ void main() {
         await t.pumpAndSettle();
         expect(s.section, Section.search);
         expect(s.nav.searchNode.hasFocus, isTrue);
-        _noError(t);
-      });
-
-      testWidgets('Back over the Spaces popup closes the drawer', (t) async {
-        await pumpTasksApp(t, size: size);
-        await _openMenu(t);
-        await t.tap(_k('rail-spaces'));
-        await t.pumpAndSettle();
-        expect(find.text('One fixed notes source'), findsOneWidget);
-        expect(await t.binding.handlePopRoute(), isTrue);
-        await t.pumpAndSettle();
-        // The popup is no route of its own: Back reaches the drawer's PopScope
-        // and closes the drawer, popup and all.
-        expect(_k('side-menu'), findsNothing);
         _noError(t);
       });
 
