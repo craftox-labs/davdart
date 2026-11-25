@@ -135,7 +135,8 @@ void main() {
           expect(_k('space-chip'), findsWidgets);
           expect(find.text('Alpha'), findsWidgets);
           // The rail strip is a column on the left edge, one tap per
-          // section, with a Back button under the panel.
+          // section; no Back of its own (the bar's Menu closes it).
+          expect(_k('side-menu-back'), findsNothing);
           final strip = t.getRect(_k('icon-rail'));
           expect(strip.left, 0);
           expect(strip.width, lessThan(60));
@@ -146,10 +147,6 @@ void main() {
           expect(
             t.getRect(_k('rail-notes')).right,
             lessThanOrEqualTo(strip.right),
-          );
-          expect(
-            t.getRect(_k('side-menu-back')).top,
-            greaterThan(t.getRect(find.text('Alpha').first).bottom),
           );
           expect(_k('menu-fold'), findsOneWidget);
           // The fold control sits inline with + and new-folder; no Space
@@ -436,10 +433,10 @@ void main() {
         _noError(t);
       });
 
-      testWidgets('the drawer Back closes the menu', (t) async {
+      testWidgets('system Back closes the menu', (t) async {
         await pumpTasksApp(t, size: size);
         await _openMenu(t);
-        await t.tap(_k('side-menu-back'));
+        expect(await t.binding.handlePopRoute(), isTrue);
         await t.pumpAndSettle();
         expect(_k('side-menu'), findsNothing);
         _noError(t);

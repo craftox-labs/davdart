@@ -328,7 +328,6 @@ class SideMenuPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = tokensOf(context);
     return GestureDetector(
       key: const Key('side-menu'),
       behavior: HitTestBehavior.translucent,
@@ -347,43 +346,10 @@ class SideMenuPage extends StatelessWidget {
             // Settings, one tap each.
             IconRail(state: state, strip: true),
             Expanded(
-              child: Column(
-                children: [
-                  Expanded(
-                    child: AreaMark(
-                      nav: state.nav,
-                      area: NavArea.panel,
-                      child: sectionBody(state, visibleSection(state), onClose),
-                    ),
-                  ),
-                  // Back inside the drawer as well: on a phone the bottom
-                  // bar's button is out of thumb reach, and Safari's own back
-                  // swipe is history, not the drawer.
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      t.space.lg,
-                      t.space.xs,
-                      t.space.lg,
-                      t.space.xs,
-                    ),
-                    child: touchBox(
-                      context,
-                      FButton(
-                        key: const Key('side-menu-back'),
-                        variant: FButtonVariant.outline,
-                        onPress: onClose,
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(FLucideIcons.arrowLeft, size: 16),
-                            SizedBox(width: 8),
-                            Text('Back'),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+              child: AreaMark(
+                nav: state.nav,
+                area: NavArea.panel,
+                child: sectionBody(state, visibleSection(state), onClose),
               ),
             ),
           ],
