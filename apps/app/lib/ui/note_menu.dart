@@ -81,6 +81,10 @@ List<FItemMixin> menuRows(
           key: i.key,
           prefix: Icon(i.icon, size: t.icons.md, color: t.muted),
           title: Text(i.label),
+          // forui picks the anchors by platform, and the web counts as not
+          // desktop: the submenu would open stacked over its row.
+          submenuAnchor: Alignment.topLeft,
+          itemAnchor: Alignment.topRight,
           submenu: [FItemGroup(children: menuRows(context, c, i.children))],
         )
       else
@@ -181,10 +185,13 @@ Future<void> showMenuSheet(
       side: side,
       mainAxisMaxRatio: 0.8,
       useSafeArea: true,
-      builder: (ctx) => SheetMenuScope(
-        child: SingleChildScrollView(
-          key: const Key('menu-sheet'),
-          child: FItemGroup.merge(children: build(ctx, c)),
+      builder: (_) => SheetMenuScope(
+        // Built below the scope: menuRows looks the scope up from this context.
+        child: Builder(
+          builder: (ctx) => SingleChildScrollView(
+            key: const Key('menu-sheet'),
+            child: FItemGroup.merge(children: build(ctx, c)),
+          ),
         ),
       ),
     );

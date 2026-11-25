@@ -152,6 +152,10 @@ void main() {
       for (final k in ['menu-open-main', 'menu-edit', 'menu-close']) {
         expect(_k(k), findsNothing, reason: k);
       }
+      // The sheet now lists flattened submenu rows, so Delete can sit below
+      // the fold of the scrollable sheet.
+      await t.ensureVisible(_k('menu-delete'));
+      await t.pumpAndSettle();
       await t.tap(_k('menu-delete'));
       await t.pumpAndSettle();
       await t.tap(_k('delete-confirm'));

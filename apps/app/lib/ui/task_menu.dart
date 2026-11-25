@@ -7,6 +7,7 @@ import '../state/app_state.dart';
 import '../state/tab_state.dart';
 import 'note_menu.dart';
 import 'parts.dart';
+import 'task_detail.dart' show priorityBucket, priorityOfBucket;
 import 'task_parts.dart';
 import 'theme.dart';
 
@@ -150,6 +151,29 @@ class TaskContextMenu extends StatelessWidget {
                 FLucideIcons.calendarX,
                 () => due(null),
                 key: const Key('menu-task-due-clear'),
+              ),
+          ],
+        ),
+      if (edit)
+        NoteMenuItem(
+          'Set priority',
+          FLucideIcons.flag,
+          () {},
+          key: const Key('menu-priority'),
+          children: [
+            for (final b in const ['none', 'high', 'medium', 'low'])
+              NoteMenuItem(
+                b == 'none'
+                    ? 'No priority'
+                    : b[0].toUpperCase() + b.substring(1),
+                b == 'none' ? FLucideIcons.circle : FLucideIcons.flag,
+                () => state.updateTask(
+                  uid,
+                  setPriority: true,
+                  priority: priorityOfBucket(b),
+                ),
+                key: Key('menu-priority-$b'),
+                selected: priorityBucket(task.priority) == b,
               ),
           ],
         ),
