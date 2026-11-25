@@ -294,10 +294,7 @@ class _Card extends StatelessWidget {
     final titleStyle = t.type.bodyStrong;
     final title = task != null
         ? OverflowTip(task.summary, maxLines: 3, style: titleStyle)
-        : Text(
-            _cardTitle(note!, plan!),
-            style: titleStyle,
-          );
+        : Text(_cardTitle(note!, plan!), style: titleStyle);
     final bucket = task != null
         ? priorityBucket(task.priority)
         : (plan!.priorityWord ?? 'none');
@@ -349,7 +346,17 @@ class _Card extends StatelessWidget {
           borderRadius: BorderRadius.circular(t.radii.card),
           border: Border.all(color: selected ? t.accent : t.cardBorder),
         ),
-        child: Padding(padding: EdgeInsets.all(t.space.lg), child: body),
+        child: Padding(
+          padding: compact
+              ? EdgeInsets.fromLTRB(
+                  t.space.lg,
+                  t.space.lg,
+                  t.space.huge,
+                  t.space.lg,
+                )
+              : EdgeInsets.all(t.space.lg),
+          child: body,
+        ),
       ),
     );
     final draggable = NoteDraggable(
@@ -366,11 +373,7 @@ class _Card extends StatelessWidget {
       child: Opacity(
         opacity: item.canceled || column == 'canceled' ? 0.5 : 1,
         child: task != null
-            ? TaskContextMenu(
-                state: state,
-                uid: task.uid,
-                child: draggable,
-              )
+            ? TaskContextMenu(state: state, uid: task.uid, child: draggable)
             : NoteContextMenu(
                 state: state,
                 uid: item.uid,
@@ -495,13 +498,15 @@ class _Card extends StatelessWidget {
     return Semantics(
       label: label,
       excludeSemantics: true,
-      child: Row(
-        children: [
-          ...parts,
-          if (folder != null)
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerRight,
+      child: LayoutBuilder(
+        builder: (context, box) => Row(
+          children: [
+            // The left group takes the row; the folder sits at the right end
+            // (capped, so a long name cannot squeeze the tags).
+            Expanded(child: Row(children: parts)),
+            if (folder != null)
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: box.maxWidth * 0.4),
                 child: Padding(
                   padding: EdgeInsets.only(left: t.space.md),
                   child: pair(
@@ -512,35 +517,40 @@ class _Card extends StatelessWidget {
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  /// The phone card with a drag grip at its bottom-right corner, a touch
-  /// target of its own, not covered by a scroll.
+  /// The phone card with a drag grip: a full-height strip at the right edge,
+  /// a touch target of its own. A long press on it does nothing, so the
+  /// card's menu cannot fire from the grip.
   Widget _withGrip(Tokens t, Widget card) => Stack(
     children: [
       card,
       Positioned(
+        top: 0,
         right: 0,
         bottom: 0,
-        child: NoteDraggable(
-          uid: item.uid,
-          source: NoteDragSource.board,
-          atPointer: true,
-          handle: true,
-          label: item.title,
-          child: SizedBox(
-            key: Key('card-grip-${item.uid}'),
-            width: t.space.huge,
-            height: t.space.huge,
-            child: Center(
-              child: Icon(
-                FLucideIcons.gripVertical,
-                size: t.icons.sm,
-                color: t.muted,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPress: () {},
+          child: NoteDraggable(
+            uid: item.uid,
+            source: NoteDragSource.board,
+            atPointer: true,
+            handle: true,
+            label: item.title,
+            child: SizedBox(
+              key: Key('card-grip-${item.uid}'),
+              width: t.space.huge,
+              child: Center(
+                child: Icon(
+                  FLucideIcons.gripVertical,
+                  size: t.icons.sm,
+                  color: t.muted,
+                ),
               ),
             ),
           ),

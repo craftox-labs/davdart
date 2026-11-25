@@ -434,8 +434,9 @@ void main() {
       await pump(t);
       expect(find.text('BACKLOG'), findsOneWidget);
       expect(find.text('TODO'), findsOneWidget);
-      expect(find.text('davdart-slice-1'), findsWidgets);
-      await t.tap(find.text('davdart-decisions').first);
+      // A plan item's card shows its summary, not the item_id slug.
+      expect(find.text('Core slice'), findsWidgets);
+      await t.tap(find.text('Build decisions').first);
       await t.pumpAndSettle();
       expect(find.text('Confirmed'), findsOneWidget);
       // The card's snippet and the detail pane both show it.

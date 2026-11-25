@@ -163,6 +163,8 @@ class _ShellState extends State<Shell>
     value: widget.state.hasPeek && !widget.state.peekCollapsed ? 1 : 0,
   );
 
+  FToasterEntry? _undoToast;
+
   /// The last peeked note, kept mounted while the pane slides shut.
   String? _heldPeek;
 
@@ -181,6 +183,25 @@ class _ShellState extends State<Shell>
       if (mounted) {
         showFToast(context: context, title: Text('Not saved: $reason'));
       }
+    };
+    widget.state.onBoardUndo = (u) {
+      if (!mounted) return;
+      _undoToast?.dismiss();
+      _undoToast = showFToast(
+        context: context,
+        title: Text(u.label),
+        suffixBuilder: (_, entry) => FButton(
+          key: const Key('board-undo'),
+          variant: FButtonVariant.outline,
+          size: FButtonSizeVariant.xs,
+          mainAxisSize: MainAxisSize.min,
+          onPress: () {
+            entry.dismiss();
+            widget.state.undoBoard(u);
+          },
+          child: const Text('Undo'),
+        ),
+      );
     };
     widget.state.openMenu = () => setState(() {
       _gridOpen = false;

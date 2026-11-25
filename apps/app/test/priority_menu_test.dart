@@ -119,7 +119,7 @@ void main() {
   });
 
   group('phone menu sheet', () {
-    testWidgets('a task: flat rows set, clear and mark the priority', (
+    testWidgets('a task: drill-in rows set, clear and mark the priority', (
       t,
     ) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -133,22 +133,26 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('item-more'));
       await t.pumpAndSettle();
-      expect(find.text('Set priority: High'), findsOneWidget);
+      await t.tap(_k('menu-priority'));
+      await t.pumpAndSettle();
       expect(_marked('menu-priority-high'), findsOneWidget);
       await t.tap(_k('menu-priority-low'));
       await t.pumpAndSettle();
       expect(_k('menu-sheet'), findsNothing);
       expect(s.taskById('k1')!.priority, 9);
+      await t.pump(const Duration(seconds: 6)); // the undo toast leaves
+      await t.pumpAndSettle();
       await t.tap(_k('item-more'));
       await t.pumpAndSettle();
-      expect(find.text('Set priority: Low'), findsOneWidget);
+      await t.tap(_k('menu-priority'));
+      await t.pumpAndSettle();
       expect(_marked('menu-priority-low'), findsOneWidget);
       await t.tap(_k('menu-priority-none'));
       await t.pumpAndSettle();
       expect(s.taskById('k1')!.priority, isNull);
     });
 
-    testWidgets('a note: flat rows set, clear and mark the priority word', (
+    testWidgets('a note: drill-in rows set, clear and mark the priority word', (
       t,
     ) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -162,20 +166,27 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('item-more'));
       await t.pumpAndSettle();
-      expect(find.text('Set priority: high'), findsOneWidget);
+      await t.tap(_k('menu-priority'));
+      await t.pumpAndSettle();
       expect(_marked('menu-priority-high'), findsOneWidget);
       await t.tap(_k('menu-priority-medium'));
+      await t.pumpAndSettle();
+      await t.pump(const Duration(seconds: 6)); // the undo toast leaves
       await t.pumpAndSettle();
       expect(_word(s, 'n'), 'medium');
       await t.tap(_k('item-more'));
       await t.pumpAndSettle();
-      expect(find.text('Set priority: medium'), findsOneWidget);
+      await t.tap(_k('menu-priority'));
+      await t.pumpAndSettle();
       await t.tap(_k('menu-priority-none'));
       await t.pumpAndSettle();
       expect(_word(s, 'n'), isNull);
+      await t.pump(const Duration(seconds: 6));
+      await t.pumpAndSettle();
       await t.tap(_k('item-more'));
       await t.pumpAndSettle();
-      expect(find.text('Set priority: No priority'), findsOneWidget);
+      await t.tap(_k('menu-priority'));
+      await t.pumpAndSettle();
       expect(_marked('menu-priority-none'), findsOneWidget);
     });
   });

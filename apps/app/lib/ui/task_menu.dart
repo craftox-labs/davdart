@@ -167,11 +167,7 @@ class TaskContextMenu extends StatelessWidget {
                     ? 'No priority'
                     : b[0].toUpperCase() + b.substring(1),
                 b == 'none' ? FLucideIcons.circle : FLucideIcons.flag,
-                () => state.updateTask(
-                  uid,
-                  setPriority: true,
-                  priority: priorityOfBucket(b),
-                ),
+                () => state.setTaskPriority(uid, priorityOfBucket(b)),
                 key: Key('menu-priority-$b'),
                 selected: priorityBucket(task.priority) == b,
               ),

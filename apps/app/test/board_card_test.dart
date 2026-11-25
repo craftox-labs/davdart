@@ -94,9 +94,7 @@ void main() {
     expect(t.getTopLeft(kind).dy, greaterThan(t.getBottomLeft(title).dy));
   });
 
-  testWidgets('each priority has its own colour: red, orange, cool', (
-    t,
-  ) async {
+  testWidgets('each priority has its own colour: red, orange, cool', (t) async {
     AppState.debugDefaultFocus = HomeFocus.board;
     await pumpTasksApp(
       t,
@@ -338,9 +336,7 @@ void main() {
     expect(PlanItem.fromNote(s.findItem('n') as Note).status, 'doing');
   });
 
-  testWidgets('phone: the grip drags, a drop on a card ranks', (
-    t,
-  ) async {
+  testWidgets('phone: the grip drags, a drop on a card ranks', (t) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     AppState.debugDefaultFocus = HomeFocus.board;
@@ -398,5 +394,47 @@ void main() {
     await t.pumpAndSettle();
     expect(_k('menu-sheet'), findsOneWidget);
     expect(PlanItem.fromNote(s.findItem('n') as Note).status, 'todo');
+  });
+
+  testWidgets('phone: a long press on the grip does not open the menu', (
+    t,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await pump(t, size: const Size(390, 844));
+    if (_k('card-grip-n').evaluate().isEmpty) {
+      await t.tap(_k('board-acc-todo-toggle'));
+      await t.pumpAndSettle();
+    }
+    await t.longPress(_k('card-grip-n'));
+    await t.pumpAndSettle();
+    expect(_k('menu-sheet'), findsNothing);
+  });
+
+  testWidgets('phone: the grip strip is as tall as the card', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    await pump(t, size: const Size(390, 844));
+    if (_k('card-grip-n').evaluate().isEmpty) {
+      await t.tap(_k('board-acc-todo-toggle'));
+      await t.pumpAndSettle();
+    }
+    final card = t.getRect(_k('nav-card-n'));
+    final grip = t.getRect(_k('card-grip-n'));
+    expect(grip.height, card.height);
+    expect(grip.right, card.right);
+  });
+
+  testWidgets('wide: the folder chip sits at the right padding edge', (
+    t,
+  ) async {
+    await pump(t);
+    for (final id in ['n', 't']) {
+      final card = t.getRect(_k('nav-card-$id'));
+      final folder = t.getRect(_k('card-folder-$id'));
+      // The card padding is 12 (space.lg); the chip ends there, however
+      // short the tags are.
+      expect(card.right - folder.right, closeTo(12, 1.5), reason: id);
+    }
   });
 }

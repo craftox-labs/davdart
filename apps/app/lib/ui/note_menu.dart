@@ -57,21 +57,37 @@ List<FItemMixin> menuRows(
   List<NoteMenuItem> items,
 ) {
   final t = tokensOf(context);
-  // A sheet has no hover submenus: a submenu's rows follow as plain rows.
-  if (SheetMenuScope.of(context)) {
-    items = [
+  // A sheet has no hover submenus: a submenu's row drills into its options
+  // (the sheet then shows them alone, under a Back row).
+  final nav = SheetMenuScope.navOf(context);
+  if (nav != null) {
+    return [
       for (final i in items)
         if (i.children.isNotEmpty)
-          for (final c in i.children)
-            NoteMenuItem(
-              '${i.label}: ${c.label}',
-              c.icon,
-              c.onPress,
-              key: c.key,
-              selected: c.selected,
-            )
+          FItem(
+            key: i.key,
+            prefix: Icon(i.icon, size: t.icons.md, color: t.muted),
+            title: Text(i.label),
+            suffix: Icon(
+              FLucideIcons.chevronRight,
+              size: t.icons.md,
+              color: t.muted,
+            ),
+            onPress: () => nav.open(i),
+          )
         else
-          i,
+          FItem(
+            key: i.key,
+            prefix: Icon(i.icon, size: t.icons.md, color: t.muted),
+            title: Text(i.label),
+            suffix: i.selected
+                ? Icon(FLucideIcons.check, size: t.icons.md, color: t.accent)
+                : null,
+            onPress: () {
+              c.hide();
+              i.onPress();
+            },
+          ),
     ];
   }
   return [
@@ -136,12 +152,32 @@ class ExclusiveContextMenu extends StatefulWidget {
 /// the event has been dispatched).
 final Set<int> _claimed = {};
 
+/// Which submenu a sheet has drilled into (null: the top level).
+class SheetMenuNav extends ChangeNotifier {
+  NoteMenuItem? current;
+
+  void open(NoteMenuItem item) {
+    current = item;
+    notifyListeners();
+  }
+
+  void back() {
+    current = null;
+    notifyListeners();
+  }
+}
+
 /// True inside [showMenuSheet]: menu rows are laid out for a sheet.
 class SheetMenuScope extends InheritedWidget {
-  const SheetMenuScope({super.key, required super.child});
+  const SheetMenuScope({super.key, required this.nav, required super.child});
 
-  static bool of(BuildContext context) =>
-      context.getInheritedWidgetOfExactType<SheetMenuScope>() != null;
+  final SheetMenuNav nav;
+
+  static bool of(BuildContext context) => navOf(context) != null;
+
+  static SheetMenuNav? navOf(BuildContext context) => context
+      .getInheritedWidgetOfExactType<SheetMenuScope>()
+      ?.nav;
 
   @override
   bool updateShouldNotify(SheetMenuScope old) => false;
@@ -170,6 +206,7 @@ Future<void> showMenuSheet(
   FLayout side = FLayout.btt,
 }) async {
   var open = true;
+  final nav = SheetMenuNav();
   late final SheetPopoverController c;
   c = SheetPopoverController(
     vsync: vsync,
@@ -186,17 +223,49 @@ Future<void> showMenuSheet(
       mainAxisMaxRatio: 0.8,
       useSafeArea: true,
       builder: (_) => SheetMenuScope(
+        nav: nav,
         // Built below the scope: menuRows looks the scope up from this context.
         child: Builder(
-          builder: (ctx) => SingleChildScrollView(
-            key: const Key('menu-sheet'),
-            child: FItemGroup.merge(children: build(ctx, c)),
+          builder: (ctx) => ListenableBuilder(
+            listenable: nav,
+            builder: (ctx, _) {
+              final open = nav.current;
+              final tokens = tokensOf(ctx);
+              return SingleChildScrollView(
+                key: const Key('menu-sheet'),
+                child: FItemGroup.merge(
+                  children: open == null
+                      ? build(ctx, c)
+                      : [
+                          FItemGroup(
+                            children: [
+                              FItem(
+                                key: const Key('menu-back'),
+                                prefix: Icon(
+                                  FLucideIcons.chevronLeft,
+                                  size: tokens.icons.md,
+                                  color: tokens.muted,
+                                ),
+                                title: Text(
+                                  open.label,
+                                  style: tokens.type.bodyStrong,
+                                ),
+                                onPress: nav.back,
+                              ),
+                              ...menuRows(ctx, c, open.children),
+                            ],
+                          ),
+                        ],
+                ),
+              );
+            },
           ),
         ),
       ),
     );
   } finally {
     open = false;
+    nav.dispose();
     c.dispose();
   }
 }

@@ -58,6 +58,13 @@ String _clock() {
 /// A named combination of view, search text, tag filter and folder scope.
 /// Stored as a `kind-view` note in the Space, so it syncs; the stored format
 /// is documented on [SavedViewSpec] in the core.
+/// A board change Undo can revert: [label] names the item and the change.
+class BoardUndo {
+  BoardUndo(this.label, this.undo);
+  final String label;
+  final Future<void> Function() undo;
+}
+
 class SavedView {
   SavedView(
     this.name,
@@ -1651,9 +1658,14 @@ class AppState extends ChangeNotifier {
 
   /// Moves a note to another status (keeps the header and status tag in step).
   /// A null [status] clears it (removes the status line and tag).
-  Future<void> setStatus(String uid, String? status) async {
+  Future<void> setStatus(
+    String uid,
+    String? status, {
+    bool undoable = true,
+  }) async {
     final n = tree.find(uid)?.note;
     if (n == null) return;
+    final before = PlanItem.fromNote(n).status;
     final copy = n.copyWith();
     final p = PlanItem.fromNote(copy);
     if (status == null) {
@@ -1662,16 +1674,101 @@ class AppState extends ChangeNotifier {
       p.setStatus(status);
     }
     await _save(p.apply());
+    if (undoable && error == null && before != status) {
+      _postUndo(
+        status == null
+            ? 'Cleared status of "${n.summary}"'
+            : 'Moved "${n.summary}" to $status',
+        () => _restoreItem(uid, setStatus: true, status: before),
+      );
+    }
   }
 
   /// Sets a note's priority (`high`, `medium`, `low`; null clears it) in its
   /// body header; the other header lines stay.
-  Future<void> setNotePriority(String uid, String? priority) async {
+  Future<void> setNotePriority(
+    String uid,
+    String? priority, {
+    bool undoable = true,
+  }) async {
     final n = tree.find(uid)?.note;
     if (n == null) return;
+    final before = PlanItem.fromNote(n).priorityWord;
     final copy = n.copyWith();
     final p = PlanItem.fromNote(copy)..setPriority(priority);
     await _save(p.apply());
+    if (undoable && error == null && before != priority) {
+      _postUndo(
+        _priorityLabel(n.summary, priority),
+        () => _restoreItem(uid, setPriority: true, priorityWord: before),
+      );
+    }
+  }
+
+  /// The one change Undo would revert, shown as a toast by the app shell.
+  /// A newer change replaces it.
+  BoardUndo? pendingUndo;
+
+  /// Set by the app shell: shows [u] as a toast with an Undo action.
+  void Function(BoardUndo u)? onBoardUndo;
+
+  void _postUndo(String label, Future<void> Function() undo) {
+    final u = BoardUndo(label, undo);
+    pendingUndo = u;
+    onBoardUndo?.call(u);
+  }
+
+  /// Runs [u] only while it is still the latest change.
+  Future<void> undoBoard(BoardUndo u) async {
+    if (!identical(pendingUndo, u)) return;
+    pendingUndo = null;
+    await u.undo();
+  }
+
+  static String _priorityLabel(String title, String? word) => word == null
+      ? 'Priority of "$title" cleared'
+      : 'Priority of "$title" set to ${word[0].toUpperCase()}${word.substring(1)}';
+
+  /// Puts back only the status, priority and/or rank of a note or task; its
+  /// other fields stay as they are now.
+  Future<void> _restoreItem(
+    String uid, {
+    bool setStatus = false,
+    String? status,
+    bool setPriority = false,
+    String? priorityWord,
+    int? priorityInt,
+    bool setRank = false,
+    double? rank,
+  }) async {
+    final t = _taskById(uid);
+    if (t != null) {
+      final copy = t.copyWith(
+        priority: setPriority ? priorityInt : null,
+        clearPriority: setPriority && priorityInt == null,
+      );
+      if (setStatus && status != null) {
+        copy.setBoardStatus(status, DateTime.now());
+      }
+      if (setRank) copy.rank = rank;
+      await _taskEdit((src) => src.saveTask(copy));
+      return;
+    }
+    final n = tree.find(uid)?.note;
+    if (n == null) return;
+    var copy = n.copyWith();
+    final p = PlanItem.fromNote(copy);
+    if (setStatus) {
+      if (status == null) {
+        p.clearStatus();
+      } else {
+        p.setStatus(status);
+      }
+    }
+    if (setPriority) p.setPriority(priorityWord);
+    copy = p.apply();
+    if (setRank) copy.rank = rank;
+    await _save(copy);
   }
 
   /// Changes a note's title and/or body text (the header lines stay).
@@ -2181,12 +2278,50 @@ class AppState extends ChangeNotifier {
 
   /// Moves a task to a board status word (`todo`, `doing`, `done`, ...);
   /// `done` follows the same repeating-task rule as [setTaskDone].
-  Future<bool> setTaskStatus(String uid, String word) async {
+  Future<bool> setTaskStatus(
+    String uid,
+    String word, {
+    bool undoable = true,
+  }) async {
     final t = _taskById(uid);
     if (t == null) return false;
     if (word == 'done' && taskCompletionBlocker(t) != null) return false;
+    final before = t.boardStatus;
+    final title = t.summary;
     final copy = t.copyWith()..setBoardStatus(word, DateTime.now());
-    return _taskEdit((src) => src.saveTask(copy));
+    final ok = await _taskEdit((src) => src.saveTask(copy));
+    if (ok && undoable && before != word) {
+      _postUndo(
+        'Moved "$title" to $word',
+        () => _restoreItem(uid, setStatus: true, status: before),
+      );
+    }
+    return ok;
+  }
+
+  /// Sets a task's priority (a [priority] of null clears it), with Undo.
+  Future<bool> setTaskPriority(String uid, int? priority) async {
+    final t = _taskById(uid);
+    if (t == null) return false;
+    final before = t.priority;
+    final title = t.summary;
+    final ok = await updateTask(uid, setPriority: true, priority: priority);
+    if (ok && before != priority) {
+      _postUndo(
+        _priorityLabel(title, _priorityWordOf(priority)),
+        () => _restoreItem(uid, setPriority: true, priorityInt: before),
+      );
+    }
+    return ok;
+  }
+
+  static String? _priorityWordOf(int? p) {
+    if (p == null || p <= 0) return null;
+    return p <= 4
+        ? 'high'
+        : p == 5
+        ? 'medium'
+        : 'low';
   }
 
   /// Drops a Home board card into [column]. With [index] (the insertion
@@ -2215,6 +2350,11 @@ class AppState extends ChangeNotifier {
     final changed = from != column;
     if (!changed && index == null) return;
     final now = DateTime.now();
+    final title = moved.isTask ? moved.task!.summary : moved.note!.summary;
+    final beforeStatus = moved.isTask
+        ? moved.task!.boardStatus
+        : PlanItem.fromNote(moved.note!).status;
+    final beforeRank = moved.rank;
     final noteSaves = <Note>[], taskSaves = <Task>[];
     for (final id in {uid, ...plan.keys}) {
       final item = byUid[id];
@@ -2251,6 +2391,18 @@ class AppState extends ChangeNotifier {
           await src.saveTask(t);
         }
       });
+    }
+    if (error == null) {
+      _postUndo(
+        changed ? 'Moved "$title" to $column' : 'Moved "$title" in $column',
+        () => _restoreItem(
+          uid,
+          setStatus: changed,
+          status: beforeStatus,
+          setRank: true,
+          rank: beforeRank,
+        ),
+      );
     }
   }
 
@@ -3177,10 +3329,10 @@ class AppState extends ChangeNotifier {
       parentUid: parent,
     );
     if (error == null && status != null && status != d.originalStatus) {
-      await setStatus(d.uid, status);
+      await setStatus(d.uid, status, undoable: false);
     }
     if (error == null && priority != d.originalPriority) {
-      await setNotePriority(d.uid, priority);
+      await setNotePriority(d.uid, priority, undoable: false);
     }
     if (error != null) return false;
     // Deleted while this save ran: updateNote did nothing. Keep the draft.
