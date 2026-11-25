@@ -70,4 +70,17 @@ void main() {
     expect(p.toDescription(), isNot(contains('status:')));
     expect(p.toDescription(), contains('custom_key: keep'));
   });
+
+  test('setPriority keeps extra text after the value', () {
+    final n = Note(uid: 'u', description: 'priority: high  # because x\n\nt');
+    PlanItem.fromNote(n)
+      ..setPriority('low')
+      ..apply();
+    expect(n.description, 'priority: low  # because x\n\nt');
+    final m = Note(uid: 'u', description: 'priority: high (urgent)\n\nt');
+    PlanItem.fromNote(m)
+      ..setPriority('medium')
+      ..apply();
+    expect(m.description, 'priority: medium (urgent)\n\nt');
+  });
 }

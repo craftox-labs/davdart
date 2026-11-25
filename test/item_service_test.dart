@@ -206,6 +206,21 @@ void main() {
         containsAll([n]));
   });
 
+  test('replacing a note body keeps priority and status lines', () async {
+    final n = await mk(ItemKind.note, 'N');
+    await svc.setPriority(n, 1);
+    await svc.setStatus(n, 'doing');
+    await svc.update(n, body: 'new text');
+    var g = await svc.get(n);
+    expect(g.priority, 1);
+    expect(g.status, 'doing');
+    expect(g.body, endsWith('\n\nnew text'));
+    await svc.update(n, body: 'priority: low\n\nother');
+    g = await svc.get(n);
+    expect(g.priority, 9, reason: 'a priority in the new body wins');
+    expect(g.status, 'doing');
+  });
+
   test('note priority is a body line; sets, reads, clears', () async {
     final n = await mk(ItemKind.note, 'N');
     final c = await svc.setPriority(n, 1);

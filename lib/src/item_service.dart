@@ -953,7 +953,21 @@ class ItemService {
         }
         if (body != null && body != e.body) {
           ch.add('body: ${e.body.length} -> ${body.length} chars');
-          e.body = body;
+          final raw = e.raw;
+          if (raw is Note) {
+            // Keep the managed header lines the new body does not carry.
+            final old = PlanItem.fromNote(raw).fields;
+            raw.description = body;
+            final p = PlanItem.fromNote(raw);
+            for (final k in const ['priority', 'status']) {
+              if (old[k] != null && !p.fields.containsKey(k)) {
+                p.fields[k] = old[k]!;
+              }
+            }
+            p.apply();
+          } else {
+            e.body = body;
+          }
         }
         final raw = e.raw;
         if (location != null || start != null || end != null) {
