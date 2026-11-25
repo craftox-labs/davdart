@@ -71,8 +71,54 @@ void main() {
     await s.deleteNote(work);
     await s.switchSpace(inbox);
     await s.switchSpace(SpaceCatalog.planningId);
+    expect(s.scopeUid, isNull, reason: 'Everything for this session');
+    // The saved entry stays: an empty or offline load must not lose it.
+    expect(prefs.read('davdart.scope.v1'), contains(work));
+  });
+
+  test('recents leave out projects that are gone', () async {
+    final s = await _open(MemoryStorage());
+    final a = (await s.addProject('A'))!;
+    final b = (await s.addProject('B'))!;
+    expect(s.recentProjects, [b, a]);
+    await s.deleteNote(a);
+    expect(s.recentProjects, [b]);
+    // The freed slot takes the next project opened.
+    final c = (await s.addProject('C'))!;
+    expect(s.recentProjects, [c, b]);
+  });
+
+  test('narrow keeps the scope when an item outside it opens', () async {
+    final prefs = MemoryStorage();
+    final s = await _open(prefs);
+    s.narrow = true;
+    await s.addFolder('Work');
+    final work = _folderUid(s, 'Work');
+    await s.addNote('Loose');
+    final loose = s.notes.firstWhere((n) => n.summary == 'Loose').uid;
+
+    s.select(loose);
+    expect(s.scopeUid, work);
+    expect(s.filtered.map((n) => n.uid), isNot(contains(loose)));
+    // Wide still leaves the folder when the item is outside it.
+    s.narrow = false;
+    s.select(null);
+    s.select(loose);
     expect(s.scopeUid, isNull);
-    expect(prefs.read('davdart.scope.v1'), isNot(contains(work)));
+  });
+
+  test('a folder inside a project makes that project recent', () async {
+    final prefs = MemoryStorage();
+    final s = await _open(prefs);
+    final alpha = (await s.addProject('Alpha'))!;
+    await s.addFolder('Design', parentUid: alpha);
+    final design = _folderUid(s, 'Design');
+    final beta = (await s.addProject('Beta'))!;
+    expect(s.recentProjects, [beta, alpha]);
+    // The sub-folder counts as opening its project, not as a recent itself.
+    s.openFolder(design);
+    expect(s.recentProjects, [alpha, beta]);
+    expect(s.recentProjects, isNot(contains(design)));
   });
 
   test(

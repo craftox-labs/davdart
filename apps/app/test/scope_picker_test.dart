@@ -33,10 +33,21 @@ final _seed = [
   _folder('p2', 'Beta', parent: 'c'),
   _folder('sub', 'Design', parent: 'p1'),
   _folder('loose', 'Loose notes'),
+  Note(uid: 'in-p1', summary: 'Inside note', parentUid: 'p1'),
+  Note(uid: 'outside', summary: 'Outside note'),
 ];
 
 Future<AppState> _app(WidgetTester t, Size size) async {
-  final s = await pumpTasksApp(t, size: size, notes: _seed);
+  final s = await pumpTasksApp(
+    t,
+    size: size,
+    notes: _seed,
+    tasks: [
+      mkTask('t-in', summary: 'In project', parent: 'p1'),
+      mkTask('t-out', summary: 'Outside task'),
+    ],
+    events: [mkEvent('e-out', summary: 'Outside event')],
+  );
   await s.activateTab(null);
   await t.pumpAndSettle();
   return s;
@@ -159,6 +170,36 @@ void main() {
         await t.pumpAndSettle();
         expect(s.scopeUid, isNull);
         expect(_text(t, 'scope-pill-space'), 'Spaces');
+        _noError(t);
+      });
+
+      testWidgets('an item outside the scope keeps it on narrow', (t) async {
+        final s = await _app(t, size);
+        s.openFolder('p1');
+        await t.pumpAndSettle();
+        // A note outside the project opens as the page it is, scope intact.
+        await s.openNote('outside');
+        await t.pumpAndSettle();
+        expect(s.scopeUid, 'p1');
+        expect(_text(t, 'scope-pill-project'), 'Alpha project');
+        expect(find.text('Outside note'), findsWidgets);
+        // Scope-dependent screens still ignore it, and count only what is in.
+        expect(s.filtered.map((n) => n.uid), isNot(contains('outside')));
+        expect(s.filteredTasks.map((t) => t.uid), ['t-in']);
+        // A task and an event outside the project keep it too.
+        await s.openTask('t-out');
+        await t.pumpAndSettle();
+        expect(s.scopeUid, 'p1');
+        await s.openEvent('e-out');
+        await t.pumpAndSettle();
+        expect(s.scopeUid, 'p1');
+        // Back returns to that scope's screens, still scoped.
+        await t.tap(_k('bar-back'));
+        await t.pumpAndSettle();
+        expect(s.activeTab, isNull);
+        expect(s.scopeUid, 'p1');
+        expect(_text(t, 'scope-pill-project'), 'Alpha project');
+        expect(_k('content-crumbs'), findsNothing, reason: 'a project level');
         _noError(t);
       });
 

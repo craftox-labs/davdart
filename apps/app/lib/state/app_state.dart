@@ -1091,7 +1091,12 @@ class AppState extends ChangeNotifier {
   void openFolder(String? uid) {
     scopeUid = uid;
     _persistScope();
-    if (uid != null && projectIndex.isProject(uid)) _rememberProject(uid);
+    if (uid != null) {
+      // A project, or a folder inside one, makes that project recent.
+      final ix = projectIndex;
+      final project = ix.isProject(uid) ? uid : ix.projectOf(uid)?.uid;
+      if (project != null) _rememberProject(project);
+    }
     final a = _activeViewTab;
     if (a != null && a.kind == TabKind.note) _activeViewTab = null;
     notifyListeners();
@@ -1114,9 +1119,15 @@ class AppState extends ChangeNotifier {
   bool _restoreScopePending = true;
 
   /// The project uids opened most recently in this Space, newest first (at
-  /// most [recentsLimit]); the scope picker lists them first.
-  List<String> get recentProjects =>
-      List.unmodifiable(_recents[_spaceKey] ?? const <String>[]);
+  /// most [recentsLimit]); the scope picker lists them first. Projects that
+  /// were deleted or are no longer projects are left out.
+  List<String> get recentProjects {
+    final live = _liveProjects;
+    return List.unmodifiable([
+      for (final uid in _recents[_spaceKey] ?? const <String>[])
+        if (live.contains(uid)) uid,
+    ]);
+  }
 
   /// The Space id the per-Space prefs are keyed by ('default' without a
   /// catalog: folders, tags, Home focus and the scope share it).
@@ -1166,7 +1177,9 @@ class AppState extends ChangeNotifier {
   }
 
   /// Brings back the Space's saved folder scope once its notes are loaded:
-  /// the saved folder when it is still there, else Everything (null).
+  /// the saved folder when it is still there, else Everything (null) for this
+  /// session. A saved folder that is only missing because the Space is empty
+  /// or offline stays saved, so a later load with it back restores it.
   void _restoreScope() {
     final saved = _scopes[_spaceKey];
     if (scopeUid != null && tree.find(scopeUid!) != null) {
@@ -1174,12 +1187,20 @@ class AppState extends ChangeNotifier {
       return;
     }
     scopeUid = saved != null && tree.find(saved) != null ? saved : null;
-    _persistScope();
   }
 
+  /// The projects of this Space, by uid.
+  Set<String> get _liveProjects => {
+    for (final p in projectIndex.projects()) p.uid,
+  };
+
   void _rememberProject(String uid) {
-    final list = List<String>.of(_recents[_spaceKey] ?? const []);
-    list.remove(uid);
+    // Projects that are gone or no longer projects give up their slot.
+    final live = _liveProjects;
+    final list = [
+      for (final u in _recents[_spaceKey] ?? const <String>[])
+        if (u != uid && live.contains(u)) u,
+    ];
     list.insert(0, uid);
     _recents[_spaceKey] = list.take(recentsLimit).toList();
     prefs?.write(_recentsKey, jsonEncode(_recents));
@@ -3888,8 +3909,11 @@ class AppState extends ChangeNotifier {
       _show(_tabOf(uid));
       return;
     }
-    // Showing a note outside the open folder leaves the folder.
-    if (uid != null &&
+    // Showing a note outside the open folder leaves the folder. Narrow keeps
+    // it: the pill still names the project and Back or Home returns to it,
+    // while the item shows as the page it is.
+    if (!narrow &&
+        uid != null &&
         !_isTask(uid) &&
         !_isEvent(uid) &&
         scopeUid != null &&
