@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:davdart/davdart.dart';
 import 'package:davdart/io.dart';
 import 'package:davdart_web/dav_proxy.dart';
+import 'package:davdart_web/gzip_static.dart';
 import 'package:davdart_web/web_app.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
@@ -36,7 +37,10 @@ Future<void> main(List<String> args) async {
   final board = buildHandler(load);
   final appDir = Directory('../app/build/web'); // relative to apps/web
   final app = appDir.existsSync()
-      ? createStaticHandler(appDir.path, defaultDocument: 'index.html')
+      ? const Pipeline()
+          .addMiddleware(gzipStatic())
+          .addHandler(createStaticHandler(appDir.path,
+              defaultDocument: 'index.html'))
       : null;
   // Off unless DAVDART_DAV_UPSTREAM (the Radicale base, e.g.
   // http://127.0.0.1:5232) is set: then /dav/... reaches it for the app's sync.

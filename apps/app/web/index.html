@@ -42,6 +42,22 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>davdart</title>
+  <style>
+    /* Shown until the app paints over it, so a slow load is not a blank page. */
+    html, body { margin: 0; height: 100%; background: #f6f6f4; }
+    @media (prefers-color-scheme: dark) { html, body { background: #161616; } }
+    #boot {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 16px;
+      font: 14px system-ui, sans-serif; color: #888;
+    }
+    #boot i {
+      width: 22px; height: 22px; border-radius: 50%;
+      border: 2px solid #8884; border-top-color: #888;
+      animation: boot-spin 0.9s linear infinite;
+    }
+    @keyframes boot-spin { to { transform: rotate(360deg); } }
+  </style>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
@@ -53,6 +69,7 @@
     For more details:
     * https://docs.flutter.dev/platform-integration/web/initialization
   -->
+  <div id="boot"><i></i><span>Loading davdart…</span></div>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
