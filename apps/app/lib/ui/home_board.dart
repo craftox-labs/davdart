@@ -356,9 +356,10 @@ class _Card extends StatelessWidget {
       uid: item.uid,
       source: NoteDragSource.board,
       atPointer: true,
-      longPress: compact,
       label: item.title,
-      child: _keyRow(t, card),
+      // On the phone the card itself does not drag (a touch scrolls, a long
+      // press opens the menu); the grip does.
+      child: compact ? _keyRow(t, _withGrip(t, card)) : _keyRow(t, card),
     );
     return Padding(
       padding: EdgeInsets.only(bottom: t.space.md),
@@ -368,13 +369,11 @@ class _Card extends StatelessWidget {
             ? TaskContextMenu(
                 state: state,
                 uid: task.uid,
-                touchMenu: !compact,
                 child: draggable,
               )
             : NoteContextMenu(
                 state: state,
                 uid: item.uid,
-                touchMenu: !compact,
                 items: [
                   if (state.editable && column != otherColumn)
                     NoteMenuItem(
@@ -518,6 +517,37 @@ class _Card extends StatelessWidget {
       ),
     );
   }
+
+  /// The phone card with a drag grip at its bottom-right corner, a touch
+  /// target of its own, not covered by a scroll.
+  Widget _withGrip(Tokens t, Widget card) => Stack(
+    children: [
+      card,
+      Positioned(
+        right: 0,
+        bottom: 0,
+        child: NoteDraggable(
+          uid: item.uid,
+          source: NoteDragSource.board,
+          atPointer: true,
+          handle: true,
+          label: item.title,
+          child: SizedBox(
+            key: Key('card-grip-${item.uid}'),
+            width: t.space.huge,
+            height: t.space.huge,
+            child: Center(
+              child: Icon(
+                FLucideIcons.gripVertical,
+                size: t.icons.sm,
+                color: t.muted,
+              ),
+            ),
+          ),
+        ),
+      ),
+    ],
+  );
 
   Widget _keyRow(Tokens t, Widget child) => NavRow(
     key: ValueKey('nav-card-${item.uid}'),

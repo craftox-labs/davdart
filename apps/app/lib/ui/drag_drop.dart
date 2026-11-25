@@ -20,6 +20,7 @@ class NoteDraggable extends StatelessWidget {
     required this.child,
     this.atPointer = false,
     this.longPress = false,
+    this.handle = false,
   });
   final String uid;
   final NoteDragSource source;
@@ -32,6 +33,10 @@ class NoteDraggable extends StatelessWidget {
   /// Touch platforms start the drag after a long press instead of never
   /// (a plain touch drag still scrolls). Mouse drags are unchanged.
   final bool longPress;
+
+  /// The child is a drag handle (a grip): it drags at once with a finger as
+  /// with a mouse, since a touch that starts on it is not a scroll.
+  final bool handle;
 
   /// Text of the floating chip under the pointer.
   final String label;
@@ -62,7 +67,7 @@ class NoteDraggable extends StatelessWidget {
     return Draggable<NoteDrag>(
       data: data,
       dragAnchorStrategy: anchor,
-      maxSimultaneousDrags: _touchPlatform ? 0 : 1,
+      maxSimultaneousDrags: handle || !_touchPlatform ? 1 : 0,
       feedback: feedback,
       childWhenDragging: ghost,
       child: child,

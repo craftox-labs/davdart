@@ -315,7 +315,7 @@ void main() {
     },
   );
 
-  testWidgets('phone: long-press drag onto another section changes status', (
+  testWidgets('phone: grip drag onto another section changes status', (
     t,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -325,10 +325,10 @@ void main() {
       await t.tap(_k('board-acc-todo-toggle'));
       await t.pumpAndSettle();
     }
-    final from = t.getCenter(_k('card-kind-n'));
+    final from = t.getCenter(_k('card-grip-n'));
     final to = t.getCenter(_k('board-acc-doing-toggle'));
     final g = await t.startGesture(from);
-    await t.pump(const Duration(milliseconds: 700));
+    await t.pump(const Duration(milliseconds: 50));
     await g.moveTo(to);
     await t.pump();
     await g.moveTo(to + const Offset(0, 1));
@@ -338,7 +338,7 @@ void main() {
     expect(PlanItem.fromNote(s.findItem('n') as Note).status, 'doing');
   });
 
-  testWidgets('phone: a held card drags, no menu sheet; drop on a card ranks', (
+  testWidgets('phone: the grip drags, a drop on a card ranks', (
     t,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
@@ -366,10 +366,10 @@ void main() {
       await t.tap(_k('board-acc-todo-toggle'));
       await t.pumpAndSettle();
     }
-    final from = t.getCenter(_k('card-kind-a'));
+    final from = t.getCenter(_k('card-grip-a'));
     final bRect = t.getRect(_k('nav-card-b'));
     final g = await t.startGesture(from);
-    await t.pump(const Duration(milliseconds: 700));
+    await t.pump(const Duration(milliseconds: 50));
     expect(_k('menu-sheet'), findsNothing);
     final to = Offset(bRect.center.dx, bRect.bottom - 3);
     await g.moveTo(to);
@@ -382,5 +382,21 @@ void main() {
     final b = s.findItem('b') as Note;
     expect(a.rank, isNotNull);
     expect(b.rank == null || a.rank! > b.rank!, isTrue);
+  });
+
+  testWidgets('phone: a long press on the card opens the menu, no drag', (
+    t,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final s = await pump(t, size: const Size(390, 844));
+    if (_k('card-kind-n').evaluate().isEmpty) {
+      await t.tap(_k('board-acc-todo-toggle'));
+      await t.pumpAndSettle();
+    }
+    await t.longPress(_k('card-kind-n'));
+    await t.pumpAndSettle();
+    expect(_k('menu-sheet'), findsOneWidget);
+    expect(PlanItem.fromNote(s.findItem('n') as Note).status, 'todo');
   });
 }
