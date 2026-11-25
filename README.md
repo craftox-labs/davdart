@@ -17,7 +17,7 @@ Status: v0, in development. APIs, note formats and the UI will still change.
 - A UI-free Dart core: notes, tasks, events, plan items, folders, saved views, a CalDAV client and sync engines for each type.
 - A Flutter web app (built on forui 0.28.0): icon rail with Notes, Tasks, Events, Projects, Views, Search, Spaces, Account and Settings; a tab strip; a full-page item view with in-place editing; board and list views; a Home page with a Day focus (month calendar with event and task dots, and cards for the selected day's events and tasks, undated tasks listed last) and a Board focus, remembered per Space; an optional mirrored layout; a token-driven theme.
 - A small board server that serves the app and proxies CalDAV to the upstream server.
-- A CLI for listing, creating, moving and exporting notes.
+- A CLI for listing, creating, moving and exporting notes, with a board view that matches the app's.
 
 ## Spaces
 
@@ -73,6 +73,13 @@ Set `DAVDART_DAV_UPSTREAM` to the CalDAV server's base URL to enable the `/dav/`
 
 CLI: `dart run bin/davdart.dart <command>`. Commands: `list [--status S] [--tag T]`, `board`, `show TEXT`, `add TITLE [BODY]`, `new TITLE [...]`, `set-status MATCH STATUS`, `append MATCH`, `folder TITLE [--under MATCH]`, `move MATCH TARGET|top`, `export DIR`, `rm UID`. Run it without arguments for the full usage line.
 
+`board` prints the notes as columns, in the fixed order backlog, todo, doing, blocked, review, done, canceled. Status words outside that set are not given columns of their own: they all land in one `other` column, after the fixed ones, and notes with no status come last. A known alias prints in the column it means (`cancelled` under canceled, `in-progress` under doing). Inside a column the order is the board order `list --status` uses: manual rank (`X-DAVDART-RANK`) first, then priority, due date, creation and title.
+
+## Tools
+
+- `dart run tool/load_test.dart`: builds a 2000-item Space in memory (nested notes, tasks, events) and times the core paths, `ItemService.list` and `board()`, the scope and parent-chain walks, and a sync merge against a modified copy. It prints a table of milliseconds, flags anything over 50 ms and uses no network. The results are written up in `docs/2026-11-25-load-test.md`.
+- `dart run tool/notices.dart`: reads `pubspec.lock` and `apps/app/pubspec.lock`, takes each hosted package's licence from the pub cache (`PUB_CACHE`, else `~/.pub-cache`) and writes `THIRD_PARTY_NOTICES.md` at the repo root: package, version, licence name and text, and source URL. Dart and Flutter SDK packages are skipped, and any package without a licence file is listed on stdout and in the file.
+
 ## Configuration
 
 The CLI and board server read `url`, `user` and `password` from a key=value file (`~/.config/davdart/credentials`, or the path in `DAVDART_CONFIG`). `DAVDART_URL`, `DAVDART_USER` and `DAVDART_PASSWORD` override each key.
@@ -87,9 +94,11 @@ Folders and saved views are hidden from boards and lists.
 ## Project layout
 
 - `lib/`, `bin/davdart.dart`, `test/`: core package and CLI.
+- `tool/`: scripts run with `dart run` (the load test and the third-party notices).
+- `docs/`: written findings and reports.
 - `apps/app/`: Flutter web app.
 - `apps/web/`: board server and CalDAV proxy.
 
 ## Licence
 
-AGPL-3.0-or-later. See `LICENSE` and `NOTICE`.
+AGPL-3.0-or-later. See `LICENSE` and `NOTICE`; the pub.dev packages and their licences are in `THIRD_PARTY_NOTICES.md`.
