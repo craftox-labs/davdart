@@ -3911,7 +3911,7 @@ class AppState extends ChangeNotifier {
   String get _homeKindKey => 'davdart.home.kind.v1.$_spaceKey';
 
   /// Which kinds the Home Board shows, remembered per Space; All by default.
-  /// Tasks fall back to All in a Space without tasks. A legacy 'tasks' focus
+  /// Tasks fall back to All in a Space without tasks, Notes in one without notes. A legacy 'tasks' focus
   /// pref with no kind pref loads as Tasks.
   HomeKind get homeKind {
     final saved = prefs?.read(_homeKindKey);
@@ -3922,7 +3922,9 @@ class AppState extends ChangeNotifier {
       _ =>
         prefs?.read(_homeFocusKey) == 'tasks' ? HomeKind.tasks : HomeKind.all,
     };
-    return kind == HomeKind.tasks && !supportsTasks ? HomeKind.all : kind;
+    if (kind == HomeKind.tasks && !supportsTasks) return HomeKind.all;
+    if (kind == HomeKind.notes && !supportsNotes) return HomeKind.all;
+    return kind;
   }
 
   void setHomeKind(HomeKind k) {

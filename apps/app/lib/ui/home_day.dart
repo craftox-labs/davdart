@@ -767,6 +767,11 @@ class _KindFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // A Space that holds only one kind (a tasks-only or notes-only collection,
+    // as other clients make them) has nothing to filter between.
+    if (!state.supportsNotes || !state.supportsTasks) {
+      return const SizedBox.shrink();
+    }
     final t = tokensOf(context);
     final active = state.homeFocus == HomeFocus.board;
     final kind = state.homeKind;
