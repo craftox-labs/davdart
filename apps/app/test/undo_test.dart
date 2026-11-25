@@ -139,4 +139,110 @@ void main() {
     expect(s.tree.find('b')!.note.summary, 'Beta2');
     expect(PlanItem.fromNote(s.tree.find('b')!.note).priorityWord, isNull);
   });
+
+  testWidgets('undo of a move out of Done restores COMPLETED and percent', (
+    t,
+  ) async {
+    final done = DateTime.utc(2026, 3, 4, 5, 6);
+    final s = await pumpTasksApp(
+      t,
+      tasks: [
+        Task(
+          uid: 'd',
+          summary: 'Shipped',
+          status: 'COMPLETED',
+          percentComplete: 100,
+          completed: done,
+          lastModified: DateTime.utc(2026, 1, 1),
+        ),
+      ],
+    );
+    expect(await s.setTaskStatus('d', 'doing'), isTrue);
+    expect(s.taskById('d')!.completed, isNull);
+    await s.undoBoard(s.pendingUndo!);
+    await t.pumpAndSettle();
+    final k = s.taskById('d')!;
+    expect(k.status, 'COMPLETED');
+    expect(k.completed, done);
+    expect(k.percentComplete, 100);
+  });
+
+  testWidgets('undo of a drop restores neighbouring ranks too', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [
+        _note('a', 'Alpha'),
+        _note('b', 'Beta', rank: 2),
+        _note('c', 'Gamma'),
+      ],
+    );
+    final before = {
+      for (final u in ['a', 'b', 'c']) u: s.tree.find(u)!.note.rank,
+    };
+    await s.placeBoardItem('c', 'todo', index: 0);
+    await t.pumpAndSettle();
+    expect({
+      for (final u in ['a', 'b', 'c']) u: s.tree.find(u)!.note.rank,
+    }, isNot(before));
+    await s.undoBoard(s.pendingUndo!);
+    await t.pumpAndSettle();
+    expect({
+      for (final u in ['a', 'b', 'c']) u: s.tree.find(u)!.note.rank,
+    }, before);
+  });
+
+  testWidgets('undo back into Done respects the completion blocker', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      tasks: [
+        Task(
+          uid: 'r',
+          summary: 'Weekly',
+          status: 'COMPLETED',
+          percentComplete: 100,
+          completed: DateTime.utc(2026, 3, 4),
+          rrule: 'FREQ=WEEKLY',
+          lastModified: DateTime.utc(2026, 1, 1),
+        ),
+      ],
+    );
+    expect(await s.setTaskStatus('r', 'todo'), isTrue);
+    await s.undoBoard(s.pendingUndo!);
+    await t.pumpAndSettle();
+    expect(s.taskById('r')!.status, 'NEEDS-ACTION');
+    expect(s.error, contains('repeats'));
+  });
+
+  testWidgets('note priority undo restores a raw non-word line', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [_note('a', 'Alpha', priority: '3 (urgent)')],
+    );
+    await s.setNotePriority('a', 'high');
+    expect(PlanItem.fromNote(s.tree.find('a')!.note).priorityWord, 'high');
+    await s.undoBoard(s.pendingUndo!);
+    await t.pumpAndSettle();
+    expect(
+      PlanItem.fromNote(s.tree.find('a')!.note).fields['priority'],
+      '3 (urgent)',
+    );
+  });
+
+  testWidgets('undo of an item deleted meanwhile does nothing', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [_note('a', 'Alpha')],
+      tasks: [mkTask('t', summary: 'Fix', priority: 5)],
+    );
+    await s.setStatus('a', 'doing');
+    final u1 = s.pendingUndo!;
+    await s.deleteNote('a');
+    await s.undoBoard(u1);
+    expect(s.tree.find('a'), isNull);
+    await s.setTaskPriority('t', 1);
+    final u2 = s.pendingUndo!;
+    await s.deleteTask('t');
+    await s.undoBoard(u2);
+    expect(s.taskById('t'), isNull);
+  });
 }

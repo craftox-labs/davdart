@@ -324,9 +324,13 @@ class ActionContextMenu extends StatelessWidget {
     super.key,
     required this.groups,
     required this.child,
+    this.touchMenu = true,
   });
   final List<List<NoteMenuItem>> groups;
   final Widget child;
+
+  /// See [ExclusiveContextMenu.touchMenu].
+  final bool touchMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -336,6 +340,7 @@ class ActionContextMenu extends StatelessWidget {
     ];
     if (live.isEmpty) return child;
     return ExclusiveContextMenu(
+      touchMenu: touchMenu,
       menuBuilder: (ctx, c, _) => [
         for (final g in live) FItemGroup(children: menuRows(ctx, c, g)),
       ],

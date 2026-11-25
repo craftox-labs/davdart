@@ -437,4 +437,26 @@ void main() {
       expect(card.right - folder.right, closeTo(12, 1.5), reason: id);
     }
   });
+
+  testWidgets('phone: the grip still drags after a 30 second hold', (t) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final s = await pump(t, size: const Size(390, 844));
+    if (_k('card-grip-n').evaluate().isEmpty) {
+      await t.tap(_k('board-acc-todo-toggle'));
+      await t.pumpAndSettle();
+    }
+    final from = t.getCenter(_k('card-grip-n'));
+    final to = t.getCenter(_k('board-acc-doing-toggle'));
+    final g = await t.startGesture(from);
+    await t.pump(const Duration(seconds: 30));
+    expect(_k('menu-sheet'), findsNothing);
+    await g.moveTo(to);
+    await t.pump();
+    await g.moveTo(to + const Offset(0, 1));
+    await t.pump();
+    await g.up();
+    await t.pumpAndSettle();
+    expect(PlanItem.fromNote(s.findItem('n') as Note).status, 'doing');
+  });
 }

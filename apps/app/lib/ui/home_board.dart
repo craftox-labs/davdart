@@ -175,6 +175,9 @@ class HomeBoard extends StatelessWidget {
       },
       onDrop: (d) => state.placeBoardItem(d.uid, name),
       child: ActionContextMenu(
+        // On a phone a long press belongs to the cards and their grips, not
+        // to the column behind them.
+        touchMenu: !state.narrow,
         groups: [
           if (state.editable && state.homeKind != HomeKind.tasks)
             [
@@ -366,31 +369,61 @@ class _Card extends StatelessWidget {
       label: item.title,
       // On the phone the card itself does not drag (a touch scrolls, a long
       // press opens the menu); the grip does.
-      child: compact ? _keyRow(t, _withGrip(t, card)) : _keyRow(t, card),
+      child: _keyRow(t, card),
     );
+    final menu = task != null
+        ? TaskContextMenu(state: state, uid: task.uid, child: draggable)
+        : NoteContextMenu(
+            state: state,
+            uid: item.uid,
+            items: [
+              if (state.editable && column != otherColumn)
+                NoteMenuItem(
+                  'New note in $column…',
+                  FLucideIcons.filePlus,
+                  () => showNewNoteDialog(context, state, status: column),
+                  key: Key('menu-card-new-$column'),
+                ),
+            ],
+            child: draggable,
+          );
     return Padding(
       padding: EdgeInsets.only(bottom: t.space.md),
       child: Opacity(
         opacity: item.canceled || column == 'canceled' ? 0.5 : 1,
-        child: task != null
-            ? TaskContextMenu(state: state, uid: task.uid, child: draggable)
-            : NoteContextMenu(
-                state: state,
-                uid: item.uid,
-                items: [
-                  if (state.editable && column != otherColumn)
-                    NoteMenuItem(
-                      'New note in $column…',
-                      FLucideIcons.filePlus,
-                      () => showNewNoteDialog(context, state, status: column),
-                      key: Key('menu-card-new-$column'),
-                    ),
-                ],
-                child: draggable,
-              ),
+        // The grip sits beside the menu, not inside it: a press on the grip
+        // never reaches the card's long press or tap, so holding it for any
+        // length of time still lets the card be dragged.
+        child: compact ? Stack(children: [menu, _grip(t)]) : menu,
       ),
     );
   }
+
+  /// The phone drag grip: a full-height strip at the right edge, a touch
+  /// target of its own.
+  Widget _grip(Tokens t) => Positioned(
+    top: 0,
+    right: 0,
+    bottom: 0,
+    child: NoteDraggable(
+      uid: item.uid,
+      source: NoteDragSource.board,
+      atPointer: true,
+      handle: true,
+      label: item.title,
+      child: SizedBox(
+        key: Key('card-grip-${item.uid}'),
+        width: t.space.huge,
+        child: Center(
+          child: Icon(
+            FLucideIcons.gripVertical,
+            size: t.icons.sm,
+            color: t.muted,
+          ),
+        ),
+      ),
+    ),
+  );
 
   /// The footer row, left-aligned with the title: kind, priority, due, tags,
   /// and the folder at the right end. Phones show the priority flag without
@@ -522,42 +555,6 @@ class _Card extends StatelessWidget {
       ),
     );
   }
-
-  /// The phone card with a drag grip: a full-height strip at the right edge,
-  /// a touch target of its own. A long press on it does nothing, so the
-  /// card's menu cannot fire from the grip.
-  Widget _withGrip(Tokens t, Widget card) => Stack(
-    children: [
-      card,
-      Positioned(
-        top: 0,
-        right: 0,
-        bottom: 0,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onLongPress: () {},
-          child: NoteDraggable(
-            uid: item.uid,
-            source: NoteDragSource.board,
-            atPointer: true,
-            handle: true,
-            label: item.title,
-            child: SizedBox(
-              key: Key('card-grip-${item.uid}'),
-              width: t.space.huge,
-              child: Center(
-                child: Icon(
-                  FLucideIcons.gripVertical,
-                  size: t.icons.sm,
-                  color: t.muted,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    ],
-  );
 
   Widget _keyRow(Tokens t, Widget child) => NavRow(
     key: ValueKey('nav-card-${item.uid}'),

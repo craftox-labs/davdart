@@ -85,7 +85,29 @@ class DavdartApp extends StatelessWidget {
             touch: isTouchPlatform,
             tokens: tokens,
           ),
-          child: FToaster(child: FTooltipGroup(child: child!)),
+          // Toasts sit where the hand is: the bottom on a phone, the top right
+          // on desktop (the bottom right is crowded there).
+          child: FToaster(
+            style: .delta(
+              toastAlignment:
+                  MediaQuery.sizeOf(context).width < Tokens.wideBreakpoint
+                  ? FToastAlignment.bottomCenter
+                  : FToastAlignment.topRight,
+              // On a phone the toast clears the bottom tab bar.
+              padding:
+                  MediaQuery.sizeOf(context).width < Tokens.wideBreakpoint
+                  ? .value(
+                      EdgeInsets.fromLTRB(
+                        const SpaceTokens().xl,
+                        const SpaceTokens().xl,
+                        const SpaceTokens().xl,
+                        const SpaceTokens().huge + const SpaceTokens().xxl,
+                      ),
+                    )
+                  : null,
+            ),
+            child: FTooltipGroup(child: child!),
+          ),
         );
         final custom = tokens;
         return custom == null

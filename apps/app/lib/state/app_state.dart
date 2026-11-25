@@ -59,6 +59,32 @@ String _clock() {
 /// Stored as a `kind-view` note in the Space, so it syncs; the stored format
 /// is documented on [SavedViewSpec] in the core.
 /// A board change Undo can revert: [label] names the item and the change.
+/// A task's status-related fields, captured before a change so Undo can put
+/// them back exactly (a plain status word would re-stamp COMPLETED/percent).
+class _TaskStatusState {
+  _TaskStatusState(Task t)
+    : status = t.status,
+      percentComplete = t.percentComplete,
+      completed = t.completed,
+      tags = [
+        for (final c in t.categories)
+          if (c.startsWith('status-')) c,
+      ];
+  final String? status;
+  final int? percentComplete;
+  final DateTime? completed;
+  final List<String> tags;
+
+  void applyTo(Task t) {
+    t.status = status;
+    t.percentComplete = percentComplete;
+    t.completed = completed;
+    t.categories
+      ..removeWhere((c) => c.startsWith('status-'))
+      ..addAll(tags);
+  }
+}
+
 class BoardUndo {
   BoardUndo(this.label, this.undo);
   final String label;
@@ -1693,14 +1719,15 @@ class AppState extends ChangeNotifier {
   }) async {
     final n = tree.find(uid)?.note;
     if (n == null) return;
-    final before = PlanItem.fromNote(n).priorityWord;
+    final before = PlanItem.fromNote(n).fields['priority'];
+    final beforeWord = PlanItem.fromNote(n).priorityWord;
     final copy = n.copyWith();
     final p = PlanItem.fromNote(copy)..setPriority(priority);
     await _save(p.apply());
-    if (undoable && error == null && before != priority) {
+    if (undoable && error == null && beforeWord != priority) {
       _postUndo(
         _priorityLabel(n.summary, priority),
-        () => _restoreItem(uid, setPriority: true, priorityWord: before),
+        () => _restoreItem(uid, setPriority: true, priorityRaw: before),
       );
     }
   }
@@ -1736,8 +1763,9 @@ class AppState extends ChangeNotifier {
     bool setStatus = false,
     String? status,
     bool setPriority = false,
-    String? priorityWord,
+    String? priorityRaw,
     int? priorityInt,
+    _TaskStatusState? taskState,
     bool setRank = false,
     double? rank,
   }) async {
@@ -1747,8 +1775,16 @@ class AppState extends ChangeNotifier {
         priority: setPriority ? priorityInt : null,
         clearPriority: setPriority && priorityInt == null,
       );
-      if (setStatus && status != null) {
-        copy.setBoardStatus(status, DateTime.now());
+      if (setStatus && taskState != null) {
+        taskState.applyTo(copy);
+        if (taskState.status == 'COMPLETED') {
+          final blocker = taskCompletionBlocker(copy);
+          if (blocker != null) {
+            error = blocker;
+            notifyListeners();
+            return;
+          }
+        }
       }
       if (setRank) copy.rank = rank;
       await _taskEdit((src) => src.saveTask(copy));
@@ -1765,10 +1801,27 @@ class AppState extends ChangeNotifier {
         p.setStatus(status);
       }
     }
-    if (setPriority) p.setPriority(priorityWord);
+    if (setPriority) _setRawPriority(p, priorityRaw);
     copy = p.apply();
     if (setRank) copy.rank = rank;
     await _save(copy);
+  }
+
+  /// Puts the `priority` header line back to its exact raw text [raw] (null
+  /// removes it), at its old place among the header lines.
+  static void _setRawPriority(PlanItem p, String? raw) {
+    final keys = p.fields.keys.toList();
+    final had = p.fields.containsKey('priority');
+    if (raw == null) {
+      p.fields.remove('priority');
+      return;
+    }
+    p.fields['priority'] = raw;
+    if (!had) return;
+    final copy = Map<String, String>.of(p.fields);
+    p.fields
+      ..clear()
+      ..addAll({for (final k in keys) k: copy[k]!});
   }
 
   /// Changes a note's title and/or body text (the header lines stay).
@@ -2287,13 +2340,14 @@ class AppState extends ChangeNotifier {
     if (t == null) return false;
     if (word == 'done' && taskCompletionBlocker(t) != null) return false;
     final before = t.boardStatus;
+    final beforeState = _TaskStatusState(t);
     final title = t.summary;
     final copy = t.copyWith()..setBoardStatus(word, DateTime.now());
     final ok = await _taskEdit((src) => src.saveTask(copy));
     if (ok && undoable && before != word) {
       _postUndo(
         'Moved "$title" to $word',
-        () => _restoreItem(uid, setStatus: true, status: before),
+        () => _restoreItem(uid, setStatus: true, taskState: beforeState),
       );
     }
     return ok;
@@ -2354,7 +2408,11 @@ class AppState extends ChangeNotifier {
     final beforeStatus = moved.isTask
         ? moved.task!.boardStatus
         : PlanItem.fromNote(moved.note!).status;
-    final beforeRank = moved.rank;
+    final beforeState = moved.isTask ? _TaskStatusState(moved.task!) : null;
+    final beforeRanks = <String, double?>{
+      for (final id in {uid, ...plan.keys})
+        if (byUid[id] != null) id: byUid[id]!.rank,
+    };
     final noteSaves = <Note>[], taskSaves = <Task>[];
     for (final id in {uid, ...plan.keys}) {
       final item = byUid[id];
@@ -2395,14 +2453,74 @@ class AppState extends ChangeNotifier {
     if (error == null) {
       _postUndo(
         changed ? 'Moved "$title" to $column' : 'Moved "$title" in $column',
-        () => _restoreItem(
+        () => _restorePlacement(
           uid,
-          setStatus: changed,
+          changed: changed,
           status: beforeStatus,
-          setRank: true,
-          rank: beforeRank,
+          taskState: beforeState,
+          ranks: beforeRanks,
         ),
       );
+    }
+  }
+
+  /// Undo of [placeBoardItem]: the moved card's status and the rank of every
+  /// card the drop wrote. Cards deleted meanwhile are skipped.
+  Future<void> _restorePlacement(
+    String uid, {
+    required bool changed,
+    required String? status,
+    required _TaskStatusState? taskState,
+    required Map<String, double?> ranks,
+  }) async {
+    final noteSaves = <Note>[], taskSaves = <Task>[];
+    for (final e in ranks.entries) {
+      final id = e.key;
+      final isMoved = id == uid;
+      final t = _taskById(id);
+      if (t != null) {
+        final copy = t.copyWith();
+        if (isMoved && changed && taskState != null) {
+          taskState.applyTo(copy);
+          if (taskState.status == 'COMPLETED' &&
+              taskCompletionBlocker(copy) != null) {
+            error = taskCompletionBlocker(copy);
+            notifyListeners();
+            return;
+          }
+        }
+        copy.rank = e.value;
+        taskSaves.add(copy);
+        continue;
+      }
+      final n = tree.find(id)?.note;
+      if (n == null) continue;
+      var copy = n.copyWith();
+      if (isMoved && changed) {
+        final p = PlanItem.fromNote(copy);
+        if (status == null) {
+          p.clearStatus();
+        } else {
+          p.setStatus(status);
+        }
+        copy = p.apply();
+      }
+      copy.rank = e.value;
+      noteSaves.add(copy);
+    }
+    if (noteSaves.isNotEmpty) {
+      await _edit((src) async {
+        for (final n in noteSaves) {
+          await src.save(n);
+        }
+      });
+    }
+    if (taskSaves.isNotEmpty) {
+      await _taskEdit((src) async {
+        for (final t in taskSaves) {
+          await src.saveTask(t);
+        }
+      });
     }
   }
 
