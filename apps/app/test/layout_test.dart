@@ -206,7 +206,7 @@ void main() {
       expect(body.right, box.right);
     });
 
-    testWidgets('rail tooltips and the Spaces popup open leftwards', (t) async {
+    testWidgets('rail tooltips open leftwards on the end side', (t) async {
       final state = await _pump(t, select: false);
       FTooltip tip() => t.widget<FTooltip>(
         find.descendant(
@@ -219,14 +219,14 @@ void main() {
       await t.pumpAndSettle();
       expect(tip().tipAnchor, Alignment.centerRight);
       expect(tip().childAnchor, Alignment.centerLeft);
-      final menu = t.widget<FPopoverMenu>(
+      // Spaces is a section like the rest now: no popup of its own.
+      expect(
         find.descendant(
           of: find.byKey(const Key('rail-spaces')),
           matching: find.byType(FPopoverMenu),
         ),
+        findsNothing,
       );
-      expect(menu.menuAnchor, Alignment.topRight);
-      expect(menu.childAnchor, Alignment.topLeft);
     });
 
     testWidgets('narrow layout ignores the side', (t) async {

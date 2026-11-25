@@ -380,7 +380,9 @@ void main() {
       final s = await pumpTasksApp(t);
       await _press(t, LogicalKeyboardKey.keyH);
       expect(s.nav.area, NavArea.rail);
-      expect(s.nav.cursorId(KeyNav.railList), 'projects');
+      // Spaces leads the rail, Projects next.
+      expect(s.nav.cursorId(KeyNav.railList), 'spaces');
+      await _press(t, _j);
       await _press(t, _j);
       await _press(t, _j);
       await _press(t, _j);

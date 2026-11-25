@@ -151,6 +151,7 @@ class ShellFrame extends StatelessWidget {
 
 /// Icon and name of a section, shared by the rail and the narrow selector.
 (IconData, String) sectionMeta(Section s) => switch (s) {
+  Section.spaces => (spacesIcon, spacesLabel),
   Section.notes => (FLucideIcons.fileText, 'Notes'),
   Section.tasks => (FLucideIcons.listChecks, 'Tasks'),
   Section.events => (FLucideIcons.calendar, 'Events'),
@@ -161,10 +162,10 @@ class ShellFrame extends StatelessWidget {
   Section.settings => (FLucideIcons.settings, 'Settings'),
 };
 
-/// Sections shown on the rail below the Spaces item, top group then bottom
-/// group. Account only
-/// appears when the app can sign in.
+/// Sections shown on the rail, Spaces first, top group then bottom group.
+/// Account only appears when the app can sign in.
 List<Section> topSections([AppState? state]) => [
+  Section.spaces,
   if (state?.supportsSection(Section.projects) ?? true) Section.projects,
   if (state?.supportsNotes ?? true) Section.notes,
   if (state?.supportsTasks ?? true) Section.tasks,
@@ -178,7 +179,7 @@ List<Section> bottomSections(AppState state) => [
   Section.settings,
 ];
 
-/// Icon of the Spaces rail item, which opens a popup instead of a section.
+/// Icon of the Spaces rail item and section.
 const spacesIcon = FLucideIcons.layoutGrid;
 const spacesLabel = 'Spaces';
 
@@ -449,64 +450,8 @@ class SectionButton extends StatelessWidget {
   }
 }
 
-/// The Spaces item: a rail button that pops a menu of the Spaces (current one
-/// first) with the manage actions. On the rail the menu opens beside the icon;
-/// in the narrow sheet ([below]) under it. Picking a Space switches to it and
-/// shows Notes.
-class SpacesMenuButton extends StatelessWidget {
-  const SpacesMenuButton({
-    super.key,
-    required this.state,
-    this.below = false,
-    this.mirror = false,
-    this.size,
-    this.onPick,
-  });
-  final AppState state;
-  final bool below;
-
-  /// The rail is on the right edge: the menu opens to the left of the icon.
-  final bool mirror;
-
-  /// The button's side; [SizeTokens.railItem] by default.
-  final double? size;
-
-  /// Runs before a manage action opens a dialog (closes the narrow sheet).
-  final VoidCallback? onPick;
-
-  @override
-  Widget build(BuildContext context) => FPopoverMenu(
-    menuAnchor: mirror ? Alignment.topRight : Alignment.topLeft,
-    childAnchor: below
-        ? Alignment.bottomLeft
-        : (mirror ? Alignment.topLeft : Alignment.topRight),
-    menuBuilder: (ctx, controller, _) =>
-        spaceMenuGroups(ctx, state, controller, onPick: onPick),
-    // A note dragged over the button opens the popup, so it can be dropped
-    // on a Space there.
-    builder: (ctx, controller, _) => DragTarget<NoteDrag>(
-      onWillAcceptWithDetails: (d) =>
-          state.editable &&
-          state.spaces.length > 1 &&
-          state.findItem(d.data.uid) != null,
-      onMove: (_) {
-        if (!controller.status.isForwardOrCompleted) controller.show();
-      },
-      builder: (_, _, _) => RailButton(
-        icon: spacesIcon,
-        label: spacesLabel,
-        active: false,
-        tipRight: !below,
-        mirror: mirror,
-        size: size,
-        onPress: controller.toggle,
-      ),
-    ),
-  );
-}
-
-/// A slim vertical rail: the logo slot, the Spaces popup, then Notes, Tasks, Events,
-/// Views and Search at the top, Account and Settings at the bottom.
+/// A slim vertical rail: the logo slot, then Spaces, Projects, Notes, Tasks,
+/// Events, Views and Search at the top, Account and Settings at the bottom.
 ///
 /// [strip] is the phone's version, inside the side menu: no logo, the
 /// touch-target size (44dp) and a press that only sets the section.
@@ -550,23 +495,38 @@ class IconRail extends StatelessWidget {
       if (s == Section.search) state.nav.focusSearch();
     }
 
-    Widget button(Section s) => NavRow(
-      nav: state.nav,
-      list: KeyNav.railList,
-      id: s.name,
-      radius: t.radii.control,
-      child: SectionButton(
-        key: Key('rail-${s.name}'),
-        section: s,
-        active: active == s,
-        tab: strip || !state.sidebarCollapsed,
-        tabMargin: (t.sizes.rail - item) / 2,
-        size: item,
-        tipRight: !strip,
-        mirror: mirror,
-        onPress: () => open(s),
-      ),
-    );
+    Widget button(Section s) {
+      final b = NavRow(
+        nav: state.nav,
+        list: KeyNav.railList,
+        id: s.name,
+        radius: t.radii.control,
+        child: SectionButton(
+          key: Key('rail-${s.name}'),
+          section: s,
+          active: active == s,
+          tab: strip || !state.sidebarCollapsed,
+          tabMargin: (t.sizes.rail - item) / 2,
+          size: item,
+          tipRight: !strip,
+          mirror: mirror,
+          onPress: () => open(s),
+        ),
+      );
+      if (s != Section.spaces) return b;
+      // A note dragged over it shows the Spaces panel, where the rows take
+      // the drop (the panel replaced the popup).
+      return DragTarget<NoteDrag>(
+        onWillAcceptWithDetails: (d) =>
+            state.editable && state.spaces.length > 1,
+        onMove: (_) {
+          if (state.section != Section.spaces) state.setSection(Section.spaces);
+          if (!strip) state.setSidebarCollapsed(false);
+        },
+        builder: (_, _, _) => b,
+      );
+    }
+
     if (strip) {
       return SizedBox(
         key: const Key('icon-rail'),
@@ -583,11 +543,6 @@ class IconRail extends StatelessWidget {
                     child: Column(
                       spacing: t.space.xs,
                       children: [
-                        SpacesMenuButton(
-                          key: const Key('rail-spaces'),
-                          state: state,
-                          size: item,
-                        ),
                         for (final s in topSections(state)) button(s),
                         const Spacer(),
                         for (final s in bottomSections(state)) button(s),
@@ -649,18 +604,13 @@ class IconRail extends StatelessWidget {
                             top: spacesTop,
                             left: 0,
                             right: 0,
-                            child: Center(
-                              child: SpacesMenuButton(
-                                key: const Key('rail-spaces'),
-                                state: state,
-                                mirror: mirror,
-                              ),
-                            ),
+                            child: Center(child: button(Section.spaces)),
                           ),
                         ],
                       ),
                     ),
-                    for (final s in topSections(state)) button(s),
+                    for (final s in topSections(state))
+                      if (s != Section.spaces) button(s),
                     const Spacer(),
                     for (final s in bottomSections(state)) button(s),
                   ],

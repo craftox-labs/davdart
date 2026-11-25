@@ -238,6 +238,7 @@ List<AppAction> buildActions(AppState state) {
         WidgetsBinding.instance.addPostFrameCallback((_) => f());
       },
     ),
+    go('go.spaces', 'Go to Spaces', Section.spaces, const ['switch'], 'w'),
     go('go.notes', 'Go to Notes', Section.notes, const ['files', 'tree'], 'n'),
     go('go.tasks', 'Go to Tasks', Section.tasks, const ['todo', 'list'], 't'),
     go('go.events', 'Go to Events', Section.events, const [

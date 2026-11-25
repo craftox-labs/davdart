@@ -1064,16 +1064,13 @@ void main() {
       await t.enterText(find.byKey(const Key('space-name')), 'Inbox');
       await t.tap(find.byKey(const Key('space-create')));
       await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('rail-spaces')));
-      await t.pumpAndSettle();
+      // The Spaces panel stays open: no second press (it would fold it).
       await t.tap(find.text('Rename this space…'));
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('space-rename-name')), 'Later');
       await t.tap(find.byKey(const Key('space-rename')));
       await t.pumpAndSettle();
       expect(state.currentSpaceName, 'Later');
-      await t.tap(find.byKey(const Key('rail-spaces')));
-      await t.pumpAndSettle();
       await t.tap(find.text('Delete this space…'));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('space-delete')));
@@ -1392,13 +1389,13 @@ void main() {
       expect(again.section, Section.views);
     });
 
-    testWidgets('the Spaces popup lists the current Space first', (t) async {
+    testWidgets('the Spaces panel lists the current Space first', (t) async {
       final state = await multi(t, const Size(1400, 900));
       state.setSection(Section.views);
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('rail-spaces')));
       await t.pumpAndSettle();
-      expect(state.section, Section.views); // not a section
+      expect(state.section, Section.spaces);
       expect(find.text('On this device only'), findsNWidgets(2));
       expect(find.text('New space…'), findsOneWidget);
       expect(find.text('Rename this space…'), findsOneWidget);
@@ -1485,12 +1482,12 @@ void main() {
       },
     );
 
-    test('a saved Spaces selection falls back to Files', () {
+    test('a saved Spaces selection restores the Spaces panel', () {
       final storage = MemoryStorage();
       storage.write('davdart.section.v1', 'spaces');
       expect(
         AppState(FakeSource(sample), prefs: storage).section,
-        Section.notes,
+        Section.spaces,
       );
     });
 

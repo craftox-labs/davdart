@@ -410,7 +410,8 @@ void main() {
       final s = await pumpTasksApp(t);
       await _open(t);
       await _type(t, 'go to');
-      // Go to Home, Notes, Tasks, ... in registry order.
+      // Go to Home, Spaces, Notes, Tasks, ... in registry order: three downs
+      // from Home and one up leave Notes.
       await t.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await t.sendKeyEvent(LogicalKeyboardKey.arrowDown);
       await t.sendKeyEvent(LogicalKeyboardKey.arrowDown);
@@ -418,7 +419,7 @@ void main() {
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pump(const Duration(milliseconds: 50));
       expect(_k('palette'), findsNothing);
-      expect(s.section, Section.tasks);
+      expect(s.section, Section.notes);
       await _end(t);
     });
 

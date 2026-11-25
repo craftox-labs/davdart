@@ -2,6 +2,7 @@ import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import '../data/space_catalog.dart';
 import '../state/app_state.dart';
 import '../state/key_nav.dart';
 import '../state/note_drag.dart';
@@ -12,6 +13,7 @@ import 'drag_drop.dart';
 import 'key_nav_ui.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
+import 'new_space_dialog.dart';
 import 'note_menu.dart';
 import 'parts.dart';
 import 'save_view_dialog.dart';
@@ -20,6 +22,8 @@ import 'segmented.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 import 'panel_tags_drawer.dart';
+import 'shell_frame.dart' show spacesLabel;
+import 'space_actions.dart';
 
 /// The panels the side panel shows, one per rail section. Each takes
 /// [onPick], run after an action that should close the narrow sheet.
@@ -125,6 +129,183 @@ abstract class _Section extends StatelessWidget {
   const _Section({super.key, required this.state, required this.onPick});
   final AppState state;
   final VoidCallback onPick;
+}
+
+/// The Spaces: every Space with its sync state, the open one marked; a tap
+/// switches to it. A note dragged over a row drops into that Space. Below,
+/// the manage actions (new, rename, delete). Long press or right click a row
+/// for its own actions.
+class SpacesSection extends _Section {
+  const SpacesSection({super.key, required super.state, required super.onPick});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final other = state.spaces.any((s) => s.id != state.currentSpaceId);
+    state.nav.publish('spaces', [
+      for (final sp in state.spaces)
+        NavEntry(
+          sp.id,
+          uid: sp.id,
+          open: (_) async {
+            await state.switchSpace(sp.id);
+            state.keepListSection();
+            onPick();
+          },
+        ),
+    ]);
+
+    Widget row(
+      SpaceInfo sp, {
+      required Key key,
+      required VoidCallback onPress,
+      required Widget child,
+    }) => NoteDropTarget(
+      key: Key('space-drop-${sp.id}'),
+      accepts: (d) =>
+          sp.id != state.currentSpaceId &&
+          state.editable &&
+          state.findItem(d.uid) != null,
+      onDrop: (d) => moveNoteToSpace(context, state, null, d.uid, sp),
+      child: NavRow(
+        nav: state.nav,
+        list: 'spaces',
+        id: sp.id,
+        child: FTappable(
+          key: key,
+          onPress: onPress,
+          child: Container(
+            constraints: BoxConstraints(minHeight: t.sizes.touchTarget),
+            padding: EdgeInsets.symmetric(
+              horizontal: t.space.md,
+              vertical: t.space.sm,
+            ),
+            decoration: BoxDecoration(
+              color: sp.id == state.currentSpaceId ? t.selected : null,
+              borderRadius: BorderRadius.circular(t.radii.small),
+            ),
+            child: child,
+          ),
+        ),
+      ),
+    );
+
+    Widget space(SpaceInfo sp) {
+      final on = sp.id == state.currentSpaceId;
+      void open() {
+        state.switchSpace(sp.id);
+        state.keepListSection();
+        onPick();
+      }
+
+      final rowWidget = row(
+        sp,
+        key: Key('space-${sp.id}'),
+        onPress: open,
+        child: Row(
+          children: [
+            Icon(
+              sp.onServer ? FLucideIcons.cloud : FLucideIcons.hardDrive,
+              size: t.icons.md,
+              color: on ? t.accent : t.muted,
+            ),
+            SizedBox(width: t.space.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(sp.name, overflow: TextOverflow.ellipsis),
+                  Text(
+                    spaceSyncLabel(state, sp),
+                    style: t.type.captionStyle.copyWith(color: t.muted),
+                  ),
+                ],
+              ),
+            ),
+            if (on) Icon(FLucideIcons.check, size: t.icons.md, color: t.accent),
+          ],
+        ),
+      );
+      return ActionContextMenu(
+        groups: [
+          [
+            if (!on)
+              NoteMenuItem(
+                'Switch to this space',
+                FLucideIcons.arrowRightToLine,
+                open,
+                key: Key('menu-space-switch-${sp.id}'),
+              ),
+            NoteMenuItem(
+              'Rename…',
+              FLucideIcons.pencil,
+              () => showRenameSpaceDialog(
+                context,
+                state,
+                id: sp.id,
+                currentName: sp.name,
+              ),
+              key: Key('menu-space-rename-${sp.id}'),
+            ),
+            if (sp.onServer)
+              NoteMenuItem(
+                'Delete from server…',
+                FLucideIcons.trash2,
+                () async {
+                  if (!await state.switchSpace(sp.id)) return;
+                  if (!context.mounted) return;
+                  showDeleteFromServerDialog(context, state);
+                },
+                key: Key('menu-space-server-delete-${sp.id}'),
+              ),
+          ],
+        ],
+        child: rowWidget,
+      );
+    }
+
+    return _Panel(
+      heading: _title(spacesLabel),
+      children: [
+        if (other)
+          const _Muted('A Space holds its own notes, tasks and events.')
+        else
+          const _Muted('One fixed notes source'),
+        for (final sp in [
+          ...state.spaces.where((s) => s.id == state.currentSpaceId),
+          ...state.spaces.where((s) => s.id != state.currentSpaceId),
+        ])
+          space(sp),
+        if (state.catalog != null) ...[
+          _label(context, 'MANAGE'),
+          _item(FLucideIcons.plus, 'New space…', () {
+            onPick();
+            showNewSpaceDialog(context, state);
+          }),
+          if (state.currentSpaceId != null) ...[
+            _item(FLucideIcons.pencil, 'Rename this space…', () {
+              onPick();
+              showRenameSpaceDialog(context, state);
+            }),
+            _item(FLucideIcons.trash2, 'Delete this space…', () {
+              onPick();
+              showDeleteSpaceDialog(context, state);
+            }),
+            if (state.currentOnServer)
+              FSidebarItem(
+                key: const Key('space-server-delete'),
+                icon: const Icon(FLucideIcons.cloudOff),
+                label: const OverflowTip('Delete from server…'),
+                onPress: () {
+                  onPick();
+                  showDeleteFromServerDialog(context, state);
+                },
+              ),
+          ],
+        ],
+      ],
+    );
+  }
 }
 
 /// Notes (the tree): the Space name, then the tree with folders and the tags

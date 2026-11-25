@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
-import '../data/space_catalog.dart';
 import '../state/app_state.dart';
 import '../state/key_nav.dart';
 import 'drag_drop.dart';
@@ -9,10 +8,10 @@ import 'key_nav_ui.dart';
 import 'events_panel.dart';
 import 'new_space_dialog.dart';
 import 'note_menu.dart';
-import 'parts.dart';
 import 'projects_panel.dart';
 import 'resize_handle.dart';
 import 'sections.dart';
+import 'space_actions.dart';
 import 'shell_frame.dart';
 import 'tasks_panel.dart';
 import 'theme.dart';
@@ -83,9 +82,9 @@ Section visibleSection(AppState state) {
       section != Section.account &&
       section != Section.settings) {
     final tops = topSections(state);
-    // Projects leads the rail but is a scope picker, not a landing page.
+    // Projects and Spaces lead the rail but are pickers, not landing pages.
     section = tops.firstWhere(
-      (o) => o != Section.projects,
+      (o) => o != Section.projects && o != Section.spaces,
       orElse: () => tops.first,
     );
   }
@@ -96,6 +95,7 @@ Section visibleSection(AppState state) {
 /// the narrow sheet.
 Widget sectionBody(AppState state, Section section, VoidCallback onPick) =>
     switch (section) {
+      Section.spaces => SpacesSection(state: state, onPick: onPick),
       Section.notes => NotesSection(state: state, onPick: onPick),
       Section.tasks => TasksPanel(state: state, onPick: onPick),
       Section.events => EventsPanel(state: state, onPick: onPick),
@@ -116,72 +116,6 @@ class _WrappedItem extends StatelessWidget with FItemMixin {
 
   @override
   Widget build(BuildContext context) => wrap(item);
-}
-
-/// Sync state line of a Space in the Spaces popup.
-String spaceSyncLabel(AppState state, SpaceInfo sp) =>
-    sp.id == state.currentSpaceId && state.syncing
-    ? 'Syncing…'
-    : sp.onServer
-    ? 'Synced with the server'
-    : 'On this device only';
-
-/// Moves note [uid] (with everything under it) to Space [sp]. A folder is
-/// confirmed first; a failure or the success is shown as a toast.
-Future<void> _dropOnSpace(
-  BuildContext context,
-  AppState state,
-  FPopoverController controller,
-  String uid,
-  SpaceInfo sp,
-) async {
-  final node = state.tree.find(uid);
-  if (node == null) {
-    final task = state.taskById(uid);
-    final event = task == null ? state.eventById(uid) : null;
-    final name = task?.summary ?? event?.summary;
-    if (name == null) return;
-    controller.hide();
-    final n = await state.moveToSpace(uid, sp.id);
-    if (!context.mounted) return;
-    showFToast(
-      context: context,
-      title: Text(
-        n == null
-            ? (state.error ?? 'Could not move "$name"')
-            : n == 1
-            ? 'Moved "$name" to "${sp.name}"'
-            : 'Moved $n items to "${sp.name}"',
-      ),
-    );
-    return;
-  }
-  if (node.children.isNotEmpty || AppState.isFolder(node.note)) {
-    final ok = await showAppDialog<bool>(
-      context,
-      title: 'Move folder?',
-      content: Text(
-        '"${node.note.summary}" and everything in it will move to '
-        '"${sp.name}".',
-      ),
-      actions: [
-        const CancelButton(),
-        ActionButton(
-          'Move',
-          key: const Key('space-move-confirm'),
-          onPress: (ctx) => Navigator.of(ctx).pop(true),
-        ),
-      ],
-    );
-    if (ok != true) return;
-  }
-  controller.hide();
-  final n = await state.moveToSpace(uid, sp.id);
-  if (!context.mounted) return;
-  final msg = n == null
-      ? (state.error ?? 'Could not move "${node.note.summary}"')
-      : 'Moved ${n == 1 ? '"${node.note.summary}"' : '$n notes'} to "${sp.name}"';
-  showFToast(context: context, title: Text(msg));
 }
 
 /// The Spaces popup's groups: every Space (the current one first, marked)
@@ -235,7 +169,7 @@ List<FItemGroup> spaceMenuGroups(
                   state.editable &&
                   state.findItem(d.uid) != null,
               onDrop: (d) =>
-                  _dropOnSpace(context, state, controller, d.uid, sp),
+                  moveNoteToSpace(context, state, controller.hide, d.uid, sp),
               child: ActionContextMenu(
                 groups: [
                   [

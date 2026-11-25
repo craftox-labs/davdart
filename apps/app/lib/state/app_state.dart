@@ -27,6 +27,8 @@ enum ViewMode { board, list }
 /// `notes` is shown as "Notes"; the ids stay so saved selections still load.
 /// Spaces is a popup on the rail, not a section.
 enum Section {
+  /// The Spaces list: switch, add and manage. On the rail in place of a popup.
+  spaces,
   notes,
   tasks,
   events,
