@@ -83,4 +83,18 @@ void main() {
       ..apply();
     expect(m.description, 'priority: medium (urgent)\n\nt');
   });
+
+  test('setPriority on a value with no word replaces the whole value', () {
+    // Current behaviour: `(x)` starts with a character the "keep the extra
+    // text" pattern stops at, so nothing is kept and the old value is
+    // dropped, not appended to.
+    final n = Note(uid: 'u', description: 'priority: (x)\n\nt');
+    final p = PlanItem.fromNote(n);
+    expect(p.priorityWord, isNull);
+    expect(p.priority, isNull);
+    p
+      ..setPriority('low')
+      ..apply();
+    expect(n.description, 'priority: low\n\nt');
+  });
 }
