@@ -303,27 +303,32 @@ class _Card extends StatelessWidget {
       folder: folder,
       compact: compact,
     );
+    // Items inside the body sit close (xs); the title and the footer stand
+    // off from the body by the card padding (lg).
+    final bodyItems = <Widget>[
+      if (note != null && !compact && plan!.itemId != null)
+        OverflowTip(
+          note.summary,
+          maxLines: 1,
+          style: t.type.bodyStyle.copyWith(color: t.muted),
+        ),
+      if (snippet.isNotEmpty)
+        Text(
+          snippet,
+          key: Key('card-snippet-${item.uid}'),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          style: t.type.bodyStyle.copyWith(color: t.muted),
+        ),
+    ];
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         title,
-        if (note != null && !compact && plan!.itemId != null) ...[
-          SizedBox(height: t.space.lg),
-          OverflowTip(
-            note.summary,
-            maxLines: 1,
-            style: t.type.bodyStyle.copyWith(color: t.muted),
-          ),
-        ],
-        if (snippet.isNotEmpty) ...[
-          SizedBox(height: t.space.lg),
-          Text(
-            snippet,
-            key: Key('card-snippet-${item.uid}'),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: t.type.bodyStyle.copyWith(color: t.muted),
-          ),
+        if (bodyItems.isNotEmpty) SizedBox(height: t.space.lg),
+        for (var i = 0; i < bodyItems.length; i++) ...[
+          if (i > 0) SizedBox(height: t.space.xs),
+          bodyItems[i],
         ],
         SizedBox(height: t.space.lg),
         footer,
