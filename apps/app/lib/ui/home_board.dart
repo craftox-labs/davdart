@@ -315,8 +315,8 @@ class _Card extends StatelessWidget {
       folder: folder,
       compact: compact,
     );
-    // Items inside the body sit close (xs); the title and the footer stand
-    // off from the body by the card padding (lg).
+    // Title and body read as one block (xs gaps); the footer stands off from
+    // it by the card padding (lg).
     final bodyItems = <Widget>[
       if (snippet.isNotEmpty)
         Text(
@@ -331,7 +331,7 @@ class _Card extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         title,
-        if (bodyItems.isNotEmpty) SizedBox(height: t.space.lg),
+        if (bodyItems.isNotEmpty) SizedBox(height: t.space.xs),
         for (var i = 0; i < bodyItems.length; i++) ...[
           if (i > 0) SizedBox(height: t.space.xs),
           bodyItems[i],
