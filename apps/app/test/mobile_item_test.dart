@@ -366,7 +366,7 @@ void main() {
       await t.tap(_k('item-mode'));
       await t.pumpAndSettle();
       expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
-      expect(_k('edit-save'), findsNothing);
+      expect(_k('edit-save-action'), findsNothing);
       await t.enterText(_k('edit-body'), 'Details');
       await t.pump(const Duration(milliseconds: 1600));
       await t.pumpAndSettle();
@@ -394,7 +394,7 @@ void main() {
       await t.tap(_k('item-mode'));
       await t.pumpAndSettle();
       expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
-      expect(_k('edit-save'), findsNothing);
+      expect(_k('edit-save-action'), findsNothing);
       await t.enterText(_k('edit-body'), 'Agenda');
       await t.pump(const Duration(milliseconds: 1600));
       await t.pumpAndSettle();
