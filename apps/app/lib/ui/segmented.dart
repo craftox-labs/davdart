@@ -52,6 +52,8 @@ class Segmented<T> extends StatelessWidget {
             child: Center(
               child: Text(
                 s.label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: t.type.captionStyle.copyWith(
                   color: on ? t.fg : t.muted,
                   fontWeight: on ? FontWeight.w600 : FontWeight.w400,

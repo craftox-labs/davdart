@@ -13,6 +13,7 @@ import 'collapsible_section.dart';
 import 'key_nav_ui.dart';
 import 'panel_tags_drawer.dart';
 import 'parts.dart';
+import 'segmented.dart';
 import 'side_panel.dart';
 import 'task_menu.dart';
 import 'task_parts.dart';
@@ -262,12 +263,32 @@ class _Filters extends StatelessWidget {
       toggle('All', TaskFilter.all),
       toggle('Completed', TaskFilter.completed),
     ];
+    // Phones: one full-width segmented control (equal segments, labels
+    // ellipsize); wide: separate buttons hugging their labels.
+    final row = narrow
+        ? Segmented<TaskFilter>(
+            fullWidth: true,
+            value: state.taskFilter,
+            onChanged: state.setTaskFilter,
+            segments: [
+              for (final (l, v) in [
+                ('Open', TaskFilter.open),
+                ('All', TaskFilter.all),
+                ('Completed', TaskFilter.completed),
+              ])
+                Segment(v, l, 'tasks-filter-${v.name}'),
+            ],
+          )
+        : null;
     return Wrap(
       spacing: t.space.md,
       runSpacing: t.space.md,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        ...toggles,
+        if (row != null)
+          SizedBox(width: double.infinity, child: row)
+        else
+          ...toggles,
         if (folders.isNotEmpty)
           SizedBox(
             // Phones: the folder selector spans the content width.
