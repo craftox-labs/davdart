@@ -429,11 +429,14 @@ FTextField field({
   );
 }
 
-/// Text the user can select and copy (the revision list). Forui has no
-/// selectable text, so this wraps the framework's region.
+/// Text the user can select and copy (the revision list, the read views of
+/// notes, tasks and events). Forui has no selectable text, so this wraps the
+/// framework's region. [enabled] is off while a draft is open: the fields keep
+/// their own selection and focus behaviour.
 class SelectableBody extends StatefulWidget {
-  const SelectableBody({super.key, required this.child});
+  const SelectableBody({super.key, required this.child, this.enabled = true});
   final Widget child;
+  final bool enabled;
 
   @override
   State<SelectableBody> createState() => _SelectableBodyState();
@@ -449,9 +452,11 @@ class _SelectableBodyState extends State<SelectableBody> {
   }
 
   @override
-  Widget build(BuildContext context) => SelectableRegion(
-    focusNode: _focus,
-    selectionControls: emptyTextSelectionControls,
-    child: widget.child,
-  );
+  Widget build(BuildContext context) => widget.enabled
+      ? SelectableRegion(
+          focusNode: _focus,
+          selectionControls: emptyTextSelectionControls,
+          child: widget.child,
+        )
+      : widget.child;
 }

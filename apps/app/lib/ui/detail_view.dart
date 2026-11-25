@@ -128,205 +128,207 @@ class DetailView extends StatelessWidget {
           ],
         ),
         Expanded(
-          child: SingleChildScrollView(
-            controller: state.nav.pageScroll(area),
-            padding: EdgeInsets.fromLTRB(
-              t.space.xxl,
-              t.space.md,
-              t.space.xxl,
-              t.space.huge,
-            ),
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: t.sizes.pageMax),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (draft != null)
-                      NoteEditor(
-                        state: state,
-                        draft: draft,
-                        note: note,
-                        full: full,
-                      )
-                    else ...[
-                      if (state.editable && !AppState.isFolder(note)) ...[
-                        SizedBox(height: t.space.md),
-                        Row(
-                          children: [
-                            Text('Status', style: TextStyle(color: t.muted)),
-                            SizedBox(width: t.space.lg),
-                            SizedBox(
-                              width: t.sizes.statusField,
-                              child: TrackPopover(
-                                builder: (_, pc) => FSelect<String>.rich(
-                                  popoverControl: pc,
-                                  key: const Key('status-menu'),
-                                  format: (v) => v.isEmpty ? 'none' : v,
-                                  hint: 'none',
-                                  control: FSelectControl.lifted(
-                                    value: boardOrder.contains(p.status)
-                                        ? p.status
-                                        : null,
-                                    // '' is the "none" row: off the boards.
-                                    onChange: (v) {
-                                      if (v != null) {
-                                        state.setStatus(
-                                          note.uid,
-                                          v.isEmpty ? null : v,
-                                        );
-                                      }
-                                    },
-                                  ),
-                                  children: [
-                                    const FSelectItem<String>(
-                                      key: Key('status-menu-none'),
-                                      title: Text('none'),
-                                      value: '',
-                                    ),
-                                    for (final s in boardOrder)
-                                      FSelectItem<String>(
-                                        title: Text(s),
-                                        value: s,
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                      SizedBox(height: t.space.lg),
-                      if (p.fields.isNotEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.all(t.space.lg),
-                          decoration: BoxDecoration(
-                            color: t.card,
-                            border: Border.all(color: t.cardBorder),
-                            borderRadius: BorderRadius.circular(t.radii.card),
-                          ),
-                          child: Column(
+          child: SelectableBody(
+            enabled: draft == null,
+            child: SingleChildScrollView(
+              controller: state.nav.pageScroll(area),
+              padding: EdgeInsets.fromLTRB(
+                t.space.xxl,
+                t.space.md,
+                t.space.xxl,
+                t.space.huge,
+              ),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: t.sizes.pageMax),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (draft != null)
+                        NoteEditor(
+                          state: state,
+                          draft: draft,
+                          note: note,
+                          full: full,
+                        )
+                      else ...[
+                        if (state.editable && !AppState.isFolder(note)) ...[
+                          SizedBox(height: t.space.md),
+                          Row(
                             children: [
-                              for (final e in p.fields.entries)
-                                Padding(
-                                  padding: EdgeInsets.symmetric(
-                                    vertical: t.space.xxs,
-                                  ),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                              Text('Status', style: TextStyle(color: t.muted)),
+                              SizedBox(width: t.space.lg),
+                              SizedBox(
+                                width: t.sizes.statusField,
+                                child: TrackPopover(
+                                  builder: (_, pc) => FSelect<String>.rich(
+                                    popoverControl: pc,
+                                    key: const Key('status-menu'),
+                                    format: (v) => v.isEmpty ? 'none' : v,
+                                    hint: 'none',
+                                    control: FSelectControl.lifted(
+                                      value: boardOrder.contains(p.status)
+                                          ? p.status
+                                          : null,
+                                      // '' is the "none" row: off the boards.
+                                      onChange: (v) {
+                                        if (v != null) {
+                                          state.setStatus(
+                                            note.uid,
+                                            v.isEmpty ? null : v,
+                                          );
+                                        }
+                                      },
+                                    ),
                                     children: [
-                                      SizedBox(
-                                        width: t.sizes.metaLabel,
-                                        child: Text(
-                                          e.key,
-                                          style: t.type.monoStyle.copyWith(
-                                            color: t.muted,
-                                          ),
-                                        ),
+                                      const FSelectItem<String>(
+                                        key: Key('status-menu-none'),
+                                        title: Text('none'),
+                                        value: '',
                                       ),
-                                      Expanded(
-                                        child: Text(
-                                          e.value,
-                                          style: t.type.bodyStyle,
+                                      for (final s in boardOrder)
+                                        FSelectItem<String>(
+                                          title: Text(s),
+                                          value: s,
                                         ),
-                                      ),
                                     ],
                                   ),
                                 ),
-                            ],
-                          ),
-                        ),
-                      if (note.categories.isNotEmpty) ...[
-                        SizedBox(height: t.space.lg),
-                        Wrap(
-                          spacing: t.space.sm,
-                          runSpacing: t.space.sm,
-                          children: [
-                            for (final c in note.categories) TagChip(c),
-                          ],
-                        ),
-                      ],
-                      SizedBox(height: t.space.xl),
-                      MarkdownLite(p.text),
-                    ],
-                    if (draft == null &&
-                        state.tasksByParent(note.uid).isNotEmpty)
-                      Padding(
-                        padding: EdgeInsets.only(top: t.space.xxl),
-                        child: ChildTasks(state: state, parentUid: note.uid),
-                      ),
-                    FutureBuilder<List<Revision>>(
-                      key: ValueKey('rev-${note.uid}-${note.lastModified}'),
-                      future: state.revisionsFor(note.uid),
-                      builder: (context, snap) {
-                        final revs = snap.data ?? const <Revision>[];
-                        if (revs.isEmpty) return const SizedBox.shrink();
-                        return Padding(
-                          padding: EdgeInsets.only(top: t.space.xxl),
-                          child: FAccordion(
-                            key: const Key('revisions'),
-                            children: [
-                              FAccordionItem(
-                                title: Text(
-                                  'Earlier versions (${revs.length})',
-                                  style: t.type.bodyStyle.copyWith(
-                                    color: t.muted,
-                                  ),
-                                ),
-                                child: Column(
-                                  children: [
-                                    for (final r in revs.reversed)
-                                      Container(
-                                        width: double.infinity,
-                                        margin: EdgeInsets.only(
-                                          bottom: t.space.md,
-                                        ),
-                                        padding: EdgeInsets.all(t.space.lg),
-                                        decoration: BoxDecoration(
-                                          color: t.card,
-                                          border: Border.all(
-                                            color: t.cardBorder,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            t.radii.card,
-                                          ),
-                                        ),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              '${r.at.toLocal().toString().substring(0, 16)}  ·  ${r.reason}',
-                                              style: t.type.microStyle.copyWith(
-                                                color: t.muted,
-                                              ),
-                                            ),
-                                            SizedBox(height: t.space.xs),
-                                            Text(
-                                              r.summary,
-                                              style: t.type.semiboldStyle,
-                                            ),
-                                            SelectableBody(
-                                              child: Text(
-                                                r.body,
-                                                style: t.type.bodyStyle,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                  ],
-                                ),
                               ),
                             ],
                           ),
-                        );
-                      },
-                    ),
-                  ],
+                        ],
+                        SizedBox(height: t.space.lg),
+                        if (p.fields.isNotEmpty)
+                          Container(
+                            width: double.infinity,
+                            padding: EdgeInsets.all(t.space.lg),
+                            decoration: BoxDecoration(
+                              color: t.card,
+                              border: Border.all(color: t.cardBorder),
+                              borderRadius: BorderRadius.circular(t.radii.card),
+                            ),
+                            child: Column(
+                              children: [
+                                for (final e in p.fields.entries)
+                                  Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: t.space.xxs,
+                                    ),
+                                    child: Row(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        SizedBox(
+                                          width: t.sizes.metaLabel,
+                                          child: Text(
+                                            e.key,
+                                            style: t.type.monoStyle.copyWith(
+                                              color: t.muted,
+                                            ),
+                                          ),
+                                        ),
+                                        Expanded(
+                                          child: Text(
+                                            e.value,
+                                            style: t.type.bodyStyle,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        if (note.categories.isNotEmpty) ...[
+                          SizedBox(height: t.space.lg),
+                          Wrap(
+                            spacing: t.space.sm,
+                            runSpacing: t.space.sm,
+                            children: [
+                              for (final c in note.categories) TagChip(c),
+                            ],
+                          ),
+                        ],
+                        SizedBox(height: t.space.xl),
+                        MarkdownLite(p.text),
+                      ],
+                      if (draft == null &&
+                          state.tasksByParent(note.uid).isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(top: t.space.xxl),
+                          child: ChildTasks(state: state, parentUid: note.uid),
+                        ),
+                      FutureBuilder<List<Revision>>(
+                        key: ValueKey('rev-${note.uid}-${note.lastModified}'),
+                        future: state.revisionsFor(note.uid),
+                        builder: (context, snap) {
+                          final revs = snap.data ?? const <Revision>[];
+                          if (revs.isEmpty) return const SizedBox.shrink();
+                          return Padding(
+                            padding: EdgeInsets.only(top: t.space.xxl),
+                            child: FAccordion(
+                              key: const Key('revisions'),
+                              children: [
+                                FAccordionItem(
+                                  title: Text(
+                                    'Earlier versions (${revs.length})',
+                                    style: t.type.bodyStyle.copyWith(
+                                      color: t.muted,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      for (final r in revs.reversed)
+                                        Container(
+                                          width: double.infinity,
+                                          margin: EdgeInsets.only(
+                                            bottom: t.space.md,
+                                          ),
+                                          padding: EdgeInsets.all(t.space.lg),
+                                          decoration: BoxDecoration(
+                                            color: t.card,
+                                            border: Border.all(
+                                              color: t.cardBorder,
+                                            ),
+                                            borderRadius: BorderRadius.circular(
+                                              t.radii.card,
+                                            ),
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              Text(
+                                                '${r.at.toLocal().toString().substring(0, 16)}  ·  ${r.reason}',
+                                                style: t.type.microStyle
+                                                    .copyWith(color: t.muted),
+                                              ),
+                                              SizedBox(height: t.space.xs),
+                                              Text(
+                                                r.summary,
+                                                style: t.type.semiboldStyle,
+                                              ),
+                                              SelectableBody(
+                                                child: Text(
+                                                  r.body,
+                                                  style: t.type.bodyStyle,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

@@ -231,105 +231,108 @@ class EventDetail extends StatelessWidget {
           ],
         ),
         Expanded(
-          child: SingleChildScrollView(
-            controller: state.nav.pageScroll(area),
-            padding: EdgeInsets.fromLTRB(
-              t.space.xxl,
-              t.space.md,
-              t.space.xxl,
-              t.space.huge,
-            ),
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: t.sizes.pageMax),
-                child: Column(
-                  key: const Key('event-detail'),
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (draft != null)
-                      EventEditor(
-                        state: state,
-                        draft: draft,
-                        event: event,
-                        full: full,
-                      )
-                    else ...[
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(t.space.lg),
-                        decoration: BoxDecoration(
-                          color: t.card,
-                          border: Border.all(color: t.cardBorder),
-                          borderRadius: BorderRadius.circular(t.radii.card),
-                        ),
-                        child: Column(
-                          children: [
-                            meta(
-                              'when',
-                              Text(
-                                eventWhen(event),
-                                key: const Key('event-when'),
-                                style: t.type.bodyStyle,
-                              ),
-                            ),
-                            if (event.location.isNotEmpty)
+          child: SelectableBody(
+            enabled: draft == null,
+            child: SingleChildScrollView(
+              controller: state.nav.pageScroll(area),
+              padding: EdgeInsets.fromLTRB(
+                t.space.xxl,
+                t.space.md,
+                t.space.xxl,
+                t.space.huge,
+              ),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: t.sizes.pageMax),
+                  child: Column(
+                    key: const Key('event-detail'),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (draft != null)
+                        EventEditor(
+                          state: state,
+                          draft: draft,
+                          event: event,
+                          full: full,
+                        )
+                      else ...[
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(t.space.lg),
+                          decoration: BoxDecoration(
+                            color: t.card,
+                            border: Border.all(color: t.cardBorder),
+                            borderRadius: BorderRadius.circular(t.radii.card),
+                          ),
+                          child: Column(
+                            children: [
                               meta(
-                                'where',
+                                'when',
                                 Text(
-                                  event.location,
-                                  key: const Key('event-location'),
+                                  eventWhen(event),
+                                  key: const Key('event-when'),
                                   style: t.type.bodyStyle,
                                 ),
                               ),
-                            meta(
-                              'status',
-                              Text(
-                                _statusName(event.status),
-                                key: const Key('event-status-text'),
-                                style: t.type.bodyStyle,
-                              ),
-                            ),
-                            if (event.isRecurring)
+                              if (event.location.isNotEmpty)
+                                meta(
+                                  'where',
+                                  Text(
+                                    event.location,
+                                    key: const Key('event-location'),
+                                    style: t.type.bodyStyle,
+                                  ),
+                                ),
                               meta(
-                                'repeats',
+                                'status',
                                 Text(
-                                  event.rrule == null || event.rrule!.isEmpty
-                                      ? 'on chosen dates (edit in another app)'
-                                      : event.rrule!,
-                                  key: const Key('event-rrule'),
+                                  _statusName(event.status),
+                                  key: const Key('event-status-text'),
                                   style: t.type.bodyStyle,
                                 ),
                               ),
-                          ],
+                              if (event.isRecurring)
+                                meta(
+                                  'repeats',
+                                  Text(
+                                    event.rrule == null || event.rrule!.isEmpty
+                                        ? 'on chosen dates (edit in another app)'
+                                        : event.rrule!,
+                                    key: const Key('event-rrule'),
+                                    style: t.type.bodyStyle,
+                                  ),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      if (event.recurrenceUnsupported) ...[
-                        SizedBox(height: t.space.md),
-                        Text(
-                          'This repeat rule is not expanded here; only the '
-                          'first occurrence is listed.',
-                          key: const Key('event-unsupported'),
-                          style: t.type.captionStyle.copyWith(color: t.muted),
-                        ),
-                      ],
-                      if (state.eventTagsOf(event).isNotEmpty) ...[
-                        SizedBox(height: t.space.lg),
-                        Wrap(
-                          spacing: t.space.sm,
-                          runSpacing: t.space.sm,
-                          children: [
-                            for (final c in state.eventTagsOf(event))
-                              TagChip(c),
-                          ],
-                        ),
-                      ],
-                      if (event.description.trim().isNotEmpty) ...[
-                        SizedBox(height: t.space.xl),
-                        MarkdownLite(event.description),
+                        if (event.recurrenceUnsupported) ...[
+                          SizedBox(height: t.space.md),
+                          Text(
+                            'This repeat rule is not expanded here; only the '
+                            'first occurrence is listed.',
+                            key: const Key('event-unsupported'),
+                            style: t.type.captionStyle.copyWith(color: t.muted),
+                          ),
+                        ],
+                        if (state.eventTagsOf(event).isNotEmpty) ...[
+                          SizedBox(height: t.space.lg),
+                          Wrap(
+                            spacing: t.space.sm,
+                            runSpacing: t.space.sm,
+                            children: [
+                              for (final c in state.eventTagsOf(event))
+                                TagChip(c),
+                            ],
+                          ),
+                        ],
+                        if (event.description.trim().isNotEmpty) ...[
+                          SizedBox(height: t.space.xl),
+                          MarkdownLite(event.description),
+                        ],
                       ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             ),

@@ -346,168 +346,173 @@ class TaskDetail extends StatelessWidget {
           ],
         ),
         Expanded(
-          child: SingleChildScrollView(
-            controller: state.nav.pageScroll(area),
-            padding: EdgeInsets.fromLTRB(
-              t.space.xxl,
-              t.space.md,
-              t.space.xxl,
-              t.space.huge,
-            ),
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: t.sizes.pageMax),
-                child: Column(
-                  key: const Key('task-detail'),
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (draft != null)
-                      TaskEditor(
-                        state: state,
-                        draft: draft,
-                        task: task,
-                        full: full,
-                      ),
-                    SizedBox(height: t.space.md),
-                    Row(
-                      children: [
-                        Text('Status', style: TextStyle(color: t.muted)),
-                        SizedBox(width: t.space.lg),
-                        if (edit)
-                          SizedBox(
-                            width: t.sizes.statusField,
-                            child: TrackPopover(
-                              builder: (_, pc) => FSelect<String>.rich(
-                                popoverControl: pc,
-                                key: const Key('task-status-menu'),
-                                format: (v) => _statusWords
-                                    .firstWhere(
-                                      (e) => e.$1 == v,
-                                      orElse: () => (v, v),
-                                    )
-                                    .$2,
-                                hint: status,
-                                control: FSelectControl.lifted(
-                                  value: _statusWords.any((e) => e.$1 == status)
-                                      ? status
-                                      : null,
-                                  onChange: (v) {
-                                    if (v != null && v != status) {
-                                      state.setTaskStatus(uid, v);
-                                    }
-                                  },
-                                ),
-                                children: [
-                                  for (final e in _statusWords)
-                                    FSelectItem<String>(
-                                      title: Text(e.$2),
-                                      value: e.$1,
-                                      enabled: !(e.$1 == 'done' && blocked),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          )
-                        else
-                          Text(
-                            _statusWords
-                                .firstWhere(
-                                  (e) => e.$1 == status,
-                                  orElse: () => (status, status),
-                                )
-                                .$2,
-                            key: const Key('task-status-text'),
-                          ),
-                      ],
-                    ),
-                    if (draft == null) ...[
-                      SizedBox(height: t.space.lg),
-                      Container(
-                        width: double.infinity,
-                        padding: EdgeInsets.all(t.space.lg),
-                        decoration: BoxDecoration(
-                          color: t.card,
-                          border: Border.all(color: t.cardBorder),
-                          borderRadius: BorderRadius.circular(t.radii.card),
+          child: SelectableBody(
+            enabled: draft == null,
+            child: SingleChildScrollView(
+              controller: state.nav.pageScroll(area),
+              padding: EdgeInsets.fromLTRB(
+                t.space.xxl,
+                t.space.md,
+                t.space.xxl,
+                t.space.huge,
+              ),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: t.sizes.pageMax),
+                  child: Column(
+                    key: const Key('task-detail'),
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (draft != null)
+                        TaskEditor(
+                          state: state,
+                          draft: draft,
+                          task: task,
+                          full: full,
                         ),
-                        child: Column(
-                          children: [
-                            meta(
-                              'due',
-                              task.due == null
-                                  ? Text('none', style: t.type.bodyStyle)
-                                  : Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: DueChip(
-                                        task,
-                                        key: const Key('task-due'),
-                                        now: now,
-                                        overdue: task.isClosed ? false : null,
+                      SizedBox(height: t.space.md),
+                      Row(
+                        children: [
+                          Text('Status', style: TextStyle(color: t.muted)),
+                          SizedBox(width: t.space.lg),
+                          if (edit)
+                            SizedBox(
+                              width: t.sizes.statusField,
+                              child: TrackPopover(
+                                builder: (_, pc) => FSelect<String>.rich(
+                                  popoverControl: pc,
+                                  key: const Key('task-status-menu'),
+                                  format: (v) => _statusWords
+                                      .firstWhere(
+                                        (e) => e.$1 == v,
+                                        orElse: () => (v, v),
+                                      )
+                                      .$2,
+                                  hint: status,
+                                  control: FSelectControl.lifted(
+                                    value:
+                                        _statusWords.any((e) => e.$1 == status)
+                                        ? status
+                                        : null,
+                                    onChange: (v) {
+                                      if (v != null && v != status) {
+                                        state.setTaskStatus(uid, v);
+                                      }
+                                    },
+                                  ),
+                                  children: [
+                                    for (final e in _statusWords)
+                                      FSelectItem<String>(
+                                        title: Text(e.$2),
+                                        value: e.$1,
+                                        enabled: !(e.$1 == 'done' && blocked),
                                       ),
-                                    ),
-                            ),
-                            meta(
-                              'priority',
-                              Text(
-                                priorityBucket(task.priority),
-                                key: const Key('task-priority'),
-                                style: t.type.bodyStyle,
-                              ),
-                            ),
-                            if (parentName != null)
-                              meta(
-                                'inside',
-                                Text(parentName, style: t.type.bodyStyle),
-                              ),
-                            if (task.rrule != null)
-                              meta(
-                                'repeats',
-                                Text(
-                                  '${task.rrule} (edit in another app)',
-                                  key: const Key('task-rrule'),
-                                  style: t.type.bodyStyle,
+                                  ],
                                 ),
                               ),
-                            if (task.completed != null)
-                              meta(
-                                'completed',
-                                Text(
-                                  task.completed!
-                                      .toLocal()
-                                      .toString()
-                                      .substring(0, 16),
-                                  style: t.type.bodyStyle,
-                                ),
-                              ),
-                          ],
-                        ),
+                            )
+                          else
+                            Text(
+                              _statusWords
+                                  .firstWhere(
+                                    (e) => e.$1 == status,
+                                    orElse: () => (status, status),
+                                  )
+                                  .$2,
+                              key: const Key('task-status-text'),
+                            ),
+                        ],
                       ),
-                      if (state.taskTagsOf(task).isNotEmpty) ...[
+                      if (draft == null) ...[
                         SizedBox(height: t.space.lg),
-                        Wrap(
-                          spacing: t.space.sm,
-                          runSpacing: t.space.sm,
-                          children: [
-                            for (final c in state.taskTagsOf(task)) TagChip(c),
-                          ],
+                        Container(
+                          width: double.infinity,
+                          padding: EdgeInsets.all(t.space.lg),
+                          decoration: BoxDecoration(
+                            color: t.card,
+                            border: Border.all(color: t.cardBorder),
+                            borderRadius: BorderRadius.circular(t.radii.card),
+                          ),
+                          child: Column(
+                            children: [
+                              meta(
+                                'due',
+                                task.due == null
+                                    ? Text('none', style: t.type.bodyStyle)
+                                    : Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: DueChip(
+                                          task,
+                                          key: const Key('task-due'),
+                                          now: now,
+                                          overdue: task.isClosed ? false : null,
+                                        ),
+                                      ),
+                              ),
+                              meta(
+                                'priority',
+                                Text(
+                                  priorityBucket(task.priority),
+                                  key: const Key('task-priority'),
+                                  style: t.type.bodyStyle,
+                                ),
+                              ),
+                              if (parentName != null)
+                                meta(
+                                  'inside',
+                                  Text(parentName, style: t.type.bodyStyle),
+                                ),
+                              if (task.rrule != null)
+                                meta(
+                                  'repeats',
+                                  Text(
+                                    '${task.rrule} (edit in another app)',
+                                    key: const Key('task-rrule'),
+                                    style: t.type.bodyStyle,
+                                  ),
+                                ),
+                              if (task.completed != null)
+                                meta(
+                                  'completed',
+                                  Text(
+                                    task.completed!
+                                        .toLocal()
+                                        .toString()
+                                        .substring(0, 16),
+                                    style: t.type.bodyStyle,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (state.taskTagsOf(task).isNotEmpty) ...[
+                          SizedBox(height: t.space.lg),
+                          Wrap(
+                            spacing: t.space.sm,
+                            runSpacing: t.space.sm,
+                            children: [
+                              for (final c in state.taskTagsOf(task))
+                                TagChip(c),
+                            ],
+                          ),
+                        ],
+                        if (task.description.trim().isNotEmpty) ...[
+                          SizedBox(height: t.space.xl),
+                          MarkdownLite(task.description),
+                        ],
+                      ] else if (task.rrule != null) ...[
+                        SizedBox(height: t.space.lg),
+                        Text(
+                          'Repeats: ${task.rrule} (edit in another app)',
+                          key: const Key('task-rrule'),
+                          style: t.type.captionStyle.copyWith(color: t.muted),
                         ),
                       ],
-                      if (task.description.trim().isNotEmpty) ...[
-                        SizedBox(height: t.space.xl),
-                        MarkdownLite(task.description),
-                      ],
-                    ] else if (task.rrule != null) ...[
-                      SizedBox(height: t.space.lg),
-                      Text(
-                        'Repeats: ${task.rrule} (edit in another app)',
-                        key: const Key('task-rrule'),
-                        style: t.type.captionStyle.copyWith(color: t.muted),
-                      ),
+                      SizedBox(height: t.space.xxl),
+                      ChildTasks(state: state, parentUid: uid),
                     ],
-                    SizedBox(height: t.space.xxl),
-                    ChildTasks(state: state, parentUid: uid),
-                  ],
+                  ),
                 ),
               ),
             ),
