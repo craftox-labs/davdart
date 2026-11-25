@@ -8,7 +8,7 @@ import '../state/note_drag.dart';
 import '../state/task_rules.dart';
 import '../theme/tokens.dart';
 import 'board_layout.dart';
-import 'chips.dart';
+import 'task_detail.dart' show priorityBucket;
 import 'drag_drop.dart';
 import 'key_nav_ui.dart';
 import 'new_note_dialog.dart';
@@ -252,7 +252,7 @@ class _Card extends StatelessWidget {
   final BoardItem item;
   final String column;
 
-  /// Narrow layout: glyph and title, plus the task meta line.
+  /// Narrow layout: smaller title; footer keeps kind, high priority, due, tag count.
   final bool compact;
 
   @override
@@ -264,42 +264,46 @@ class _Card extends StatelessWidget {
         ? state.peekUid == task.uid || state.mainTaskUid == task.uid
         : state.peekUid == note!.uid;
     final plan = note == null ? null : PlanItem.fromNote(note);
-    // Phone cards keep title, glyph, priority and due only.
-    final allTags = compact
-        ? const <String>[]
-        : task != null
+    final allTags = task != null
         ? state.taskTagsOf(task)
         : state.noteTagsOf(note!);
-    final shownTags = allTags.take(boardCardMaxTags).toList();
+    final shownTags = compact
+        ? const <String>[]
+        : allTags.take(boardCardMaxTags).toList();
     final moreTags = allTags.length - shownTags.length;
     final folder = compact || state.scopeUid != null
         ? null
         : state.folderNameOf(item.uid);
     final snippet = note == null || compact ? '' : noteSnippet(plan!.text);
+    final titleStyle = compact ? t.type.bodyStrong : t.type.titleStyle;
     final title = task != null
-        ? OverflowTip(task.summary, maxLines: 3, style: t.type.semiboldStyle)
+        ? OverflowTip(task.summary, maxLines: 3, style: titleStyle)
         : Text(
             compact ? note!.summary : (plan!.itemId ?? note!.summary),
-            style: t.type.semiboldStyle,
+            style: titleStyle,
           );
+    final bucket = task != null
+        ? priorityBucket(task.priority)
+        : (plan!.priorityWord ?? 'none');
+    final showPriority = bucket != 'none' && (!compact || bucket == 'high');
+    final now = DateTime.now();
+    final due = task == null ? '' : dueLabel(task, now);
+    final late = task != null && !task.isClosed && isTaskOverdue(task, now);
+    final footer = _footer(
+      t,
+      bucket: showPriority ? bucket : null,
+      due: due,
+      late: late,
+      tags: shownTags,
+      moreTags: moreTags,
+      tagCount: allTags.length,
+      folder: folder,
+      compact: compact,
+    );
     final body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: title),
-            Padding(
-              padding: EdgeInsets.only(top: t.space.xxs, left: t.space.md),
-              child: Icon(
-                kindIcon(item.isTask),
-                key: Key('card-kind-${item.uid}'),
-                size: t.icons.md,
-                color: t.muted,
-              ),
-            ),
-          ],
-        ),
+        title,
         if (note != null && !compact && plan!.itemId != null) ...[
           SizedBox(height: t.space.xxs),
           OverflowTip(
@@ -318,56 +322,8 @@ class _Card extends StatelessWidget {
             style: t.type.bodyStyle.copyWith(color: t.muted),
           ),
         ],
-        if (folder != null || shownTags.isNotEmpty) ...[
-          SizedBox(height: t.space.sm),
-          Wrap(
-            spacing: t.space.md,
-            runSpacing: t.space.xs,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (folder != null)
-                ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: t.sizes.tabMax),
-                  child: TagChip(folder, key: Key('card-folder-${item.uid}')),
-                ),
-              if (shownTags.isNotEmpty)
-                Text(
-                  [...shownTags, if (moreTags > 0) '+$moreTags'].join(' · '),
-                  key: Key('card-tags-${item.uid}'),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: t.type.captionStyle.copyWith(color: t.muted),
-                ),
-            ],
-          ),
-        ],
-        if (task != null && taskHasMeta(task)) ...[
-          SizedBox(height: t.space.sm),
-          TaskCardMeta(task: task),
-        ],
-        if (note != null && plan!.priorityWord != null) ...[
-          SizedBox(height: t.space.sm),
-          Text(
-            '${plan.priorityWord![0].toUpperCase()}'
-            '${plan.priorityWord!.substring(1)}',
-            key: Key('card-priority-${note.uid}'),
-            style: t.type.captionStyle.copyWith(
-              color: plan.priorityWord == 'high' ? t.accent : t.muted,
-            ),
-          ),
-        ],
-        if (note != null &&
-            !compact &&
-            (plan!.owner ?? plan.decidedBy) != null) ...[
-          SizedBox(height: t.space.sm),
-          Text(
-            [
-              if (plan.owner != null) plan.owner!,
-              if (plan.decidedBy != null) 'decided by ${plan.decidedBy!}',
-            ].join(' · '),
-            style: t.type.captionStyle.copyWith(color: t.muted),
-          ),
-        ],
+        SizedBox(height: t.space.sm),
+        footer,
       ],
     );
     final card = FTappable(
@@ -416,6 +372,125 @@ class _Card extends StatelessWidget {
                 ],
                 child: draggable,
               ),
+      ),
+    );
+  }
+
+  /// The footer row, left-aligned with the title: kind, priority, due, tags,
+  /// and the folder at the right end. Phones drop medium/low priority, list
+  /// tags as an icon with the count.
+  Widget _footer(
+    Tokens t, {
+    required String? bucket,
+    required String due,
+    required bool late,
+    required List<String> tags,
+    required int moreTags,
+    required int tagCount,
+    required String? folder,
+    required bool compact,
+  }) {
+    final uid = item.uid;
+    final small = t.type.captionStyle;
+    Widget pair(IconData icon, Widget text, Color color, {Key? key}) => Row(
+      key: key,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: t.icons.sm, color: color),
+        SizedBox(width: t.space.xs),
+        Flexible(child: text),
+      ],
+    );
+    Text txt(String s, Color c, {Key? key}) => Text(
+      s,
+      key: key,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: small.copyWith(color: c),
+    );
+    final gap = SizedBox(width: t.space.md);
+    final high = bucket == 'high';
+    final parts = <Widget>[
+      Icon(
+        kindIcon(item.isTask),
+        key: Key('card-kind-$uid'),
+        size: t.icons.sm,
+        color: t.muted,
+      ),
+      if (bucket != null) ...[
+        gap,
+        pair(
+          FLucideIcons.flag,
+          txt(
+            '${bucket[0].toUpperCase()}${bucket.substring(1)}',
+            high ? t.accent : t.muted,
+          ),
+          high ? t.accent : t.muted,
+          key: Key('card-priority-$uid'),
+        ),
+      ],
+      if (due.isNotEmpty) ...[
+        gap,
+        Flexible(
+          child: pair(
+            FLucideIcons.calendar,
+            txt(due, late ? t.error : t.muted),
+            late ? t.error : t.muted,
+            key: Key('card-due-$uid'),
+          ),
+        ),
+      ],
+      if (compact && tagCount > 0) ...[
+        gap,
+        pair(
+          FLucideIcons.tag,
+          txt('$tagCount', t.muted, key: Key('card-tag-count-$uid')),
+          t.muted,
+        ),
+      ],
+      if (tags.isNotEmpty) ...[
+        gap,
+        Flexible(
+          child: txt(
+            [
+              for (final g in tags) '#$g',
+              if (moreTags > 0) '+$moreTags',
+            ].join(' '),
+            t.muted,
+            key: Key('card-tags-$uid'),
+          ),
+        ),
+      ],
+    ];
+    final label = [
+      item.isTask ? 'Task' : 'Note',
+      if (bucket != null) '$bucket priority',
+      if (due.isNotEmpty) '${late ? 'overdue, ' : ''}due $due',
+      if (tagCount > 0) 'tags ${tags.isEmpty ? '$tagCount' : tags.join(', ')}',
+      if (folder != null) 'in $folder',
+    ].join(', ');
+    return Semantics(
+      label: label,
+      excludeSemantics: true,
+      child: Row(
+        children: [
+          ...parts,
+          if (folder != null)
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: EdgeInsets.only(left: t.space.md),
+                  child: pair(
+                    FLucideIcons.folder,
+                    txt(folder, t.muted),
+                    t.muted,
+                    key: Key('card-folder-$uid'),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

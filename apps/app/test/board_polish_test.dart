@@ -248,7 +248,8 @@ void main() {
       );
       await showTasksBoard(t);
       await t.pumpAndSettle();
-      expect(find.text('Medium'), findsOneWidget);
+      expect(find.text('Medium'), findsNothing);
+      expect(_k('card-priority-a'), findsNothing);
       expect(_k('card-due-a'), findsOneWidget);
     });
   });

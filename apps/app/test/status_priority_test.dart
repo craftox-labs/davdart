@@ -62,8 +62,15 @@ void main() {
   tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
   test('review sits between doing and done in the fixed order', () {
-    expect(boardOrder,
-        ['backlog', 'todo', 'doing', 'blocked', 'review', 'done', 'canceled']);
+    expect(boardOrder, [
+      'backlog',
+      'todo',
+      'doing',
+      'blocked',
+      'review',
+      'done',
+      'canceled',
+    ]);
     expect(statusColumn('review'), 'review');
   });
 
@@ -119,7 +126,7 @@ void main() {
       s.setView(ViewMode.board);
       await t.pumpAndSettle();
       expect(_k('card-priority-c'), findsOneWidget);
-      expect(t.widget<Text>(_k('card-priority-c')).data, 'High');
+      expect(find.text('High'), findsOneWidget);
       expect(_k('card-priority-b'), findsNothing);
       await t.tap(
         find.descendant(
@@ -135,7 +142,13 @@ void main() {
       await t.tap(_k('menu-priority-medium'));
       await t.pumpAndSettle();
       expect(PlanItem.fromNote(s.tree.find('b')!.note).priorityWord, 'medium');
-      expect(t.widget<Text>(_k('card-priority-b')).data, 'Medium');
+      expect(
+        find.descendant(
+          of: _k('card-priority-b'),
+          matching: find.text('Medium'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('the editor sets the priority with Save', (t) async {

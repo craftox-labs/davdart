@@ -62,14 +62,105 @@ void main() {
     t,
   ) async {
     await pump(t);
-    expect(find.text('a · b · +1'), findsOneWidget);
-    expect(find.text('x · y'), findsOneWidget);
+    expect(find.text('#a #b +1'), findsOneWidget);
+    expect(find.text('#x #y'), findsOneWidget);
     expect(_k('card-folder-n'), findsOneWidget);
     expect(_k('card-folder-t'), findsOneWidget);
     expect(_k('card-snippet-n'), findsOneWidget);
     expect(_k('card-snippet-t'), findsNothing);
-    expect(find.text('Sam'), findsOneWidget);
     expect(_k('card-due-t'), findsOneWidget);
+  });
+
+  testWidgets('wide: footer order and shared left edge with the title', (
+    t,
+  ) async {
+    await pump(t);
+    double x(Finder f) => t.getTopLeft(f).dx;
+    final kind = _k('card-kind-t');
+    final due = _k('card-due-t');
+    final tags = _k('card-tags-t');
+    final folder = _k('card-folder-t');
+    expect(x(kind), lessThan(x(due)));
+    expect(x(due), lessThan(x(tags)));
+    expect(x(tags), lessThan(x(folder)));
+    final title = find.descendant(
+      of: _k('nav-card-t'),
+      matching: find.text('Fix it'),
+    );
+    expect(x(kind), x(title));
+    // the kind glyph is no longer on the title row
+    expect(t.getTopLeft(kind).dy, greaterThan(t.getBottomLeft(title).dy));
+  });
+
+  testWidgets('priority is coloured only for high', (t) async {
+    AppState.debugDefaultFocus = HomeFocus.board;
+    await pumpTasksApp(
+      t,
+      tasks: [
+        mkTask('h', priority: 1),
+        mkTask('m', priority: 5),
+        mkTask('l', priority: 7),
+      ],
+      size: const Size(1280, 900),
+    );
+    await showTasksBoard(t);
+    await t.pumpAndSettle();
+    Color col(String uid) => t
+        .widget<Icon>(
+          find.descendant(
+            of: _k('card-priority-$uid'),
+            matching: find.byType(Icon),
+          ),
+        )
+        .color!;
+    expect(col('m'), col('l'));
+    expect(col('h'), isNot(col('m')));
+    expect(find.text('Low'), findsOneWidget);
+  });
+
+  testWidgets('overdue due uses the error colour, a future one does not', (
+    t,
+  ) async {
+    AppState.debugDefaultFocus = HomeFocus.board;
+    await pumpTasksApp(
+      t,
+      tasks: [mkTask('late', days: -3), mkTask('soon', days: 3)],
+      size: const Size(1280, 900),
+    );
+    await showTasksBoard(t);
+    await t.pumpAndSettle();
+    Color col(String uid) => t
+        .widget<Text>(
+          find.descendant(of: _k('card-due-$uid'), matching: find.byType(Text)),
+        )
+        .style!
+        .color!;
+    expect(col('late'), isNot(col('soon')));
+  });
+
+  testWidgets('owner and decided-by are not on cards', (t) async {
+    AppState.debugDefaultFocus = HomeFocus.board;
+    await pumpTasksApp(
+      t,
+      notes: [
+        Note(
+          uid: 'n',
+          summary: 'Alpha',
+          description: 'status: todo\nowner: Sam\ndecided_by: Kim\n\nbody',
+          categories: const ['status-todo'],
+          lastModified: DateTime.utc(2026, 1, 2),
+        ),
+      ],
+      size: const Size(1280, 900),
+    );
+    expect(_k('nav-card-n'), findsOneWidget);
+    final card = _k('nav-card-n');
+    for (final w in ['Sam', 'Kim']) {
+      expect(
+        find.descendant(of: card, matching: find.textContaining(w)),
+        findsNothing,
+      );
+    }
   });
 
   testWidgets('folder chip is gone when the board is scoped to a folder', (
@@ -83,24 +174,27 @@ void main() {
     expect(_k('card-folder-t'), findsNothing);
   });
 
-  testWidgets('phone: no snippet, tags or folder; title, glyph, due stay', (
-    t,
-  ) async {
-    await pump(t, size: const Size(390, 844));
-    for (final c in ['todo', 'backlog']) {
-      final h = _k('board-acc-$c-toggle');
-      if (h.evaluate().isNotEmpty && _k('card-kind-n').evaluate().isEmpty) {
-        await t.tap(h);
-        await t.pumpAndSettle();
+  testWidgets(
+    'phone: no snippet, tag names or folder; kind, due, tag count stay',
+    (t) async {
+      await pump(t, size: const Size(390, 844));
+      for (final c in ['todo', 'backlog']) {
+        final h = _k('board-acc-$c-toggle');
+        if (h.evaluate().isNotEmpty && _k('card-kind-n').evaluate().isEmpty) {
+          await t.tap(h);
+          await t.pumpAndSettle();
+        }
       }
-    }
-    expect(_k('card-kind-n'), findsOneWidget);
-    expect(_k('card-snippet-n'), findsNothing);
-    expect(_k('card-tags-n'), findsNothing);
-    expect(_k('card-folder-n'), findsNothing);
-    expect(find.text('Sam'), findsNothing);
-    expect(_k('card-due-t'), findsOneWidget);
-  });
+      expect(_k('card-kind-n'), findsOneWidget);
+      expect(_k('card-snippet-n'), findsNothing);
+      expect(_k('card-tags-n'), findsNothing);
+      expect(_k('card-folder-n'), findsNothing);
+      expect(find.text('Sam'), findsNothing);
+      expect(_k('card-due-t'), findsOneWidget);
+      expect(_k('card-tag-count-n'), findsOneWidget);
+      expect(t.widget<Text>(_k('card-tag-count-n')).data, '3');
+    },
+  );
 
   testWidgets('phone: long-press drag onto another section changes status', (
     t,
