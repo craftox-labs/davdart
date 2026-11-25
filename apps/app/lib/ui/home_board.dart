@@ -308,7 +308,7 @@ class _Card extends StatelessWidget {
       children: [
         title,
         if (note != null && !compact && plan!.itemId != null) ...[
-          SizedBox(height: t.space.xs),
+          SizedBox(height: t.space.lg),
           OverflowTip(
             note.summary,
             maxLines: 1,
@@ -316,7 +316,7 @@ class _Card extends StatelessWidget {
           ),
         ],
         if (snippet.isNotEmpty) ...[
-          SizedBox(height: t.space.xs),
+          SizedBox(height: t.space.lg),
           Text(
             snippet,
             key: Key('card-snippet-${item.uid}'),
@@ -325,7 +325,7 @@ class _Card extends StatelessWidget {
             style: t.type.bodyStyle.copyWith(color: t.muted),
           ),
         ],
-        SizedBox(height: t.space.md),
+        SizedBox(height: t.space.lg),
         footer,
       ],
     );
