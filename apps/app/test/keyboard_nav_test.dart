@@ -448,9 +448,9 @@ void main() {
   group('text fields', () {
     testWidgets('a field keeps every key; Esc leaves it', (t) async {
       final s = await pumpTasksApp(t, tasks: [mkTask('a'), mkTask('b')]);
-      s.setSection(Section.tasks);
+      s.setSection(Section.search);
       await t.pumpAndSettle();
-      await t.tap(_k('task-quick-add'));
+      await t.tap(_k('search-all-field'));
       await t.pump(_ms);
       final field = FocusManager.instance.primaryFocus;
       await _press(t, _j);
@@ -463,6 +463,8 @@ void main() {
       expect(find.text('Delete task?'), findsNothing);
       await _press(t, LogicalKeyboardKey.escape);
       expect(FocusManager.instance.primaryFocus, s.nav.node);
+      s.setSection(Section.tasks);
+      await t.pumpAndSettle();
       s.nav.pointerIn(NavArea.panel);
       await _press(t, _j);
       expect(s.nav.cursorId('tasks'), isNotNull);
@@ -605,13 +607,15 @@ void main() {
 
     testWidgets('a click on empty space leaves keys working', (t) async {
       final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
-      s.setSection(Section.tasks);
+      s.setSection(Section.search);
       await t.pumpAndSettle();
-      await t.tap(_k('task-quick-add'));
+      await t.tap(_k('search-all-field'));
       await t.pump(_ms);
       FocusManager.instance.primaryFocus?.unfocus();
       await t.pump(_ms);
       await t.tapAt(const Offset(640, 880));
+      await t.pumpAndSettle();
+      s.setSection(Section.tasks);
       await t.pumpAndSettle();
       s.nav.pointerIn(NavArea.panel);
       await _press(t, _j);

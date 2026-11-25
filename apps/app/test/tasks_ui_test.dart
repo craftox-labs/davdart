@@ -79,14 +79,22 @@ void main() {
       expect(s.mainTaskUid, 'nodate');
     });
 
-    testWidgets('New task focuses the quick-add field', (t) async {
+    testWidgets('New task opens the dialog; adding creates the task', (
+      t,
+    ) async {
       final s = await _tab(t);
       final before = s.tasks.length;
       await t.tap(_k('new-task'));
       await t.pumpAndSettle();
       expect(s.tasks.length, before);
-      final field = t.widget<FTextField>(_k('task-quick-add'));
-      expect(field.focusNode!.hasFocus, isTrue);
+      expect(_k('task-quick-add'), findsNothing);
+      expect(_k('new-task-title'), findsOneWidget);
+      await t.enterText(_k('new-task-title'), 'Brand new');
+      await t.tap(_k('new-task-add'));
+      await t.pumpAndSettle();
+      expect(_k('new-task-title'), findsNothing);
+      final k = s.tasks.firstWhere((k) => k.summary == 'Brand new');
+      expect(_p('task-row-${k.uid}'), findsOneWidget);
     });
 
     testWidgets('groups, open filter hides Completed, All shows it', (t) async {
@@ -170,16 +178,7 @@ void main() {
       e.openTasksPanel();
       await t.pumpAndSettle();
       expect(_p('tasks-empty'), findsOneWidget);
-      expect(_p('task-quick-add'), findsOneWidget);
-    });
-
-    testWidgets('quick add on top creates a task', (t) async {
-      final s = await _tab(t);
-      await t.enterText(_p('task-quick-add'), 'Brand new');
-      await t.testTextInput.receiveAction(TextInputAction.done);
-      await t.pumpAndSettle();
-      final k = s.tasks.firstWhere((k) => k.summary == 'Brand new');
-      expect(_p('task-row-${k.uid}'), findsOneWidget);
+      expect(_k('task-quick-add'), findsNothing);
     });
 
     testWidgets('click follows the open setting; double click promotes', (

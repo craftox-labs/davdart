@@ -14,12 +14,12 @@ import 'key_nav_ui.dart';
 import 'panel_tags_drawer.dart';
 import 'parts.dart';
 import 'side_panel.dart';
+import 'task_menu.dart';
 import 'task_parts.dart';
 import 'theme.dart';
 
 /// The Tasks side panel section: every task of the Space in collapsible
-/// groups (Overdue, Today, Upcoming, No date, Completed), with quick add on
-/// top and filters for status, tag and parent folder. A row opens the task
+/// groups (Overdue, Today, Upcoming, No date, Completed), with filters for status, tag and parent folder. A row opens the task
 /// like a note (peek or main, per the open setting). [onPick] runs after an
 /// open, to close the narrow sheet.
 class TasksPanel extends StatefulWidget {
@@ -35,15 +35,6 @@ class TasksPanel extends StatefulWidget {
 }
 
 class _TasksPanelState extends State<TasksPanel> {
-  /// The quick-add field, which the New task button focuses.
-  final _quickAdd = FocusNode(debugLabel: 'task-quick-add');
-
-  @override
-  void dispose() {
-    _quickAdd.dispose();
-    super.dispose();
-  }
-
   AppState get state => widget.state;
   VoidCallback? get onPick => widget.onPick;
   DateTime? get now => widget.now;
@@ -123,7 +114,10 @@ class _TasksPanelState extends State<TasksPanel> {
                   key: const Key('new-task'),
                   tooltip: 'New task',
                   icon: FLucideIcons.plus,
-                  onPress: _quickAdd.requestFocus,
+                  onPress: () {
+                    onPick?.call();
+                    showNewTaskDialog(context, state);
+                  },
                 )
               : null,
           body: PanelTagsDrawer(
@@ -147,10 +141,7 @@ class _TasksPanelState extends State<TasksPanel> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     spacing: t.space.md,
-                    children: [
-                      TaskQuickAdd(state: state, focusNode: _quickAdd),
-                      _Filters(state: state),
-                    ],
+                    children: [_Filters(state: state)],
                   ),
                 ),
                 Expanded(

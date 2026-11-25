@@ -358,7 +358,7 @@ class TaskRow extends StatelessWidget {
   }
 }
 
-/// A one-line "Add a task…" field: Enter adds an open task with no due date
+/// A one-line "Add a task…" field (child tasks in a task page): Enter adds an open task with no due date
 /// (under [parentUid] when given) and clears the field. Hidden in a
 /// read-only Space.
 class TaskQuickAdd extends StatefulWidget {
