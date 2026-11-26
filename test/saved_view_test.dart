@@ -2,6 +2,7 @@ import 'package:davdart/davdart.dart';
 import 'package:test/test.dart';
 
 void main() {
+  personalStructuralTests();
   test('view note round trip keeps every field', () {
     final v = SavedViewSpec(
       uid: 'v1',
@@ -67,5 +68,13 @@ void main() {
     expect(isStructuralNote(Note(uid: 'a', categories: [folderTag])), isTrue);
     expect(isStructuralNote(Note(uid: 'a', categories: [viewTag])), isTrue);
     expect(isStructuralNote(Note(uid: 'a', categories: ['x'])), isFalse);
+  });
+}
+
+void personalStructuralTests() {
+  test('a hand-made Personal container is structural and out of lists', () {
+    final p = Note(uid: 'p', summary: 'Personal', categories: ['kind-personal']);
+    expect(isStructuralNote(p), isTrue);
+    expect(isStructuralNote(Note(uid: 'n', summary: 'Plain')), isFalse);
   });
 }

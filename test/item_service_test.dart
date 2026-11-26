@@ -109,6 +109,14 @@ void main() {
     expect(cols.fold<int>(0, (a, c) => a + c.$2.length), 503);
   });
 
+  test('a hand-made Personal note is not listed as an item', () async {
+    await client.putNote(
+        Note(uid: 'pp', summary: 'Personal', categories: [personalTag]));
+    final n = await mk(ItemKind.note, 'Plain');
+    final l = await svc.list();
+    expect(l.items.map((i) => i.uid), [n]);
+  });
+
   test('overview gives tree and counts', () async {
     final f = await mk(ItemKind.note, 'Folder', folder: true);
     final sub = await mk(ItemKind.note, 'Sub', parent: f, folder: true);

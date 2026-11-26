@@ -1,4 +1,5 @@
 import 'note.dart';
+import 'personal.dart' show isPersonalContainer;
 import 'plan_item.dart';
 
 /// Tag of a folder note (a container, hidden from Board and List).
@@ -11,9 +12,10 @@ const viewTag = 'kind-view';
 bool isFolderNote(Note n) => n.categories.contains(folderTag);
 bool isViewNote(Note n) => n.categories.contains(viewTag);
 
-/// True for notes that hold structure or settings rather than content, so
-/// boards and lists leave them out.
-bool isStructuralNote(Note n) => isFolderNote(n) || isViewNote(n);
+/// True for notes that hold structure or settings rather than content (folders,
+/// saved views, Personal containers), so boards and lists leave them out.
+bool isStructuralNote(Note n) =>
+    isFolderNote(n) || isViewNote(n) || isPersonalContainer(n);
 
 /// A saved view: a named query over a Space, stored as a note so it syncs
 /// like any other note and shows up for every client.

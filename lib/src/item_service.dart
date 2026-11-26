@@ -12,7 +12,7 @@ import 'note.dart';
 import 'note_tree.dart';
 import 'plan_item.dart';
 import 'projects.dart' show projectsTag;
-import 'personal.dart' show personalTag;
+import 'personal.dart' show isPersonalContainer, personalTag;
 import 'rank.dart' show planRanks;
 import 'saved_view.dart';
 import 'status.dart';
@@ -800,7 +800,10 @@ class ItemService {
     final raw = status?.toLowerCase();
     final low = status == null ? null : canonicalStatus(status) ?? raw;
     final hits = refs.where((r) {
-      if (!includeFolders && r.raw is Note && isFolderNote(r.raw as Note)) {
+      if (!includeFolders &&
+          r.raw is Note &&
+          (isFolderNote(r.raw as Note) ||
+              isPersonalContainer(r.raw as Note))) {
         return false;
       }
       if (tag != null && !r.tags.contains(tag)) return false;
