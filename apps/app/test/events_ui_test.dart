@@ -63,6 +63,36 @@ Future<AppState> _panel(
 void main() {
   setUp(() => LocalZone.use('Asia/Bangkok'));
   tearDown(() => LocalZone.use(null));
+  group('Calendar and dated tasks', () {
+    testWidgets('tasks with a due date ride along in the agenda', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        events: [_events().first],
+        tasks: [
+          mkTask('due-today', summary: 'Pay rent', days: 0),
+          mkTask('due-soon', summary: 'Book a room', days: 3),
+          mkTask('undated', summary: 'Someday'),
+          mkTask('done', summary: 'Already done', days: 0, status: 'COMPLETED'),
+        ],
+      );
+      s.setSection(Section.events);
+      await t.pumpAndSettle();
+      // A marker row under its day, marked as a task.
+      expect(_p('task-row-due-today'), findsOneWidget);
+      expect(_p('task-row-due-soon'), findsOneWidget);
+      expect(_panelText('Pay rent'), findsOneWidget);
+      expect(_panelText('Task'), findsNWidgets(2));
+      // No due date, or closed: not in the agenda.
+      expect(_k('task-row-undated'), findsNothing);
+      expect(_k('task-row-done'), findsNothing);
+      // Tapping one opens the task (peek by default).
+      await t.tap(_p('task-row-due-today'));
+      await t.pumpAndSettle();
+      expect(s.peekUid, 'due-today');
+      await _end(t);
+    });
+  });
+
   group('Events panel', () {
     testWidgets('the rail Events item lists the agenda', (t) async {
       final s = await pumpTasksApp(t, events: _events());

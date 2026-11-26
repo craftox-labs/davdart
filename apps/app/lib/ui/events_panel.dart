@@ -4,6 +4,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../state/event_rules.dart';
+import '../state/task_rules.dart';
 import '../state/key_nav.dart';
 import '../state/note_drag.dart';
 import 'collapsible_section.dart';
@@ -50,9 +51,27 @@ class EventsPanel extends StatelessWidget {
           ('upcoming', 'Upcoming', of({'week', 'later'})),
           ('past', 'Past', state.pastOccurrences(clock, pastDays)),
         ];
-        final shown = sections.any((s) => s.$3.isNotEmpty);
+        // Dated tasks ride along in the agenda as markers (the Calendar is
+        // events first; a full grid comes later).
+        final today0 = wallDay(wallNow(clock));
+        final tasks = <String, List<Task>>{'today': [], 'tomorrow': [], 'upcoming': [], 'past': []};
+        for (final k in state.openTasks(clock)) {
+          final day = taskDueDay(k);
+          if (day == null) continue;
+          final days = day.difference(today0).inDays;
+          if (days.abs() > upcomingDays) continue;
+          final group = days < 0
+              ? 'past'
+              : days == 0
+              ? 'today'
+              : days == 1
+              ? 'tomorrow'
+              : 'upcoming';
+          tasks[group]!.add(k);
+        }
+        final shown = sections.any((s) => s.$3.isNotEmpty || tasks[s.$1]!.isNotEmpty);
         state.nav.publish('events', [
-          for (final s in sections)
+          for (final s in sections) ...[
             for (final o in s.$3)
               NavEntry(
                 eventRowId(o),
@@ -65,6 +84,19 @@ class EventsPanel extends StatelessWidget {
                   onPick?.call();
                 },
               ),
+            for (final k in tasks[s.$1]!)
+              NavEntry(
+                'task-row-${k.uid}',
+                uid: k.uid,
+                hidden: () =>
+                    state.prefs?.read('davdart.events.${s.$1}.collapsed.v1') ==
+                    'true',
+                open: (mode) async {
+                  await state.openTask(k.uid, mode: mode);
+                  onPick?.call();
+                },
+              ),
+          ],
         ]);
         return SidePanelFrame(
           key: const Key('events-panel'),
@@ -105,14 +137,14 @@ class EventsPanel extends StatelessWidget {
                 else if (!shown)
                   _Note('Nothing in sight', key: const Key('events-none')),
                 for (final s in sections)
-                  if (s.$3.isNotEmpty)
+                  if (s.$3.isNotEmpty || tasks[s.$1]!.isNotEmpty)
                     Padding(
                       padding: EdgeInsets.only(top: t.space.md),
                       child: CollapsibleSection(
                         id: 'events-${s.$1}',
                         title: s.$2,
                         upper: false,
-                        count: s.$3.length,
+                        count: s.$3.length + tasks[s.$1]!.length,
                         prefs: state.prefs,
                         prefKey: 'davdart.events.${s.$1}.collapsed.v1',
                         headerPadding: EdgeInsets.all(t.space.xs),
@@ -129,6 +161,20 @@ class EventsPanel extends StatelessWidget {
                                   key: eventRowKey(o),
                                   state: state,
                                   occurrence: o,
+                                  showDay: s.$1 == 'upcoming' || s.$1 == 'past',
+                                  onOpen: onPick,
+                                ),
+                              ),
+                            for (final k in tasks[s.$1]!)
+                              NavRow(
+                                key: ValueKey('nav-task-row-${k.uid}'),
+                                nav: state.nav,
+                                list: 'events',
+                                id: 'task-row-${k.uid}',
+                                child: TaskDueRow(
+                                  key: Key('task-row-${k.uid}'),
+                                  state: state,
+                                  task: k,
                                   showDay: s.$1 == 'upcoming' || s.$1 == 'past',
                                   onOpen: onPick,
                                 ),
@@ -267,6 +313,97 @@ class EventRow extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A task with a due date, in the Calendar agenda: the same shape as an event
+/// row, marked as a task. Tapping opens the task.
+class TaskDueRow extends StatelessWidget {
+  const TaskDueRow({
+    super.key,
+    required this.state,
+    required this.task,
+    this.showDay = false,
+    this.onOpen,
+  });
+  final AppState state;
+  final Task task;
+  final bool showDay;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final muted = t.type.captionStyle.copyWith(color: t.muted);
+    final day = taskDueDay(task);
+    final selected = state.peekUid == task.uid ||
+        state.selectedTaskUid == task.uid;
+    final overdue = isTaskOverdue(task, DateTime.now());
+    return FTappable(
+      onPress: () {
+        state.clickTask(task.uid);
+        onOpen?.call();
+      },
+      child: Container(
+        color: selected ? t.selected : null,
+        padding: EdgeInsets.symmetric(
+          horizontal: t.space.xs,
+          vertical: t.space.sm,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: t.sizes.eventTime,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (showDay && day != null)
+                    OverflowTip(
+                      dayLabel(day).split(' ').take(2).join(' '),
+                      textKey: Key('task-day-${task.uid}'),
+                      style: muted,
+                    ),
+                  // The due time when the task has one, else the word.
+                  OverflowTip(
+                    task.due != null && !task.due!.allDay
+                        ? timeLabel(task.due!.localDay ?? day ?? DateTime.now())
+                        : 'Due',
+                    textKey: Key('task-time-${task.uid}'),
+                    style: overdue
+                        ? muted.copyWith(color: t.statusBlocked)
+                        : muted,
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: t.space.md),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  OverflowTip(
+                    task.summary.isEmpty ? '(no title)' : task.summary,
+                    style: t.type.bodyStyle,
+                  ),
+                  Row(
+                    children: [
+                      Icon(
+                        FLucideIcons.listChecks,
+                        size: t.icons.sm,
+                        color: t.muted,
+                      ),
+                      SizedBox(width: t.space.xxs),
+                      Text('Task', style: muted),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
