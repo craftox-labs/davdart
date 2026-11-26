@@ -7,17 +7,24 @@ import '../state/event_rules.dart';
 import '../state/task_rules.dart';
 import '../theme/tokens.dart';
 import 'events_panel.dart';
+import 'home_board.dart';
 import 'overflow_tip.dart';
+import 'placeholder_card.dart';
+import 'section_registry.dart' show projectViews;
+import 'sections.dart' show NotesSection;
+import 'segmented.dart';
 import 'theme.dart';
 
-/// A project's page in the main area: what the project holds, its open tasks,
-/// what is coming (tasks with a due date and events, reusing the agenda's
-/// rows) and the items changed last. No new data: every number and list is
-/// derived from the Space's notes, tasks and events, narrowed to the project
-/// in scope.
+/// A project's page in the main area: the project's name, a switcher across
+/// its views (Overview, Board, Notes, Calendar) and, on Overview, a summary
+/// built from what already exists (progress, coming up, recent). Everything
+/// new is a marked placeholder: the header chips, About, the details and
+/// milestones.
 ///
-/// Below [Tokens.stackBreakpoint] the blocks stack in one column; a wider
-/// window sets the blocks beside each other.
+/// The page needs a real project in scope; [AppState.section] is
+/// [Section.overview] for every tab, so the switcher never changes the side
+/// panel. Board is the unified board (already scoped by [AppState.scopeUid]);
+/// Notes and Calendar reuse the panels' scoped lists.
 class ProjectOverviewPage extends StatelessWidget {
   const ProjectOverviewPage({super.key, required this.state, this.now});
   final AppState state;
@@ -25,101 +32,490 @@ class ProjectOverviewPage extends StatelessWidget {
   /// Clock override for tests.
   final DateTime? now;
 
+  static ProjectTab tabOf(String viewId) => switch (viewId) {
+    'board' => ProjectTab.board,
+    'notes' => ProjectTab.notes,
+    'events' => ProjectTab.calendar,
+    _ => ProjectTab.overview,
+  };
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: state,
+    builder: (context, _) => _build(context),
+  );
+
+  Widget _build(BuildContext context) {
     final t = tokensOf(context);
-    return ListenableBuilder(
-      listenable: state,
-      builder: (context, _) {
-        final clock = now ?? DateTime.now();
-        final scope = state.scope;
-        // Every list is read once per build and passed down: a rebuild
-        // sorts nothing twice.
-        final open = state.openTasks(clock);
-        final notes = state.notesInScope;
-        final allTasks = state.scopedTasks;
-        final events = state.scopedEvents;
-        final tiles = StatTiles(
-          tilesKey: const Key('overview-tiles'),
-          stats: [
-            StatTileData('open', 'Open tasks', open.length),
-            StatTileData(
-              'overdue',
-              'Overdue',
-              state.overdueIn(state.scopeUid, clock).length,
-            ),
-            StatTileData(
-              'done',
-              'Done this week',
-              state.doneThisWeek(clock).length,
-            ),
-            StatTileData('notes', 'Notes', notes.length),
-            StatTileData('events', 'Calendar', events.length),
-          ],
-        );
-        final tasks = _Tasks(state: state, tasks: open, now: clock);
-        final upcoming = _Upcoming(
-          state: state,
-          tasks: open,
-          events: events,
-          now: clock,
-        );
-        final recent = _Recent(
-          state: state,
-          notes: notes,
-          tasks: allTasks,
-          events: events,
-          now: clock,
-        );
-        return SingleChildScrollView(
-          key: const Key('overview-page'),
+    final clock = now ?? DateTime.now();
+    final ix = state.projectIndex;
+    final scopeUid = state.scopeUid;
+    final projectUid = scopeUid == null
+        ? null
+        : ix.projectOf(scopeUid)?.uid ?? scopeUid;
+    final tab = projectUid == null
+        ? ProjectTab.overview
+        : state.projectTab(projectUid);
+    final scope = state.scope;
+    final name = scope == null || scope.summary.isEmpty
+        ? 'Overview'
+        : scope.summary;
+    final counts = projectUid == null
+        ? null
+        : state.projectTaskCounts(projectUid, clock);
+
+    Widget tabBody() => switch (tab) {
+      ProjectTab.overview => _OverviewTab(
+        state: state,
+        clock: clock,
+        counts: counts,
+      ),
+      ProjectTab.board => KeyedSubtree(
+        key: const Key('proj-board-tab'),
+        child: HomeBoard(state: state),
+      ),
+      ProjectTab.notes => KeyedSubtree(
+        key: const Key('proj-notes-tab'),
+        child: NotesSection(state: state, onPick: () {}),
+      ),
+      ProjectTab.calendar => KeyedSubtree(
+        key: const Key('proj-calendar-tab'),
+        child: EventsPanel(state: state),
+      ),
+    };
+
+    return Column(
+      key: const Key('proj-page'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
           padding: EdgeInsets.fromLTRB(
             t.space.xl,
             t.space.lg,
             t.space.xl,
-            fabInset(context) + t.space.xl,
+            t.space.sm,
           ),
-          child: LayoutBuilder(
-            builder: (context, c) {
-              final twoUp = c.maxWidth >= Tokens.stackBreakpoint;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                spacing: t.space.lg,
-                children: [
-                  Text(
-                    scope == null || scope.summary.isEmpty
-                        ? 'Overview'
-                        : scope.summary,
-                    key: const Key('overview-title'),
-                    style: t.type.titleStyle,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: t.space.sm,
+            children: [
+              Text(
+                name,
+                key: const Key('overview-title'),
+                style: t.type.titleStyle,
+              ),
+              Wrap(
+                spacing: t.space.xs,
+                runSpacing: t.space.xs,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: const [
+                  _PlaceholderChip(
+                    name: 'star',
+                    icon: FLucideIcons.star,
+                    label: 'Star',
                   ),
-                  tiles,
-                  if (twoUp)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      spacing: t.space.lg,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            spacing: t.space.lg,
-                            children: [tasks, upcoming],
-                          ),
-                        ),
-                        Expanded(child: recent),
-                      ],
-                    )
-                  else ...[
-                    tasks,
-                    upcoming,
-                    recent,
-                  ],
+                  _PlaceholderChip(
+                    name: 'status',
+                    icon: FLucideIcons.flag,
+                    label: 'Status',
+                  ),
+                  _PlaceholderChip(
+                    name: 'members',
+                    icon: FLucideIcons.users,
+                    label: 'Members',
+                  ),
+                  _PlaceholderChip(
+                    name: 'share',
+                    icon: FLucideIcons.share2,
+                    label: 'Share',
+                  ),
+                  _PlaceholderChip(
+                    name: 'settings',
+                    icon: FLucideIcons.settings,
+                    label: 'Settings',
+                  ),
                 ],
-              );
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: t.space.xl),
+          child: Segmented<ProjectTab>(
+            key: const Key('proj-tabs'),
+            value: tab,
+            fullWidth: narrowLayout(context),
+            onChanged: (v) {
+              if (projectUid != null) state.setProjectTab(projectUid, v);
             },
+            segments: [
+              for (final v in projectViews)
+                Segment<ProjectTab>(
+                  tabOf(v.id),
+                  v.label,
+                  'proj-tab-${v.id}',
+                  icon: v.icon,
+                ),
+            ],
+          ),
+        ),
+        SizedBox(height: t.space.sm),
+        Expanded(child: tabBody()),
+      ],
+    );
+  }
+}
+
+/// A muted, dashed chip that marks a header action not built yet. No action.
+class _PlaceholderChip extends StatelessWidget {
+  const _PlaceholderChip({
+    required this.name,
+    required this.icon,
+    required this.label,
+  });
+  final String name, label;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return DashedOutline(
+      key: Key('proj-chip-$name'),
+      radius: t.radii.card,
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: t.space.sm,
+          vertical: t.space.xxs,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: t.icons.sm, color: t.muted),
+            SizedBox(width: t.space.xxs),
+            Text(label, style: t.type.captionStyle.copyWith(color: t.muted)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// The Overview tab: About, Progress, Coming up, Details, Milestones, Recent.
+/// Wide: two columns (the summary and what is coming up left, the details
+/// right); narrow: one column in that order.
+class _OverviewTab extends StatelessWidget {
+  const _OverviewTab({
+    required this.state,
+    required this.clock,
+    required this.counts,
+  });
+  final AppState state;
+  final DateTime clock;
+  final ({
+    int total,
+    int done,
+    int open,
+    int overdue,
+    Map<String, int> byStatus,
+  })?
+  counts;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final open = state.openTasks(clock);
+    final notes = state.notesInScope;
+    final allTasks = state.scopedTasks;
+    final events = state.scopedEvents;
+    final about = const PlaceholderCard(
+      name: 'project-about',
+      title: 'About',
+      willBe: 'Description, edited in place.',
+    );
+    final progress = _Progress(counts: counts);
+    final comingUp = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: t.space.lg,
+      children: [
+        _Tasks(state: state, tasks: open, now: clock),
+        _Upcoming(state: state, tasks: open, events: events, now: clock),
+      ],
+    );
+    final details = _Details(counts: counts);
+    const milestones = PlaceholderCard(
+      name: 'project-milestones',
+      title: 'Milestones',
+      willBe: 'Milestones are not built yet.',
+    );
+    final recent = _Recent(
+      state: state,
+      notes: notes,
+      tasks: allTasks,
+      events: events,
+      now: clock,
+    );
+    return SingleChildScrollView(
+      key: const Key('overview-page'),
+      padding: EdgeInsets.fromLTRB(
+        t.space.xl,
+        t.space.md,
+        t.space.xl,
+        fabInset(context) + t.space.xl,
+      ),
+      child: LayoutBuilder(
+        builder: (context, c) {
+          final twoUp = c.maxWidth >= Tokens.stackBreakpoint;
+          final summary = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: t.space.lg,
+            children: [about, progress, comingUp],
+          );
+          final right = Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: t.space.lg,
+            children: [details, milestones, recent],
+          );
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: t.space.lg,
+            children: [
+              if (twoUp)
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: t.space.lg,
+                  children: [
+                    Expanded(child: summary),
+                    Expanded(child: right),
+                  ],
+                )
+              else ...[
+                about,
+                progress,
+                details,
+                milestones,
+                comingUp,
+                recent,
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Progress is real and derived: percent, done over total tasks, overdue, and
+/// a bar by the fixed status set. The due-date line is the one placeholder.
+class _Progress extends StatelessWidget {
+  const _Progress({required this.counts});
+  final ({
+    int total,
+    int done,
+    int open,
+    int overdue,
+    Map<String, int> byStatus,
+  })?
+  counts;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final c = counts;
+    final total = c?.total ?? 0;
+    final done = c?.done ?? 0;
+    final overdue = c?.overdue ?? 0;
+    final percent = total == 0 ? 0 : (done * 100 / total).round();
+    final by = c?.byStatus ?? const <String, int>{};
+    const known = {'backlog', 'todo', 'doing', 'blocked', 'review', 'done'};
+    final other = by.entries
+        .where((e) => !known.contains(e.key))
+        .fold(0, (a, e) => a + e.value);
+    final segments = <(String, String, Color, int)>[
+      ('backlog', 'Backlog', t.muted, by['backlog'] ?? 0),
+      ('todo', 'To Do', t.statusTodo, (by['todo'] ?? 0) + other),
+      (
+        'doing',
+        'In Progress',
+        t.statusDoing,
+        (by['doing'] ?? 0) + (by['blocked'] ?? 0),
+      ),
+      ('review', 'Review', t.muted, by['review'] ?? 0),
+      ('done', 'Done', t.statusDone, by['done'] ?? 0),
+    ];
+    final muted = t.type.captionStyle.copyWith(color: t.muted);
+    return _Card(
+      key: const Key('proj-progress'),
+      title: 'Progress',
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '$percent%',
+              key: const Key('proj-percent'),
+              style: t.type.titleStyle,
+            ),
+            SizedBox(width: t.space.md),
+            Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(bottom: t.space.xxs),
+                child: Text(
+                  '$done of $total tasks done',
+                  key: const Key('proj-done-line'),
+                  style: muted,
+                ),
+              ),
+            ),
+          ],
+        ),
+        if (overdue > 0)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Container(
+              key: const Key('proj-overdue-badge'),
+              padding: EdgeInsets.symmetric(
+                horizontal: t.space.sm,
+                vertical: t.space.xxs,
+              ),
+              decoration: BoxDecoration(
+                color: t.statusBlocked.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(t.radii.card),
+              ),
+              child: Text(
+                '$overdue overdue',
+                style: t.type.captionStyle.copyWith(color: t.statusBlocked),
+              ),
+            ),
+          ),
+        SizedBox(height: t.space.sm),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(t.radii.small),
+          child: Row(
+            children: [
+              for (final s in segments)
+                if (s.$4 > 0)
+                  Expanded(
+                    flex: s.$4,
+                    child: Container(
+                      key: Key('proj-bar-${s.$1}'),
+                      height: t.sizes.progressBar,
+                      color: s.$3,
+                    ),
+                  ),
+            ],
+          ),
+        ),
+        SizedBox(height: t.space.xs),
+        Wrap(
+          spacing: t.space.md,
+          runSpacing: t.space.xxs,
+          children: [
+            for (final s in segments)
+              if (s.$4 > 0)
+                Text(
+                  '${s.$2} ${s.$4}',
+                  key: Key('proj-count-${s.$1}'),
+                  style: muted,
+                ),
+          ],
+        ),
+        SizedBox(height: t.space.xs),
+        Text(
+          'Days until due needs a project due date.',
+          key: const Key('proj-placeholder-due'),
+          style: muted,
+        ),
+      ],
+    );
+  }
+}
+
+/// The project fields that come later: Status shows a derived word, the rest
+/// are marked placeholders.
+class _Details extends StatelessWidget {
+  const _Details({required this.counts});
+  final ({
+    int total,
+    int done,
+    int open,
+    int overdue,
+    Map<String, int> byStatus,
+  })?
+  counts;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final total = counts?.total ?? 0;
+    final done = counts?.done ?? 0;
+    final status = total == 0
+        ? 'No tasks yet'
+        : done == total
+        ? 'Done'
+        : done == 0
+        ? 'Not started'
+        : 'In progress';
+    final muted = t.type.captionStyle.copyWith(color: t.muted);
+    Widget row(String id, String label, String value, {bool derived = false}) =>
+        Padding(
+          padding: EdgeInsets.symmetric(vertical: t.space.xxs),
+          child: Row(
+            children: [
+              SizedBox(width: 88, child: Text(label, style: muted)),
+              Expanded(
+                child: Text(
+                  value,
+                  key: Key('proj-detail-$id'),
+                  style: derived
+                      ? t.type.bodyStyle
+                      : t.type.captionStyle.copyWith(color: t.muted),
+                ),
+              ),
+            ],
           ),
         );
-      },
+    return _Card(
+      key: const Key('proj-details'),
+      title: 'Details',
+      children: [
+        row('status', 'Status', status, derived: true),
+        row('lead', 'Lead', 'Placeholder'),
+        row('team', 'Team', 'Placeholder'),
+        row('start', 'Start', 'Placeholder'),
+        row('due', 'Due', 'Placeholder'),
+        row('members', 'Members', 'Placeholder'),
+      ],
+    );
+  }
+}
+
+/// A bordered block with a small capitalised heading.
+class _Card extends StatelessWidget {
+  const _Card({super.key, required this.title, required this.children});
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return Container(
+      padding: EdgeInsets.all(t.space.md),
+      decoration: BoxDecoration(
+        color: t.card,
+        borderRadius: BorderRadius.circular(t.radii.card),
+        border: Border.all(color: t.cardBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: t.space.xs,
+        children: [
+          Text(
+            title.toUpperCase(),
+            style: t.type.labelStyle.copyWith(color: t.muted),
+          ),
+          ...children,
+        ],
+      ),
     );
   }
 }

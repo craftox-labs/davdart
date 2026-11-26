@@ -22,13 +22,9 @@ class PlaceholderCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final muted = t.type.captionStyle.copyWith(color: t.muted);
-    return CustomPaint(
+    return DashedOutline(
       key: Key('placeholder-$name'),
-      painter: _DashedBorder(
-        color: t.cardBorder,
-        radius: t.radii.card,
-        stroke: t.borders.hairline,
-      ),
+      radius: t.radii.card,
       child: Padding(
         padding: EdgeInsets.all(t.space.md),
         child: Column(
@@ -54,8 +50,36 @@ class PlaceholderCard extends StatelessWidget {
   }
 }
 
-/// A rounded rectangle outline with a dashed stroke (Flutter has no dashed
-/// border of its own).
+/// A rounded rectangle drawn with a dashed stroke around [child] (Flutter has
+/// no dashed border of its own). The placeholder card and its chips share it.
+class DashedOutline extends StatelessWidget {
+  const DashedOutline({
+    super.key,
+    required this.child,
+    required this.radius,
+    this.color,
+  });
+  final Widget child;
+  final double radius;
+
+  /// Defaults to the theme's card border.
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return CustomPaint(
+      painter: _DashedBorder(
+        color: color ?? t.cardBorder,
+        radius: radius,
+        stroke: t.borders.hairline,
+      ),
+      child: child,
+    );
+  }
+}
+
+/// The dashed stroke behind [DashedOutline].
 class _DashedBorder extends CustomPainter {
   const _DashedBorder({
     required this.color,

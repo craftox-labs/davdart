@@ -1,6 +1,8 @@
 import 'package:davdart/davdart.dart';
+import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/ui/app_actions.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -53,8 +55,7 @@ Future<AppState> _app(
   return s;
 }
 
-String _tile(WidgetTester t, String id) =>
-    t.widget<Text>(_k('overview-tile-$id-value')).data!;
+String _text(WidgetTester t, String key) => t.widget<Text>(_k(key)).data!;
 
 Future<void> _end(WidgetTester t) => t.pump(const Duration(seconds: 1));
 
@@ -77,39 +78,106 @@ void main() {
   tearDown(() => LocalZone.use(null));
 
   group('project overview', () {
-    testWidgets('the tiles count the project, not the Space', (t) async {
+    testWidgets('progress counts the project tasks, not the Space', (t) async {
       await _app(t);
       expect(_k('overview-page'), findsOneWidget);
-      // Soon, Later and the overdue one are all open; the Space's own task
-      // is not the project's.
-      expect(_tile(t, 'open'), '3');
-      expect(_tile(t, 'overdue'), '1');
-      expect(_tile(t, 'notes'), '1');
-      expect(_tile(t, 'events'), '1');
+      // Four project tasks (three open, one done); the Space's own task is
+      // not the project's.
+      expect(_text(t, 'proj-percent'), '25%');
+      expect(_text(t, 'proj-done-line'), '1 of 4 tasks done');
+      expect(
+        find.descendant(
+          of: _k('proj-overdue-badge'),
+          matching: find.text('1 overdue'),
+        ),
+        findsOneWidget,
+      );
+      expect(_text(t, 'proj-count-todo'), 'To Do 3');
+      expect(_text(t, 'proj-count-done'), 'Done 1');
+      expect(_k('overview-tiles'), findsNothing);
       await _end(t);
     });
 
-    testWidgets('a task overdue is counted, a done one this week too', (
-      t,
-    ) async {
+    testWidgets('the project page carries the marked placeholders', (t) async {
+      await _app(t);
+      for (final chip in [
+        'proj-chip-star',
+        'proj-chip-status',
+        'proj-chip-members',
+        'proj-chip-share',
+        'proj-chip-settings',
+      ]) {
+        expect(_k(chip), findsOneWidget);
+      }
+      expect(_k('placeholder-project-about'), findsOneWidget);
+      expect(_k('placeholder-project-milestones'), findsOneWidget);
+      expect(_k('proj-placeholder-due'), findsOneWidget);
+      // Status is the one derived detail row; the rest say Placeholder.
+      expect(_text(t, 'proj-detail-status'), 'In progress');
+      expect(_text(t, 'proj-detail-lead'), 'Placeholder');
+      expect(_text(t, 'proj-detail-members'), 'Placeholder');
+      await _end(t);
+    });
+
+    testWidgets('a restored project scope opens its page again', (t) async {
+      final prefs = MemoryStorage()
+        ..write('davdart.section.v1', 'overview')
+        ..write('davdart.scope.v1', '{"default":"p"}');
       final s = await pumpTasksApp(
         t,
         notes: _seed,
-        tasks: [
-          mkTask('overdue', summary: 'Late', days: -3, parent: 'p'),
-          mkTask('done', summary: 'Finished', parent: 'p', status: 'COMPLETED'),
-        ],
+        prefs: prefs,
+        tasks: [mkTask('open-soon', summary: 'Soon', days: 1, parent: 'p')],
       );
-      // A completion stamped today counts as done this week.
-      s.tasks.firstWhere((k) => k.uid == 'done').completed = DateTime.now();
       await s.activateTab(null);
-      s.openFolder('p');
-      s.setSection(Section.overview);
       await t.pumpAndSettle();
-      expect(_tile(t, 'overdue'), '1');
-      expect(_tile(t, 'done'), '1');
-      await _end(t);
+      expect(s.scopeUid, 'p');
+      expect(s.section, Section.overview);
+      expect(_k('overview-page'), findsOneWidget);
     });
+
+    testWidgets('the Overview palette entry applies only to real projects', (
+      t,
+    ) async {
+      final s = await _app(t);
+      bool enabled() =>
+          buildActions(s).firstWhere((a) => a.id == 'go.overview').enabled(s);
+      expect(enabled(), isTrue);
+      s.openFolder(null);
+      expect(enabled(), isFalse);
+      s.openFolder('c'); // the Projects container, not a project
+      expect(enabled(), isFalse);
+      s.openFolder('p');
+      expect(enabled(), isTrue);
+    });
+
+    testWidgets(
+      'the switcher moves between Overview, Board, Notes and Calendar',
+      (t) async {
+        final s = await _app(t);
+        expect(_k('overview-page'), findsOneWidget);
+        await t.tap(_k('proj-tab-board'));
+        await t.pumpAndSettle();
+        expect(s.section, Section.overview);
+        expect(_k('proj-board-tab'), findsOneWidget);
+        expect(_k('overview-page'), findsNothing);
+        expect(_k('board-drop-todo'), findsOneWidget);
+        await t.tap(_k('proj-tab-notes'));
+        await t.pumpAndSettle();
+        expect(_k('proj-notes-tab'), findsOneWidget);
+        expect(find.text('Alpha note'), findsWidgets);
+        await t.tap(_k('proj-tab-events'));
+        await t.pumpAndSettle();
+        expect(_k('proj-calendar-tab'), findsOneWidget);
+        expect(find.text('Kickoff'), findsWidgets);
+        expect(s.projectTab('p'), ProjectTab.calendar);
+        await t.tap(_k('proj-tab-overview'));
+        await t.pumpAndSettle();
+        expect(_k('overview-page'), findsOneWidget);
+        expect(s.projectTab('p'), ProjectTab.overview);
+        await _end(t);
+      },
+    );
 
     testWidgets('the Tasks and Recent blocks list the project items', (
       t,
@@ -163,7 +231,10 @@ void main() {
       s.openFolder('p');
       s.setSection(Section.overview);
       await t.pumpAndSettle();
-      expect(_tile(t, 'open'), '0');
+      expect(_text(t, 'proj-percent'), '0%');
+      expect(_text(t, 'proj-done-line'), '0 of 0 tasks done');
+      expect(_k('proj-overdue-badge'), findsNothing);
+      expect(_text(t, 'proj-detail-status'), 'No tasks yet');
       expect(_k('overview-tasks-empty'), findsOneWidget);
       expect(_k('overview-upcoming-empty'), findsOneWidget);
       expect(_k('overview-recent-empty'), findsOneWidget);
@@ -190,9 +261,7 @@ void main() {
       s.openFolder('p');
       s.setSection(Section.overview);
       await t.pumpAndSettle();
-      expect(_tile(t, 'open'), '1');
-      expect(_tile(t, 'notes'), '1');
-      expect(_tile(t, 'events'), '1');
+      expect(_text(t, 'proj-done-line'), '0 of 1 tasks done');
       expect(_k('overview-task-deep-task'), findsOneWidget);
       expect(_k('overview-recent-deep'), findsOneWidget);
       await _end(t);
@@ -235,7 +304,7 @@ void main() {
     testWidgets('320dp wide: no overflow', (t) async {
       await _app(t, size: const Size(320, 568));
       expect(_k('overview-page'), findsOneWidget);
-      expect(_k('overview-tiles'), findsOneWidget);
+      expect(_k('proj-progress'), findsOneWidget);
       // Scroll the page to its end: every block lays out at that width.
       await t.drag(_k('overview-page'), const Offset(0, -600));
       await t.pumpAndSettle();

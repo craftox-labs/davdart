@@ -47,6 +47,9 @@ enum Section {
 /// or the folder tree.
 enum NotesView { list, tree }
 
+/// The tabs of a project's page, in switcher order.
+enum ProjectTab { overview, board, notes, calendar }
+
 /// The fixed status set, in board order.
 const boardOrder = allowedStatuses;
 
@@ -228,12 +231,14 @@ class AppState extends ChangeNotifier {
     prefs?.remove('davdart.home.board.collapsed.v1');
     prefs?.remove('davdart.home.today.collapsed.v1');
     final saved = prefs?.read(_sectionKey);
-    section = _landing(
-      Section.values.firstWhere(
-        (v) => v.name == saved,
-        orElse: () => Section.notes,
-      ),
+    final savedSection = Section.values.firstWhere(
+      (v) => v.name == saved,
+      orElse: () => Section.notes,
     );
+    section = _landing(savedSection);
+    // A saved Overview only lands once the project scope is back: the page
+    // needs a real project (see load).
+    _overviewToRestore = savedSection == Section.overview;
     sidebarCollapsed = prefs?.read(_collapsedKey) == 'true';
     final w = double.tryParse(prefs?.read(_widthKey) ?? '');
     sidebarWidth = (w == null || !w.isFinite) ? null : w;
@@ -525,16 +530,26 @@ class AppState extends ChangeNotifier {
   /// Which section the side panel shows.
   Section section = Section.notes;
 
+  /// Set on start when the saved section was Overview; it is applied after
+  /// the saved scope comes back, and only when that scope is a project.
+  bool _overviewToRestore = false;
+
   /// Whether the current Space's collection can hold what [s] lists.
   bool supportsSection(Section s) => switch (s) {
     Section.notes => supportsNotes,
     Section.tasks => supportsTasks,
     Section.events => supportsEvents,
     Section.projects => supportsNotes,
-    // A project's page is only about a project.
-    Section.overview => supportsNotes && scopeUid != null,
+    // A project's page is only about a real project (or a folder inside one).
+    Section.overview => supportsNotes && scopeInProject,
     _ => true,
   };
+
+  /// Whether the open scope is a project or a folder inside one.
+  bool get scopeInProject {
+    final uid = scopeUid;
+    return uid != null && projectIndex.projectOf(uid) != null;
+  }
 
   /// True when the Space has a Projects container or any project folder.
   bool get hasProjects {
@@ -1291,6 +1306,80 @@ class AppState extends ChangeNotifier {
   /// Space's saved scope. A plain reload leaves the scope alone.
   bool _restoreScopePending = true;
 
+  /// The tab a project's page opens on, remembered per project (Overview by
+  /// default). Stored per Space, so the same projects in another Space do not
+  /// share it.
+  ProjectTab projectTab(String uid) =>
+      switch (prefs?.read('davdart.proj.tab.v1.$_spaceKey.$uid')) {
+        'board' => ProjectTab.board,
+        'notes' => ProjectTab.notes,
+        'calendar' => ProjectTab.calendar,
+        _ => ProjectTab.overview,
+      };
+
+  void setProjectTab(String uid, ProjectTab tab) {
+    if (projectTab(uid) == tab) return;
+    prefs?.write('davdart.proj.tab.v1.$_spaceKey.$uid', tab.name);
+    notifyListeners();
+  }
+
+  /// The tasks under project [uid] at any depth (no scope or filter applied).
+  List<Task> projectTasks(String uid) => [
+    for (final t in tasks)
+      if (projectIndex.projectOf(t.uid)?.uid == uid) t,
+  ];
+
+  /// The tasks of project [uid] counted for progress: canceled tasks left
+  /// out; `done` versus the total, open, overdue, and a count per canonical
+  /// status (blocked and unknown words are kept in their own map entries and
+  /// the page folds them into the fixed bar).
+  ({int total, int done, int open, int overdue, Map<String, int> byStatus})
+  projectTaskCounts(String uid, [DateTime? now]) {
+    final n = now ?? DateTime.now();
+    final by = <String, int>{};
+    var total = 0, done = 0, open = 0, overdue = 0;
+    for (final t in projectTasks(uid)) {
+      final status = canonicalStatus(t.boardStatus) ?? t.boardStatus;
+      if (status == 'canceled') continue;
+      total++;
+      by[status] = (by[status] ?? 0) + 1;
+      if (status == 'done') {
+        done++;
+      } else {
+        open++;
+      }
+      if (!t.isClosed && isTaskOverdue(t, n)) overdue++;
+    }
+    return (
+      total: total,
+      done: done,
+      open: open,
+      overdue: overdue,
+      byStatus: by,
+    );
+  }
+
+  /// When the project last changed: the newest modification stamp of its
+  /// notes, tasks and events (the folder itself included), or null.
+  DateTime? projectLastChanged(String uid) {
+    final ix = projectIndex;
+    DateTime? at;
+    void touch(DateTime? d) {
+      if (d != null && (at == null || d.isAfter(at!))) at = d;
+    }
+
+    for (final n in notes) {
+      if (ix.projectOf(n.uid)?.uid == uid) touch(n.lastModified ?? n.dtstamp);
+    }
+    for (final t in tasks) {
+      if (ix.projectOf(t.uid)?.uid == uid) touch(t.lastModified ?? t.dtstamp);
+    }
+    for (final e in events) {
+      if (ix.projectOf(e.uid)?.uid == uid) touch(e.lastModified ?? e.dtstamp);
+    }
+    return at;
+  }
+
   /// The Space's projects, the ones opened most recently first: the scope
   /// picker and the palette list them in this order.
   List<Note> get projectsByRecent {
@@ -1791,6 +1880,10 @@ class AppState extends ChangeNotifier {
       if (_restoreScopePending) {
         _restoreScopePending = false;
         _restoreScope();
+        if (_overviewToRestore) {
+          _overviewToRestore = false;
+          if (supportsSection(Section.overview)) section = Section.overview;
+        }
       }
     } catch (e) {
       if (src != source) return;
@@ -1948,17 +2041,17 @@ class AppState extends ChangeNotifier {
       final er = supportsEvents ? await s.syncEvents() : null;
       if (s != _space) return;
       if (er != null && er.errors.isNotEmpty) {
-        eventProblem = 'Events: sync problem: ${er.errors.first}';
+        eventProblem = 'Calendar: sync problem: ${er.errors.first}';
       }
     } catch (e) {
       if (s != _space) return;
-      eventProblem = 'Events: sync failed: $e';
+      eventProblem = 'Calendar: sync failed: $e';
     }
     try {
       _setEvents(supportsEvents ? await s.loadEvents() : <Event>[]);
       _rebaseEventDrafts();
     } catch (e) {
-      eventProblem ??= 'Events could not be read: $e';
+      eventProblem ??= 'Calendar could not be read: $e';
     }
     if (s != _space) return;
     taskError = taskProblem;
@@ -3035,7 +3128,7 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       if (src != source) return;
       events = [];
-      eventError = 'Events could not be read: $e';
+      eventError = 'Calendar could not be read: $e';
     }
   }
 
