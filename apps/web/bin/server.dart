@@ -4,6 +4,7 @@ import 'package:davdart/davdart.dart';
 import 'package:davdart/io.dart';
 import 'package:davdart_web/dav_proxy.dart';
 import 'package:davdart_web/gzip_static.dart';
+import 'package:davdart_web/host_guard.dart';
 import 'package:davdart_web/web_app.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf/shelf_io.dart' as io;
@@ -67,6 +68,11 @@ Future<void> main(List<String> args) async {
     return board(req);
   }
 
-  final server = await io.serve(handler, InternetAddress.loopbackIPv4, port);
+  final server = await io.serve(
+      const Pipeline()
+          .addMiddleware(hostGuard(
+              parseAllowedHosts(Platform.environment['DAVDART_ALLOWED_HOSTS'])))
+          .addHandler(handler),
+      InternetAddress.loopbackIPv4, port);
   stdout.writeln('davdart board on http://127.0.0.1:${server.port}/');
 }
