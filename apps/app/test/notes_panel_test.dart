@@ -30,7 +30,7 @@ final _notes = [
 ];
 
 Finder _inPanel(String text) =>
-    find.descendant(of: _k('drop-root'), matching: find.text(text));
+    find.descendant(of: _k('notes-body'), matching: find.text(text));
 
 Future<void> _end(WidgetTester t) => t.pump(const Duration(seconds: 1));
 

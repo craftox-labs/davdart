@@ -302,7 +302,7 @@ class SpacesSection extends _Section {
 /// Notes: the Space name, then the current scope's notes as a list (the
 /// default), with folders named as group labels, or as the folder tree. A
 /// Tree | List toggle appears when the scope has sub-folders; the choice is
-/// saved ([NotesView]). The tags drawer stays at the end.
+/// saved ([NotesView]). Folder rows drag and take drops in the tree only. The tags drawer stays at the end.
 class NotesSection extends _Section {
   const NotesSection({
     super.key,
@@ -602,12 +602,13 @@ class NotesSection extends _Section {
           child: chip,
         ),
       ),
-      wrapBody: (body) => MoveDropTarget(
-        key: const Key('drop-root'),
-        state: state,
-        folderUid: null,
-        rounded: false,
-        child: ActionContextMenu(
+      // The body's right-click area, and in Tree mode the drop area for the
+      // top level. Folders only move in the tree, so list mode has no drop
+      // target at all: a note's home is a project or Personal, never a folder
+      // out of the tree.
+      wrapBody: (body) {
+        final content = ActionContextMenu(
+          key: const Key('notes-body'),
           groups: [
             if (state.editable)
               [
@@ -626,8 +627,16 @@ class NotesSection extends _Section {
               ],
           ],
           child: body,
-        ),
-      ),
+        );
+        if (view != NotesView.tree) return content;
+        return MoveDropTarget(
+          key: const Key('drop-root'),
+          state: state,
+          folderUid: null,
+          rounded: false,
+          child: content,
+        );
+      },
       trailing: state.editable
           ? Row(
               mainAxisSize: MainAxisSize.min,

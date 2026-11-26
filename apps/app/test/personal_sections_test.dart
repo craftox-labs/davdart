@@ -55,11 +55,11 @@ void main() {
     s.setSection(Section.notes);
     await t.pumpAndSettle();
     expect(
-      find.descendant(of: _k('drop-root'), matching: find.text('Loose note')),
+      find.descendant(of: _k('notes-body'), matching: find.text('Loose note')),
       findsOneWidget,
     );
     expect(
-      find.descendant(of: _k('drop-root'), matching: find.text('Project note')),
+      find.descendant(of: _k('notes-body'), matching: find.text('Project note')),
       findsNothing,
     );
     s.setSection(Section.tasks);
