@@ -148,6 +148,15 @@ double? _rankPick(double? b, double? l, double? r, bool preferLocal) {
 }
 
 /// Merged note plus what had to be decided.
+/// Both sides can set a different `status-*` tag from the same base; the set
+/// merge would keep both. Keep the winning side's one.
+List<String> _oneStatus(List<String> tags, List<String> winner) {
+  final all = tags.where((t) => t.startsWith('status-')).toList();
+  if (all.length < 2) return tags;
+  final keep = winner.firstWhere(all.contains, orElse: () => all.first);
+  return [for (final t in tags) if (!t.startsWith('status-') || t == keep) t];
+}
+
 bool _sameMap(Map<String, String> a, Map<String, String> b) =>
     a.length == b.length && a.entries.every((e) => b[e.key] == e.value);
 
@@ -240,10 +249,10 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
   for (final c in base.categories) {
     if (!local.categories.contains(c)) cats.remove(c);
   }
-  merged.categories = [
+  merged.categories = _oneStatus([
     for (final c in [...remote.categories, ...local.categories])
       if (cats.remove(c)) c
-  ];
+  ], preferLocal ? local.categories : remote.categories);
 
   final fields = <String, String>{};
   final keys = {...ri.fields.keys, ...li.fields.keys, ...bi.fields.keys};
@@ -370,10 +379,10 @@ TaskMerge mergeTasks(Task base, Task local, Task remote) {
   for (final c in base.categories) {
     if (!local.categories.contains(c)) cats.remove(c);
   }
-  merged.categories = [
+  merged.categories = _oneStatus([
     for (final c in [...remote.categories, ...local.categories])
       if (cats.remove(c)) c
-  ];
+  ], preferLocal ? local.categories : remote.categories);
 
   final text = mergeText(
       base.description, local.description, remote.description,

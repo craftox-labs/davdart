@@ -57,6 +57,19 @@ void main() {
     final t1 = DateTime.utc(2026, 11, 19, 2);
     final t2 = DateTime.utc(2026, 11, 19, 3);
 
+    test('two different status tags collapse to the later writer\'s', () {
+      final base = n('x', tags: ['d', 'status-backlog'], at: t0);
+      final local = n('x', tags: ['d', 'status-doing'], at: t2);
+      final remote = n('x', tags: ['d', 'status-done'], at: t1);
+      var m = mergeNotes(base, local, remote);
+      expect(m.note.categories.where((c) => c.startsWith('status-')),
+          ['status-doing']);
+      m = mergeNotes(base, remote, local);
+      expect(m.note.categories.where((c) => c.startsWith('status-')),
+          ['status-doing']);
+      expect(m.note.categories, contains('d'));
+    });
+
     test('status change locally and text edit remotely both land', () {
       final base = n('${head}a\nb\nc', tags: ['d', 'status-backlog'], at: t0);
       final local = n('${head.replaceFirst('backlog', 'todo')}a\nb\nc',
