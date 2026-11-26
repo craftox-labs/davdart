@@ -29,6 +29,16 @@ void main() {
     expect((await again.notes()).single.summary, 'First');
   });
 
+  test('a local-only space handles many calls on one engine', () async {
+    final book = await SpaceBook.open(dir.path);
+    final s = await book.createLocal('Notes');
+    for (var i = 0; i < 20; i++) {
+      await s.save(Note(uid: 'n$i', summary: 'N$i'));
+    }
+    await s.delete('n0');
+    expect((await s.notes()), hasLength(19));
+  });
+
   test('attaching a server sends local notes and merges with its own',
       () async {
     final server = FakeCalDav();

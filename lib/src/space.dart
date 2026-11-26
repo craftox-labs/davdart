@@ -51,7 +51,9 @@ class Space {
   /// The Space has a server saved but no login in this session.
   bool get needsPassword => config.hasServer && _client == null;
 
-  SyncEngine get _local => SyncEngine(
+  // One engine (and its http.Client) for the life of the Space, not one per
+  // call: a client is never closed here, so each call used to leak sockets.
+  late final SyncEngine _local = SyncEngine(
         // Local edits never touch the network; a throwaway client is not
         // needed because save/delete/notes only use the store.
         CalDavClient(
