@@ -230,10 +230,18 @@ class Task {
   bool get isRecurring => rrule != null && rrule!.isNotEmpty;
 
   /// The board status word (`backlog`, `todo`, `doing`, `blocked`, `review`, `done`,
-  /// `canceled`): a `status-*` tag wins, else derived from [status].
+  /// `canceled`): a `status-*` tag wins (unless the task is closed and the tag
+  /// says it is open), else derived from [status].
   String get boardStatus {
     for (final c in categories) {
-      if (c.startsWith('status-')) return c.substring(7);
+      if (!c.startsWith('status-')) continue;
+      final word = c.substring(7);
+      // A client that closed the task (STATUS:COMPLETED/CANCELLED) does not
+      // touch our tag: a closed task cannot still be todo or doing.
+      if (isClosed && !const {'done', 'canceled', 'cancelled'}.contains(word)) {
+        break;
+      }
+      return word;
     }
     return switch (status) {
       'COMPLETED' => 'done',

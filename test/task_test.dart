@@ -62,6 +62,7 @@ END:VCALENDAR
 ''';
 
 void main() {
+  staleStatusTagTests();
   test('parses the modelled fields of a VTODO', () {
     final t = parseTask(nextcloud);
     expect(t.uid, 't-1');
@@ -169,5 +170,30 @@ void main() {
   test('a task can be a child of a note', () {
     final t = Task(uid: 'c', summary: 'Child', parentUid: 'note-1');
     expect(parseTask(serializeTask(t)).parentUid, 'note-1');
+  });
+}
+
+void staleStatusTagTests() {
+  test('a stale open status tag does not override a closed STATUS', () {
+    for (final tag in ['status-todo', 'status-doing', 'status-blocked']) {
+      expect(
+          Task(uid: 'u', summary: 's', status: 'COMPLETED', categories: [tag])
+              .boardStatus,
+          'done');
+      expect(
+          Task(uid: 'u', summary: 's', status: 'CANCELLED', categories: [tag])
+              .boardStatus,
+          'canceled');
+    }
+    expect(
+        Task(uid: 'u', summary: 's', status: 'COMPLETED', categories: [
+          'status-done'
+        ]).boardStatus,
+        'done');
+    expect(
+        Task(uid: 'u', summary: 's', status: 'IN-PROCESS', categories: [
+          'status-blocked'
+        ]).boardStatus,
+        'blocked');
   });
 }
