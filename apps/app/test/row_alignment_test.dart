@@ -87,16 +87,20 @@ void main() {
     }
   }
 
-  testWidgets('rail Spaces icon is level with the side panel header', (
-    t,
-  ) async {
+  testWidgets('rail: Home under the logo, the tools set apart', (t) async {
     await _pump(t, 1280, LayoutSide.start);
-    expect(
-      (t.getRect(_k('rail-spaces')).center.dy -
-              t.getRect(_k('side-header')).center.dy)
-          .abs(),
-      lessThanOrEqualTo(1),
-    );
+    final logo = t.getRect(_k('logo-slot'));
+    final home = t.getRect(_k('rail-home'));
+    final notes = t.getRect(_k('rail-notes'));
+    final tasks = t.getRect(_k('rail-tasks'));
+    final events = t.getRect(_k('rail-events'));
+    final search = t.getRect(_k('rail-search'));
+    expect(home.top, greaterThanOrEqualTo(logo.bottom));
+    // One step inside a group; a wider gap where the tools start.
+    final step = notes.top - home.top;
+    expect(tasks.top - notes.top, closeTo(step, 1));
+    expect(events.top - tasks.top, closeTo(step, 1));
+    expect(search.top - events.top, greaterThan(step));
   });
 
   testWidgets('header controls share one centreline at 1280', (t) async {

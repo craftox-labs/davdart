@@ -22,7 +22,7 @@ import 'segmented.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 import 'panel_tags_drawer.dart';
-import 'shell_frame.dart' show spacesLabel;
+import 'section_registry.dart' show spacesLabel;
 import 'space_actions.dart';
 
 /// The panels the side panel shows, one per rail section. Each takes

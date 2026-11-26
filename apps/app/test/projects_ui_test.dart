@@ -113,7 +113,10 @@ void main() {
 
     testWidgets('New project creates the container once', (t) async {
       final s = await _app(t, notes: const []);
-      await t.tap(_k('rail-projects'));
+      // No project yet, so the rail leaves the item out: the panel is
+      // reachable from the palette (and the phone's scope pill).
+      expect(_k('rail-projects'), findsNothing);
+      s.setSection(Section.projects);
       await t.pumpAndSettle();
       expect(_k('projects-empty'), findsOneWidget);
       await t.tap(_k('new-project'));

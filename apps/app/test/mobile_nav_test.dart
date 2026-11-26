@@ -353,22 +353,23 @@ void main() {
         // The sections in rail order, then Settings (no sign-in here).
         final ys = [
           for (final k in [
-            'rail-spaces',
-            'rail-projects',
+            'rail-home',
             'rail-notes',
             'rail-tasks',
             'rail-events',
-            'rail-views',
             'rail-search',
+            'rail-views',
+            'rail-spaces',
             'rail-settings',
           ])
             t.getRect(_k(k)).top,
         ];
         expect(ys, [...ys]..sort());
-        // Set apart: a bigger gap before Settings than between sections.
-        final gap = ys.last - ys[ys.length - 2];
-        final step = ys[2] - ys[1];
-        expect(gap, greaterThan(step));
+        // Set apart: bigger gaps between the groups (the lists, the tools)
+        // than between two items of one group.
+        final step = ys[1] - ys[0];
+        expect(ys[4] - ys[3], greaterThan(step)); // lists -> tools
+        expect(ys[5] - ys[4], step); // within the tools
         // The strip is 44dp targets.
         expect(t.getRect(_k('rail-notes')).height, 44);
         // Spaces is a section of its own, like the others (one fixed source

@@ -380,12 +380,17 @@ void main() {
       final s = await pumpTasksApp(t);
       await _press(t, LogicalKeyboardKey.keyH);
       expect(s.nav.area, NavArea.rail);
-      // Spaces leads the rail, Projects next.
-      expect(s.nav.cursorId(KeyNav.railList), 'spaces');
+      // Home leads the rail, then the Space's lists.
+      expect(s.nav.cursorId(KeyNav.railList), 'home');
+      // Home, Notes, Tasks, Calendar: the personal group comes first.
       await _press(t, _j);
       await _press(t, _j);
       await _press(t, _j);
+      expect(s.nav.cursorId(KeyNav.railList), 'events');
+      // Past it the tools follow, Calendar included in the one list.
       await _press(t, _j);
+      expect(s.nav.cursorId(KeyNav.railList), 'search');
+      await _press(t, _k_); // back to Calendar
       expect(s.nav.cursorId(KeyNav.railList), 'events');
       await _press(t, LogicalKeyboardKey.enter);
       expect(s.section, Section.events);
@@ -1051,8 +1056,7 @@ void main() {
       expect(s.nav.ring, contains(NavArea.rail));
       await _press(t, LogicalKeyboardKey.keyH);
       expect(s.nav.area, NavArea.rail);
-      expect(s.nav.cursorId(KeyNav.railList), 'spaces');
-      await _press(t, _j);
+      expect(s.nav.cursorId(KeyNav.railList), 'home');
       await _press(t, _j);
       await _press(t, _j);
       expect(s.nav.cursorId(KeyNav.railList), 'tasks');

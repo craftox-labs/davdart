@@ -36,7 +36,7 @@ void main() {
       expect(_k('new-note'), findsNothing);
       await t.tap(_k('rail-events'));
       await t.pumpAndSettle();
-      expect(_header('Events'), findsOneWidget);
+      expect(_header('Calendar'), findsOneWidget);
       expect(_k('new-event'), findsOneWidget);
       expect(_k('new-task'), findsNothing);
       expect(_k('new-note'), findsNothing);

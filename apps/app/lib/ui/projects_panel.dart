@@ -449,3 +449,71 @@ class ProjectsPanel extends StatelessWidget {
     );
   }
 }
+
+/// A project's own page: a placeholder for now. The project's name, what it
+/// holds (open tasks, notes, events in scope) and that more is coming.
+class ProjectOverviewPanel extends StatelessWidget {
+  const ProjectOverviewPanel({
+    super.key,
+    required this.state,
+    this.onPick,
+  });
+  final AppState state;
+  final VoidCallback? onPick;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return ListenableBuilder(
+      listenable: state,
+      builder: (context, _) {
+        final scope = state.scope;
+        final name = scope == null || scope.summary.isEmpty
+            ? 'These projects'
+            : scope.summary;
+        final ix = state.projectIndex;
+        final project = state.scopeUid == null
+            ? null
+            : ix.projectOf(state.scopeUid!)?.uid ??
+                  (ix.isProject(state.scopeUid!) ? state.scopeUid : null);
+        final counts = project == null
+            ? null
+            : ix.statsOf(project);
+        final notes = state.scopeUid == null
+            ? 0
+            : state.tree
+                  .descendants(state.scopeUid!)
+                  .where((n) => !AppState.isFolder(n))
+                  .length;
+        final tasks = state.openTasks().length;
+        final events = state.scopedEvents.length;
+        Widget line(String text) => Padding(
+          padding: EdgeInsets.only(top: t.space.xs),
+          child: Text(text, style: t.type.captionStyle.copyWith(color: t.muted)),
+        );
+        return SidePanelFrame(
+          key: const Key('overview-panel'),
+          title: SidePanelTitle(name),
+          body: ListView(
+            padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+            children: [
+              Padding(
+                padding: EdgeInsets.only(top: t.space.md),
+                child: Text(
+                  'Project overview',
+                  key: const Key('overview-heading'),
+                  style: t.type.bodyStyle,
+                ),
+              ),
+              line('$tasks open ${tasks == 1 ? 'task' : 'tasks'}'),
+              line('$notes ${notes == 1 ? 'note' : 'notes'}'),
+              line('$events ${events == 1 ? 'event' : 'events'}'),
+              if (counts != null) line(projectCounts(counts)),
+              line('More coming: a summary of this project here.'),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}

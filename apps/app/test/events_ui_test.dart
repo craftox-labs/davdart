@@ -73,7 +73,7 @@ void main() {
       expect(_k('events-panel'), findsOneWidget);
       expect(_k('events-view'), findsOneWidget);
       expect(
-        find.descendant(of: _k('side-header'), matching: find.text('Events')),
+        find.descendant(of: _k('side-header'), matching: find.text('Calendar')),
         findsOneWidget,
       );
       expect(_k('new-event'), findsOneWidget);

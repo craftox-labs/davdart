@@ -16,7 +16,7 @@ import 'side_panel.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
-/// The Events side panel section: an agenda of the Space's events. Today and
+/// The Calendar side panel section (events data; the name says Calendar): an agenda of the Space's events. Today and
 /// Tomorrow, Upcoming (the rest of the next 30 days, recurring events
 /// expanded) and a collapsible Past (the last 30 days). A row opens the event
 /// like a note (peek or main, per the open setting). [onPick] runs after an
@@ -68,7 +68,7 @@ class EventsPanel extends StatelessWidget {
         ]);
         return SidePanelFrame(
           key: const Key('events-panel'),
-          title: const SidePanelTitle('Events'),
+          title: const SidePanelTitle('Calendar'),
           actions: state.eventsEditable
               ? IconAction(
                   compact: true,

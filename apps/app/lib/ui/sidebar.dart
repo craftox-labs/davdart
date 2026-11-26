@@ -8,7 +8,6 @@ import 'events_panel.dart';
 import 'projects_panel.dart';
 import 'resize_handle.dart';
 import 'sections.dart';
-import 'shell_frame.dart';
 import 'tasks_panel.dart';
 import 'theme.dart';
 
@@ -68,20 +67,13 @@ class Sidebar extends StatelessWidget {
 }
 
 /// The section the panel shows: the chosen one, or the first the Space (and
-/// sign-in) allow.
+/// sign-in, and scope) allow.
 Section visibleSection(AppState state) {
   var section = state.section;
   if (section == Section.account && !state.canSignIn) section = Section.notes;
-  // A section the Space's collection cannot hold falls back to one it can.
-  if (!topSections(state).contains(section) &&
-      section != Section.account &&
-      section != Section.settings) {
-    final tops = topSections(state);
-    // Projects and Spaces lead the rail but are pickers, not landing pages.
-    section = tops.firstWhere(
-      (o) => o != Section.projects && o != Section.spaces,
-      orElse: () => tops.first,
-    );
+  // A section the Space (or the scope) cannot hold falls back to one it can.
+  if (!state.supportsSection(section) && section != Section.account) {
+    section = state.resolveSection(section);
   }
   return section;
 }
@@ -95,6 +87,7 @@ Widget sectionBody(AppState state, Section section, VoidCallback onPick) =>
       Section.tasks => TasksPanel(state: state, onPick: onPick),
       Section.events => EventsPanel(state: state, onPick: onPick),
       Section.projects => ProjectsPanel(state: state, onPick: onPick),
+      Section.overview => ProjectOverviewPanel(state: state, onPick: onPick),
       Section.views => ViewsSection(state: state, onPick: onPick),
       Section.search => SearchSection(state: state, onPick: onPick),
       Section.account => AccountSection(state: state, onPick: onPick),

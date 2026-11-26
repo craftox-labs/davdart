@@ -344,7 +344,7 @@ class SideMenuPage extends StatelessWidget {
           children: [
             // The desktop rail, without its logo: Spaces, the sections and
             // Settings, one tap each.
-            IconRail(state: state, strip: true),
+            IconRail(state: state, strip: true, onHome: onClose),
             Expanded(
               child: AreaMark(
                 nav: state.nav,

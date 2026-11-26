@@ -18,7 +18,7 @@ class PaletteEntry {
   });
 
   /// The heading the row sits under (Recent, an action group, Actions,
-  /// Notes, Tasks, Events).
+  /// Notes, Tasks, Calendar).
   final String group;
   final String title;
 
@@ -110,7 +110,7 @@ List<PaletteEntry> paletteEntries(
       state.events,
       (e) => e.summary,
       (e) => [e.description, e.location],
-    ).take(maxItemHits).map((e) => hit('Events', e.uid, e.summary)),
+    ).take(maxItemHits).map((e) => hit('Calendar', e.uid, e.summary)),
   );
   return out;
 }

@@ -11,6 +11,7 @@ import 'app_actions.dart';
 import 'key_nav_ui.dart';
 import '../theme/tokens.dart';
 import 'logo.dart';
+import 'section_registry.dart';
 import 'sidebar.dart';
 import 'theme.dart';
 
@@ -148,40 +149,6 @@ class ShellFrame extends StatelessWidget {
     );
   }
 }
-
-/// Icon and name of a section, shared by the rail and the narrow selector.
-(IconData, String) sectionMeta(Section s) => switch (s) {
-  Section.spaces => (spacesIcon, spacesLabel),
-  Section.notes => (FLucideIcons.fileText, 'Notes'),
-  Section.tasks => (FLucideIcons.listChecks, 'Tasks'),
-  Section.events => (FLucideIcons.calendar, 'Events'),
-  Section.projects => (FLucideIcons.folderKanban, 'Projects'),
-  Section.views => (FLucideIcons.bookmark, 'Views'),
-  Section.search => (FLucideIcons.search, 'Search'),
-  Section.account => (FLucideIcons.circleUser, 'Account'),
-  Section.settings => (FLucideIcons.settings, 'Settings'),
-};
-
-/// Sections shown on the rail, Spaces first, top group then bottom group.
-/// Account only appears when the app can sign in.
-List<Section> topSections([AppState? state]) => [
-  Section.spaces,
-  if (state?.supportsSection(Section.projects) ?? true) Section.projects,
-  if (state?.supportsNotes ?? true) Section.notes,
-  if (state?.supportsTasks ?? true) Section.tasks,
-  if (state?.supportsEvents ?? true) Section.events,
-  Section.views,
-  Section.search,
-];
-
-List<Section> bottomSections(AppState state) => [
-  if (state.canSignIn) Section.account,
-  Section.settings,
-];
-
-/// Icon of the Spaces rail item and section.
-const spacesIcon = FLucideIcons.layoutGrid;
-const spacesLabel = 'Spaces';
 
 /// Paints the active rail item as a tab that opens into the panel. It is laid
 /// out as the item's box and paints beyond it: across the rail margin
@@ -409,11 +376,11 @@ class RailButton extends StatelessWidget {
   }
 }
 
-/// A rail or selector button for a section.
+/// A rail or selector button for an entry of the [sectionDefs] registry.
 class SectionButton extends StatelessWidget {
   const SectionButton({
     super.key,
-    required this.section,
+    required this.def,
     required this.active,
     required this.onPress,
     this.tab = false,
@@ -422,7 +389,7 @@ class SectionButton extends StatelessWidget {
     this.tipRight = false,
     this.mirror = false,
   });
-  final Section section;
+  final SectionDef def;
   final bool active;
   final VoidCallback onPress;
   final bool tab;
@@ -435,10 +402,9 @@ class SectionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final (icon, name) = sectionMeta(section);
     return RailButton(
-      icon: icon,
-      label: name,
+      icon: def.icon,
+      label: def.label,
       active: active,
       onPress: onPress,
       tab: tab,
@@ -450,13 +416,20 @@ class SectionButton extends StatelessWidget {
   }
 }
 
-/// A slim vertical rail: the logo slot, then Spaces, Projects, Notes, Tasks,
-/// Events, Views and Search at the top, Account and Settings at the bottom.
+/// A slim vertical rail, built from the [sectionDefs] registry: the logo, the
+/// personal group (Home, Notes, Tasks, Calendar), Projects, a gap, then the
+/// global tools (Search, Views, Spaces, Account, Settings). Entries whose
+/// section the Space cannot hold are left out.
 ///
 /// [strip] is the phone's version, inside the side menu: no logo, the
 /// touch-target size (44dp) and a press that only sets the section.
 class IconRail extends StatelessWidget {
-  const IconRail({super.key, required this.state, this.strip = false});
+  const IconRail({
+    super.key,
+    required this.state,
+    this.strip = false,
+    this.onHome,
+  });
   final AppState state;
 
   /// Phone: the strip in the side menu. No logo; [SizeTokens.touchTarget] tap
@@ -465,52 +438,81 @@ class IconRail extends StatelessWidget {
   /// fold the desktop panel and write its shared pref.
   final bool strip;
 
+  /// Runs after a press on Home on the strip: the main area is hidden behind
+  /// the side menu there, so the menu closes on it.
+  final VoidCallback? onHome;
+
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final mirror = !strip && state.layoutSide == LayoutSide.end;
     final item = strip ? t.sizes.touchTarget : t.sizes.railItem;
     // The strip marks the section the panel shows, which is not
-    // [AppState.section] when the Space cannot hold the stored one.
+    // [AppState.section] when the Space cannot hold the stored one. Home is
+    // not a panel section: it is marked while the main area shows it.
     final active = strip ? visibleSection(state) : state.section;
-    final sections = [...topSections(state), ...bottomSections(state)];
+    final top = railEntries(state);
+    final bottom = railBottomEntries(state);
+    final all = [...top, ...bottom];
+
+    /// Home: the main area's personal overview, not a panel.
+    Future<void> home() async {
+      state.clearSearch();
+      await state.activateTab(null);
+      state.nav.focusArea(
+        NavArea.main,
+        list: navListId(state, NavArea.main),
+      );
+      onHome?.call();
+    }
+
     state.nav.publish(KeyNav.railList, [
-      for (final s in sections)
+      for (final d in all)
         NavEntry(
-          s.name,
+          d.id,
           open: (_) async {
-            state.setSection(s);
+            if (d.section == null) {
+              await home();
+              return;
+            }
+            state.setSection(d.section!);
             focusPanel(state);
             // Search opens on its field, like the bar's button and `/`.
-            if (s == Section.search) state.nav.focusSearch();
+            if (d.section == Section.search) state.nav.focusSearch();
           },
         ),
     ]);
-    void open(Section s) {
-      if (strip) {
-        state.setSection(s);
-      } else {
-        state.pressRail(s);
+
+    void open(SectionDef d) {
+      if (d.section == null) {
+        home();
+        return;
       }
-      if (s == Section.search) state.nav.focusSearch();
+      if (strip) {
+        state.setSection(d.section!);
+      } else {
+        state.pressRail(d.section!);
+      }
+      if (d.section == Section.search) state.nav.focusSearch();
     }
 
-    Widget button(Section s) {
+    Widget button(SectionDef d, {bool tabJoined = true}) {
+      final s = d.section;
       final b = NavRow(
         nav: state.nav,
         list: KeyNav.railList,
-        id: s.name,
+        id: d.id,
         radius: t.radii.control,
         child: SectionButton(
-          key: Key('rail-${s.name}'),
-          section: s,
-          active: active == s,
-          tab: strip || !state.sidebarCollapsed,
+          key: Key('rail-${d.id}'),
+          def: d,
+          active: s == null ? false : active == s,
+          tab: tabJoined && (strip || !state.sidebarCollapsed),
           tabMargin: (t.sizes.rail - item) / 2,
           size: item,
           tipRight: !strip,
           mirror: mirror,
-          onPress: () => open(s),
+          onPress: () => open(d),
         ),
       );
       if (s != Section.spaces) return b;
@@ -526,6 +528,16 @@ class IconRail extends StatelessWidget {
         builder: (_, _, _) => b,
       );
     }
+
+    /// The entries with a wider gap between groups: the personal group and
+    /// Projects stay together, the global tools are set apart.
+    List<Widget> entries(List<SectionDef> defs) => [
+      for (final (i, d) in defs.indexed) ...[
+        if (i > 0 && d.group != defs[i - 1].group)
+          SizedBox(height: t.space.md),
+        button(d),
+      ],
+    ];
 
     if (strip) {
       return SizedBox(
@@ -543,9 +555,9 @@ class IconRail extends StatelessWidget {
                     child: Column(
                       spacing: t.space.xs,
                       children: [
-                        for (final s in topSections(state)) button(s),
+                        ...entries(top),
                         const Spacer(),
-                        for (final s in bottomSections(state)) button(s),
+                        ...entries(bottom),
                       ],
                     ),
                   ),
@@ -556,23 +568,15 @@ class IconRail extends StatelessWidget {
         ),
       );
     }
-    final gap = t.space.xs;
     final tabMid = math.max(0.0, t.sizes.frameInset + t.sizes.tabStrip / 2);
     final logoBand = tabMid + t.sizes.railItem / 2;
-    final headerMid =
-        t.sizes.frameInset +
-        t.sizes.tabStrip +
-        t.borders.hairline +
-        t.sizes.paneHeader / 2;
-    final spacesTop = headerMid - t.sizes.railItem / 2;
-    final oldSpacesTop = logoBand + 3 * gap;
     return SizedBox(
       key: const Key('icon-rail'),
       width: t.sizes.rail,
       child: Padding(
         padding: EdgeInsets.only(bottom: t.space.lg),
         // Scrolls when the window is too short for every item (the Spacer
-        // still pushes Account and Settings to the bottom when it fits).
+        // still pushes the global tools to the bottom when it fits).
         child: LayoutBuilder(
           builder: (context, box) => SingleChildScrollView(
             child: ConstrainedBox(
@@ -581,38 +585,17 @@ class IconRail extends StatelessWidget {
                 child: Column(
                   spacing: t.space.xs,
                   children: [
-                    // The logo's centre is on the tab row's centreline and the Spaces
-                    // item's centre on the side panel header's; the block is as tall
-                    // as when Spaces sat right under the logo, so the items below
-                    // keep their positions.
+                    // The logo's centre is on the header tab row's centreline.
                     SizedBox(
-                      height:
-                          math.max(oldSpacesTop, spacesTop) + t.sizes.railItem,
-                      child: Stack(
-                        children: [
-                          Positioned(
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            height: logoBand,
-                            child: const Align(
-                              alignment: Alignment.bottomCenter,
-                              child: LogoSlot(),
-                            ),
-                          ),
-                          Positioned(
-                            top: spacesTop,
-                            left: 0,
-                            right: 0,
-                            child: Center(child: button(Section.spaces)),
-                          ),
-                        ],
+                      height: logoBand,
+                      child: const Align(
+                        alignment: Alignment.bottomCenter,
+                        child: LogoSlot(),
                       ),
                     ),
-                    for (final s in topSections(state))
-                      if (s != Section.spaces) button(s),
+                    ...entries(top),
                     const Spacer(),
-                    for (final s in bottomSections(state)) button(s),
+                    ...entries(bottom),
                   ],
                 ),
               ),

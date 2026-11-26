@@ -34,6 +34,8 @@ enum Section {
   tasks,
   events,
   projects,
+  /// A project's own page (a placeholder for now); needs a project scope.
+  overview,
   views,
   search,
   account,
@@ -519,12 +521,21 @@ class AppState extends ChangeNotifier {
     Section.tasks => supportsTasks,
     Section.events => supportsEvents,
     Section.projects => supportsNotes,
+    // A project's page is only about a project.
+    Section.overview => supportsNotes && scopeUid != null,
     _ => true,
   };
 
+  /// True when the Space has a Projects container or any project folder.
+  bool get hasProjects {
+    final ix = projectIndex;
+    return ix.projects().isNotEmpty || ix.containers().isNotEmpty;
+  }
+
   /// The section to open on: the rail's pickers (Spaces, Projects) lead the
   /// rail but are not landing pages, so a saved one falls back to a list.
-  Section _landing(Section s) => s == Section.spaces || s == Section.projects
+  Section _landing(Section s) =>
+      s == Section.spaces || s == Section.projects || s == Section.overview
       ? _supportedSection(Section.notes)
       : s;
 
@@ -537,6 +548,10 @@ class AppState extends ChangeNotifier {
     return Section.views;
   }
 
+  /// [s] as the panel can show it: the section itself, or the first list
+  /// section this Space (and scope) allows.
+  Section resolveSection(Section s) => _supportedSection(s);
+
   void setSection(Section s) {
     s = _supportedSection(s);
     setSidebarCollapsed(false);
@@ -548,6 +563,9 @@ class AppState extends ChangeNotifier {
 
   /// After a Space switch: the Tasks and Events lists stay (the choice on
   /// the rail survives), any other section falls back to Notes.
+  /// After a Space switch: the Tasks and Events lists stay (the choice on
+  /// the rail survives), any other section falls back to Notes (a project
+  /// page too: the other Space's project scope is gone).
   void keepListSection() {
     if (section != Section.tasks &&
         section != Section.events &&
@@ -1096,6 +1114,11 @@ class AppState extends ChangeNotifier {
       );
     tree = NoteTree.build(notes);
     if (scopeUid != null && tree.find(scopeUid!) == null) scopeUid = null;
+    // A project page left open without its project (a deleted project, a
+    // reload): the panel falls back to the list.
+    if (section == Section.overview) {
+      section = _supportedSection(section);
+    }
     if (_tabsLoaded) _pruneTabs();
     if (peekUid != null && findItem(peekUid!) == null) peekUid = null;
     if (peekUid == null) peekCollapsed = false;
@@ -1117,6 +1140,12 @@ class AppState extends ChangeNotifier {
   /// a recent one.
   void openFolder(String? uid) {
     scopeUid = uid;
+    // A project's own page needs a project (or folder) scope: without one the
+    // panel goes back to the list it came from.
+    if (uid == null && section == Section.overview) {
+      section = _supportedSection(Section.notes);
+      prefs?.write(_sectionKey, section.name);
+    }
     _persistScope();
     if (uid != null) {
       // A project, or a folder inside one, makes that project recent.

@@ -1432,7 +1432,7 @@ void main() {
     });
 
     testWidgets(
-      'rail order: logo, Spaces, Notes, Tasks, Events, Views, Search',
+      'rail order: logo, Home, Notes, Tasks, Calendar, then the tools',
       (t) async {
         await pump(t);
         expect(find.byKey(const Key('logo-slot')), findsOneWidget);
@@ -1460,12 +1460,13 @@ void main() {
         );
         final keys = [
           'logo-slot',
-          'rail-spaces',
+          'rail-home',
           'rail-notes',
           'rail-tasks',
           'rail-events',
-          'rail-views',
           'rail-search',
+          'rail-views',
+          'rail-spaces',
           'rail-settings',
         ];
         final ys = [for (final k in keys) t.getTopLeft(find.byKey(Key(k))).dy];

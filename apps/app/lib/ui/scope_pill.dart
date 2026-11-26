@@ -2,7 +2,8 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
-import 'shell_frame.dart';
+import 'section_registry.dart';
+import 'shell_frame.dart' show JoinedTab;
 import 'theme.dart';
 
 /// The narrow top bar's one joined tab: the open Space and the project the

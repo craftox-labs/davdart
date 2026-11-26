@@ -163,14 +163,15 @@ List<AppAction> buildActions(AppState state) {
     String title,
     Section sec,
     List<String> kw,
-    String key,
-  ) => AppAction(
+    String key, {
+    bool Function(AppState s)? enabled,
+  }) => AppAction(
     id: id,
     title: title,
     group: 'Go to',
     keywords: ['open', 'show', ...kw],
     shortcuts: ['g $key'],
-    enabled: yes,
+    enabled: enabled ?? yes,
     run: (c) {
       // On the phone this opens the side menu too (nothing else would show);
       // Search goes on to focus its field.
@@ -241,19 +242,32 @@ List<AppAction> buildActions(AppState state) {
     go('go.spaces', 'Go to Spaces', Section.spaces, const ['switch'], 'w'),
     go('go.notes', 'Go to Notes', Section.notes, const ['files', 'tree'], 'n'),
     go('go.tasks', 'Go to Tasks', Section.tasks, const ['todo', 'list'], 't'),
-    go('go.events', 'Go to Events', Section.events, const [
+    go('go.events', 'Go to Calendar', Section.events, const [
       'agenda',
       'calendar',
+      'events',
     ], 'e'),
-    go('go.projects', 'Go to Projects', Section.projects, const [
-      'project',
-      'progress',
-    ], 'p'),
+    go(
+      'go.projects',
+      'Go to Projects',
+      Section.projects,
+      const ['project', 'progress'],
+      'p',
+      enabled: (s) => s.supportsSection(Section.projects),
+    ),
     go('go.views', 'Go to Views', Section.views, const [
       'saved',
       'filters',
     ], 'v'),
     go('go.search', 'Go to Search', Section.search, const ['find'], 's'),
+    go(
+      'go.overview',
+      'Go to Overview',
+      Section.overview,
+      const ['project', 'page'],
+      'o',
+      enabled: (s) => s.supportsSection(Section.overview),
+    ),
     // The open Space's projects, the recent ones first, then the way back to
     // the whole Space.
     for (final p in state.projectsByRecent)
