@@ -49,10 +49,7 @@ Future<(AppState, Finder)> _eventRow(WidgetTester t) async {
 }
 
 Future<(AppState, Finder)> _treeRow(WidgetTester t) async {
-  final s = await pumpTasksApp(
-    t,
-    notes: [Note(uid: 'a', summary: 'Alpha')],
-  );
+  final s = await pumpTasksApp(t, notes: [Note(uid: 'a', summary: 'Alpha')]);
   await t.pumpAndSettle();
   return (
     s,
@@ -64,10 +61,7 @@ Future<(AppState, Finder)> _treeRow(WidgetTester t) async {
 }
 
 Future<(AppState, Finder)> _listRow(WidgetTester t) async {
-  final s = await pumpTasksApp(
-    t,
-    notes: [Note(uid: 'a', summary: 'Alpha')],
-  );
+  final s = await pumpTasksApp(t, notes: [Note(uid: 'a', summary: 'Alpha')]);
   // Home is always the board; a saved view shows the list.
   s.setView(ViewMode.list);
   await s.saveView('List');
@@ -75,10 +69,7 @@ Future<(AppState, Finder)> _listRow(WidgetTester t) async {
   await t.pumpAndSettle();
   return (
     s,
-    find.descendant(
-      of: find.byType(NoteListView),
-      matching: find.text('Alpha'),
-    ),
+    find.descendant(of: find.byType(NoteListView), matching: find.text('Alpha')),
   );
 }
 
@@ -144,7 +135,9 @@ void main() {
         expect(s.peekUid, isNull);
       });
 
-      testWidgets('$name opens in the peek with the main setting', (t) async {
+      testWidgets('$name opens in the peek with the main setting', (
+        t,
+      ) async {
         final (s, row) = await pump(t);
         s.setOpenMode(OpenMode.main);
         await t.pumpAndSettle();
@@ -207,8 +200,7 @@ void main() {
         expect(s.eventIsUnder(e3, 'e2'), isTrue);
         expect(s.eventIsUnder(e3, 'e1'), isTrue);
       },
-      skip:
-          'eventIsUnder stops at an event parent: the walk only follows '
+      skip: 'eventIsUnder stops at an event parent: the walk only follows '
           'tasks and notes, so a nested event is not seen as under its '
           'grandparent (lib bug, not fixed here)',
     );
@@ -228,11 +220,7 @@ void main() {
 
     test('a sibling is not under its sibling', () async {
       final s = await _state(
-        tasks: [
-          mkTask('g'),
-          mkTask('one', parent: 'g'),
-          mkTask('two', parent: 'g'),
-        ],
+        tasks: [mkTask('g'), mkTask('one', parent: 'g'), mkTask('two', parent: 'g')],
         events: [
           mkEvent('h'),
           mkEvent('ea', parent: 'h'),
@@ -263,14 +251,8 @@ void main() {
 
     test('a two-node parent loop ends with no hang', () async {
       final s = await _state(
-        tasks: [
-          mkTask('a', parent: 'b'),
-          mkTask('b', parent: 'a'),
-        ],
-        events: [
-          mkEvent('u', parent: 'v'),
-          mkEvent('v', parent: 'u'),
-        ],
+        tasks: [mkTask('a', parent: 'b'), mkTask('b', parent: 'a')],
+        events: [mkEvent('u', parent: 'v'), mkEvent('v', parent: 'u')],
       );
       final a = s.tasks.firstWhere((t) => t.uid == 'a');
       final u = s.events.firstWhere((e) => e.uid == 'u');

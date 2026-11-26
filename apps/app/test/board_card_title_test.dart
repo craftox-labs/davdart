@@ -54,14 +54,12 @@ void main() {
     expect(_texts(t, 'bare'), contains('bare:'));
   });
 
-  testWidgets(
-    'only the item id prefix is stripped, not any word before a colon',
-    (t) async {
-      await pumpHomeApp(
-        t,
-        notes: [_plan('colon', 'topic: Something', itemId: 'other')],
-      );
-      expect(_texts(t, 'colon'), contains('topic: Something'));
-    },
-  );
+  testWidgets('only the item id prefix is stripped, not any word before a colon',
+      (t) async {
+    await pumpHomeApp(
+      t,
+      notes: [_plan('colon', 'topic: Something', itemId: 'other')],
+    );
+    expect(_texts(t, 'colon'), contains('topic: Something'));
+  });
 }
