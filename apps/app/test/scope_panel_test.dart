@@ -85,11 +85,11 @@ Future<void> _openPicker(WidgetTester t) async {
 void main() {
   for (final size in _sizes) {
     group('narrow scope pill at $size', () {
-      testWidgets('the Space alone, and no crumb anywhere in the bar', (
+      testWidgets('the page title, and no crumb anywhere in the bar', (
         t,
       ) async {
         await _app(t, size);
-        expect(_text(t, 'scope-pill-space'), 'Spaces');
+        expect(_text(t, 'top-title'), 'Home');
         expect(_k('scope-pill-project'), findsNothing);
         // Logo left, pill, sync right.
         expect(
@@ -111,22 +111,14 @@ void main() {
           final s = await _app(t, size);
           s.openFolder('p1');
           await t.pumpAndSettle();
-          // The Space name gives way to its icon; the project is named.
-          expect(_k('scope-pill-space'), findsNothing);
-          expect(_text(t, 'scope-pill-project'), 'Alpha project');
-          expect(
-            find.descendant(
-              of: _k('space-chip'),
-              matching: find.byIcon(FLucideIcons.layoutGrid),
-            ),
-            findsOneWidget,
-          );
-          // A project is the pill's own level: no crumb row.
+          // The closed bar names the page, not the folder scope.
+          expect(_text(t, 'top-title'), 'Home');
+          // A project is the page's own level: no crumb row.
           expect(_k('content-crumbs'), findsNothing);
-          // Opening the project as a page keeps the pill as it was.
+          // Opening the project as a page names the project.
           s.openNoteTab('p1');
           await t.pumpAndSettle();
-          expect(_text(t, 'scope-pill-project'), 'Alpha project');
+          expect(_text(t, 'top-title'), 'Alpha project');
           expect(
             find.descendant(of: _k('top-bar'), matching: _k('crumb-folder')),
             findsNothing,
@@ -160,13 +152,13 @@ void main() {
         await t.pumpAndSettle();
         expect(_k('side-menu'), findsNothing);
         expect(s.scopeUid, 'p2');
-        expect(_text(t, 'scope-pill-project'), 'Beta');
+        expect(_text(t, 'top-title'), 'Beta');
         // The Space's own row clears the scope again.
         await _openPicker(t);
         await t.tap(_k('projects-all'));
         await t.pumpAndSettle();
         expect(s.scopeUid, isNull);
-        expect(_text(t, 'scope-pill-space'), 'Spaces');
+        expect(_text(t, 'top-title'), 'Home');
         _noError(t);
       });
 
@@ -178,7 +170,7 @@ void main() {
         await s.openNote('outside');
         await t.pumpAndSettle();
         expect(s.scopeUid, 'p1');
-        expect(_text(t, 'scope-pill-project'), 'Alpha project');
+        expect(_text(t, 'top-title'), 'Outside note');
         expect(find.text('Outside note'), findsWidgets);
         // Scope-dependent screens still ignore it, and count only what is in.
         expect(s.filtered.map((n) => n.uid), isNot(contains('outside')));
@@ -432,8 +424,8 @@ void main() {
         s.applyView(s.savedViews.single);
         await t.pumpAndSettle();
         expect(s.activeViewName, 'My list');
-        // The bar still says the Space; the view's name is in the row.
-        expect(_text(t, 'scope-pill-space'), 'Spaces');
+        // The bar names the view; its crumb row stays.
+        expect(_text(t, 'top-title'), 'My list');
         expect(_k('content-crumbs'), findsOneWidget);
         expect(
           find.descendant(
@@ -444,7 +436,7 @@ void main() {
         );
         expect(
           find.descendant(of: _k('top-bar'), matching: find.text('My list')),
-          findsNothing,
+          findsWidgets,
         );
         _noError(t);
       });

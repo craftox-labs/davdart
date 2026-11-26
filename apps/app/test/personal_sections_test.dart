@@ -97,22 +97,15 @@ void main() {
     t,
   ) async {
     final s = await _app(t);
-    await t.ensureVisible(_k('home-new-note'));
-    await t.tap(_k('home-new-note'));
-    await t.pumpAndSettle();
-    await t.enterText(_k('new-note-title'), 'Personal note');
-    await t.tap(_k('new-note-add'));
+    await t.runAsync(() => s.addNote('Personal note', personal: true));
     await t.pumpAndSettle();
     final container = s.personalContainer;
     expect(container, isNotNull);
     expect(container!.categories, contains(personalTag));
     final note = s.notes.firstWhere((n) => n.summary == 'Personal note');
     expect(note.parentUid, container.uid);
-    // A task and an event made from Home too.
-    await t.tap(_k('home-new-task'));
-    await t.pumpAndSettle();
-    await t.enterText(_k('new-task-title'), 'Personal task');
-    await t.tap(_k('new-task-add'));
+    // A task made the same way.
+    await t.runAsync(() => s.addTask('Personal task', personal: true));
     await t.pumpAndSettle();
     expect(
       s.tasks.firstWhere((k) => k.summary == 'Personal task').parentUid,

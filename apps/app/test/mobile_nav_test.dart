@@ -2,7 +2,6 @@ import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
-import 'package:davdart_app/theme/tokens.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -26,6 +25,7 @@ class _NoNotes extends FlagState {
 }
 
 Finder _k(String k) => find.byKey(Key(k));
+String _text(WidgetTester t, String k) => t.widget<Text>(_k(k)).data!;
 
 void _noError(WidgetTester t) {
   final ex = t.takeException();
@@ -230,6 +230,30 @@ void main() {
         expect(_k('bar-add'), findsNothing);
       });
 
+      testWidgets('the closed bar names the page; the menu names the Space', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(
+          t,
+          notes: [_note('n1', 'Alpha')],
+          size: size,
+        );
+        expect(_text(t, 'top-title'), 'Home');
+        await s.openNote('n1');
+        await t.pumpAndSettle();
+        expect(_text(t, 'top-title'), 'Alpha');
+        // The menu keeps its Space heading while it is open.
+        await _openMenu(t);
+        expect(_text(t, 'scope-pill-space'), 'Spaces');
+        // Back Home updates the closed bar again.
+        await t.tap(_k('menu'));
+        await t.pumpAndSettle();
+        await t.tap(_k('bar-home'));
+        await t.pumpAndSettle();
+        expect(_text(t, 'top-title'), 'Home');
+        _noError(t);
+      });
+
       testWidgets('the Space chip is a joined tab on the top bar edge', (
         t,
       ) async {
@@ -254,17 +278,14 @@ void main() {
         _noError(t);
       });
 
-      testWidgets('the chip content is on the logo centre line, logo-sized', (
-        t,
-      ) async {
+      testWidgets('the page title is on the logo centre line', (t) async {
         await pumpTasksApp(t, size: size);
         final logo = t.getRect(_k('top-logo'));
-        final icon = find.descendant(
-          of: _k('space-chip'),
-          matching: find.byType(Icon),
+        // No Space icon on the closed bar: the page's title sits there.
+        expect(
+          find.descendant(of: _k('space-chip'), matching: find.byType(Icon)),
+          findsNothing,
         );
-        expect(t.getRect(icon).center.dy, closeTo(logo.center.dy, 1.5));
-        expect(t.getSize(icon).height, Tokens.light.icons.lg);
         final label = find.descendant(
           of: _k('space-chip'),
           matching: find.byType(Text),

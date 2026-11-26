@@ -13,6 +13,7 @@ import 'package:davdart_app/ui/shell_frame.dart';
 import 'package:davdart_app/ui/sidebar.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'package:forui/forui.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 class _Seed implements NoteSource {
@@ -85,6 +86,23 @@ void main() {
       final panel = t.getRect(_k('shell-panel'));
       final bar = t.getRect(find.byKey(const Key('top-bar')));
       expect(bar.top, greaterThan(panel.top));
+    });
+
+    testWidgets('the page header row names the page and keeps sync right', (
+      t,
+    ) async {
+      await _pump(t);
+      final row = t.getRect(_k('top-bar'));
+      final title = t.getRect(_k('page-title'));
+      final sync = t.getRect(find.byIcon(FLucideIcons.refreshCw));
+      // Home's heading is its Space; the tab strip still says Home.
+      expect(t.widget<Text>(_k('page-title')).data, 'This Space');
+      expect(row.height, _z.paneHeader);
+      expect(title.centerLeft.dx, closeTo(row.left + Tokens.light.space.md, 1));
+      expect(title.center.dy, closeTo(row.center.dy, 1));
+      expect(sync.right, lessThan(row.right));
+      expect(sync.left, greaterThan(row.right - _z.touchTarget));
+      expect(title.right, lessThan(sync.left));
     });
 
     testWidgets('the active tab is flush on the panel top, others unframed', (

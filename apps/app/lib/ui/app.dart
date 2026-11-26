@@ -25,6 +25,7 @@ import 'list_view.dart';
 import '../state/tab_state.dart';
 import 'logo.dart';
 import 'mobile_nav.dart';
+import 'page_header.dart';
 import 'parts.dart';
 import 'project_overview.dart';
 import 'resize_handle.dart';
@@ -488,7 +489,8 @@ class _ShellState extends State<Shell>
           // pane, full height beside it.
           final mainColumn = Column(
             children: [
-              if (showTopBar) TopBar(state: state, showMenu: !wide),
+              if (showTopBar)
+                TopBar(state: state, showMenu: !wide, menuOpen: _menuOpen),
               Expanded(
                 child: PromoteTarget(state: state, child: main()),
               ),
@@ -518,7 +520,7 @@ class _ShellState extends State<Shell>
       childPad: false,
       header: split || !showTopBar
           ? null
-          : TopBar(state: state, showMenu: !wide),
+          : TopBar(state: state, showMenu: !wide, menuOpen: _menuOpen),
       footer: narrowBar
           ? MobileBar(
               state: state,
@@ -848,11 +850,20 @@ class _LeaveGuardState extends State<_LeaveGuard> {
 }
 
 class TopBar extends StatelessWidget {
-  const TopBar({super.key, required this.state, required this.showMenu});
+  const TopBar({
+    super.key,
+    required this.state,
+    required this.showMenu,
+    this.menuOpen = false,
+  });
   final AppState state;
 
   /// The narrow layout: the logo left, the title centred.
   final bool showMenu;
+
+  /// Narrow, menu open: the bar keeps the Space's name; closed, it names the
+  /// page the main area shows.
+  final bool menuOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -862,25 +873,43 @@ class TopBar extends StatelessWidget {
     );
   }
 
-  /// Narrow: one stable pill (the Space and its project), whatever the screen
-  /// shows; folder crumbs and a view's name live in the content's thin row
-  /// instead ([AppShell]'s narrow crumb row), so the bar never swaps its
-  /// title.
-  Widget _title(Tokens t) => ScopePill(state: state);
-
-  /// Left side of the row: the breadcrumb on Home and view tabs, nothing
-  /// where a note fills the main area (it has its own header).
-  Widget _lead(Tokens t) {
-    // A note filling the main area carries its title in its own header; Home
-    // and project pages name themselves (no breadcrumb row).
-    if (state.mainItemUid != null ||
-        state.activeTab == null ||
-        state.mainProjectUid != null) {
-      return const SizedBox.shrink();
-    }
+  /// Narrow, menu open: the Space pill (as before). Closed: the page's title
+  /// in the same joined tab; a tap still opens the Projects picker.
+  Widget _title(Tokens t) {
+    if (menuOpen) return ScopePill(state: state);
+    final title = state.mainPageTitle;
+    final flare = t.radii.tab;
     return Align(
-      alignment: Alignment.centerLeft,
-      child: ScopeCrumbs(state: state, label: state.activeViewName),
+      alignment: Alignment.bottomCenter,
+      child: Transform.translate(
+        offset: Offset(0, t.borders.hairline),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: flare),
+          child: FTappable(
+            key: const Key('space-chip'),
+            semanticsLabel: title,
+            behavior: HitTestBehavior.opaque,
+            onPress: () => state.openPanel(Section.projects),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: JoinedTab(
+                active: true,
+                height: t.sizes.paneHeader,
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: t.space.lg),
+                  child: Text(
+                    title,
+                    key: const Key('top-title'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.type.captionStyle.copyWith(color: t.fg),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -930,34 +959,41 @@ class TopBar extends StatelessWidget {
       spinning: state.syncing || state.loading,
       onPress: state.load,
     );
-    return PaneHeaderRow(
-      key: const Key('top-bar'),
-      children: [
-        // Narrow: the plain app logo (the menu toggle is in the bottom bar).
-        if (showMenu)
-          SizedBox(
-            key: const Key('top-logo'),
-            width: t.sizes.touchTarget,
-            height: t.sizes.touchTarget,
-            child: Center(child: LogoMark(extent: t.icons.lg)),
-          ),
-        SizedBox(width: t.space.xs),
-        Expanded(child: showMenu ? _title(t) : _lead(t)),
-        SizedBox(width: t.space.md),
-        if (narrow) ...[
-          viewControl,
-          refresh,
-        ] else ...[
+    if (!showMenu) {
+      return PageHeaderRow(
+        key: const Key('top-bar'),
+        // Desktop: Home's heading is the Space's name, not the word Home.
+        title: state.activeTab == null
+            ? (state.currentSpaceName ?? 'This Space')
+            : state.mainPageTitle,
+        textKey: const Key('page-title'),
+        actions: [
           viewControl,
           // Menu first: Columns and refresh keep their place whether or not
           // a folder is open.
           if (home) ScopeActions(state: state),
-          if (!showMenu &&
-              state.mainProjectUid != null &&
+          if (state.mainProjectUid != null &&
               state.projectTab(state.mainProjectUid!) == ProjectTab.board)
             HomeColumnsToggle(state: state),
           refresh,
         ],
+      );
+    }
+    return PaneHeaderRow(
+      key: const Key('top-bar'),
+      children: [
+        // Narrow: the plain app logo (the menu toggle is in the bottom bar).
+        SizedBox(
+          key: const Key('top-logo'),
+          width: t.sizes.touchTarget,
+          height: t.sizes.touchTarget,
+          child: Center(child: LogoMark(extent: t.icons.lg)),
+        ),
+        SizedBox(width: t.space.xs),
+        Expanded(child: _title(t)),
+        SizedBox(width: t.space.md),
+        viewControl,
+        refresh,
       ],
     );
   }

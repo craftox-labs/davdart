@@ -3756,6 +3756,15 @@ class AppState extends ChangeNotifier {
 
   String? get mainItemUid => mainNoteUid ?? mainTaskUid ?? mainEventUid;
 
+  /// The title of the page the main pane shows: Home, a note, a saved view
+  /// or a project. The phone bar names it.
+  String get mainPageTitle {
+    final t = activeTab;
+    if (t == null) return 'Home';
+    final title = tabTitle(t);
+    return title.isEmpty ? 'Untitled' : title;
+  }
+
   /// Something other than Home or a view fills the main pane: a note, task
   /// or event page.
   bool get mainIsPage => mainItemUid != null;
