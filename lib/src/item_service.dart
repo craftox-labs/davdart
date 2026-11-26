@@ -839,10 +839,20 @@ class ItemService {
   /// ([compareBoardItems]), so the manual rank decides before priority and
   /// creation.
   Future<List<(String, List<PlanItem>)>> board({int limit = 500}) async {
-    final page =
-        await list(kind: ItemKind.note, includeFolders: false, limit: limit);
+    // list() caps a page at 500; walk the pages so no note is dropped.
+    final items = <ItemData>[];
+    for (var off = 0;;) {
+      final page = await list(
+          kind: ItemKind.note,
+          includeFolders: false,
+          limit: limit,
+          offset: off);
+      items.addAll(page.items);
+      off += page.items.length;
+      if (!page.hasMore || page.items.isEmpty) break;
+    }
     final by = <String, List<(PlanItem, BoardItem)>>{};
-    for (final i in page.items) {
+    for (final i in items) {
       final n = _noteOf(i);
       final pi = PlanItem.fromNote(n);
       final raw = pi.status;

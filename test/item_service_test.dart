@@ -101,6 +101,14 @@ void main() {
     expect((await svc.get(n)).tags, isNot(contains(folderTag)));
   });
 
+  test('board pages past the 500 list cap', () async {
+    for (var i = 0; i < 503; i++) {
+      await client.putNote(Note(uid: 'n$i', summary: 'N$i'));
+    }
+    final cols = await svc.board();
+    expect(cols.fold<int>(0, (a, c) => a + c.$2.length), 503);
+  });
+
   test('overview gives tree and counts', () async {
     final f = await mk(ItemKind.note, 'Folder', folder: true);
     final sub = await mk(ItemKind.note, 'Sub', parent: f, folder: true);
