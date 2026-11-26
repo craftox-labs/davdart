@@ -261,14 +261,6 @@ List<AppAction> buildActions(AppState state) {
       'filters',
     ], 'v'),
     go('go.search', 'Go to Search', Section.search, const ['find'], 's'),
-    go(
-      'go.overview',
-      'Go to Overview',
-      Section.overview,
-      const ['project', 'page'],
-      'o',
-      enabled: (s) => s.supportsSection(Section.overview),
-    ),
     // The open Space's projects, the recent ones first, then the way back to
     // the whole Space.
     for (final p in state.projectsByRecent)
@@ -277,12 +269,8 @@ List<AppAction> buildActions(AppState state) {
         title: 'Go to project: ${p.summary.isEmpty ? 'Untitled' : p.summary}',
         group: 'Go to',
         keywords: const ['project', 'folder', 'scope', 'open'],
-        enabled: (s) => s.scopeUid != p.uid,
-        run: (c) => c.state.guarded(() {
-          c.state.openFolder(p.uid);
-          // A project opens on its page, not only as a scope.
-          c.state.setSection(Section.overview);
-        }),
+        enabled: (s) => s.mainProjectUid != p.uid,
+        run: (c) => c.state.guarded(() => c.state.openProjectTab(p.uid)),
       ),
     AppAction(
       id: 'project.go.all',
@@ -298,7 +286,7 @@ List<AppAction> buildActions(AppState state) {
       group: 'Create',
       keywords: const ['add', 'create', 'page'],
       enabled: notes,
-      run: (c) => showNewNoteDialog(c.context, c.state),
+      run: (c) => showNewNoteDialog(c.context, c.state, personal: true),
     ),
     AppAction(
       id: 'folder.new',
@@ -322,7 +310,7 @@ List<AppAction> buildActions(AppState state) {
       group: 'Create',
       keywords: const ['add', 'create', 'todo'],
       enabled: (s) => s.tasksEditable,
-      run: (c) => showNewTaskDialog(c.context, c.state),
+      run: (c) => showNewTaskDialog(c.context, c.state, personal: true),
     ),
     AppAction(
       id: 'event.new',
@@ -330,7 +318,7 @@ List<AppAction> buildActions(AppState state) {
       group: 'Create',
       keywords: const ['add', 'create', 'meeting', 'appointment'],
       enabled: (s) => s.eventsEditable,
-      run: (c) => showNewEventDialog(c.context, c.state),
+      run: (c) => showNewEventDialog(c.context, c.state, personal: true),
     ),
     for (final sp in state.spaces)
       AppAction(
@@ -572,9 +560,13 @@ List<AppAction> buildActions(AppState state) {
         _ => false,
       },
       run: (c) => switch (c.state.section) {
-        Section.notes => showNewNoteDialog(c.context, c.state),
-        Section.tasks => showNewTaskDialog(c.context, c.state),
-        Section.events => showNewEventDialog(c.context, c.state),
+        Section.notes => showNewNoteDialog(c.context, c.state, personal: true),
+        Section.tasks => showNewTaskDialog(c.context, c.state, personal: true),
+        Section.events => showNewEventDialog(
+          c.context,
+          c.state,
+          personal: true,
+        ),
         Section.projects => showNewProjectDialog(c.context, c.state),
         _ => null,
       },

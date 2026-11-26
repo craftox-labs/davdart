@@ -94,14 +94,6 @@ const List<SectionDef> sectionDefs = [
     section: Section.projects,
   ),
   SectionDef(
-    id: 'overview',
-    label: 'Overview',
-    icon: FLucideIcons.layoutDashboard,
-    group: SectionGroup.projects,
-    section: Section.overview,
-    onRail: false,
-  ),
-  SectionDef(
     id: 'search',
     label: 'Search',
     icon: FLucideIcons.search,
@@ -160,8 +152,18 @@ projectViews = [
     icon: FLucideIcons.layoutDashboard,
     section: Section.overview,
   ),
-  (id: 'board', label: 'Board', icon: FLucideIcons.kanban, section: Section.tasks),
-  (id: 'notes', label: 'Notes', icon: FLucideIcons.fileText, section: Section.notes),
+  (
+    id: 'board',
+    label: 'Board',
+    icon: FLucideIcons.kanban,
+    section: Section.tasks,
+  ),
+  (
+    id: 'notes',
+    label: 'Notes',
+    icon: FLucideIcons.fileText,
+    section: Section.notes,
+  ),
   (
     id: 'events',
     label: 'Calendar',

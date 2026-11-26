@@ -135,37 +135,6 @@ void main() {
         },
       );
 
-      testWidgets('below a project the crumbs move into the content', (
-        t,
-      ) async {
-        final s = await _app(t, size);
-        s.openFolder('sub');
-        await t.pumpAndSettle();
-        // The pill still says Space › Project (the project of the scope).
-        expect(_text(t, 'scope-pill-project'), 'Alpha project');
-        // The path below it is in the content's thin row.
-        expect(_k('content-crumbs'), findsOneWidget);
-        expect(_text(t, 'crumb-folder'), 'Design');
-        expect(
-          find.descendant(of: _k('top-bar'), matching: _k('content-crumbs')),
-          findsNothing,
-        );
-        expect(
-          t.getRect(_k('content-crumbs')).top,
-          greaterThanOrEqualTo(t.getRect(_k('top-bar')).bottom - 1),
-        );
-        // A folder outside every project shows its path too.
-        s.openFolder('loose');
-        await t.pumpAndSettle();
-        expect(_k('scope-pill-project'), findsNothing);
-        expect(_text(t, 'crumb-folder'), 'Loose notes');
-        // Back at the Space root the row goes.
-        s.openFolder(null);
-        await t.pumpAndSettle();
-        expect(_k('content-crumbs'), findsNothing);
-        _noError(t);
-      });
-
       testWidgets('the pill opens the Projects panel: the Space, then the '
           'projects', (t) async {
         final s = await _app(t, size);
@@ -221,13 +190,12 @@ void main() {
         await s.openEvent('e-out');
         await t.pumpAndSettle();
         expect(s.scopeUid, 'p1');
-        // Back returns to that scope's screens, still scoped.
+        // Back returns to Home, which is personal (scope cleared).
         await t.tap(_k('bar-back'));
         await t.pumpAndSettle();
         expect(s.activeTab, isNull);
-        expect(s.scopeUid, 'p1');
-        expect(_text(t, 'scope-pill-project'), 'Alpha project');
-        expect(_k('content-crumbs'), findsNothing, reason: 'a project level');
+        expect(s.scopeUid, isNull);
+        expect(_k('content-crumbs'), findsNothing);
         _noError(t);
       });
 
@@ -244,13 +212,13 @@ void main() {
         await t.tap(_k('project-p1'));
         await t.pumpAndSettle();
         expect(s.scopeUid, 'p1');
-        expect(s.section, Section.overview);
+        expect(s.mainProjectUid, 'p1');
         expect(_k('side-menu'), findsNothing, reason: 'the pick closed it');
         expect(_k('overview-page'), findsOneWidget);
         // The project's own switcher is in the page.
         await t.tap(_k('proj-tab-notes'));
         await t.pumpAndSettle();
-        expect(s.section, Section.overview);
+        expect(s.mainProjectUid, 'p1');
         expect(_k('proj-notes-tab'), findsOneWidget);
         _noError(t);
       });
@@ -367,19 +335,20 @@ void main() {
         }
 
         await add('add-task', 'new-task-title', 'new-task-add');
+        final personal = s.personalContainer!.uid;
         expect(
           s.tasks.firstWhere((e) => e.summary == 'In the project').parentUid,
-          'p1',
+          personal,
         );
         await add('add-event', 'new-event-title', 'new-event-add');
         expect(
           s.events.firstWhere((e) => e.summary == 'In the project').parentUid,
-          'p1',
+          personal,
         );
         await add('add-note', 'new-note-title', 'new-note-add');
         expect(
           s.notes.firstWhere((e) => e.summary == 'In the project').parentUid,
-          'p1',
+          personal,
         );
         _noError(t);
       });

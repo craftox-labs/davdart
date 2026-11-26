@@ -504,7 +504,10 @@ class IconRail extends StatelessWidget {
         child: SectionButton(
           key: Key('rail-${d.id}'),
           def: d,
-          active: s == null ? false : active == s,
+          active: s == null
+              ? false
+              : active == s ||
+                    (s == Section.projects && state.mainProjectUid != null),
           tab: tabJoined && (strip || !state.sidebarCollapsed),
           tabMargin: (t.sizes.rail - item) / 2,
           size: item,

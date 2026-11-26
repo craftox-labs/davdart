@@ -124,15 +124,22 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
         // order.
         final projects = state.projectsByRecent;
         final scope = state.scopeUid;
-        final current = scope == null ? null : ix.projectOf(scope)?.uid;
+        // The card of the project whose page is open is highlighted.
+        final current =
+            state.mainProjectUid ??
+            (scope == null ? null : ix.projectOf(scope)?.uid);
 
-        /// Selecting a project enters it on Overview (scope and section
-        /// together); the phone's drawer closes on the pick.
+        /// Selecting a project opens (or focuses) its own tab; the panel stays
+        /// the project list. 'No project' leaves any project and goes Home.
         Future<void> open(String? uid) async {
           var picked = false;
           await state.guarded(() {
-            state.openFolder(uid);
-            if (uid != null) state.setSection(Section.overview);
+            if (uid == null) {
+              state.openFolder(null);
+              state.showHome();
+            } else {
+              state.openProjectTab(uid);
+            }
             picked = true;
           });
           if (picked) onPick?.call();
@@ -409,73 +416,6 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
                   ],
                 ),
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-/// The project in scope, in the side panel: its name and what it holds (open
-/// tasks, notes and events in scope). The page itself, with the tiles and the
-/// lists, opens in the main area ([ProjectOverviewPage]).
-class ProjectOverviewPanel extends StatelessWidget {
-  const ProjectOverviewPanel({super.key, required this.state, this.onPick});
-  final AppState state;
-  final VoidCallback? onPick;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return ListenableBuilder(
-      listenable: state,
-      builder: (context, _) {
-        final scope = state.scope;
-        final name = scope == null || scope.summary.isEmpty
-            ? 'These projects'
-            : scope.summary;
-        final ix = state.projectIndex;
-        final project = state.scopeUid == null
-            ? null
-            : ix.projectOf(state.scopeUid!)?.uid ??
-                  (ix.isProject(state.scopeUid!) ? state.scopeUid : null);
-        final counts = project == null ? null : ix.statsOf(project);
-        final notes = state.scopeUid == null
-            ? 0
-            : state.tree
-                  .descendants(state.scopeUid!)
-                  .where((n) => !AppState.isFolder(n))
-                  .length;
-        final tasks = state.openTasks().length;
-        final events = state.scopedEvents.length;
-        Widget line(String text) => Padding(
-          padding: EdgeInsets.only(top: t.space.xs),
-          child: Text(
-            text,
-            style: t.type.captionStyle.copyWith(color: t.muted),
-          ),
-        );
-        return SidePanelFrame(
-          key: const Key('overview-panel'),
-          title: SidePanelTitle(name),
-          body: ListView(
-            padding: EdgeInsets.symmetric(horizontal: t.space.lg),
-            children: [
-              Padding(
-                padding: EdgeInsets.only(top: t.space.md),
-                child: Text(
-                  'Overview',
-                  key: const Key('overview-heading'),
-                  style: t.type.bodyStyle,
-                ),
-              ),
-              line('$tasks open ${tasks == 1 ? 'task' : 'tasks'}'),
-              line('$notes ${notes == 1 ? 'note' : 'notes'}'),
-              line(
-                '$events ${events == 1 ? 'event' : 'events'} in the Calendar',
-              ),
-              if (counts != null) line(projectCounts(counts)),
             ],
           ),
         );

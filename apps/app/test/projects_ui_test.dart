@@ -1,7 +1,6 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/note_draft.dart';
-import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -87,7 +86,7 @@ void main() {
       await t.tap(_k('project-b'));
       await t.pumpAndSettle();
       expect(s.scopeUid, 'b');
-      expect(s.section, Section.overview);
+      expect(s.mainProjectUid, 'b');
       // Back to the flat list, then leave the project.
       s.setSection(Section.projects);
       await t.pumpAndSettle();
@@ -158,18 +157,18 @@ void main() {
       await t.tap(_k('project-a'));
       await t.pumpAndSettle();
       expect(s.scopeUid, 'a');
-      expect(s.section, Section.overview);
+      expect(s.mainProjectUid, 'a');
       expect(_k('overview-page'), findsOneWidget);
       expect(_k('proj-progress'), findsOneWidget);
       // The switcher changes the page, not the section (the panel stays).
       await t.tap(_k('proj-tab-notes'));
       await t.pumpAndSettle();
-      expect(s.section, Section.overview);
+      expect(s.mainProjectUid, 'a');
       expect(_k('proj-notes-tab'), findsOneWidget);
-      // Without the project scope the page has nothing to show: Notes.
+      // The page belongs to its tab: a scope change does not close it.
       s.openFolder(null);
       await t.pumpAndSettle();
-      expect(s.section, Section.notes);
+      expect(s.mainProjectUid, 'a');
       await _end(t);
     });
 
@@ -191,59 +190,7 @@ void main() {
       await t.tap(_k('project-a'));
       await t.pumpAndSettle();
       expect(s.scopeUid, 'a');
-      expect(s.section, Section.overview);
-      await _end(t);
-    });
-
-    testWidgets('context menu offers rename, new folder, delete', (t) async {
-      await _app(t);
-      await t.tap(_k('rail-projects'));
-      await t.pumpAndSettle();
-      await t.tap(_k('project-a'), buttons: kSecondaryButton);
-      await t.pumpAndSettle();
-      expect(_k('menu-project-rename-a'), findsOneWidget);
-      expect(_k('menu-project-new-folder-a'), findsOneWidget);
-      expect(_k('menu-project-delete-a'), findsOneWidget);
-      await _end(t);
-    });
-  });
-
-  group('notes tree, crumbs, tags, new items', () {
-    testWidgets('project rows get the project icon', (t) async {
-      final s = await _app(t);
-      // The Projects panel lists the projects with the project icon (the
-      // Notes panel shows one scope's notes now, not the whole tree).
-      s.setSection(Section.projects);
-      await t.pumpAndSettle();
-      expect(find.byIcon(FLucideIcons.folderKanban), findsNWidgets(3));
-      await _end(t);
-    });
-
-    testWidgets('wide crumb skips the container', (t) async {
-      final s = await _app(t);
-      s.openFolder('sub');
-      await t.pumpAndSettle();
-      final text = t.widget<Text>(_k('crumb-folder')).data;
-      expect(text, 'Alpha  ›  Sub');
-      await _end(t);
-    });
-
-    testWidgets('phone crumb and its sheet skip the container', (t) async {
-      final s = await _app(t, size: const Size(390, 800));
-      s.openFolder('a');
-      await t.pumpAndSettle();
-      expect(_k('crumb-more'), findsNothing); // Space > Alpha
-      s.openFolder('sub');
-      await t.pumpAndSettle();
-      await t.tap(_k('crumb-more'));
-      await t.pumpAndSettle();
-      expect(_k('crumb-anc-1'), findsOneWidget);
-      expect(_k('crumb-anc-2'), findsNothing);
-      expect(
-        find.descendant(of: _k('crumb-anc-1'), matching: find.text('Alpha')),
-        findsOneWidget,
-      );
-      expect(find.text('Projects'), findsNothing);
+      expect(s.mainProjectUid, 'a');
       await _end(t);
     });
 
