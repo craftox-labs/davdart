@@ -181,10 +181,12 @@ bool showsInRail(SectionDef d, AppState? state) {
     'notes' => state.supportsNotes,
     'tasks' => state.supportsTasks,
     'events' => state.supportsEvents,
-    // Projects are an optional layer: without one the rail leaves the item
-    // out, so a Space with none looks like a plain one. The panel itself
-    // stays reachable (the scope pill opens it: it lists "No project").
-    'projects' => state.supportsSection(Section.projects) && state.hasProjects,
+    // Projects are an optional layer: a read-only Space with none leaves the
+    // item out. An editable one keeps it, so the first project can be made
+    // from the panel's empty state.
+    'projects' =>
+      state.supportsSection(Section.projects) &&
+          (state.hasProjects || state.editable),
     _ => true,
   };
 }

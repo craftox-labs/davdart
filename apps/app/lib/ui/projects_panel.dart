@@ -388,9 +388,24 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
                     horizontal: t.space.md,
                     vertical: t.space.xs,
                   ),
-                  child: Text(
-                    'No projects yet',
-                    style: t.type.captionStyle.copyWith(color: t.muted),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: t.space.sm,
+                    children: [
+                      Text(
+                        'No projects yet',
+                        style: t.type.captionStyle.copyWith(color: t.muted),
+                      ),
+                      if (state.editable)
+                        ActionButton(
+                          'New project',
+                          key: const Key('projects-empty-new'),
+                          onPress: (_) {
+                            onPick?.call();
+                            showNewProjectDialog(context, state);
+                          },
+                        ),
+                    ],
                   ),
                 ),
               for (final p in projects) project(p),

@@ -1,7 +1,7 @@
 import 'package:davdart/davdart.dart';
-import 'package:davdart_app/ui/app_actions.dart';
 import 'package:davdart_app/ui/new_note_dialog.dart';
 import 'package:davdart_app/ui/scope_bar.dart';
+import 'package:davdart_app/state/app_state.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,6 +16,7 @@ final _notes = [
 ];
 
 void main() {
+  _emptyTests();
   testWidgets('back to all projects leaves the project page', (t) async {
     final s = await pumpTasksApp(t, notes: _notes);
     s.openProjectTab('a');
@@ -82,4 +83,22 @@ void main() {
     expect(s.notes.any((n) => n.uid == 'a'), isFalse);
     expect(s.mainProjectUid, isNull);
   });
+}
+
+void _emptyTests() {
+  testWidgets(
+    'an editable Space with no project shows the first-project entry',
+    (t) async {
+      final s = await pumpTasksApp(
+        t,
+        notes: [Note(uid: 'x', summary: 'X')],
+      );
+      s.setSection(Section.projects);
+      await t.pumpAndSettle();
+      expect(_k('projects-empty-new'), findsOneWidget);
+      await t.tap(_k('projects-empty-new'));
+      await t.pumpAndSettle();
+      expect(_k('new-project-title'), findsOneWidget);
+    },
+  );
 }
