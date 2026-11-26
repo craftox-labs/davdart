@@ -13,11 +13,13 @@ class BrowserStorage implements KeyValueStorage {
   }
 
   @override
-  void write(String key, String value) {
+  bool write(String key, String value) {
     try {
       web.window.localStorage.setItem(key, value);
+      return true;
     } catch (_) {
-      // Blocked or full: the session keeps working, edits just are not saved.
+      // Blocked or full: the caller reports it; the session keeps working.
+      return false;
     }
   }
 

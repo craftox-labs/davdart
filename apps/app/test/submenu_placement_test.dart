@@ -1,4 +1,3 @@
-import 'package:davdart_app/state/app_state.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart' show kSecondaryButton;
 import 'package:flutter/widgets.dart';
@@ -9,7 +8,6 @@ import 'tasks_helper.dart';
 Finder _k(String k) => find.byKey(Key(k));
 
 void main() {
-  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
   // The web (and any non-desktop platform) used to stack submenus over
   // their row, so run the popup on android as well as linux.
@@ -17,7 +15,6 @@ void main() {
     testWidgets('task popup: submenus open to the right ($p)', (t) async {
       debugDefaultTargetPlatformOverride = p;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      AppState.debugDefaultFocus = HomeFocus.board;
       final s = await pumpHomeApp(t, tasks: [mkTask('t', summary: 'Fix it')]);
       await t.tap(
         find.descendant(of: _k('nav-card-t'), matching: find.text('Fix it')),

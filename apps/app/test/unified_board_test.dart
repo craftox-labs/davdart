@@ -37,7 +37,6 @@ void main() {
   setUp(() => LocalZone.use('Asia/Bangkok'));
   tearDown(() {
     LocalZone.use(null);
-    AppState.debugDefaultFocus = HomeFocus.day;
   });
 
   group('sort order', () {
@@ -221,7 +220,6 @@ void main() {
 
     testWidgets("a saved 'tasks' focus loads as Board with Tasks", (t) async {
       final s = await pumpHomeApp(t, prefs: legacy(), tasks: [mkTask('a')]);
-      expect(s.homeFocus, HomeFocus.board);
       expect(s.homeKind, HomeKind.tasks);
       // The old Tasks view's hidden columns still apply.
       expect(s.homeHiddenCols(), {'doing'});
@@ -229,12 +227,10 @@ void main() {
       expect(_k('board-drop-todo'), findsOneWidget);
     });
 
-    testWidgets('leaving the Board keeps the kind the old pref implied', (
+    testWidgets('choosing a kind replaces the kind the old pref implied', (
       t,
     ) async {
       final s = await pumpHomeApp(t, prefs: legacy());
-      s.setHomeFocus(HomeFocus.day);
-      expect(s.homeFocus, HomeFocus.day);
       expect(s.homeKind, HomeKind.tasks);
       s.setHomeKind(HomeKind.all);
       expect(s.homeKind, HomeKind.all);

@@ -64,8 +64,6 @@ Future<void> _later(WidgetTester t) =>
     t.runAsync(() => Future.delayed(AppState.doubleClickWindow * 2));
 
 void main() {
-  setUp(() => AppState.debugDefaultFocus = HomeFocus.board);
-  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
   group('Open notes in setting', () {
     test('defaults to peek and persists', () {
       final p = MemoryStorage();

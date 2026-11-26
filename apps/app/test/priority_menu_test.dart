@@ -33,13 +33,11 @@ String? _word(AppState s, String uid) =>
     PlanItem.fromNote(s.tree.find(uid)!.note).priorityWord;
 
 void main() {
-  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
   group('task context menu', () {
     testWidgets('each priority is set, cleared and marked current', (
       t,
     ) async {
-      AppState.debugDefaultFocus = HomeFocus.board;
       final s = await pumpHomeApp(
         t,
         tasks: [mkTask('t', summary: 'Fix it')],
@@ -78,7 +76,6 @@ void main() {
     testWidgets('each priority word is set, cleared and marked current', (
       t,
     ) async {
-      AppState.debugDefaultFocus = HomeFocus.board;
       final s = await pumpHomeApp(
         t,
         notes: [_note('n', 'Alpha', priority: 'medium')],

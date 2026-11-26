@@ -162,10 +162,8 @@ List<Event> _events() => [
 
 Future<AppState> _pump(
   WidgetTester t,
-  double w, {
-  HomeFocus focus = HomeFocus.board,
-}) async {
-  AppState.debugDefaultFocus = focus;
+  double w,
+) async {
   return pumpTasksApp(
     t,
     notes: _notes(),
@@ -178,7 +176,6 @@ Future<AppState> _pump(
 /// Pumps an app with a Spaces catalog, which the search needs (search covers
 /// every Space of the catalog).
 Future<AppState> _pumpWithCatalog(WidgetTester t, double w) async {
-  AppState.debugDefaultFocus = HomeFocus.board;
   t.view.physicalSize = Size(w, _heights);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
@@ -207,7 +204,6 @@ Future<void> _addDialog(WidgetTester t, String entry) async {
 }
 
 void main() {
-  setUp(() => AppState.debugDefaultFocus = HomeFocus.board);
 
   // The audit is only worth anything if an overflow in this harness reaches
   // takeException().
@@ -236,7 +232,6 @@ void main() {
       reason: 'a 400 px row in a 100 px box must be reported',
     );
   });
-  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
   for (final w in _widths) {
     final at = '@${w.toInt()}px';

@@ -77,7 +77,6 @@ Color _border(WidgetTester t, String key) {
 }
 
 void main() {
-  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
   for (final size in _phones) {
     group('narrow at $size', () {
       testWidgets(

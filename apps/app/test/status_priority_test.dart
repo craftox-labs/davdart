@@ -47,8 +47,6 @@ Future<AppState> _pump(WidgetTester t) async =>
     pumpHomeApp(t, notes: await _Seed().load());
 
 void main() {
-  setUp(() => AppState.debugDefaultFocus = HomeFocus.board);
-  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
   test('review sits between doing and done in the fixed order', () {
     expect(boardOrder, [

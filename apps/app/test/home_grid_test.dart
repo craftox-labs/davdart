@@ -85,7 +85,6 @@ List<Rect> _cols(WidgetTester t, [List<String> names = _four]) => [
 ];
 
 void main() {
-  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
   testWidgets('board columns fill the content width at 1280', (t) async {
     const three = ['backlog', 'todo', 'doing'];
     await _pump(t, three);

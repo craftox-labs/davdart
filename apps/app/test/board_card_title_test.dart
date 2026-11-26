@@ -1,5 +1,4 @@
 import 'package:davdart/davdart.dart';
-import 'package:davdart_app/state/app_state.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -31,8 +30,6 @@ List<String> _texts(WidgetTester t, String uid) => [
 ];
 
 void main() {
-  setUp(() => AppState.debugDefaultFocus = HomeFocus.board);
-  tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
   testWidgets('a "slug: Title" summary shows only the title', (t) async {
     await pumpHomeApp(t, notes: [_plan('slug', 'slug: Title', itemId: 'slug')]);
