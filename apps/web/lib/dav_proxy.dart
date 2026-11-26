@@ -60,6 +60,10 @@ Handler davProxy(Uri upstream, {http.Client? client}) {
     req.headers.forEach((k, v) {
       if (_forwardRequest.contains(k.toLowerCase())) out.headers[k] = v;
     });
+    // Depth: infinity walks the whole upstream tree; the app uses 0 and 1.
+    if (req.headers['depth']?.trim().toLowerCase() == 'infinity') {
+      return Response(400, body: 'depth infinity not allowed');
+    }
     final declared = req.contentLength;
     if (declared != null && declared > _maxBody) {
       return Response(413, body: 'too large');
@@ -72,11 +76,16 @@ Handler davProxy(Uri upstream, {http.Client? client}) {
     out.bodyBytes = Uint8List.fromList(body);
     final http.Response res;
     try {
-      res = await http.Response.fromStream(
-        await c.send(out).timeout(const Duration(seconds: 30)),
+      // One timeout over send and body, so a slow body cannot hang either.
+      res = await (() async =>
+          http.Response.fromStream(await c.send(out)))().timeout(
+        const Duration(seconds: 30),
       );
     } on TimeoutException {
       return Response(504, body: 'upstream timed out');
+    } on Exception {
+      // Upstream down or reset (SocketException, ClientException, ...).
+      return Response(502, body: 'upstream unavailable');
     }
     return Response(
       res.statusCode,

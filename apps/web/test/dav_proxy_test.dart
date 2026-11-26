@@ -25,6 +25,20 @@ void main() {
       Request(method, Uri.parse('http://app/$path'),
           headers: headers, body: 'body');
 
+  test('upstream connection failure is a 502, not a 500', () async {
+    final down = davProxy(Uri.parse('http://radicale:5232'),
+        client: MockClient((r) async => throw http.ClientException('refused')));
+    final r = await down(rq('GET', 'dav/u/'));
+    expect(r.statusCode, 502);
+  });
+
+  test('Depth: infinity is refused, 0 and 1 pass', () async {
+    expect((await h(rq('PROPFIND', 'dav/u/', headers: {'Depth': 'infinity'})))
+        .statusCode, 400);
+    expect((await h(rq('PROPFIND', 'dav/u/', headers: {'Depth': '1'})))
+        .statusCode, 207);
+  });
+
   test('forwards path, auth and body; drops other headers both ways', () async {
     final r = await h(rq('PROPFIND', 'dav/u/cal/', headers: {
       'Authorization': 'Basic abc',
