@@ -39,12 +39,23 @@ class ProjectOverviewPage extends StatelessWidget {
         final notes = state.notesInScope;
         final allTasks = state.scopedTasks;
         final events = state.scopedEvents;
-        final tiles = _Tiles(
-          open: open.length,
-          overdue: open.where((k) => isTaskOverdue(k, clock)).length,
-          done: state.doneThisWeek(clock).length,
-          notes: notes.length,
-          events: events.length,
+        final tiles = StatTiles(
+          tilesKey: const Key('overview-tiles'),
+          stats: [
+            StatTileData('open', 'Open tasks', open.length),
+            StatTileData(
+              'overdue',
+              'Overdue',
+              open.where((k) => isTaskOverdue(k, clock)).length,
+            ),
+            StatTileData(
+              'done',
+              'Done this week',
+              state.doneThisWeek(clock).length,
+            ),
+            StatTileData('notes', 'Notes', notes.length),
+            StatTileData('events', 'Events', events.length),
+          ],
         );
         final tasks = _Tasks(state: state, tasks: open, now: clock);
         final upcoming = _Upcoming(
@@ -113,45 +124,51 @@ class ProjectOverviewPage extends StatelessWidget {
   }
 }
 
-/// The five numbers, in a row on a wide card and wrapped on a phone.
-class _Tiles extends StatelessWidget {
-  const _Tiles({
-    required this.open,
-    required this.overdue,
-    required this.done,
-    required this.notes,
-    required this.events,
+/// One number for [StatTiles]: [id] is used in its keys.
+class StatTileData {
+  const StatTileData(this.id, this.label, this.value);
+  final String id, label;
+  final int value;
+}
+
+/// The metric tiles shared by the project Overview and Home: a row on a wide
+/// card, wrapped on a phone. [keyPrefix] keeps each page's keys distinct
+/// (`overview-tile-<id>`, `home-tile-<id>`).
+class StatTiles extends StatelessWidget {
+  const StatTiles({
+    super.key,
+    required this.stats,
+    this.keyPrefix = 'overview-tile',
+    this.tilesKey,
   });
-  final int open, overdue, done, notes, events;
+  final List<StatTileData> stats;
+  final String keyPrefix;
+  final Key? tilesKey;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     return Wrap(
-      key: const Key('overview-tiles'),
+      key: tilesKey,
       spacing: t.space.sm,
       runSpacing: t.space.sm,
       children: [
-        _Tile('open', 'Open tasks', open),
-        _Tile('overdue', 'Overdue', overdue),
-        _Tile('done', 'Done this week', done),
-        _Tile('notes', 'Notes', notes),
-        _Tile('events', 'Events', events),
+        for (final s in stats) _Tile(keyPrefix, s.id, s.label, s.value),
       ],
     );
   }
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile(this.id, this.label, this.value);
-  final String id, label;
+  const _Tile(this.keyPrefix, this.id, this.label, this.value);
+  final String keyPrefix, id, label;
   final int value;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     return Container(
-      key: Key('overview-tile-$id'),
+      key: Key('$keyPrefix-$id'),
       constraints: BoxConstraints(minWidth: t.sizes.touchTarget * 2),
       padding: EdgeInsets.symmetric(
         horizontal: t.space.md,
@@ -168,7 +185,7 @@ class _Tile extends StatelessWidget {
         children: [
           Text(
             '$value',
-            key: Key('overview-tile-$id-value'),
+            key: Key('$keyPrefix-$id-value'),
             style: t.type.titleStyle,
           ),
           Text(label, style: t.type.captionStyle.copyWith(color: t.muted)),

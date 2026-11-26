@@ -34,6 +34,7 @@ enum Section {
   tasks,
   events,
   projects,
+
   /// A project's own page (a placeholder for now); needs a project scope.
   overview,
   views,
@@ -512,8 +513,10 @@ class AppState extends ChangeNotifier {
   /// A press on a rail icon: the open section folds the side panel away,
   /// any other section (or any icon while folded) opens that section.
   void pressRail(Section s) {
+    showingHome = false;
     if (s == section && !sidebarCollapsed) {
       setSidebarCollapsed(true);
+      notifyListeners();
     } else {
       setSection(s);
     }
@@ -562,9 +565,29 @@ class AppState extends ChangeNotifier {
   void setSection(Section s) {
     s = _supportedSection(s);
     setSidebarCollapsed(false);
-    if (section == s) return;
+    showingHome = false;
+    if (section == s) {
+      notifyListeners();
+      return;
+    }
     section = s;
     prefs?.write(_sectionKey, s.name);
+    notifyListeners();
+  }
+
+  /// Whether the main area shows the Home page rather than a section's own
+  /// main view (Tasks' board, Calendar's day). Home is not a panel section:
+  /// it keeps the open panel and only takes the main area, so this is
+  /// transient, not a stored section. A dirty draft is not settled here; the
+  /// UI goes through [guarded] where that matters.
+  bool showingHome = true;
+
+  /// Shows the Home page in the main area (the Home rail action and palette
+  /// entry). A project Overview is a main-area page too, so the panel falls
+  /// back to Notes; the project scope is kept (Home ignores it).
+  void showHome() {
+    if (section == Section.overview) setSection(Section.notes);
+    showingHome = true;
     notifyListeners();
   }
 
@@ -1147,11 +1170,25 @@ class AppState extends ChangeNotifier {
   /// True for a note inside the Space's Projects container (a project, a
   /// folder or note in one) and for the container itself.
   bool inProjectsLayer(String uid) {
-    final n = tree.find(uid)?.note;
-    if (n == null) return false;
-    if (isProjectsContainer(n)) return true;
     final ix = projectIndex;
-    return ix.isProject(uid) || ix.projectOf(uid) != null;
+    if (ix.isProject(uid) || ix.projectOf(uid) != null) return true;
+    // The container itself, and anything sitting directly under it without
+    // being a project. Tasks and events are not in the note tree, so the walk
+    // goes through [findItem] like the scope checks do.
+    String? cur = uid;
+    for (var i = 0; cur != null && i <= notes.length + tasks.length; i++) {
+      final n = tree.find(cur)?.note;
+      if (n != null && isProjectsContainer(n)) return true;
+      final item = findItem(cur);
+      cur = item is Note
+          ? item.parentUid
+          : item is Task
+          ? item.parentUid
+          : item is Event
+          ? item.parentUid
+          : null;
+    }
+    return false;
   }
 
   /// The notes the Notes panel lists: [scopeUid]'s subtree in a project
@@ -2302,13 +2339,19 @@ class AppState extends ChangeNotifier {
 
   /// Tasks completed this week (from Monday; a cancelled one is not done):
   /// the Overview's done tile.
-  List<Task> doneThisWeek([DateTime? now]) {
+  List<Task> doneThisWeek([DateTime? now]) => doneThisWeekIn(scopeUid, now);
+
+  /// Tasks completed this week in [scope] (a folder at any depth; null means
+  /// the whole Space). The one counting rule behind the Overview's done tile
+  /// and Home's Space-wide one.
+  List<Task> doneThisWeekIn(String? scope, [DateTime? now]) {
     final n = now ?? DateTime.now();
     final today = wallDay(wallNow(n));
     final monday = today.subtract(Duration(days: today.weekday - 1));
     return [
-      for (final t in scopedTasks)
-        if (t.isCompleted &&
+      for (final t in tasks)
+        if ((scope == null || taskIsUnder(t, scope)) &&
+            t.isCompleted &&
             t.completed != null &&
             !wallDay(wallNow(t.completed!)).isBefore(monday))
           t,
@@ -2381,15 +2424,26 @@ class AppState extends ChangeNotifier {
   Object? findItem(String uid) =>
       tree.find(uid)?.note ?? _taskById(uid) ?? _eventById(uid);
 
+  /// The one "is this mine" seam Home reads for its personal lists. Today
+  /// everything in the Space is the user's own (true for every item); later
+  /// this reads an assignee or owner tag (a missing owner means everyone, so
+  /// stored data needs no migration). No other multi-user filter exists.
+  bool isMine(Object item) => true;
+
   // Selectors. [now] defaults to the current time (tests pass their own).
 
   /// Open tasks (not completed, not cancelled) in the open scope: overdue
   /// first, then by due date, priority, title.
-  List<Task> openTasks([DateTime? now]) {
+  List<Task> openTasks([DateTime? now]) => openTasksIn(scopeUid, now);
+
+  /// Open tasks in [scope] (a folder at any depth; null means the whole
+  /// Space), ordered as [openTasks]. The one counting rule behind the
+  /// Overview's tiles and Home's Space-wide ones.
+  List<Task> openTasksIn(String? scope, [DateTime? now]) {
     final n = now ?? DateTime.now();
     return [
       for (final t in tasks)
-        if (!t.isClosed && taskInScope(t)) t,
+        if (!t.isClosed && (scope == null || taskIsUnder(t, scope))) t,
     ]..sort((a, b) => compareTasks(a, b, n));
   }
 
