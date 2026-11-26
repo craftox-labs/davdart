@@ -60,9 +60,9 @@ class PrefixedStorage implements KeyValueStorage {
   @override
   String? read(String key) => inner.read('$prefix$key');
   @override
-  void write(String key, String value) {
-    if (dead?.call() ?? false) return;
-    inner.write('$prefix$key', value);
+  bool write(String key, String value) {
+    if (dead?.call() ?? false) return true;
+    return inner.write('$prefix$key', value);
   }
 
   @override

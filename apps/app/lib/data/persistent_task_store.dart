@@ -24,5 +24,5 @@ class PersistentTaskStore extends MemoryTaskStore {
   final String key;
 
   @override
-  void changed() => storage.write(key, jsonEncode(toJson()));
+  void changed() => writeOrThrow(storage, key, jsonEncode(toJson()));
 }

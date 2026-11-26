@@ -2170,7 +2170,8 @@ class AppState extends ChangeNotifier {
       taskProblem = 'Tasks: sync failed: $e';
     }
     try {
-      _setTasks(supportsTasks ? await s.loadTasks() : <Task>[]);
+      final loaded = supportsTasks ? await s.loadTasks() : <Task>[];
+      _setTasks(loaded);
       _rebaseTaskDrafts();
     } catch (e) {
       taskProblem ??= 'Tasks could not be read: $e';
@@ -2188,7 +2189,8 @@ class AppState extends ChangeNotifier {
       eventProblem = 'Calendar: sync failed: $e';
     }
     try {
-      _setEvents(supportsEvents ? await s.loadEvents() : <Event>[]);
+      final loaded = supportsEvents ? await s.loadEvents() : <Event>[];
+      _setEvents(loaded);
       _rebaseEventDrafts();
     } catch (e) {
       eventProblem ??= 'Calendar could not be read: $e';
@@ -2217,12 +2219,18 @@ class AppState extends ChangeNotifier {
     if (src is! EditableNoteSource) {
       throw StateError('This source is read-only');
     }
+    String? notSaved;
     try {
-      await change(src);
+      try {
+        await change(src);
+      } on StorageWriteException catch (e) {
+        // Kept in memory but not on disk: show it, and reload as usual.
+        notSaved = '$e';
+      }
       final loaded = await src.load();
       if (src != source) return;
       _setNotes(loaded);
-      error = null;
+      error = notSaved;
     } catch (e) {
       if (src != source) return;
       error = 'Save failed: $e';
@@ -2795,12 +2803,17 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    String? notSaved;
     try {
-      await change(src);
+      try {
+        await change(src);
+      } on StorageWriteException catch (e) {
+        notSaved = '$e';
+      }
       final loaded = await src.loadTasks();
       if (src != source) return true;
       _setTasks(loaded);
-      error = null;
+      error = notSaved;
     } catch (e) {
       if (src != source) return false;
       error = 'Save failed: $e';
@@ -3379,12 +3392,17 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    String? notSaved;
     try {
-      await change(src);
+      try {
+        await change(src);
+      } on StorageWriteException catch (e) {
+        notSaved = '$e';
+      }
       final loaded = await src.loadEvents();
       if (src != source) return true;
       _setEvents(loaded);
-      error = null;
+      error = notSaved;
     } catch (e) {
       if (src != source) return false;
       error = 'Save failed: $e';
