@@ -180,6 +180,22 @@ void main() {
       expect([for (final i in s.homeItems) i.isTask], [true]);
     });
 
+    testWidgets('the project Board draws only the kinds it keeps', (t) async {
+      final s = await pumpHomeApp(
+        t,
+        notes: [_note('n1', status: 'review')],
+        tasks: [mkTask('t1', summary: 'Bug')],
+      );
+      s.setHomeKind(HomeKind.notes);
+      await t.pumpAndSettle();
+      expect(_k('board-drop-review'), findsOneWidget);
+      expect(_k('board-drop-todo'), findsNothing);
+      s.setHomeKind(HomeKind.tasks);
+      await t.pumpAndSettle();
+      expect(_k('board-drop-todo'), findsOneWidget);
+      expect(_k('board-drop-review'), findsNothing);
+    });
+
     testWidgets('kind is remembered per Space; All clears it', (t) async {
       final prefs = MemoryStorage();
       final s = await pumpHomeApp(t, prefs: prefs);

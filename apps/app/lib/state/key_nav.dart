@@ -522,6 +522,10 @@ String? navListId(AppState s, NavArea a) => switch (a) {
     _ => null,
   },
   NavArea.main =>
-    !s.noSpace && s.activeTab == null && !s.mainIsPage ? KeyNav.homeList : null,
+    !s.noSpace &&
+            !s.mainIsPage &&
+            (s.activeTab == null || s.mainProjectTab == ProjectTab.board)
+        ? KeyNav.homeList
+        : null,
   NavArea.peek => null,
 };
