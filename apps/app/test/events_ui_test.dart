@@ -91,6 +91,37 @@ void main() {
       expect(s.peekUid, 'due-today');
       await _end(t);
     });
+
+    testWidgets('dated tasks alone do not say "No events yet"', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        tasks: [mkTask('due-today', summary: 'Pay rent', days: 0)],
+      );
+      s.setSection(Section.events);
+      await t.pumpAndSettle();
+      expect(_k('events-empty'), findsNothing);
+      expect(_p('task-row-due-today'), findsOneWidget);
+      await _end(t);
+    });
+
+    testWidgets('the Tasks tag filter keeps out a task of another tag', (
+      t,
+    ) async {
+      final s = await pumpTasksApp(
+        t,
+        events: [_events().first],
+        tasks: [
+          mkTask('tagged', summary: 'Tagged task', days: 0, tags: ['home']),
+          mkTask('plain', summary: 'Plain task', days: 0),
+        ],
+      );
+      s.setTaskTagFilter('home');
+      s.setSection(Section.events);
+      await t.pumpAndSettle();
+      expect(_p('task-row-tagged'), findsOneWidget);
+      expect(_k('task-row-plain'), findsNothing);
+      await _end(t);
+    });
   });
 
   group('Events panel', () {

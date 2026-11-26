@@ -261,7 +261,7 @@ class SpacesSection extends _Section {
         if (state.catalog == null)
           const _Muted('One fixed notes source')
         else if (other)
-          const _Muted('A Space holds its own notes, tasks and events.'),
+          const _Muted('A Space holds its own notes, tasks and Calendar.'),
         for (final sp in [
           ...state.spaces.where((s) => s.id == state.currentSpaceId),
           ...state.spaces.where((s) => s.id != state.currentSpaceId),
@@ -318,37 +318,44 @@ class NotesSection extends _Section {
     final scopeOn = state.scopeUid;
 
     /// One row's furniture: the context menu, the drag, the selected tone.
-    Widget entry(String uid, {required NoteDragSource source, required Widget child, bool on = false}) =>
-        NoteContextMenu(
-          state: state,
-          uid: uid,
-          onOpen: onPick,
-          child: NoteDraggable(
-            uid: uid,
-            source: source,
-            label: state.tree.find(uid)?.note.summary ?? '',
-            child: FTappable(
-              onPress: () {
-                final n = state.tree.find(uid)?.note;
-                if (n == null) return;
-                if (AppState.isFolder(n)) {
-                  state.guarded(() => state.openFolder(uid));
-                } else {
-                  state.clickNote(uid);
-                }
-                onPick();
-              },
-              child: Container(
-                color: on ? t.selected : null,
-                padding: EdgeInsets.symmetric(
-                  horizontal: t.space.md,
-                  vertical: t.space.sm - t.borders.hairline,
-                ),
-                child: child,
-              ),
+    Widget entry(
+      String uid, {
+      required NoteDragSource source,
+      required Widget child,
+      bool on = false,
+    }) => NoteContextMenu(
+      state: state,
+      uid: uid,
+      onOpen: onPick,
+      child: NoteDraggable(
+        uid: uid,
+        source: source,
+        label: state.tree.find(uid)?.note.summary ?? '',
+        child: FTappable(
+          onPress: () {
+            final n = state.tree.find(uid)?.note;
+            if (n == null) return;
+            if (AppState.isFolder(n)) {
+              state.guarded(() => state.openFolder(uid));
+            } else {
+              state.clickNote(uid);
+            }
+            onPick();
+          },
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: t.space.md,
+              vertical: t.space.sm - t.borders.hairline,
             ),
+            decoration: BoxDecoration(
+              color: on ? t.selected : null,
+              borderRadius: BorderRadius.circular(t.radii.small),
+            ),
+            child: child,
           ),
-        );
+        ),
+      ),
+    );
 
     if (view == NotesView.tree) {
       void walk(List<NoteNode> nodes, int depth) {
@@ -443,7 +450,9 @@ class NotesSection extends _Section {
           final ga = state.notesGroupOf(a.uid)?.summary ?? '';
           final gb = state.notesGroupOf(b.uid)?.summary ?? '';
           final g = ga.toLowerCase().compareTo(gb.toLowerCase());
-          return g != 0 ? g : a.summary.toLowerCase().compareTo(b.summary.toLowerCase());
+          return g != 0
+              ? g
+              : a.summary.toLowerCase().compareTo(b.summary.toLowerCase());
         });
       String? group;
       for (final n in scopeNotes) {
@@ -489,7 +498,11 @@ class NotesSection extends _Section {
               on: on,
               child: Row(
                 children: [
-                  Icon(FLucideIcons.fileText, size: t.icons.tree, color: t.muted),
+                  Icon(
+                    FLucideIcons.fileText,
+                    size: t.icons.tree,
+                    color: t.muted,
+                  ),
                   SizedBox(width: t.space.sm),
                   Expanded(
                     child: OverflowTip(n.summary, style: t.type.bodyStyle),

@@ -102,7 +102,7 @@ void main() {
     await pumpTasksApp(t, size: const Size(1700, 900));
     expect(_k('home-today-doing'), findsNothing);
     expect(find.text('Nothing due today'), findsOneWidget);
-    expect(find.text('No events today'), findsOneWidget);
+    expect(find.text('Nothing on the Calendar today'), findsOneWidget);
     final e = t.getRect(_k('home-today-events'));
     final k = t.getRect(_k('home-today-tasks'));
     expect(e.width, closeTo(k.width, 0.5));
@@ -293,10 +293,10 @@ void main() {
     expect(_k('event-location-early'), findsOneWidget);
     expect(_k('event-repeat-daily'), findsOneWidget);
     expect(_count(t, 'events'), '5');
-    expect(find.text('No events today'), findsNothing);
+    expect(find.text('Nothing on the Calendar today'), findsNothing);
   });
 
-  testWidgets('event tap opens it; All events switches rail', (t) async {
+  testWidgets('event tap opens it; Open Calendar switches rail', (t) async {
     final s = await pumpTasksApp(t, events: [mkEvent('e', summary: 'Sync')]);
     await t.tap(find.text('Sync').first);
     await t.pumpAndSettle();

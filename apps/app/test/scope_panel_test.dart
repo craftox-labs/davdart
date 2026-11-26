@@ -245,8 +245,15 @@ void main() {
         expect(_k('projects-folder-sub'), findsNothing);
         expect(_k('projects-up'), findsNothing);
         expect(_k('projects-here'), findsNothing);
-        // A view sets the project scope and the section together, and the
+        // Overview is a page of this panel: the drawer stays open on it.
+        await t.tap(_k('project-view-p1-overview'));
+        await t.pumpAndSettle();
+        expect(s.section, Section.overview);
+        expect(_k('side-menu'), findsOneWidget);
+        expect(_k('overview-panel'), findsOneWidget);
+        // Any other view sets the scope and the section together, and the
         // drawer closes on it.
+        await _openPicker(t);
         await t.tap(_k('project-view-p1-events'));
         await t.pumpAndSettle();
         expect(s.scopeUid, 'p1');

@@ -1,5 +1,6 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/state/note_draft.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -176,6 +177,30 @@ void main() {
       // Without the project scope the page has nothing to show: Notes.
       s.openFolder(null);
       await t.pumpAndSettle();
+      expect(s.section, Section.notes);
+      await _end(t);
+    });
+
+    testWidgets('a declined prompt leaves scope and section alone', (t) async {
+      final s = await _app(t);
+      // An unsaved edit holds the peek, and the prompt keeps it.
+      s.clickNote('out');
+      s.startEdit('out');
+      s.draftFor('out')!.titleController.text = 'Changed';
+      s.leaveGuard = () async => DraftChoice.keep;
+      s.setSection(Section.projects);
+      await t.pumpAndSettle();
+      await t.tap(_k('project-toggle-a'));
+      await t.pumpAndSettle();
+      await t.tap(_k('project-view-a-notes'));
+      await t.pumpAndSettle();
+      expect(s.scopeUid, isNull, reason: 'the scope waited for the prompt');
+      expect(s.section, Section.projects);
+      // Discarding goes through: scope and section together.
+      s.leaveGuard = () async => DraftChoice.discard;
+      await t.tap(_k('project-view-a-notes'));
+      await t.pumpAndSettle();
+      expect(s.scopeUid, 'a');
       expect(s.section, Section.notes);
       await _end(t);
     });

@@ -54,8 +54,16 @@ class EventsPanel extends StatelessWidget {
         // Dated tasks ride along in the agenda as markers (the Calendar is
         // events first; a full grid comes later).
         final today0 = wallDay(wallNow(clock));
-        final tasks = <String, List<Task>>{'today': [], 'tomorrow': [], 'upcoming': [], 'past': []};
-        for (final k in state.openTasks(clock)) {
+        final tasks = <String, List<Task>>{
+          'today': [],
+          'tomorrow': [],
+          'upcoming': [],
+          'past': [],
+        };
+        // The Tasks panel's tag filter and the scope apply here too (the
+        // Calendar's own tag filter is for events).
+        for (final k in state.filteredTasks) {
+          if (k.isClosed) continue;
           final day = taskDueDay(k);
           if (day == null) continue;
           final days = day.difference(today0).inDays;
@@ -69,7 +77,9 @@ class EventsPanel extends StatelessWidget {
               : 'upcoming';
           tasks[group]!.add(k);
         }
-        final shown = sections.any((s) => s.$3.isNotEmpty || tasks[s.$1]!.isNotEmpty);
+        final shown = sections.any(
+          (s) => s.$3.isNotEmpty || tasks[s.$1]!.isNotEmpty,
+        );
         state.nav.publish('events', [
           for (final s in sections) ...[
             for (final o in s.$3)
@@ -132,7 +142,10 @@ class EventsPanel extends StatelessWidget {
                 t.space.huge,
               ),
               children: [
-                if (state.events.isEmpty)
+                // Nothing to list at all: no events and no dated tasks
+                // (either would be shown below).
+                if (state.filteredEvents.isEmpty &&
+                    tasks.values.every((l) => l.isEmpty))
                   _Note('No events yet', key: const Key('events-empty'))
                 else if (!shown)
                   _Note('Nothing in sight', key: const Key('events-none')),
@@ -339,8 +352,8 @@ class TaskDueRow extends StatelessWidget {
     final t = tokensOf(context);
     final muted = t.type.captionStyle.copyWith(color: t.muted);
     final day = taskDueDay(task);
-    final selected = state.peekUid == task.uid ||
-        state.selectedTaskUid == task.uid;
+    final selected =
+        state.peekUid == task.uid || state.selectedTaskUid == task.uid;
     final overdue = isTaskOverdue(task, DateTime.now());
     return FTappable(
       onPress: () {

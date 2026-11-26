@@ -253,9 +253,9 @@ class _HomeTodayState extends State<HomeToday> {
     ];
     return TodayCard(
       slug: 'events',
-      title: 'Events',
+      title: 'Calendar',
       count: sorted.length,
-      link: 'All events',
+      link: 'Open Calendar',
       onLink: state.openEventsPanel,
       add: state.eventsEditable
           ? IconAction(
@@ -269,7 +269,9 @@ class _HomeTodayState extends State<HomeToday> {
               },
             )
           : null,
-      emptyText: isToday ? 'No events today' : 'No events',
+      emptyText: isToday
+          ? 'Nothing on the Calendar today'
+          : 'Nothing on the Calendar',
       total: sorted.length,
       collapsed: state.homeCardCollapsed('events'),
       onToggle: (c) => state.setHomeCardCollapsed('events', c),

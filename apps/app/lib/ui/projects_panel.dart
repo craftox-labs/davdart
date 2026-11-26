@@ -117,8 +117,8 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
     final scope = widget.state.scopeUid;
     if (scope == null) return {};
     final ix = widget.state.projectIndex;
-    final project = ix.projectOf(scope)?.uid ??
-        (ix.isProject(scope) ? scope : null);
+    final project =
+        ix.projectOf(scope)?.uid ?? (ix.isProject(scope) ? scope : null);
     return {?project};
   }
 
@@ -147,12 +147,17 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
         });
 
         /// A project view: the project becomes the scope and the section
-        /// follows it in one step (Board is the Tasks list scoped, until the
-        /// board itself lands in the panel).
+        /// follows it, in one guarded step (a declined prompt leaves both
+        /// alone). Overview is a page of this panel, so the phone's drawer
+        /// stays open on it; every other view closes it.
         Future<void> openView(String uid, Section section) async {
-          await state.guarded(() => state.openFolder(uid));
-          state.setSection(section);
-          onPick?.call();
+          var picked = false;
+          await state.guarded(() {
+            state.openFolder(uid);
+            state.setSection(section);
+            picked = true;
+          });
+          if (picked && section != Section.overview) onPick?.call();
         }
 
         final rows = <NavEntry>[
@@ -352,9 +357,7 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
                       child: label(
                         v.icon,
                         v.label,
-                        color: on && state.section == v.section
-                            ? t.fg
-                            : null,
+                        color: on && state.section == v.section ? t.fg : null,
                       ),
                     ),
                   ),
@@ -455,11 +458,7 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
 /// A project's own page: a placeholder for now. The project's name, what it
 /// holds (open tasks, notes, events in scope) and that more is coming.
 class ProjectOverviewPanel extends StatelessWidget {
-  const ProjectOverviewPanel({
-    super.key,
-    required this.state,
-    this.onPick,
-  });
+  const ProjectOverviewPanel({super.key, required this.state, this.onPick});
   final AppState state;
   final VoidCallback? onPick;
 
@@ -478,9 +477,7 @@ class ProjectOverviewPanel extends StatelessWidget {
             ? null
             : ix.projectOf(state.scopeUid!)?.uid ??
                   (ix.isProject(state.scopeUid!) ? state.scopeUid : null);
-        final counts = project == null
-            ? null
-            : ix.statsOf(project);
+        final counts = project == null ? null : ix.statsOf(project);
         final notes = state.scopeUid == null
             ? 0
             : state.tree
@@ -491,7 +488,10 @@ class ProjectOverviewPanel extends StatelessWidget {
         final events = state.scopedEvents.length;
         Widget line(String text) => Padding(
           padding: EdgeInsets.only(top: t.space.xs),
-          child: Text(text, style: t.type.captionStyle.copyWith(color: t.muted)),
+          child: Text(
+            text,
+            style: t.type.captionStyle.copyWith(color: t.muted),
+          ),
         );
         return SidePanelFrame(
           key: const Key('overview-panel'),
@@ -509,7 +509,9 @@ class ProjectOverviewPanel extends StatelessWidget {
               ),
               line('$tasks open ${tasks == 1 ? 'task' : 'tasks'}'),
               line('$notes ${notes == 1 ? 'note' : 'notes'}'),
-              line('$events ${events == 1 ? 'event' : 'events'}'),
+              line(
+                '$events ${events == 1 ? 'event' : 'events'} in the Calendar',
+              ),
               if (counts != null) line(projectCounts(counts)),
               line('More coming: a summary of this project here.'),
             ],
