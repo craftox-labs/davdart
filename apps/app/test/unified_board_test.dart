@@ -129,8 +129,11 @@ void main() {
       );
       final cols = {for (final c in s.homeColumns()) c.$1: c.$2};
       expect(cols.keys, ['todo', 'doing', 'done']);
-      expect(_titles(s, 'todo'), ['Note n1', 'Bug']);
-      expect([for (final i in cols['todo']!) i.isTask], [false, true]);
+      // Neither item has CREATED, so their relative order is by title (stable).
+      expect(_titles(s, 'todo'), unorderedEquals(['Note n1', 'Bug']));
+      expect([
+        for (final i in cols['todo']!) i.isTask,
+      ], unorderedEquals([false, true]));
       // A note without a status never appears.
       expect([
         for (final c in cols.values)

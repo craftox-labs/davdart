@@ -61,7 +61,10 @@ Handler davProxy(Uri upstream, {http.Client? client}) {
       if (_forwardRequest.contains(k.toLowerCase())) out.headers[k] = v;
     });
     // Depth: infinity walks the whole upstream tree; the app uses 0 and 1.
-    if (req.headers['depth']?.trim().toLowerCase() == 'infinity') {
+    // A missing Depth on PROPFIND means infinity (RFC 4918).
+    final depth = req.headers['depth']?.trim().toLowerCase();
+    if (depth == 'infinity' ||
+        (depth == null && req.method.toUpperCase() == 'PROPFIND')) {
       return Response(400, body: 'depth infinity not allowed');
     }
     final declared = req.contentLength;
@@ -77,8 +80,8 @@ Handler davProxy(Uri upstream, {http.Client? client}) {
     final http.Response res;
     try {
       // One timeout over send and body, so a slow body cannot hang either.
-      res = await (() async =>
-          http.Response.fromStream(await c.send(out)))().timeout(
+      res = await (() async => http.Response.fromStream(await c.send(out)))()
+          .timeout(
         const Duration(seconds: 30),
       );
     } on TimeoutException {

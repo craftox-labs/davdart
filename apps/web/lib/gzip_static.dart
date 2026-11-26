@@ -24,33 +24,33 @@ bool _compressible(String? type) {
 Middleware gzipStatic() {
   final cache = <String, List<int>>{};
   return (inner) => (request) async {
-    final res = await inner(request);
-    final accept = request.headers['accept-encoding'] ?? '';
-    if (request.method != 'GET' ||
-        res.statusCode != 200 ||
-        !accept.contains('gzip') ||
-        res.headers.containsKey('content-encoding') ||
-        !_compressible(res.headers['content-type'])) {
-      return res;
-    }
-    final etag = res.headers['etag'];
-    final key = etag == null ? null : '${request.url.path}|$etag';
-    var bytes = key == null ? null : cache[key];
-    if (bytes == null) {
-      final raw = <int>[];
-      await for (final c in res.read()) {
-        raw.addAll(c);
-      }
-      bytes = gzip.encode(raw);
-      if (key != null) cache[key] = bytes;
-    }
-    return res.change(
-      body: bytes,
-      headers: {
-        'content-encoding': 'gzip',
-        'content-length': '${bytes.length}',
-        'vary': 'Accept-Encoding',
-      },
-    );
-  };
+        final res = await inner(request);
+        final accept = request.headers['accept-encoding'] ?? '';
+        if (request.method != 'GET' ||
+            res.statusCode != 200 ||
+            !accept.contains('gzip') ||
+            res.headers.containsKey('content-encoding') ||
+            !_compressible(res.headers['content-type'])) {
+          return res;
+        }
+        final etag = res.headers['etag'];
+        final key = etag == null ? null : '${request.url.path}|$etag';
+        var bytes = key == null ? null : cache[key];
+        if (bytes == null) {
+          final raw = <int>[];
+          await for (final c in res.read()) {
+            raw.addAll(c);
+          }
+          bytes = gzip.encode(raw);
+          if (key != null) cache[key] = bytes;
+        }
+        return res.change(
+          body: bytes,
+          headers: {
+            'content-encoding': 'gzip',
+            'content-length': '${bytes.length}',
+            'vary': 'Accept-Encoding',
+          },
+        );
+      };
 }

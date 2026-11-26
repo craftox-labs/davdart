@@ -39,7 +39,7 @@ Middleware hostGuard(Iterable<String> allowed) {
           return Response(421, body: 'unknown host');
         }
         final origin = req.headers['origin'];
-        if (origin != null && origin != 'null') {
+        if (origin != null) {
           final u = Uri.tryParse(origin);
           final oh = u == null || u.host.isEmpty
               ? null

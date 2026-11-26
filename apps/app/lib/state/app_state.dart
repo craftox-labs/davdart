@@ -2504,6 +2504,10 @@ class AppState extends ChangeNotifier {
   Future<void> deleteProject(String uid) async {
     if (!projectIndex.isProject(uid)) return deleteNote(uid);
     final home = await ensurePersonalContainer();
+    // No Personal container (e.g. the Space changed under us): keep the
+    // project and its children rather than orphan them.
+    if (home == null) return;
+    error = null;
     final kidNotes = [
       for (final n in notes)
         if (n.parentUid == uid) n.copyWith(parentUid: home),
@@ -2522,6 +2526,7 @@ class AppState extends ChangeNotifier {
           await src.save(k);
         }
       });
+      if (error != null) return;
     }
     if (kidTasks.isNotEmpty) {
       await _taskEdit((src) async {
@@ -2529,6 +2534,7 @@ class AppState extends ChangeNotifier {
           await src.saveTask(k);
         }
       });
+      if (error != null) return;
     }
     if (kidEvents.isNotEmpty) {
       await _eventEdit((src) async {
@@ -2536,8 +2542,8 @@ class AppState extends ChangeNotifier {
           await src.saveEvent(k);
         }
       });
+      if (error != null) return;
     }
-    if (error != null) return;
     await deleteNote(uid);
   }
 

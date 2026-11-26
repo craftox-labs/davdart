@@ -33,10 +33,17 @@ void main() {
   });
 
   test('Depth: infinity is refused, 0 and 1 pass', () async {
-    expect((await h(rq('PROPFIND', 'dav/u/', headers: {'Depth': 'infinity'})))
-        .statusCode, 400);
-    expect((await h(rq('PROPFIND', 'dav/u/', headers: {'Depth': '1'})))
-        .statusCode, 207);
+    expect(
+        (await h(rq('PROPFIND', 'dav/u/', headers: {'Depth': 'infinity'})))
+            .statusCode,
+        400);
+    expect(
+        (await h(rq('PROPFIND', 'dav/u/', headers: {'Depth': '1'}))).statusCode,
+        207);
+  });
+
+  test('PROPFIND with no Depth (infinity by default) is refused', () async {
+    expect((await h(rq('PROPFIND', 'dav/u/'))).statusCode, 400);
   });
 
   test('forwards path, auth and body; drops other headers both ways', () async {

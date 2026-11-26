@@ -11,9 +11,8 @@ void main() {
   Response inner(Request r) {
     hits++;
     return Response.ok(body, headers: {
-      'content-type': r.url.path.endsWith('.png')
-          ? 'image/png'
-          : 'text/javascript',
+      'content-type':
+          r.url.path.endsWith('.png') ? 'image/png' : 'text/javascript',
       'etag': 'W/"1"',
     });
   }

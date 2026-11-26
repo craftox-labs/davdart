@@ -6,10 +6,9 @@ void main() {
   final h = const Pipeline()
       .addMiddleware(hostGuard(parseAllowedHosts(null)))
       .addHandler((_) => Response.ok('ok'));
-  Future<int> code(Map<String, String> headers) async =>
-      (await h(Request('GET', Uri.parse('http://x/api/notes'),
-              headers: headers)))
-          .statusCode;
+  Future<int> code(Map<String, String> headers) async => (await h(
+          Request('GET', Uri.parse('http://x/api/notes'), headers: headers)))
+      .statusCode;
 
   test('loopback and tailnet hosts pass, with or without port', () async {
     expect(await code({'host': '127.0.0.1:8800'}), 200);
@@ -29,6 +28,10 @@ void main() {
         403);
     expect(await code({'host': 'localhost:1', 'origin': 'http://localhost:1'}),
         200);
+  });
+
+  test('Origin: null (sandboxed iframe) is refused', () async {
+    expect(await code({'host': 'localhost:1', 'origin': 'null'}), 403);
   });
 
   test('env list replaces defaults', () async {
