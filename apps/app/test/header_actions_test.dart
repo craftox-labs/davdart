@@ -38,7 +38,7 @@ void main() {
       expect(_k('scope-edit'), findsOneWidget);
       expect(_k('scope-delete'), findsOneWidget);
       expect(_k('scope-close'), findsOneWidget);
-      expect(find.text('Show the whole space'), findsOneWidget);
+      expect(find.text('Back to all projects'), findsOneWidget);
       await t.tap(_k('scope-close'));
       await t.pumpAndSettle();
       expect(s.scopeUid, isNull);

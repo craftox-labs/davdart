@@ -82,7 +82,7 @@ class _ScopeCrumbsState extends State<ScopeCrumbs>
       children: [
         FTappable(
           key: const Key('crumb-space'),
-          semanticsLabel: 'Show the whole space',
+          semanticsLabel: 'Back to all projects',
           onPress: () => state.openFolder(null),
           builder: (_, _, _) => Padding(
             padding: EdgeInsets.all(t.space.xs),
@@ -177,7 +177,7 @@ class _ScopeCrumbsState extends State<ScopeCrumbs>
           child: scoped
               ? FTappable(
                   key: const Key('crumb-space'),
-                  semanticsLabel: 'Show the whole space',
+                  semanticsLabel: 'Back to all projects',
                   onPress: () => state.openFolder(null),
                   builder: (_, _, _) =>
                       OverflowTip(space, style: style.copyWith(color: t.muted)),
@@ -254,19 +254,19 @@ List<NoteMenuItem> scopeActionItems(
   if (state.editable) ...[
     if (state.spaces.length > 1)
       NoteMenuItem(
-        'Move to another space',
+        'Move to Space…',
         FLucideIcons.folderInput,
         () => showMoveSpaceDialog(context, state, folder),
         key: const Key('scope-move'),
       ),
     NoteMenuItem(
-      'Edit folder',
+      'Edit project',
       FLucideIcons.pencil,
       () => showEditNoteDialog(context, state, folder),
       key: const Key('scope-edit'),
     ),
     NoteMenuItem(
-      'Delete folder',
+      'Delete project…',
       FLucideIcons.trash2,
       () => confirmDeleteNote(context, state, folder),
       key: const Key('scope-delete'),
@@ -274,7 +274,7 @@ List<NoteMenuItem> scopeActionItems(
   ],
   if (includeClose)
     NoteMenuItem(
-      'Show the whole space',
+      'Back to all projects',
       FLucideIcons.x,
       () => state.openFolder(null),
       key: const Key('scope-close'),
@@ -329,7 +329,7 @@ extension on ScopeActions {
     builder: (ctx, controller, _) => IconAction(
       key: const Key('scope-more'),
       compact: true,
-      tooltip: 'Folder actions',
+      tooltip: 'Project actions',
       icon: FLucideIcons.ellipsis,
       onPress: controller.toggle,
     ),

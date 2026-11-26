@@ -236,4 +236,24 @@ void main() {
     // Its child folder stays reachable.
     expect(_k('move-folder-pf'), findsOneWidget);
   });
+
+  testWidgets('move dialog offers Personal and projects, not the container', (
+    t,
+  ) async {
+    final s = await _app(t);
+    showMoveFolderDialog(
+      t.element(find.byKey(const Key('home-page'))),
+      s,
+      s.tree.find('loose')!.note,
+    );
+    await t.pumpAndSettle();
+    expect(find.text('Personal'), findsOneWidget);
+    expect(find.text('Top level'), findsNothing);
+    expect(_k('move-folder-c'), findsNothing);
+    expect(_k('move-folder-p'), findsOneWidget);
+    expect(
+      find.descendant(of: _k('move-folder-p'), matching: find.text('Alpha')),
+      findsOneWidget,
+    );
+  });
 }
