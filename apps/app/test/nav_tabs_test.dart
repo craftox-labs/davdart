@@ -140,4 +140,26 @@ void main() {
     expect(s.activeTab, isNull);
     expect(_k('home-page'), findsOneWidget);
   });
+
+  testWidgets('Home at startup drops a stale saved folder scope', (t) async {
+    final prefs = MemoryStorage()..write('davdart.scope.v1', '{"default":"p"}');
+    final s = await _app(t, prefs: prefs);
+    expect(s.activeTab, isNull);
+    expect(s.scopeUid, isNull);
+    expect(_k('home-page'), findsOneWidget);
+  });
+
+  testWidgets('closing a project tab moves the scope to the next tab', (
+    t,
+  ) async {
+    final s = await _app(t);
+    s.openProjectTab('p');
+    s.openProjectTab('q');
+    await t.pumpAndSettle();
+    expect(s.scopeUid, 'q');
+    await s.closeTab(const DocTab.project('q'));
+    await t.pumpAndSettle();
+    expect(s.activeTab, const DocTab.project('p'));
+    expect(s.scopeUid, 'p');
+  });
 }

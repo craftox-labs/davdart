@@ -107,8 +107,7 @@ class TabStrip extends StatelessWidget {
                         width: homeW,
                         icon: FLucideIcons.house,
                         title: 'Home',
-                        tooltip:
-                            'Home: everything in ${state.scope?.summary ?? state.currentSpaceName ?? 'this space'}',
+                        tooltip: 'Home: your personal dashboard',
                         active: active == null,
                         onPress: () => state.activateTab(null),
                       ),
