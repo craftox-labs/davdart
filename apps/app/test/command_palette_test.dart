@@ -461,7 +461,7 @@ void main() {
       await _type(t, 'milk');
       expect(find.text('NOTES'), findsOneWidget);
       expect(find.text('TASKS'), findsWidgets); // also Home's header
-      expect(find.text('EVENTS'), findsWidgets);
+      expect(find.text('CALENDAR'), findsWidgets);
       await t.tap(_k('palette-row-a'));
       await t.pump(const Duration(milliseconds: 50));
       expect(s.peekUid, 'a');
