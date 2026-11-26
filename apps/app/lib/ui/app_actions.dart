@@ -278,7 +278,11 @@ List<AppAction> buildActions(AppState state) {
         group: 'Go to',
         keywords: const ['project', 'folder', 'scope', 'open'],
         enabled: (s) => s.scopeUid != p.uid,
-        run: (c) => c.state.guarded(() => c.state.openFolder(p.uid)),
+        run: (c) => c.state.guarded(() {
+          c.state.openFolder(p.uid);
+          // A project opens on its page, not only as a scope.
+          c.state.setSection(Section.overview);
+        }),
       ),
     AppAction(
       id: 'project.go.all',

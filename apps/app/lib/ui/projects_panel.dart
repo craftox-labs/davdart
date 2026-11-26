@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import '../state/event_rules.dart';
 import '../state/key_nav.dart';
 import 'edit_note_dialog.dart';
 import 'new_folder_dialog.dart';
@@ -10,9 +11,9 @@ import 'key_nav_ui.dart';
 import 'note_menu.dart';
 import 'move_space_dialog.dart';
 import 'scope_bar.dart';
-import 'section_registry.dart';
 import 'overflow_tip.dart';
 import 'parts.dart';
+import 'placeholder_card.dart';
 import 'side_panel.dart';
 import 'theme.dart';
 
@@ -110,18 +111,6 @@ class ProjectsPanel extends StatefulWidget {
 }
 
 class _ProjectsPanelState extends State<ProjectsPanel> {
-  /// The projects whose views are shown; the one in scope starts open.
-  late final Set<String> _open = _openProjects();
-
-  Set<String> _openProjects() {
-    final scope = widget.state.scopeUid;
-    if (scope == null) return {};
-    final ix = widget.state.projectIndex;
-    final project =
-        ix.projectOf(scope)?.uid ?? (ix.isProject(scope) ? scope : null);
-    return {?project};
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
@@ -136,42 +125,23 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
         final projects = state.projectsByRecent;
         final scope = state.scopeUid;
         final current = scope == null ? null : ix.projectOf(scope)?.uid;
+
+        /// Selecting a project enters it on Overview (scope and section
+        /// together); the phone's drawer closes on the pick.
         Future<void> open(String? uid) async {
-          await state.guarded(() => state.openFolder(uid));
-          onPick?.call();
-        }
-
-        bool expanded(Note p) => _open.contains(p.uid);
-        void toggle(Note p) => setState(() {
-          if (!_open.remove(p.uid)) _open.add(p.uid);
-        });
-
-        /// A project view: the project becomes the scope and the section
-        /// follows it, in one guarded step (a declined prompt leaves both
-        /// alone). Overview is a page of this panel, so the phone's drawer
-        /// stays open on it; every other view closes it.
-        Future<void> openView(String uid, Section section) async {
           var picked = false;
           await state.guarded(() {
             state.openFolder(uid);
-            state.setSection(section);
+            if (uid != null) state.setSection(Section.overview);
             picked = true;
           });
-          if (picked && section != Section.overview) onPick?.call();
+          if (picked) onPick?.call();
         }
 
         final rows = <NavEntry>[
           NavEntry('all', open: (_) => open(null)),
-          for (final p in projects) ...[
+          for (final p in projects)
             NavEntry(p.uid, uid: p.uid, open: (_) => open(p.uid)),
-            if (expanded(p))
-              for (final v in projectViews)
-                NavEntry(
-                  'view:${p.uid}:${v.id}',
-                  uid: p.uid,
-                  open: (_) => openView(p.uid, v.section),
-                ),
-          ],
         ];
         state.nav.publish('projects', rows);
 
@@ -204,7 +174,7 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
         );
 
         /// [folder]'s actions, behind its ⋯ (a long press or a right click
-        /// opens them on any row too).
+        /// opens them on the card too).
         Widget more(Note folder) => FPopoverMenu(
           menuAnchor: Alignment.topRight,
           childAnchor: Alignment.bottomRight,
@@ -224,9 +194,7 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
           ),
         );
 
-        /// [folder]'s actions: a project keeps its own (rename, a folder
-        /// inside, a move, delete); any other folder gets the scope actions
-        /// (edit, delete, and back to the whole space).
+        /// A project's actions: rename, a folder inside, a move, delete.
         Widget withActions(Note folder, Widget child) => ActionContextMenu(
           groups: [
             if (ix.projectOf(folder.uid)?.uid == folder.uid && state.editable)
@@ -263,105 +231,99 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
           child: child,
         );
 
-        Widget label(IconData icon, String text, {Color? color}) => Row(
-          children: [
-            Icon(icon, size: t.icons.tree, color: color ?? t.muted),
-            SizedBox(width: t.space.sm),
-            Expanded(child: OverflowTip(text, style: t.type.bodyStyle)),
-          ],
-        );
-
         String name(Note n) => n.summary.isEmpty ? 'Untitled' : n.summary;
 
+        /// A flat project card: name, progress bar and percent, open and
+        /// overdue counts, last changed, and one marked placeholder slot for
+        /// status and members. Styling comes later.
         Widget project(Note p) {
-          final s = ix.statsOf(p.uid);
           final on = current == p.uid;
-          final showing = expanded(p);
-          final body = Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: t.space.xs,
-            children: [
-              Row(
-                children: [
-                  // The chevron shows the project's views; the row's name
-                  // still sets the scope alone.
-                  SizedBox(
-                    width: t.sizes.chevronBox,
-                    child: FTappable(
-                      key: Key('project-toggle-${p.uid}'),
-                      semanticsLabel: showing
-                          ? 'Hide the views of ${name(p)}'
-                          : 'Show the views of ${name(p)}',
-                      behavior: HitTestBehavior.opaque,
-                      onPress: () => toggle(p),
-                      child: Icon(
-                        showing
-                            ? FLucideIcons.chevronDown
-                            : FLucideIcons.chevronRight,
-                        size: t.icons.md,
-                        color: t.muted,
+          final counts = state.projectTaskCounts(p.uid);
+          final percent = counts.total == 0
+              ? 0
+              : (counts.done * 100 / counts.total).round();
+          final at = state.projectLastChanged(p.uid);
+          final muted = t.type.captionStyle.copyWith(color: t.muted);
+          final summary = [
+            '${counts.open} open',
+            if (counts.overdue > 0) '${counts.overdue} overdue',
+          ].join(' · ');
+          return withActions(
+            p,
+            row(
+              key: Key('project-${p.uid}'),
+              id: p.uid,
+              on: on,
+              onPress: () => open(p.uid),
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: t.space.xxs),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  spacing: t.space.xs,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          FLucideIcons.folderKanban,
+                          size: t.icons.tree,
+                          color: t.muted,
+                        ),
+                        SizedBox(width: t.space.sm),
+                        Expanded(
+                          child: OverflowTip(name(p), style: t.type.bodyStyle),
+                        ),
+                        if (on) more(p),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: KeyedSubtree(
+                            key: Key('project-progress-${p.uid}'),
+                            child: ProjectProgressBar(percent / 100),
+                          ),
+                        ),
+                        SizedBox(width: t.space.sm),
+                        Text(
+                          '$percent%',
+                          key: Key('proj-percent-${p.uid}'),
+                          style: muted,
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            summary,
+                            key: Key('project-counts-${p.uid}'),
+                            style: muted,
+                          ),
+                        ),
+                        Text(
+                          at == null
+                              ? 'No changes yet'
+                              : dayLabel(wallDay(wallNow(at))),
+                          key: Key('proj-changed-${p.uid}'),
+                          style: muted,
+                        ),
+                      ],
+                    ),
+                    DashedOutline(
+                      key: Key('proj-placeholder-${p.uid}'),
+                      radius: t.radii.card,
+                      child: Padding(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: t.space.sm,
+                          vertical: t.space.xxs,
+                        ),
+                        child: Text('Status, members', style: muted),
                       ),
                     ),
-                  ),
-                  Icon(
-                    FLucideIcons.folderKanban,
-                    size: t.icons.tree,
-                    color: t.muted,
-                  ),
-                  SizedBox(width: t.space.sm),
-                  Expanded(
-                    child: OverflowTip(name(p), style: t.type.bodyStyle),
-                  ),
-                  if (on) more(p),
-                ],
-              ),
-              Padding(
-                padding: EdgeInsets.only(right: on ? t.sizes.touchTarget : 0),
-                child: Text(
-                  projectCounts(s),
-                  key: Key('project-counts-${p.uid}'),
-                  style: t.type.captionStyle.copyWith(color: t.muted),
+                  ],
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.only(right: on ? t.sizes.touchTarget : 0),
-                child: KeyedSubtree(
-                  key: Key('project-progress-${p.uid}'),
-                  child: ProjectProgressBar(s.progress),
-                ),
-              ),
-            ],
-          );
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              withActions(
-                p,
-                row(
-                  key: Key('project-${p.uid}'),
-                  id: p.uid,
-                  on: on,
-                  onPress: () => open(p.uid),
-                  child: body,
-                ),
-              ),
-              if (showing)
-                for (final v in projectViews)
-                  row(
-                    key: Key('project-view-${p.uid}-${v.id}'),
-                    id: 'view:${p.uid}:${v.id}',
-                    on: on && state.section == v.section,
-                    onPress: () => openView(p.uid, v.section),
-                    child: Padding(
-                      padding: EdgeInsets.only(left: t.sizes.treeIndent),
-                      child: label(
-                        v.icon,
-                        v.label,
-                        color: on && state.section == v.section ? t.fg : null,
-                      ),
-                    ),
-                  ),
-            ],
+            ),
           );
         }
 

@@ -231,42 +231,27 @@ void main() {
         _noError(t);
       });
 
-      testWidgets('a project expands to its views', (t) async {
+      testWidgets('a project card enters it on Overview', (t) async {
         final s = await _app(t, size);
         s.openFolder('p1');
         await t.pumpAndSettle();
         await _openPicker(t);
-        // The project in scope starts expanded: Overview, Board, Notes,
-        // Calendar. No folder rows any more.
-        for (final v in ['overview', 'board', 'notes', 'events']) {
-          expect(_k('project-view-p1-$v'), findsOneWidget, reason: v);
-        }
-        expect(_k('project-view-p2-overview'), findsNothing);
+        // The panel is a flat list of cards: no chevrons or view rows.
+        expect(_k('project-p1'), findsOneWidget);
+        expect(_k('project-view-p1-overview'), findsNothing);
+        expect(_k('project-toggle-p1'), findsNothing);
         expect(_k('projects-folder-sub'), findsNothing);
-        expect(_k('projects-up'), findsNothing);
-        expect(_k('projects-here'), findsNothing);
-        // Overview is a page of this panel: the drawer stays open on it.
-        await t.tap(_k('project-view-p1-overview'));
-        await t.pumpAndSettle();
-        expect(s.section, Section.overview);
-        expect(_k('side-menu'), findsOneWidget);
-        expect(_k('overview-panel'), findsOneWidget);
-        // Any other view sets the scope and the section together, and the
-        // drawer closes on it.
-        await _openPicker(t);
-        await t.tap(_k('project-view-p1-events'));
+        await t.tap(_k('project-p1'));
         await t.pumpAndSettle();
         expect(s.scopeUid, 'p1');
-        expect(s.section, Section.events);
-        expect(_k('side-menu'), findsNothing);
-        // The chevron shows and hides a project's views.
-        await _openPicker(t);
-        await t.tap(_k('project-toggle-p1'));
+        expect(s.section, Section.overview);
+        expect(_k('side-menu'), findsNothing, reason: 'the pick closed it');
+        expect(_k('overview-page'), findsOneWidget);
+        // The project's own switcher is in the page.
+        await t.tap(_k('proj-tab-notes'));
         await t.pumpAndSettle();
-        expect(_k('project-view-p1-overview'), findsNothing);
-        await t.tap(_k('project-toggle-p1'));
-        await t.pumpAndSettle();
-        expect(_k('project-view-p1-overview'), findsOneWidget);
+        expect(s.section, Section.overview);
+        expect(_k('proj-notes-tab'), findsOneWidget);
         _noError(t);
       });
 

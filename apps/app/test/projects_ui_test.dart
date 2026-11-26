@@ -70,22 +70,27 @@ void main() {
       expect(_k('project-a'), findsOneWidget);
       expect(_k('project-b'), findsOneWidget);
       expect(_k('project-sub'), findsNothing); // not a project
-      // Alpha: tasks t1, t2 open, n2 review, n1 done.
-      final counts = t.widget<Text>(_k('project-counts-a')).data;
-      expect(counts, '2 open · 1 review · 1 done');
-      expect(t.widget<Text>(_k('project-counts-b')).data, 'Nothing to count');
+      // Alpha holds tasks t1 and t2 (both open, none done).
+      expect(t.widget<Text>(_k('project-counts-a')).data, '2 open');
+      expect(t.widget<Text>(_k('proj-percent-a')).data, '0%');
+      expect(t.widget<Text>(_k('project-counts-b')).data, '0 open');
       expect(_k('project-progress-a'), findsOneWidget);
+      expect(_k('proj-placeholder-a'), findsOneWidget);
       expect(t.widget<Text>(_k('projects-else-counts')).data, '1 open');
       await _end(t);
     });
 
-    testWidgets('tap sets the folder scope, All clears it', (t) async {
+    testWidgets('tap enters the project; All clears it', (t) async {
       final s = await _app(t);
       await t.tap(_k('rail-projects'));
       await t.pumpAndSettle();
       await t.tap(_k('project-b'));
       await t.pumpAndSettle();
       expect(s.scopeUid, 'b');
+      expect(s.section, Section.overview);
+      // Back to the flat list, then leave the project.
+      s.setSection(Section.projects);
+      await t.pumpAndSettle();
       await t.tap(_k('projects-all'));
       await t.pumpAndSettle();
       expect(s.scopeUid, isNull);
@@ -144,42 +149,23 @@ void main() {
       await _end(t);
     });
 
-    testWidgets('a view row sets the scope and the section together', (
+    testWidgets('a project card enters it on Overview; its tabs stay there', (
       t,
     ) async {
       final s = await _app(t);
       s.setSection(Section.projects);
       await t.pumpAndSettle();
-      await t.tap(_k('project-toggle-a'));
-      await t.pumpAndSettle();
-      await t.tap(_k('project-view-a-notes'));
-      await t.pumpAndSettle();
-      expect(s.scopeUid, 'a');
-      expect(s.section, Section.notes);
-      // Board is the Tasks list scoped, until the board lands in the panel.
-      s.setSection(Section.projects);
-      await t.pumpAndSettle();
-      await t.tap(_k('project-view-a-board'));
-      await t.pumpAndSettle();
-      expect(s.scopeUid, 'a');
-      expect(s.section, Section.tasks);
-      // Overview opens the project's page in the main area, and the side
-      // panel keeps its counts.
-      s.setSection(Section.projects);
-      await t.pumpAndSettle();
-      await t.tap(_k('project-view-a-overview'));
+      await t.tap(_k('project-a'));
       await t.pumpAndSettle();
       expect(s.scopeUid, 'a');
       expect(s.section, Section.overview);
-      expect(_k('overview-panel'), findsOneWidget);
       expect(_k('overview-page'), findsOneWidget);
-      expect(
-        find.descendant(
-          of: _k('overview-page'),
-          matching: _k('overview-tiles'),
-        ),
-        findsOneWidget,
-      );
+      expect(_k('proj-progress'), findsOneWidget);
+      // The switcher changes the page, not the section (the panel stays).
+      await t.tap(_k('proj-tab-notes'));
+      await t.pumpAndSettle();
+      expect(s.section, Section.overview);
+      expect(_k('proj-notes-tab'), findsOneWidget);
       // Without the project scope the page has nothing to show: Notes.
       s.openFolder(null);
       await t.pumpAndSettle();
@@ -196,18 +182,16 @@ void main() {
       s.leaveGuard = () async => DraftChoice.keep;
       s.setSection(Section.projects);
       await t.pumpAndSettle();
-      await t.tap(_k('project-toggle-a'));
-      await t.pumpAndSettle();
-      await t.tap(_k('project-view-a-notes'));
+      await t.tap(_k('project-a'));
       await t.pumpAndSettle();
       expect(s.scopeUid, isNull, reason: 'the scope waited for the prompt');
       expect(s.section, Section.projects);
       // Discarding goes through: scope and section together.
       s.leaveGuard = () async => DraftChoice.discard;
-      await t.tap(_k('project-view-a-notes'));
+      await t.tap(_k('project-a'));
       await t.pumpAndSettle();
       expect(s.scopeUid, 'a');
-      expect(s.section, Section.notes);
+      expect(s.section, Section.overview);
       await _end(t);
     });
 
