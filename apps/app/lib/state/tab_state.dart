@@ -3,9 +3,9 @@ import 'dart:convert';
 /// What a document tab shows.
 enum TabKind { note, view, task, event, project }
 
-/// One closable tab of the strip: a note opened full page, or an applied
-/// saved view. Identified by the note's uid (for a view, the uid of the note
-/// that stores it, so renaming a view keeps its tab). The home tab is not a
+/// One closable tab of the strip: a note, task, event or project page, or an
+/// applied saved view. Identified by the item's uid (for a view, the uid of
+/// the note that stores it, so renaming a view keeps its tab). The home tab is not a
 /// [DocTab]: it is the strip's fixed first entry.
 class DocTab {
   const DocTab(this.kind, this.id);

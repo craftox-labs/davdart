@@ -588,8 +588,6 @@ class AppState extends ChangeNotifier {
   void showHome() => _show(null);
 
   /// After a Space switch: the Tasks and Events lists stay (the choice on
-  /// the rail survives), any other section falls back to Notes.
-  /// After a Space switch: the Tasks and Events lists stay (the choice on
   /// the rail survives), any other section falls back to Notes (a project
   /// page too: the other Space's project scope is gone).
   void keepListSection() {
@@ -825,13 +823,7 @@ class AppState extends ChangeNotifier {
     }
     prefs?.remove(viewsKey);
     prefs?.remove('$viewsKey.migrated');
-    prefs?.remove('davdart.tabs.v1.$id');
-    prefs?.remove('davdart.folders.collapsed.v1.$id');
-    prefs?.remove('davdart.tags.open.v1.$id');
-    for (final f in const ['board', 'tasks']) {
-      prefs?.remove('davdart.home.hidden.v1.$f.$id');
-    }
-    prefs?.remove('davdart.home.kind.v1.$id');
+    _removeSpacePrefs(id);
     // Its scope and recents go with it.
     if (_scopes.remove(id) != null) {
       prefs?.write(_scopeKey, jsonEncode(_scopes));
@@ -842,6 +834,44 @@ class AppState extends ChangeNotifier {
     c.remove(id);
     if (next == null) await _openCurrent();
     notifyListeners();
+  }
+
+  /// Per-Space pref keys are `<base>.<id>`; the Home card keys carry a slug
+  /// before the id and the project tab keys a uid after it.
+  static const _spacePrefBases = [
+    'davdart.tabs.v1',
+    'davdart.activetab.v1',
+    'davdart.folders.collapsed.v1',
+    'davdart.tags.open.v1',
+    'davdart.tasktags.open.v1',
+    'davdart.eventtags.open.v1',
+    'davdart.home.focus.v1', // dropped feature, may linger
+    'davdart.home.cal.open.v1',
+    'davdart.home.kind.v1',
+    'davdart.home.hidden.v1.board',
+    'davdart.home.hidden.v1.tasks',
+    'davdart.home.card.collapsed.v1.tasks',
+    'davdart.home.card.collapsed.v1.events',
+  ];
+
+  /// Removes every pref saved for Space [id]. Matches exact keys, so a Space
+  /// whose id merely starts with [id] and a dot keeps its own.
+  void _removeSpacePrefs(String id) {
+    final p = prefs;
+    if (p == null) return;
+    final lookalikes = [
+      for (final o in catalog?.spaces ?? const <SpaceInfo>[])
+        if (o.id != id && o.id.startsWith('$id.')) o.id,
+    ];
+    for (final k in p.keys.toList()) {
+      if (!k.startsWith('davdart.')) continue;
+      final exact = [for (final b in _spacePrefBases) '$b.$id'].contains(k);
+      final projTab = 'davdart.proj.tab.v1.$id.';
+      final isProjTab =
+          k.startsWith(projTab) &&
+          !lookalikes.any((o) => k.startsWith('davdart.proj.tab.v1.$o.'));
+      if (exact || isProjTab) p.remove(k);
+    }
   }
 
   /// Notes, tasks and events whose title or text contain [q]
@@ -1146,6 +1176,7 @@ class AppState extends ChangeNotifier {
         ]..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase())),
       );
     tree = NoteTree.build(notes);
+    _dropCaches(); // pruning below reads the index
     if (scopeUid != null && tree.find(scopeUid!) == null) scopeUid = null;
     // A project page left open without its project (a deleted project, a
     // reload): the panel falls back to the list.
@@ -1195,9 +1226,11 @@ class AppState extends ChangeNotifier {
   /// level); concurrent calls share one save, and the oldest container wins.
   Future<String?> ensurePersonalContainer() async {
     if (!editable) return null;
+    final src = source;
     while (_personalBusy != null) {
       await _personalBusy;
     }
+    if (src != source) return null;
     final existing = personalContainer;
     if (existing != null) return existing.uid;
     final done = Completer<void>();
@@ -1206,7 +1239,7 @@ class AppState extends ChangeNotifier {
       final n = _newFolder(personalTitle, tags: const [personalTag]);
       if (n == null) return null;
       await _save(n);
-      if (error != null) return null;
+      if (src != source || error != null) return null;
       // A sync may have landed a container meanwhile: the oldest wins.
       return personalContainer?.uid ?? tree.find(n.uid)?.note.uid;
     } finally {
@@ -1880,9 +1913,14 @@ class AppState extends ChangeNotifier {
       _projectIndexCache ??= ProjectIndex(notes, tasks, events);
   ProjectIndex? _projectIndexCache;
 
+  void _dropCaches() {
+    _projectIndexCache = null;
+    _parentCache = null;
+  }
+
   @override
   void notifyListeners() {
-    _projectIndexCache = null;
+    _dropCaches();
     super.notifyListeners();
   }
 
@@ -1892,11 +1930,13 @@ class AppState extends ChangeNotifier {
   /// uid, or null (empty title, read-only Space, failure).
   Future<String?> addProject(String title) async {
     if (title.trim().isEmpty || !editable) return null;
+    final src = source;
     // A second call while one is running waits for it and re-reads the containers, so a
     // double submit never creates two containers.
     while (_projectsBusy != null) {
       await _projectsBusy;
     }
+    if (src != source) return null;
     final done = Completer<void>();
     _projectsBusy = done.future;
     try {
@@ -1904,7 +1944,7 @@ class AppState extends ChangeNotifier {
       if (container == null) {
         final c = _newFolder(projectsTitle, tags: [projectsTag])!;
         await _save(c);
-        if (error != null) return null;
+        if (src != source || error != null) return null;
         // A sync may have landed a container meanwhile: the oldest wins.
         container =
             projectIndex.containers().firstOrNull ?? tree.find(c.uid)?.note;
@@ -1912,7 +1952,7 @@ class AppState extends ChangeNotifier {
       }
       final n = _newFolder(title, parentUid: container.uid)!;
       await _save(n);
-      if (error != null) return null;
+      if (src != source || error != null) return null;
       openFolder(n.uid);
       return n.uid;
     } finally {
@@ -2020,6 +2060,12 @@ class AppState extends ChangeNotifier {
           scopeUid = null;
           _persistScope();
         }
+        // A restored view tab shows its view, not just its name in the strip.
+        final at = activeTab;
+        final saved = at != null && at.kind == TabKind.view
+            ? _viewByUid(at.id)
+            : null;
+        if (saved != null) applyView(saved);
       }
     } catch (e) {
       if (src != source) return;
@@ -2523,34 +2569,41 @@ class AppState extends ChangeNotifier {
   }
 
   /// True when [t] sits under [uid] (a folder, note or task) at any depth.
-  bool taskIsUnder(Task t, String uid) {
-    var cur = t.parentUid;
-    for (var i = 0; cur != null && i <= tasks.length + notes.length; i++) {
+  bool taskIsUnder(Task t, String uid) => _isUnder(t.parentUid, uid);
+
+  /// True when [e] sits under [uid] (a folder, note or task) at any depth.
+  bool eventIsUnder(Event e, String uid) => _isUnder(e.parentUid, uid);
+
+  /// Walks the parent chain from [start] with the cached uid-to-parent map
+  /// (one map per notification, not a search per step) and a seen-set, so a
+  /// parent loop ends instead of spinning.
+  bool _isUnder(String? start, String uid) {
+    final parents = _parentCache ??= _buildParents();
+    final seen = <String>{};
+    var cur = start;
+    while (cur != null && seen.add(cur)) {
       if (cur == uid) return true;
-      final item = findItem(cur);
-      cur = item is Task
-          ? item.parentUid
-          : item is Note
-          ? item.parentUid
-          : null;
+      cur = parents[cur];
     }
     return false;
   }
 
-  /// True when [e] sits under [uid] (a folder, note or task) at any depth.
-  bool eventIsUnder(Event e, String uid) {
-    var cur = e.parentUid;
-    for (var i = 0; cur != null && i <= tasks.length + notes.length; i++) {
-      if (cur == uid) return true;
-      final item = findItem(cur);
-      cur = item is Task
-          ? item.parentUid
-          : item is Note
-          ? item.parentUid
-          : null;
+  Map<String, String?> _buildParents() {
+    // Notes win over tasks over events, as in [findItem].
+    final m = <String, String?>{};
+    for (final e in events) {
+      m[e.uid] = e.parentUid;
     }
-    return false;
+    for (final t in tasks) {
+      m[t.uid] = t.parentUid;
+    }
+    for (final n in notes) {
+      m[n.uid] = n.parentUid;
+    }
+    return m;
   }
+
+  Map<String, String?>? _parentCache;
 
   /// Whether task [t] is in the open scope (always, with no scope).
   bool taskInScope(Task t) => scopeUid == null || taskIsUnder(t, scopeUid!);
@@ -2620,12 +2673,14 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       if (src != source) return;
       tasks = [];
+      _dropCaches();
       taskError = 'Tasks could not be read: $e';
     }
   }
 
   void _setTasks(List<Task> loaded) {
     tasks = List.unmodifiable(loaded);
+    _dropCaches();
     _taskDrafts.removeWhere((u, _) => !tasks.any((t) => t.uid == u));
     if (selectedTaskUid != null && _taskById(selectedTaskUid!) == null) {
       selectedTaskUid = null;
@@ -3290,12 +3345,14 @@ class AppState extends ChangeNotifier {
     } catch (e) {
       if (src != source) return;
       events = [];
+      _dropCaches();
       eventError = 'Calendar could not be read: $e';
     }
   }
 
   void _setEvents(List<Event> loaded) {
     events = List.unmodifiable(loaded);
+    _dropCaches();
     if (eventTagFilter != null && !eventTags.contains(eventTagFilter)) {
       eventTagFilter = null;
     }
@@ -3765,13 +3822,13 @@ class AppState extends ChangeNotifier {
         : null;
   }
 
-  /// The note, task or event the main pane shows full page, if any.
   /// The tab the open project page shows, if a project tab is active.
   ProjectTab? get mainProjectTab {
     final p = mainProjectUid;
     return p == null ? null : projectTab(p);
   }
 
+  /// The note, task or event the main pane shows full page, if any.
   String? get mainItemUid => mainNoteUid ?? mainTaskUid ?? mainEventUid;
 
   /// The title of the page the main pane shows: Home, a note, a saved view
@@ -3787,9 +3844,8 @@ class AppState extends ChangeNotifier {
   /// or event page.
   bool get mainIsPage => mainItemUid != null;
 
-  String get _tabsKey => 'davdart.tabs.v1.${catalog?.current ?? 'default'}';
-  String get _activeTabKey =>
-      'davdart.activetab.v1.${catalog?.current ?? 'default'}';
+  String get _tabsKey => 'davdart.tabs.v1.$_spaceKey';
+  String get _activeTabKey => 'davdart.activetab.v1.$_spaceKey';
 
   void _saveTabs() {
     if (!_tabsLoaded) return;
@@ -3813,7 +3869,23 @@ class AppState extends ChangeNotifier {
     peekCollapsed = false;
   }
 
-  bool _tabExists(DocTab t) => switch (t.kind) {
+  /// A tab stays while its kind's list cannot vouch for it: a task or event
+  /// load that failed says nothing about which items exist, and so does an
+  /// empty list on the first restore of an offline or empty Space. Pruning
+  /// then would drop and save the user's tabs for good.
+  bool _tabExists(DocTab t) => _tabUnverified(t) || _tabFound(t);
+
+  bool _restoringTabs = false;
+
+  bool _tabUnverified(DocTab t) => switch (t.kind) {
+    TabKind.note ||
+    TabKind.view ||
+    TabKind.project => _restoringTabs && notes.isEmpty,
+    TabKind.task => taskError != null || (_restoringTabs && tasks.isEmpty),
+    TabKind.event => eventError != null || (_restoringTabs && events.isEmpty),
+  };
+
+  bool _tabFound(DocTab t) => switch (t.kind) {
     TabKind.note => tree.find(t.id) != null,
     TabKind.view => _viewNotes.containsKey(t.id),
     TabKind.task => _taskById(t.id) != null,
@@ -3832,11 +3904,16 @@ class AppState extends ChangeNotifier {
   }
 
   /// Brings back the tabs saved for this Space, dropping any whose note or
-  /// view is gone. Home is always the focused tab after a restore.
+  /// view is gone. The saved active tab takes focus again (Home if none).
   void _restoreTabs() {
     _tabs.decode(prefs?.read(_tabsKey));
     _tabsLoaded = true;
-    _pruneTabs();
+    _restoringTabs = true;
+    try {
+      _pruneTabs();
+    } finally {
+      _restoringTabs = false;
+    }
     final active = DocTab.parse(prefs?.read(_activeTabKey) ?? '');
     if (active != null && _tabs.contains(active)) _activeViewTab = active;
     _saveTabs();
@@ -4018,7 +4095,9 @@ class AppState extends ChangeNotifier {
       }
       _saveTabs();
       if (wasActive) _show(next);
-      _syncScopeToTab();
+      // Only a closed project page gives up its scope; a loose folder scope
+      // (the Notes panel's own) survives closing any other tab.
+      if (t.kind == TabKind.project && wasActive) _syncScopeToTab();
       notifyListeners();
     }
 
