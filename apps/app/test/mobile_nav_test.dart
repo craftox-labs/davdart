@@ -1,6 +1,8 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/ui/section_registry.dart';
+import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -281,11 +283,13 @@ void main() {
       testWidgets('the page title is on the logo centre line', (t) async {
         await pumpTasksApp(t, size: size);
         final logo = t.getRect(_k('top-logo'));
-        // No Space icon on the closed bar: the page's title sits there.
-        expect(
-          find.descendant(of: _k('space-chip'), matching: find.byType(Icon)),
-          findsNothing,
+        // The same pill as the menu: its Space icon and one label line.
+        final icon = find.descendant(
+          of: _k('space-chip'),
+          matching: find.byType(Icon),
         );
+        expect(icon, findsOneWidget);
+        expect(t.getSize(icon).height, Tokens.light.icons.lg);
         final label = find.descendant(
           of: _k('space-chip'),
           matching: find.byType(Text),
@@ -296,6 +300,58 @@ void main() {
           t.getRect(find.byIcon(FLucideIcons.refreshCw)).left,
           greaterThan(t.getRect(_k('space-chip')).right),
         );
+        _noError(t);
+      });
+
+      testWidgets('Home, project and menu pills share one structure', (
+        t,
+      ) async {
+        final s = await pumpTasksApp(
+          t,
+          notes: [
+            Note(
+              uid: 'c',
+              summary: 'Projects',
+              categories: const [folderTag, projectsTag],
+            ),
+            Note(
+              uid: 'p',
+              summary: 'Alpha',
+              parentUid: 'c',
+              categories: const [folderTag],
+            ),
+          ],
+          size: size,
+        );
+        Rect box() => t.getRect(_k('space-chip'));
+        Finder icon() =>
+            find.descendant(of: _k('space-chip'), matching: find.byType(Icon));
+        IconData iconOf() => t.widget<Icon>(icon()).icon!;
+        final homeBox = box();
+        final homeStyle = t.widget<Text>(_k('top-title')).style;
+        final homeIconSize = t.getSize(icon());
+        // Home: the Home tab's icon.
+        expect(iconOf(), FLucideIcons.house);
+
+        // A project page: the project tab's icon.
+        s.openProjectTab('p');
+        await t.pumpAndSettle();
+        expect(_text(t, 'top-title'), 'Alpha');
+        expect(iconOf(), FLucideIcons.folderKanban);
+        expect(box().height, homeBox.height);
+        expect(box().center.dx, closeTo(homeBox.center.dx, 0.5));
+        expect(t.getSize(icon()), homeIconSize);
+        expect(t.widget<Text>(_k('top-title')).style, homeStyle);
+
+        // Menu open: the Space icon and name, same pill.
+        await t.tap(_k('space-chip'));
+        await t.pumpAndSettle();
+        expect(_k('side-menu'), findsOneWidget);
+        expect(_text(t, 'scope-pill-space'), 'Spaces');
+        expect(iconOf(), spacesIcon);
+        expect(box().height, homeBox.height);
+        expect(t.getSize(icon()), homeIconSize);
+        expect(t.widget<Text>(_k('scope-pill-space')).style, homeStyle);
         _noError(t);
       });
 

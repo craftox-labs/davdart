@@ -30,10 +30,11 @@ import 'parts.dart';
 import 'project_overview.dart';
 import 'resize_handle.dart';
 import 'scope_bar.dart';
-import 'scope_pill.dart';
+import 'section_registry.dart';
 import 'shell_frame.dart';
 import 'sidebar.dart';
 import 'tab_strip.dart';
+import 'top_tab.dart';
 import 'theme.dart';
 
 /// The real app: Spaces kept in browser storage. `Planning` is filled once
@@ -873,43 +874,22 @@ class TopBar extends StatelessWidget {
     );
   }
 
-  /// Narrow, menu open: the Space pill (as before). Closed: the page's title
-  /// in the same joined tab; a tap still opens the Projects picker.
-  Widget _title(Tokens t) {
-    if (menuOpen) return ScopePill(state: state);
-    final title = state.mainPageTitle;
-    final flare = t.radii.tab;
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Transform.translate(
-        offset: Offset(0, t.borders.hairline),
-        child: Padding(
-          padding: EdgeInsets.symmetric(horizontal: flare),
-          child: FTappable(
-            key: const Key('space-chip'),
-            semanticsLabel: title,
-            behavior: HitTestBehavior.opaque,
-            onPress: () => state.openPanel(Section.projects),
-            child: Align(
-              alignment: Alignment.bottomCenter,
-              child: JoinedTab(
-                active: true,
-                height: t.sizes.paneHeader,
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: t.space.lg),
-                  child: Text(
-                    title,
-                    key: const Key('top-title'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: t.type.captionStyle.copyWith(color: t.fg),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
+  /// Narrow: one pill in both states. The menu open shows the Space's icon
+  /// and name; closed, the page's icon (the tab strip's) and title.
+  Widget _title() {
+    if (menuOpen) {
+      return TopTabPill(
+        icon: spacesIcon,
+        label: state.currentSpaceName ?? 'Spaces',
+        labelKey: const Key('scope-pill-space'),
+        onPress: () => state.openPanel(Section.projects),
+      );
+    }
+    final tab = state.activeTab;
+    return TopTabPill(
+      icon: tab == null ? homeTabIcon : tabStripIcon(state, tab),
+      label: state.mainPageTitle,
+      onPress: () => state.openPanel(Section.projects),
     );
   }
 
@@ -990,7 +970,7 @@ class TopBar extends StatelessWidget {
           child: Center(child: LogoMark(extent: t.icons.lg)),
         ),
         SizedBox(width: t.space.xs),
-        Expanded(child: _title(t)),
+        Expanded(child: _title()),
         SizedBox(width: t.space.md),
         viewControl,
         refresh,

@@ -17,6 +17,20 @@ import 'task_menu.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
+/// The icon a document tab shows: the desktop strip and the phone's top tab
+/// use this one mapping.
+IconData tabStripIcon(AppState state, DocTab tab) => switch (tab.kind) {
+  TabKind.project => FLucideIcons.folderKanban,
+  TabKind.view => FLucideIcons.bookmark,
+  TabKind.task => FLucideIcons.listChecks,
+  TabKind.event => FLucideIcons.calendarDays,
+  TabKind.note =>
+    state.tabIsFolder(tab) ? FLucideIcons.folder : FLucideIcons.fileText,
+};
+
+/// The fixed Home tab's icon (it is not a [DocTab]).
+const homeTabIcon = FLucideIcons.house;
+
 /// The document tab strip across the top of the content area: the pinned home
 /// tab (the Board or List), one closable tab per open note or applied saved
 /// view, and a "+" that adds a note. It lives in the shell's header row, on
@@ -216,17 +230,7 @@ class _ReorderableTab extends StatelessWidget {
     Widget item = TabItem(
       key: Key('tab-${tab.code}'),
       width: width,
-      icon: tab.kind == TabKind.project
-          ? FLucideIcons.folderKanban
-          : tab.kind == TabKind.view
-          ? FLucideIcons.bookmark
-          : tab.kind == TabKind.task
-          ? FLucideIcons.listChecks
-          : tab.kind == TabKind.event
-          ? FLucideIcons.calendarDays
-          : state.tabIsFolder(tab)
-          ? FLucideIcons.folder
-          : FLucideIcons.fileText,
+      icon: tabStripIcon(state, tab),
       title: title,
       active: active,
       dirty: state.tabDirty(tab),
