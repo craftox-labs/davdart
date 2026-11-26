@@ -2171,9 +2171,11 @@ class AppState extends ChangeNotifier {
     }
     try {
       final loaded = supportsTasks ? await s.loadTasks() : <Task>[];
+      if (s != _space) return;
       _setTasks(loaded);
       _rebaseTaskDrafts();
     } catch (e) {
+      if (s != _space) return;
       taskProblem ??= 'Tasks could not be read: $e';
     }
     if (s != _space) return;
@@ -2190,9 +2192,11 @@ class AppState extends ChangeNotifier {
     }
     try {
       final loaded = supportsEvents ? await s.loadEvents() : <Event>[];
+      if (s != _space) return;
       _setEvents(loaded);
       _rebaseEventDrafts();
     } catch (e) {
+      if (s != _space) return;
       eventProblem ??= 'Calendar could not be read: $e';
     }
     if (s != _space) return;
