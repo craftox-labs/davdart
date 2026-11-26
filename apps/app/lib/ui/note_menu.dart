@@ -205,6 +205,7 @@ Future<void> showMenuSheet(
   FLayout side = FLayout.btt,
 }) async {
   var open = true;
+  final navigator = Navigator.of(context);
   final nav = SheetMenuNav();
   late final SheetPopoverController c;
   c = SheetPopoverController(
@@ -212,7 +213,7 @@ Future<void> showMenuSheet(
     close: () {
       if (!open) return;
       open = false;
-      Navigator.of(context).pop();
+      navigator.pop();
     },
   );
   try {

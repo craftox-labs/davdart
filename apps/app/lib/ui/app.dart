@@ -277,7 +277,7 @@ class _ShellState extends State<Shell>
     WidgetsBinding.instance.removeObserver(this);
     widget.state.onNotSaved = null;
     widget.state.onBoardUndo = null;
-    widget.state.onNotSaved = null;
+    widget.state.openMenu = null;
     _dock.dispose();
     _peek.dispose();
     super.dispose();
@@ -951,7 +951,7 @@ class TopBar extends StatelessWidget {
           viewControl,
           // Menu first: Columns and refresh keep their place whether or not
           // a folder is open.
-          if (home) ScopeActions(state: state),
+          if (home && state.activeTab != null) ScopeActions(state: state),
           if (state.mainProjectUid != null &&
               state.projectTab(state.mainProjectUid!) == ProjectTab.board)
             HomeColumnsToggle(state: state),

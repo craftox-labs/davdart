@@ -619,7 +619,7 @@ void main() {
         await t.tap(_k('bar-count'));
         await t.pumpAndSettle();
         expect(_k('open-grid'), findsOneWidget);
-        expect(find.text('Open items (4)'), findsOneWidget);
+        expect(find.text('Open items (3)'), findsOneWidget);
         for (final c in ['n:n1', 'n:n2', 't:k1']) {
           expect(_k('grid-card-$c'), findsOneWidget);
         }

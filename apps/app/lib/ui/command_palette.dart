@@ -198,7 +198,7 @@ class _CommandPaletteState extends State<CommandPalette> {
       }
       rows.add(
         _Row(
-          key: _keys[i] = GlobalKey(),
+          key: _keys.putIfAbsent(i, GlobalKey.new),
           entry: e,
           selected: i == _index,
           onHover: () {

@@ -23,7 +23,7 @@ IconData tabStripIcon(AppState state, DocTab tab) => switch (tab.kind) {
   TabKind.project => FLucideIcons.folderKanban,
   TabKind.view => FLucideIcons.bookmark,
   TabKind.task => FLucideIcons.listChecks,
-  TabKind.event => FLucideIcons.calendarDays,
+  TabKind.event => FLucideIcons.calendar,
   TabKind.note =>
     state.tabIsFolder(tab) ? FLucideIcons.folder : FLucideIcons.fileText,
 };

@@ -739,7 +739,7 @@ void main() {
       expect(
         find.descendant(
           of: _k('tab-e:k'),
-          matching: find.byIcon(FLucideIcons.calendarDays),
+          matching: find.byIcon(FLucideIcons.calendar),
         ),
         findsOneWidget,
       );
@@ -776,7 +776,7 @@ void main() {
       expect(
         find.descendant(
           of: _k('hit-$uid'),
-          matching: find.byIcon(FLucideIcons.calendarDays),
+          matching: find.byIcon(FLucideIcons.calendar),
         ),
         findsOneWidget,
       );

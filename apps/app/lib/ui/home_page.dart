@@ -216,11 +216,12 @@ class HomePage extends StatelessWidget {
         if (loose(e.uid) && state.isMine(e)) e,
     ];
 
-    // Personal Tasks and Calendar hold loose items, but switching there
-    // keeps the open project scope (the panel's own scope); a loose-only
-    // list would need a Tasks/Calendar mode of its own.
-    void seeAll(Section section) =>
-        state.guarded(() => state.setSection(section));
+    // Home is personal: "See all" drops any leftover project scope first, so
+    // the list matches the heading.
+    void seeAll(Section section) => state.guarded(() {
+      state.openFolder(null);
+      state.setSection(section);
+    });
 
     Widget taskRow(Task k) {
       final day = taskDueDay(k);

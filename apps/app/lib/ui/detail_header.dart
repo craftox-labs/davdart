@@ -53,7 +53,7 @@ class DetailHeader extends StatelessWidget {
               final icon = task != null
                   ? FLucideIcons.listChecks
                   : event != null
-                  ? FLucideIcons.calendarDays
+                  ? FLucideIcons.calendar
                   : note != null && AppState.isFolder(note)
                   ? FLucideIcons.folder
                   : FLucideIcons.fileText;

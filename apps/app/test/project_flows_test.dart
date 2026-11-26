@@ -1,7 +1,10 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/ui/new_note_dialog.dart';
+import 'package:davdart_app/ui/tab_strip.dart';
+import 'package:forui/forui.dart';
 import 'package:davdart_app/ui/scope_bar.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/state/tab_state.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -16,6 +19,7 @@ final _notes = [
 ];
 
 void main() {
+  _mediumTests();
   _emptyTests();
   testWidgets('back to all projects leaves the project page', (t) async {
     final s = await pumpTasksApp(t, notes: _notes);
@@ -101,4 +105,25 @@ void _emptyTests() {
       expect(_k('new-project-title'), findsOneWidget);
     },
   );
+}
+
+void _mediumTests() {
+  testWidgets('one icon for an event tab, one list of icons', (t) async {
+    final s = await pumpTasksApp(t, notes: _notes);
+    expect(tabStripIcon(s, DocTab.event('e')), FLucideIcons.calendar);
+  });
+
+  testWidgets('the top bar offers project actions only on a project page', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(t, notes: _notes);
+    s.openProjectTab('a');
+    await t.pumpAndSettle();
+    expect(_k('scope-more'), findsOneWidget);
+    s.showHome();
+    s.openFolder('a'); // a leftover scope behind Home
+    await t.pumpAndSettle();
+    expect(s.activeTab, isNull);
+    expect(_k('scope-more'), findsNothing);
+  });
 }
