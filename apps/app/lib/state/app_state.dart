@@ -2293,6 +2293,27 @@ class AppState extends ChangeNotifier {
       if (eventInScope(e)) e,
   ];
 
+  /// Tasks in the open scope, whatever the tag and status filters say (the
+  /// project Overview counts and lists them).
+  List<Task> get scopedTasks => [
+    for (final t in tasks)
+      if (taskInScope(t)) t,
+  ];
+
+  /// Tasks completed this week (from Monday): the Overview's done tile.
+  List<Task> doneThisWeek([DateTime? now]) {
+    final n = now ?? DateTime.now();
+    final today = wallDay(wallNow(n));
+    final monday = today.subtract(Duration(days: today.weekday - 1));
+    return [
+      for (final t in scopedTasks)
+        if (t.isClosed &&
+            t.completed != null &&
+            !wallDay(wallNow(t.completed!)).isBefore(monday))
+          t,
+    ];
+  }
+
   /// Tasks after the Tasks view's tag filter and the open scope (status
   /// filter not applied; see [taskFilter]).
   List<Task> get filteredTasks => [

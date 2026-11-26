@@ -27,6 +27,7 @@ import '../state/tab_state.dart';
 import 'logo.dart';
 import 'mobile_nav.dart';
 import 'parts.dart';
+import 'project_overview.dart';
 import 'resize_handle.dart';
 import 'scope_bar.dart';
 import 'scope_pill.dart';
@@ -405,26 +406,32 @@ class _ShellState extends State<Shell>
               if (!wide) NarrowCrumbs(state: state),
               ScopeText(state: state),
               if (state.activeTab == null) ...[
-                HomeSwitch(state: state),
-                if (state.homeFocus == HomeFocus.day)
-                  Expanded(child: HomeDayFocus(state: state))
-                else if (MediaQuery.sizeOf(context).width <
-                    Tokens.stackBreakpoint)
-                  // Phone: the board accordions in one scroll view.
-                  Expanded(
-                    child: SingleChildScrollView(
-                      key: const Key('home-scroll'),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          homeBoard(embedded: true),
-                          SizedBox(height: fabInset(context)),
-                        ],
+                // A project's Overview is a page of its own, in the main
+                // area (the side panel lists projects, not their pages).
+                if (state.section == Section.overview && state.scopeUid != null)
+                  Expanded(child: ProjectOverviewPage(state: state))
+                else ...[
+                  HomeSwitch(state: state),
+                  if (state.homeFocus == HomeFocus.day)
+                    Expanded(child: HomeDayFocus(state: state))
+                  else if (MediaQuery.sizeOf(context).width <
+                      Tokens.stackBreakpoint)
+                    // Phone: the board accordions in one scroll view.
+                    Expanded(
+                      child: SingleChildScrollView(
+                        key: const Key('home-scroll'),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            homeBoard(embedded: true),
+                            SizedBox(height: fabInset(context)),
+                          ],
+                        ),
                       ),
-                    ),
-                  )
-                else
-                  Expanded(child: homeBoard()),
+                    )
+                  else
+                    Expanded(child: homeBoard()),
+                ],
               ] else
                 Expanded(
                   child: state.view == ViewMode.board

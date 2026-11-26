@@ -455,8 +455,9 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
   }
 }
 
-/// A project's own page: a placeholder for now. The project's name, what it
-/// holds (open tasks, notes, events in scope) and that more is coming.
+/// The project in scope, in the side panel: its name and what it holds (open
+/// tasks, notes and events in scope). The page itself, with the tiles and the
+/// lists, opens in the main area ([ProjectOverviewPage]).
 class ProjectOverviewPanel extends StatelessWidget {
   const ProjectOverviewPanel({super.key, required this.state, this.onPick});
   final AppState state;
@@ -502,7 +503,7 @@ class ProjectOverviewPanel extends StatelessWidget {
               Padding(
                 padding: EdgeInsets.only(top: t.space.md),
                 child: Text(
-                  'Project overview',
+                  'Overview',
                   key: const Key('overview-heading'),
                   style: t.type.bodyStyle,
                 ),
@@ -513,7 +514,6 @@ class ProjectOverviewPanel extends StatelessWidget {
                 '$events ${events == 1 ? 'event' : 'events'} in the Calendar',
               ),
               if (counts != null) line(projectCounts(counts)),
-              line('More coming: a summary of this project here.'),
             ],
           ),
         );

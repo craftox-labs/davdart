@@ -162,7 +162,8 @@ void main() {
       await t.pumpAndSettle();
       expect(s.scopeUid, 'a');
       expect(s.section, Section.tasks);
-      // Overview is the project's own page (a placeholder for now).
+      // Overview opens the project's page in the main area, and the side
+      // panel keeps its counts.
       s.setSection(Section.projects);
       await t.pumpAndSettle();
       await t.tap(_k('project-view-a-overview'));
@@ -170,8 +171,12 @@ void main() {
       expect(s.scopeUid, 'a');
       expect(s.section, Section.overview);
       expect(_k('overview-panel'), findsOneWidget);
+      expect(_k('overview-page'), findsOneWidget);
       expect(
-        find.text('More coming: a summary of this project here.'),
+        find.descendant(
+          of: _k('overview-page'),
+          matching: _k('overview-tiles'),
+        ),
         findsOneWidget,
       );
       // Without the project scope the page has nothing to show: Notes.
