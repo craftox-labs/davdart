@@ -18,6 +18,7 @@ import 'event_draft.dart';
 import 'event_rules.dart';
 import 'task_draft.dart';
 import 'task_rules.dart';
+import 'uid.dart';
 
 export 'board_item.dart' show BoardItem, HomeKind, compareBoardItems;
 
@@ -982,7 +983,6 @@ class AppState extends ChangeNotifier {
       }
     }
     final have = {for (final v in savedViews) v.name};
-    var stamp = DateTime.now().toUtc().microsecondsSinceEpoch;
     for (final v in old) {
       if (!have.add(v.name)) continue;
       await src.save(
@@ -991,7 +991,7 @@ class AppState extends ChangeNotifier {
           v.view,
           v.query,
           v.tags,
-          uid: 'davdart-view-${stamp++}',
+          uid: newUid(prefix: 'davdart-view'),
         ).toNote(),
       );
     }
@@ -1050,7 +1050,7 @@ class AppState extends ChangeNotifier {
     if (n.isEmpty) return 'Give the view a name';
     if (_viewNameTaken(n)) return 'A view with that name exists';
     if (!_canEditViews()) return 'This source is read-only';
-    final uid = 'davdart-view-${DateTime.now().toUtc().microsecondsSinceEpoch}';
+    final uid = newUid(prefix: 'davdart-view');
     await _save(_current(n, uid: uid).toNote());
     return error;
   }
@@ -1669,11 +1669,7 @@ class AppState extends ChangeNotifier {
         noteGroup.length + taskGroup.length + (rootEvent == null ? 0 : 1);
     // Unsaved edits would be lost with the old items: settle them first.
     if (!await _settleDrafts([...ids])) return null;
-    final stamp = DateTime.now().toUtc().microsecondsSinceEpoch;
-    final fresh = <String, String>{};
-    for (final u in ids) {
-      fresh[u] = 'davdart-$stamp-${fresh.length}';
-    }
+    final fresh = <String, String>{for (final u in ids) u: newUid()};
     try {
       for (final n in noteGroup) {
         await target.save(
@@ -1861,7 +1857,7 @@ class AppState extends ChangeNotifier {
     if (t.isEmpty) return null;
     final now = DateTime.now().toUtc();
     return Note(
-      uid: 'davdart-${now.microsecondsSinceEpoch}',
+      uid: newUid(),
       summary: t,
       description: text.trim(),
       categories: [folderTag, ...tags],
@@ -2476,7 +2472,7 @@ class AppState extends ChangeNotifier {
     // Nothing loose under a Projects container (same rule as tasks/events).
     final pn = parentUid == null ? null : tree.find(parentUid)?.note;
     final n = Note(
-      uid: 'davdart-${now.microsecondsSinceEpoch}',
+      uid: newUid(),
       summary: t,
       parentUid: pn != null && isProjectsContainer(pn) ? null : parentUid,
       created: now,
@@ -2847,7 +2843,7 @@ class AppState extends ChangeNotifier {
         ? await ensurePersonalContainer()
         : _parentOrScope(parentUid);
     final task = Task(
-      uid: 'davdart-${now.microsecondsSinceEpoch}',
+      uid: newUid(),
       summary: t,
       description: description ?? '',
       status: 'NEEDS-ACTION',
@@ -3448,7 +3444,7 @@ class AppState extends ChangeNotifier {
       last = eventDate(end);
     }
     final event = Event(
-      uid: 'davdart-${now.microsecondsSinceEpoch}',
+      uid: newUid(),
       summary: t,
       description: description ?? '',
       location: location.trim(),
