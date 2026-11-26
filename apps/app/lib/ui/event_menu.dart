@@ -285,6 +285,7 @@ Future<String?> showNewEventDialog(
   BuildContext context,
   AppState state, {
   DateTime? day,
+  bool personal = false,
 }) {
   final form = _NewEventForm(wallDay(day ?? wallNow(DateTime.now())));
   Future<void> submit(BuildContext ctx) async {
@@ -296,6 +297,7 @@ Future<String?> showNewEventDialog(
       end: form.end,
       allDay: form.allDay,
       location: form.location.text,
+      personal: personal,
     );
     if (uid != null) nav.pop(uid);
   }

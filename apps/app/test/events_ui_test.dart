@@ -229,8 +229,8 @@ void main() {
       expect(_p('event-repeat-daily'), findsNWidgets(3));
       expect(_p('event-repeat-standup'), findsNothing);
       // Upcoming and Past rows carry the day
-      expect(_k('event-day-review'), findsOneWidget);
-      expect(_k('event-day-standup'), findsNothing);
+      expect(_p('event-day-review'), findsOneWidget);
+      expect(_p('event-day-standup'), findsNothing);
       // a cancelled event is struck through
       final style = t
           .widget<Text>(

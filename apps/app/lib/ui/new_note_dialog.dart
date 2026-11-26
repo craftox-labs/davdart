@@ -13,8 +13,9 @@ Future<void> showNewNoteDialog(
   bool inTab = false,
   Note? under,
   String status = 'backlog',
+  bool personal = false,
 }) {
-  final parent = under ?? state.peek ?? state.scope;
+  final parent = personal ? under : (under ?? state.peek ?? state.scope);
   final title = TextEditingController();
   var underParent = parent != null;
   void submit(BuildContext ctx) {
@@ -26,6 +27,7 @@ Future<void> showNewNoteDialog(
       parentUid: underParent ? parent?.uid : null,
       status: status,
       inTab: inTab,
+      personal: personal,
     );
   }
 

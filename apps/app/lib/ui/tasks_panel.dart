@@ -47,12 +47,12 @@ class _TasksPanelState extends State<TasksPanel> {
       listenable: state,
       builder: (context, _) {
         final clock = now ?? DateTime.now();
-        final keep = {for (final k in state.filteredTasks) k.uid};
+        final keep = {for (final k in state.filteredPersonalTasks) k.uid};
         List<Task> pick(List<Task> l) => [
           for (final k in l)
             if (keep.contains(k.uid)) k,
         ];
-        final open = pick(state.openTasks(clock));
+        final open = pick(state.personalOpenTasks(clock));
         final today = wallDay(wallNow(clock));
         final overdue = [
           for (final k in open)
@@ -78,7 +78,7 @@ class _TasksPanelState extends State<TasksPanel> {
         ];
         final closed = [
           ...pick(state.completedTasks()),
-          for (final k in state.filteredTasks)
+          for (final k in state.filteredPersonalTasks)
             if (k.isCancelled) k,
         ];
         final f = state.taskFilter;
@@ -117,7 +117,7 @@ class _TasksPanelState extends State<TasksPanel> {
                   icon: FLucideIcons.plus,
                   onPress: () {
                     onPick?.call();
-                    showNewTaskDialog(context, state);
+                    showNewTaskDialog(context, state, personal: true);
                   },
                 )
               : null,

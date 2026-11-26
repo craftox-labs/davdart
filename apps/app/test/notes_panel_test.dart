@@ -8,13 +8,17 @@ import 'tasks_helper.dart';
 
 Finder _k(String k) => find.byKey(Key(k));
 
-Note _folder(String uid, String name, {String? parent, bool container = false}) =>
-    Note(
-      uid: uid,
-      summary: name,
-      parentUid: parent,
-      categories: [folderTag, if (container) projectsTag],
-    );
+Note _folder(
+  String uid,
+  String name, {
+  String? parent,
+  bool container = false,
+}) => Note(
+  uid: uid,
+  summary: name,
+  parentUid: parent,
+  categories: [folderTag, if (container) projectsTag],
+);
 
 final _notes = [
   _folder('c', 'Projects', container: true),
@@ -75,16 +79,17 @@ void main() {
       await _end(t);
     });
 
-    testWidgets('a project scope lists only its own notes, no toggle', (
+    testWidgets('the project scope does not narrow the Personal panel', (
       t,
     ) async {
       final s = await pumpTasksApp(t, notes: _notes);
       s.openFolder('p');
       await t.pumpAndSettle();
-      expect(_inPanel('Project note'), findsOneWidget);
-      expect(_inPanel('Loose note'), findsNothing);
-      // No sub-folders: nothing to switch to.
-      expect(_k('notes-view-toggle'), findsNothing);
+      // Personal reads its own layer whatever the scope: project notes stay
+      // in the project, loose and personal-folder notes stay here.
+      expect(_inPanel('Project note'), findsNothing);
+      expect(_inPanel('Loose note'), findsOneWidget);
+      expect(_inPanel('In plans'), findsOneWidget);
       await _end(t);
     });
 

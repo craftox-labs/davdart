@@ -66,7 +66,8 @@ void main() {
         findsOneWidget,
       );
       expect(_k('new-task'), findsOneWidget);
-      expect(_k('home-today'), findsOneWidget);
+      // Main area stays Home; the panel lists the tasks.
+      expect(_k('home-page'), findsOneWidget);
     });
 
     testWidgets('a task row opens per the open setting', (t) async {
@@ -151,28 +152,29 @@ void main() {
       expect(_p('task-row-soon'), findsNothing);
     });
 
-    testWidgets('tag and folder filters narrow the list', (t) async {
+    testWidgets('the tag filter narrows the Personal list; scope does not', (
+      t,
+    ) async {
       final s = await _tab(t);
       s.setTaskTagFilter('home');
       await t.pumpAndSettle();
       expect(_p('task-row-late'), findsOneWidget);
       expect(_p('task-row-today'), findsNothing);
-      s.setTaskTagFilter('home');
+      // The project scope belongs to project pages: it does not narrow this.
       s.openFolder('f');
       await t.pumpAndSettle();
-      expect(_p('task-row-today'), findsOneWidget);
-      expect(_p('task-row-late'), findsNothing);
+      expect(_p('task-row-today'), findsNothing);
+      expect(_p('task-row-late'), findsOneWidget);
       s.openFolder(null);
       await t.pumpAndSettle();
       expect(_p('task-row-late'), findsOneWidget);
       expect(_k('tasks-tags-drawer'), findsOneWidget);
       expect(_k('tasks-tag-filter'), findsNothing);
-      expect(_p('tasks-folder-filter'), findsOneWidget);
     });
 
     testWidgets('no match and empty messages', (t) async {
       final s = await _tab(t);
-      s.openFolder('a'); // a note with no tasks under it
+      s.setTaskTagFilter('no-such-tag');
       await t.pumpAndSettle();
       expect(_p('tasks-no-match'), findsOneWidget);
       final e = await pumpTasksApp(t);

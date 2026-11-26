@@ -304,7 +304,16 @@ class SpacesSection extends _Section {
 /// Tree | List toggle appears when the scope has sub-folders; the choice is
 /// saved ([NotesView]). The tags drawer stays at the end.
 class NotesSection extends _Section {
-  const NotesSection({super.key, required super.state, required super.onPick});
+  const NotesSection({
+    super.key,
+    required super.state,
+    required super.onPick,
+    this.scoped = false,
+  });
+
+  /// A project tab's Notes shows the open scope; the Personal section (the
+  /// default) shows the individual's own notes.
+  final bool scoped;
 
   @override
   Widget build(BuildContext context) {
@@ -312,10 +321,10 @@ class NotesSection extends _Section {
     final body = <Widget>[];
     final rows = <NavEntry>[];
     final projects = state.projectIndex;
-    final folders = state.subFolders;
+    final folders = scoped ? state.subFolders : state.personalSubFolders;
     // No sub-folders to show: the list, whatever is saved.
     final view = folders.isEmpty ? NotesView.list : state.notesView;
-    final scopeOn = state.scopeUid;
+    final scopeOn = scoped ? state.scopeUid : null;
 
     /// One row's furniture: the context menu, the drag, the selected tone.
     Widget entry(
@@ -442,21 +451,35 @@ class NotesSection extends _Section {
         }
       }
 
-      walk(state.noteTreeRoots, 0);
+      walk(scoped ? state.noteTreeRoots : state.personalTreeRoots, 0);
     } else {
       // The list: the scope's notes grouped under the folder they sit in.
-      final scopeNotes = [...state.notesInScope]
-        ..sort((a, b) {
-          final ga = state.notesGroupOf(a.uid)?.summary ?? '';
-          final gb = state.notesGroupOf(b.uid)?.summary ?? '';
-          final g = ga.toLowerCase().compareTo(gb.toLowerCase());
-          return g != 0
-              ? g
-              : a.summary.toLowerCase().compareTo(b.summary.toLowerCase());
-        });
+      final scopeNotes =
+          [...(scoped ? state.notesInScope : state.personalNotes)]
+            ..sort((a, b) {
+              final ga =
+                  (scoped
+                          ? state.notesGroupOf(a.uid)
+                          : state.personalGroupOf(a.uid))
+                      ?.summary ??
+                  '';
+              final gb =
+                  (scoped
+                          ? state.notesGroupOf(b.uid)
+                          : state.personalGroupOf(b.uid))
+                      ?.summary ??
+                  '';
+              final g = ga.toLowerCase().compareTo(gb.toLowerCase());
+              return g != 0
+                  ? g
+                  : a.summary.toLowerCase().compareTo(b.summary.toLowerCase());
+            });
       String? group;
       for (final n in scopeNotes) {
-        final g = state.notesGroupOf(n.uid)?.summary ?? '';
+        final g =
+            (scoped ? state.notesGroupOf(n.uid) : state.personalGroupOf(n.uid))
+                ?.summary ??
+            '';
         if (g != group) {
           group = g;
           if (g.isNotEmpty) {
@@ -591,7 +614,7 @@ class NotesSection extends _Section {
                 NoteMenuItem(
                   'New note…',
                   FLucideIcons.filePlus,
-                  () => showNewNoteDialog(context, state),
+                  () => showNewNoteDialog(context, state, personal: !scoped),
                   key: const Key('menu-tree-new-note'),
                 ),
                 NoteMenuItem(
@@ -625,7 +648,7 @@ class NotesSection extends _Section {
                   icon: FLucideIcons.plus,
                   onPress: () {
                     onPick();
-                    showNewNoteDialog(context, state);
+                    showNewNoteDialog(context, state, personal: !scoped);
                   },
                 ),
                 IconAction(

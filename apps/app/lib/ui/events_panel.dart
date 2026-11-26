@@ -23,9 +23,19 @@ import 'overflow_tip.dart';
 /// like a note (peek or main, per the open setting). [onPick] runs after an
 /// open, to close the narrow sheet.
 class EventsPanel extends StatelessWidget {
-  const EventsPanel({super.key, required this.state, this.onPick, this.now});
+  const EventsPanel({
+    super.key,
+    required this.state,
+    this.onPick,
+    this.now,
+    this.scoped = false,
+  });
   final AppState state;
   final VoidCallback? onPick;
+
+  /// A project tab's Calendar shows the open scope's events; the Personal
+  /// section (the default) shows the individual's own.
+  final bool scoped;
 
   /// Clock override for tests.
   final DateTime? now;
@@ -40,7 +50,9 @@ class EventsPanel extends StatelessWidget {
       listenable: state,
       builder: (context, _) {
         final clock = now ?? DateTime.now();
-        final groups = state.upcomingOccurrences(clock, upcomingDays);
+        final groups = scoped
+            ? state.upcomingOccurrences(clock, upcomingDays)
+            : state.upcomingPersonalOccurrences(clock, upcomingDays);
         List<EventOccurrence> of(Set<String> ids) => [
           for (final g in groups)
             if (ids.contains(g.id)) ...g.items,
@@ -49,7 +61,13 @@ class EventsPanel extends StatelessWidget {
           ('today', 'Today', of({'today'})),
           ('tomorrow', 'Tomorrow', of({'tomorrow'})),
           ('upcoming', 'Upcoming', of({'week', 'later'})),
-          ('past', 'Past', state.pastOccurrences(clock, pastDays)),
+          (
+            'past',
+            'Past',
+            scoped
+                ? state.pastOccurrences(clock, pastDays)
+                : state.pastPersonalOccurrences(clock, pastDays),
+          ),
         ];
         // Dated tasks ride along in the agenda as markers (the Calendar is
         // events first; a full grid comes later).
@@ -62,7 +80,10 @@ class EventsPanel extends StatelessWidget {
         };
         // The Tasks panel's tag filter and the scope apply here too (the
         // Calendar's own tag filter is for events).
-        for (final k in state.filteredTasks) {
+        final taskSource = scoped
+            ? state.filteredTasks
+            : state.filteredPersonalTasks;
+        for (final k in taskSource) {
           if (k.isClosed) continue;
           final day = taskDueDay(k);
           if (day == null) continue;
@@ -118,7 +139,11 @@ class EventsPanel extends StatelessWidget {
                   tooltip: 'New event',
                   icon: FLucideIcons.plus,
                   onPress: () async {
-                    final uid = await showNewEventDialog(context, state);
+                    final uid = await showNewEventDialog(
+                      context,
+                      state,
+                      personal: !scoped,
+                    );
                     if (uid == null) return;
                     await state.clickEvent(uid);
                     onPick?.call();
@@ -144,7 +169,10 @@ class EventsPanel extends StatelessWidget {
               children: [
                 // Nothing to list at all: no events and no dated tasks
                 // (either would be shown below).
-                if (state.filteredEvents.isEmpty &&
+                if ((scoped
+                            ? state.filteredEvents
+                            : state.filteredPersonalEvents)
+                        .isEmpty &&
                     tasks.values.every((l) => l.isEmpty))
                   _Note('No events yet', key: const Key('events-empty'))
                 else if (!shown)

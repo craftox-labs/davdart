@@ -364,13 +364,14 @@ Future<void> showNewTaskDialog(
   AppState state, {
   String? parentUid,
   ICalDate? due,
+  bool personal = false,
 }) {
   final title = TextEditingController();
   void submit(BuildContext ctx) {
     final text = title.text;
     if (text.trim().isEmpty) return;
     Navigator.of(ctx).pop();
-    state.addTask(text, parentUid: parentUid, due: due);
+    state.addTask(text, parentUid: parentUid, due: due, personal: personal);
   }
 
   return showAppDialog(
