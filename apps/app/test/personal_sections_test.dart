@@ -3,6 +3,7 @@ import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/move_folder_dialog.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:forui/forui.dart';
 
 import 'tasks_helper.dart';
 
@@ -59,7 +60,10 @@ void main() {
       findsOneWidget,
     );
     expect(
-      find.descendant(of: _k('notes-body'), matching: find.text('Project note')),
+      find.descendant(
+        of: _k('notes-body'),
+        matching: find.text('Project note'),
+      ),
       findsNothing,
     );
     s.setSection(Section.tasks);
@@ -248,5 +252,77 @@ void main() {
       find.descendant(of: _k('move-folder-p'), matching: find.text('Alpha')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('moving a top-level note to Personal uses the container', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [
+        _folder('pc', 'Personal', personal: true),
+        _note('loose', 'Loose note'),
+      ],
+    );
+    showMoveFolderDialog(
+      t.element(find.byKey(const Key('home-page'))),
+      s,
+      s.tree.find('loose')!.note,
+    );
+    await t.pumpAndSettle();
+    await t.tap(_k('move-folder-personal'));
+    await t.pumpAndSettle();
+    expect(s.tree.find('loose')!.note.parentUid, 'pc');
+  });
+
+  testWidgets('a note already in Personal has the row disabled', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [
+        _folder('pc', 'Personal', personal: true),
+        _note('inside', 'Inside', parent: 'pc'),
+      ],
+    );
+    showMoveFolderDialog(
+      t.element(find.byKey(const Key('home-page'))),
+      s,
+      s.tree.find('inside')!.note,
+    );
+    await t.pumpAndSettle();
+    expect(t.widget<FItem>(_k('move-folder-personal')).enabled, isFalse);
+  });
+
+  testWidgets('read-only, no container: a top-level note cannot move', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(
+      t,
+      notesReadOnly: true,
+      notes: [_note('loose', 'Loose note')],
+    );
+    showMoveFolderDialog(
+      t.element(find.byKey(const Key('home-page'))),
+      s,
+      s.tree.find('loose')!.note,
+    );
+    await t.pumpAndSettle();
+    expect(t.widget<FItem>(_k('move-folder-personal')).enabled, isFalse);
+  });
+
+  testWidgets('with no container, a move to Personal creates it', (t) async {
+    final s = await _app(t);
+    expect(s.personalContainer, isNull);
+    showMoveFolderDialog(
+      t.element(find.byKey(const Key('home-page'))),
+      s,
+      s.tree.find('loose')!.note,
+    );
+    await t.pumpAndSettle();
+    expect(t.widget<FItem>(_k('move-folder-personal')).enabled, isTrue);
+    await t.tap(_k('move-folder-personal'));
+    await t.pumpAndSettle();
+    final container = s.personalContainer;
+    expect(container, isNotNull);
+    expect(s.tree.find('loose')!.note.parentUid, container!.uid);
   });
 }

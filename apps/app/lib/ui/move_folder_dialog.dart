@@ -13,7 +13,14 @@ Future<void> showMoveFolderDialog(
   AppState state,
   Note note,
 ) {
-  final here = state.tree.find(note.uid)?.parent?.note.uid;
+  final parentUid = state.tree.find(note.uid)?.parent?.note.uid;
+  final personal = state.personalContainer;
+  // No container yet: an editable Space creates one on the move; a
+  // read-only Space's Personal is the top level.
+  final canCreatePersonal = personal == null && state.editable;
+  final atPersonal = personal != null
+      ? parentUid == personal.uid
+      : (!canCreatePersonal && parentUid == null);
   final projects = state.projectsByRecent
       .where((p) => state.tree.canMove(note.uid, p.uid))
       .toList();
@@ -40,25 +47,50 @@ Future<void> showMoveFolderDialog(
     content: Builder(
       builder: (ctx) {
         final t = tokensOf(ctx);
-        Widget row(String? uid, String label, int depth, IconData icon) =>
-            Padding(
-              padding: EdgeInsets.only(left: depth * t.space.lg),
-              child: FItem(
-                key: Key('move-folder-${uid ?? 'top'}'),
-                enabled: uid != here,
-                prefix: Icon(icon, size: t.icons.lg),
-                title: Text(label, overflow: TextOverflow.ellipsis),
-                onPress: () {
-                  Navigator.of(ctx).pop();
-                  state.moveNote(note.uid, uid);
-                },
-              ),
-            );
+        Widget row(
+          String? uid,
+          String label,
+          int depth,
+          IconData icon, {
+          String? keyName,
+          bool? enabled,
+          Future<void> Function()? onPress,
+        }) => Padding(
+          padding: EdgeInsets.only(left: depth * t.space.lg),
+          child: FItem(
+            key: Key('move-folder-${keyName ?? uid ?? 'top'}'),
+            enabled: enabled ?? uid != parentUid,
+            prefix: Icon(icon, size: t.icons.lg),
+            title: Text(label, overflow: TextOverflow.ellipsis),
+            onPress: () {
+              Navigator.of(ctx).pop();
+              if (onPress != null) {
+                onPress();
+              } else {
+                state.moveNote(note.uid, uid);
+              }
+            },
+          ),
+        );
         return Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            row(null, 'Personal', 0, FLucideIcons.arrowUpToLine),
+            // Personal is the real container (created on the move when it is
+            // missing); its row stays hidden from folder/project targets.
+            row(
+              personal?.uid,
+              'Personal',
+              0,
+              FLucideIcons.arrowUpToLine,
+              keyName: 'personal',
+              enabled: !atPersonal,
+              onPress: () async {
+                final target =
+                    personal?.uid ?? await state.ensurePersonalContainer();
+                await state.moveNote(note.uid, target);
+              },
+            ),
             for (final p in projects)
               row(
                 p.uid,
