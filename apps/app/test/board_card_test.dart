@@ -280,15 +280,14 @@ void main() {
     }
   });
 
-  testWidgets('folder chip is gone when the board is scoped to a folder', (
+  testWidgets('the folder chip names the card\'s folder on the board', (
     t,
   ) async {
-    final s = await pump(t);
-    s.openFolder('f');
-    await t.pumpAndSettle();
+    await pump(t);
+    // The board's own project folder is not a chip; the folder under it is.
     expect(_k('card-kind-n'), findsOneWidget);
-    expect(_k('card-folder-n'), findsNothing);
-    expect(_k('card-folder-t'), findsNothing);
+    expect(_k('card-folder-n'), findsOneWidget);
+    expect(_k('card-folder-t'), findsOneWidget);
   });
 
   testWidgets(

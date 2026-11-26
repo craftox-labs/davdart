@@ -369,15 +369,13 @@ void main() {
         size: const Size(1700, 900),
       );
       await s.activateTab(null);
-      s.setSection(Section.notes);
       await t.pumpAndSettle();
       s.nav.focusArea(NavArea.main, list: KeyNav.homeList);
       await t.pump();
-      expect(s.nav.cursorId(KeyNav.homeList), 'event-row-e1');
+      // Home's rows: personal tasks first, then the calendar preview.
+      expect(s.nav.cursorId(KeyNav.homeList), 'home-task-a');
       await _press(t, LogicalKeyboardKey.enter);
-      expect(s.peekUid, 'e1');
-      await _press(t, LogicalKeyboardKey.keyJ);
-      expect(s.nav.cursorId(KeyNav.homeList), 'task-a');
+      expect(s.peekUid, 'a');
     });
 
     testWidgets('rail: j k move over sections, Enter picks one', (t) async {

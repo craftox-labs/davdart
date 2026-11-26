@@ -16,6 +16,9 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'tasks_helper.dart';
+
 import 'package:forui/forui.dart';
 
 class _Seed implements NoteSource {
@@ -42,18 +45,7 @@ Future<AppState> _pump(
   MemoryStorage? prefs,
   Size size = const Size(1500, 900),
 }) async {
-  t.view.physicalSize = size;
-  t.view.devicePixelRatio = 1;
-  addTearDown(t.view.reset);
-  final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
-  final s = AppState(
-    SpaceNoteSource(space, seed: _Seed()),
-    prefs: prefs ?? MemoryStorage(),
-  );
-  s.setSection(Section.notes); // the old Day | Board main view, not Home
-  await t.pumpWidget(DavdartApp(state: s));
-  await t.pumpAndSettle();
-  return s;
+  return pumpHomeApp(t, notes: await _Seed().load(), prefs: prefs, size: size);
 }
 
 /// Shows the list in a saved-view tab (Home is always the board).
@@ -64,6 +56,10 @@ Future<void> _listTab(AppState s) async {
 }
 
 Finder _k(String k) => find.byKey(Key(k));
+
+/// The note/view/task/event tabs (the project tab is not one of them).
+List<DocTab> _notes(AppState s) =>
+    s.tabs.where((t) => t.kind != TabKind.project).toList();
 Future<void> _later(WidgetTester t) =>
     t.runAsync(() => Future.delayed(AppState.doubleClickWindow * 2));
 
@@ -106,7 +102,7 @@ void main() {
       await t.tap(card);
       await t.pumpAndSettle();
       expect(s.peekUid, 'a');
-      expect(s.tabs, isEmpty);
+      expect(_notes(s), isEmpty);
       s.setOpenMode(OpenMode.main);
       await _later(t);
       await t.tap(
@@ -212,7 +208,7 @@ void main() {
       await t.tap(_k('menu-open-peek'));
       await t.pumpAndSettle();
       expect(s.peekUid, 'a');
-      expect(s.tabs, isEmpty);
+      expect(_notes(s), isEmpty);
     });
 
     testWidgets('long-press opens it on a list row', (t) async {
@@ -246,7 +242,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('menu-close'));
       await t.pumpAndSettle();
-      expect(s.tabs, isEmpty);
+      expect(_notes(s), isEmpty);
     });
 
     testWidgets('Delete from the menu asks, then deletes', (t) async {
@@ -296,7 +292,7 @@ void main() {
       await t.pump();
       await g.up();
       await t.pumpAndSettle();
-      expect(s.tabs.map((e) => e.id), ['c', 'a', 'b']);
+      expect(_notes(s).map((e) => e.id), ['c', 'a', 'b']);
       expect(
         (AppState(
           _Seed2(),
@@ -324,7 +320,7 @@ void main() {
         );
         await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
         await t.pumpAndSettle();
-        expect(s.tabs, hasLength(reversed ? 0 : 1));
+        expect(_notes(s), hasLength(reversed ? 0 : 1));
         expect(s.peekUid, reversed ? isNotNull : isNull);
       });
     }
@@ -340,7 +336,7 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
-      expect(s.tabs, isEmpty);
+      expect(_notes(s), isEmpty);
       expect(s.peekUid, isNotNull);
     });
 
@@ -351,7 +347,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('tab-n:a'), buttons: kMiddleMouseButton);
       await t.pumpAndSettle();
-      expect(s.tabs, [const DocTab.note('b')]);
+      expect(_notes(s), [const DocTab.note('b')]);
     });
 
     testWidgets('dragging the peek tab onto the strip still promotes', (
@@ -430,7 +426,7 @@ void main() {
       await t.tap(_k('tab-n:a'), buttons: kMiddleMouseButton);
       await t.pumpAndSettle();
       expect(asked, 1);
-      expect(s.tabs, [const DocTab.note('a')]);
+      expect(_notes(s), [const DocTab.note('a')]);
     });
 
     testWidgets('a search hit has a menu with both opens', (t) async {
@@ -492,7 +488,7 @@ void main() {
       expect(s.peekUid, 'a');
       await t.tap(_k('detail-tab'));
       await t.pumpAndSettle();
-      expect(s.tabs, isEmpty);
+      expect(_notes(s), isEmpty);
     });
 
     testWidgets('dragging a tab rightward reorders', (t) async {
@@ -509,7 +505,7 @@ void main() {
       await t.pump();
       await g.up();
       await t.pumpAndSettle();
-      expect(s.tabs.map((e) => e.id), ['b', 'c', 'a']);
+      expect(_notes(s).map((e) => e.id), ['b', 'c', 'a']);
     });
 
     testWidgets('dragging a note tab onto a view tab reorders', (t) async {
@@ -521,7 +517,7 @@ void main() {
       s.openNoteTab('b');
       s.applyView(v);
       await t.pumpAndSettle();
-      expect(s.tabs.last, DocTab.view(v.uid));
+      expect(_notes(s).last, DocTab.view(v.uid));
       final g = await t.startGesture(t.getCenter(_k('tab-n:a')));
       await t.pump();
       await g.moveTo(t.getCenter(_k('tab-v:${v.uid}')) + const Offset(4, 0));
@@ -530,7 +526,7 @@ void main() {
       await t.pump();
       await g.up();
       await t.pumpAndSettle();
-      expect(s.tabs.map((e) => e.code), ['n:b', 'v:${v.uid}', 'n:a']);
+      expect(_notes(s).map((e) => e.code), ['n:b', 'v:${v.uid}', 'n:a']);
     });
   });
 

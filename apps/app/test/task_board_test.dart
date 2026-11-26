@@ -21,7 +21,6 @@ void main() {
         mkTask('c', summary: 'Fixed bug', status: 'COMPLETED'),
       ],
     );
-    expect(find.byType(HomeBoard), findsNothing);
     await showTasksBoard(t);
     await t.pumpAndSettle();
     expect(find.byType(HomeBoard), findsOneWidget);
@@ -84,8 +83,10 @@ void main() {
         ],
       );
       state.setHomeKind(HomeKind.tasks);
-      expect([for (final c in state.homeColumns()) c.$1],
-          ['backlog', 'todo', 'doing', 'blocked', 'review', 'done', 'canceled']);
+      expect(
+        [for (final c in state.homeColumns()) c.$1],
+        ['backlog', 'todo', 'doing', 'blocked', 'review', 'done', 'canceled'],
+      );
       final cols = {for (final c in state.homeColumns()) c.$1: c.$2};
       expect([for (final x in cols['review']!) x.title], ['Shipped']);
       expect([for (final x in cols['backlog']!) x.title], ['Later']);
@@ -111,36 +112,5 @@ void main() {
     expect(_k('board-accordion'), findsOneWidget);
     expect(find.text('Busy bug'), findsOneWidget); // doing starts open
     expect(find.text('Open bug'), findsNothing); // todo starts collapsed
-  });
-
-  testWidgets('wide Home: + adds the focus type, chevron lists all three', (
-    t,
-  ) async {
-    await pumpHomeApp(t);
-    // Day leads with an event; the chevron lists note, task and event.
-    await t.tap(_k('home-add-more'));
-    await t.pumpAndSettle();
-    for (final k in ['home-add-event', 'home-add-note', 'home-add-task']) {
-      expect(_k(k), findsOneWidget);
-    }
-    // Event, note, task: the order of the Day, Board and Tasks views.
-    expect(
-      t.getTopLeft(_k('home-add-event')).dy,
-      lessThan(t.getTopLeft(_k('home-add-note')).dy),
-    );
-    expect(
-      t.getTopLeft(_k('home-add-note')).dy,
-      lessThan(t.getTopLeft(_k('home-add-task')).dy),
-    );
-    await t.tapAt(const Offset(5, 5));
-    await t.pumpAndSettle();
-    await showTasksBoard(t);
-    await t.pumpAndSettle();
-    await t.tap(_k('home-add'));
-    await t.pumpAndSettle();
-    expect(_k('new-task-title'), findsOneWidget);
-    await pumpHomeApp(t, size: const Size(400, 800));
-    expect(_k('home-add'), findsNothing);
-    expect(_k('home-add-more'), findsNothing);
   });
 }

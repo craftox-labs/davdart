@@ -36,19 +36,43 @@ Future<AppState> _pump(
   List<String> statuses, {
   double w = 1280,
   MemoryStorage? prefs,
-  bool board = true,
 }) async {
-  AppState.debugDefaultFocus = board ? HomeFocus.board : HomeFocus.day;
   t.view.physicalSize = Size(w, 900);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
   final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+  // The board lives on a project's Board tab: seed one and put the notes in.
+  final projectNotes = [
+    Note(
+      uid: 'grid-container',
+      summary: 'Projects',
+      categories: const [folderTag, projectsTag],
+    ),
+    Note(
+      uid: 'grid-project',
+      summary: 'Grid project',
+      parentUid: 'grid-container',
+      categories: const [folderTag],
+    ),
+    for (final n in _notes(statuses))
+      Note(
+        uid: n.uid,
+        summary: n.summary,
+        description: n.description,
+        parentUid: 'grid-project',
+        categories: n.categories,
+        lastModified: n.lastModified,
+        dtstamp: n.dtstamp,
+      ),
+  ];
   final s = AppState(
-    SpaceNoteSource(space, seed: _Seed(_notes(statuses))),
+    SpaceNoteSource(space, seed: _Seed(projectNotes)),
     prefs: prefs ?? MemoryStorage(),
   );
-  s.setSection(Section.notes); // the old Day | Board main view, not Home
   await t.pumpWidget(DavdartApp(state: s));
+  await t.pumpAndSettle();
+  s.openProjectTab('grid-project');
+  s.setProjectTab('grid-project', ProjectTab.board);
   await t.pumpAndSettle();
   return s;
 }
@@ -78,18 +102,6 @@ void main() {
       expect(cols[i].width, closeTo(cols[0].width, 0.5));
     }
     expect(t.takeException(), isNull);
-  });
-
-  testWidgets('Events above Tasks, same width, beside the calendar', (t) async {
-    await _pump(t, _four, w: 1700, board: false);
-    final cal = _r(t, 'home-calendar');
-    final tasks = _r(t, 'home-today-tasks');
-    final events = _r(t, 'home-today-events');
-    expect(tasks.left, greaterThan(cal.right));
-    expect(tasks.left, closeTo(events.left, 0.5));
-    expect(tasks.width, closeTo(events.width, 0.5));
-    // Events above Tasks, a space.lg gap between the sections' blocks.
-    expect(tasks.top, greaterThan(events.bottom));
   });
 
   testWidgets('falls back to scrolling below the minimum width', (t) async {

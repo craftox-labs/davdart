@@ -61,8 +61,6 @@ void main() {
         Note(uid: 'k', summary: 'Busy', description: 'status: doing\n\nx'),
       ],
     );
-    await t.tap(_k('home-focus-board'));
-    await t.pumpAndSettle();
     await _drag(
       t,
       t.getCenter(_k('nav-card-a')),

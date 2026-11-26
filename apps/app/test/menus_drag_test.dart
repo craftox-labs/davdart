@@ -14,6 +14,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'tasks_helper.dart';
+
 class _Seed implements NoteSource {
   @override
   Future<List<Note>> load() async => [
@@ -61,6 +63,16 @@ Future<AppState> _pump(
   s.setSection(Section.notes); // the old Day | Board main view, not Home
   await t.pumpWidget(DavdartApp(state: s));
   await t.pumpAndSettle();
+  return s;
+}
+
+/// The board lives on a project's Board tab now: its cards are seeded into a
+/// synthetic project.
+Future<AppState> _pumpBoard(WidgetTester t) async {
+  debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+  addTearDown(() => debugDefaultTargetPlatformOverride = null);
+  final s = await pumpHomeApp(t, notes: await _Seed().load());
+  s.setNotesView(NotesView.tree);
   return s;
 }
 
@@ -143,13 +155,10 @@ void main() {
 
   group('nested menus', () {
     testWidgets('a board card opens only its own menu', (t) async {
-      final s = await _pump(t);
+      final s = await _pumpBoard(t);
       s.setView(ViewMode.board);
       await t.pumpAndSettle();
-      final card = find.descendant(
-        of: _k('board-drop-backlog'),
-        matching: find.text('Alpha'),
-      );
+      final card = find.byKey(const ValueKey('nav-card-a'));
       await t.tap(card, buttons: kSecondaryButton);
       await t.pumpAndSettle();
       expect(_k('menu-open-peek'), findsOneWidget);
@@ -244,7 +253,7 @@ void main() {
     });
 
     testWidgets('Home stays a board whatever the persisted mode', (t) async {
-      final s = await _pump(t);
+      final s = await _pumpBoard(t);
       s.setView(ViewMode.list);
       await t.pumpAndSettle();
       expect(find.byType(HomeBoard), findsOneWidget);
@@ -274,19 +283,17 @@ void main() {
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
       final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
-      final state = AppState(
-        SpaceNoteSource(space, seed: _Plain()),
-        prefs: MemoryStorage(),
+      await t.pumpWidget(
+        DavdartApp(state: AppState(SpaceNoteSource(space, seed: _Plain()))),
       );
-      state.setSection(Section.notes);
-      await t.pumpWidget(DavdartApp(state: state));
       await t.pumpAndSettle();
-      expect(find.textContaining('No work items yet'), findsOneWidget);
+      // The Home tab is the dashboard now; the board lives in a project.
+      expect(find.byKey(const Key('home-page')), findsOneWidget);
       expect(find.text('No notes'), findsNothing);
     });
 
     testWidgets('a board column adds a note in its status', (t) async {
-      final s = await _pump(t);
+      final s = await _pumpBoard(t);
       s.setView(ViewMode.board);
       await t.pumpAndSettle();
       await t.tap(find.text('DOING'), buttons: kSecondaryButton);
@@ -353,19 +360,21 @@ void main() {
     });
 
     testWidgets('a board card dropped on a column sets its status', (t) async {
-      final s = await _pump(t);
+      final s = await _pumpBoard(t);
       s.setView(ViewMode.board);
       await t.pumpAndSettle();
-      final card = find.descendant(
-        of: _k('board-drop-backlog'),
-        matching: find.text('Alpha'),
+      final card = find.byKey(const ValueKey('nav-card-a'));
+      final target = t.getRect(_k('board-drop-doing'));
+      await _drag(
+        t,
+        t.getCenter(card),
+        Offset(target.center.dx, target.bottom - 20),
       );
-      await _drag(t, t.getCenter(card), t.getCenter(_k('board-drop-doing')));
       expect(PlanItem.fromNote(s.tree.find('a')!.note).status, 'doing');
     });
 
     testWidgets('a card clears its status from the menu', (t) async {
-      final s = await _pump(t);
+      final s = await _pumpBoard(t);
       await t.tap(
         find.descendant(
           of: _k('board-drop-backlog'),

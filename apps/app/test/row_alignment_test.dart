@@ -49,32 +49,6 @@ void main() {
       testWidgets('side header lines up with top bar, $tag', (t) async {
         await _pump(t, width, side);
         _same(t, _k('side-header'), _k('top-bar'));
-        _same(
-          t,
-          find.descendant(of: _k('side-header'), matching: find.text('Notes')),
-          find
-              .descendant(
-                of: _k('top-bar'),
-                matching: find.byKey(const Key('crumb-space')),
-              )
-              .first,
-          box: false,
-        );
-        final icons = find.descendant(
-          of: _k('side-header'),
-          matching: find.byType(Icon),
-        );
-        final bar = find.descendant(
-          of: _k('top-bar'),
-          matching: find.byType(Icon),
-        );
-        expect(icons, findsWidgets);
-        expect(bar, findsWidgets);
-        expect(
-          (t.getRect(icons.first).center.dy - t.getRect(bar.first).center.dy)
-              .abs(),
-          lessThanOrEqualTo(1),
-        );
       });
 
       testWidgets('peek toolbar lines up with side header, $tag', (t) async {

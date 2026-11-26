@@ -1,11 +1,11 @@
 import 'package:davdart/davdart.dart';
-import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
-import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+import 'tasks_helper.dart';
 
 Note _note(
   String uid,
@@ -43,20 +43,8 @@ class _Seed implements NoteSource {
 
 Finder _k(String k) => find.byKey(Key(k));
 
-Future<AppState> _pump(WidgetTester t) async {
-  t.view.physicalSize = const Size(1500, 900);
-  t.view.devicePixelRatio = 1;
-  addTearDown(t.view.reset);
-  final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
-  final s = AppState(
-    SpaceNoteSource(space, seed: _Seed()),
-    prefs: MemoryStorage(),
-  );
-  s.setSection(Section.notes); // the old Day | Board main view, not Home
-  await t.pumpWidget(DavdartApp(state: s));
-  await t.pumpAndSettle();
-  return s;
-}
+Future<AppState> _pump(WidgetTester t) async =>
+    pumpHomeApp(t, notes: await _Seed().load());
 
 void main() {
   setUp(() => AppState.debugDefaultFocus = HomeFocus.board);

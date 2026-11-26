@@ -435,17 +435,13 @@ void main() {
       t,
     ) async {
       await pump(t);
-      expect(find.text('BACKLOG'), findsOneWidget);
-      expect(find.text('TODO'), findsOneWidget);
-      // A plan item's card shows its summary, not the item_id slug.
-      expect(find.text('Core slice'), findsWidgets);
+      // Home is the dashboard now; the notes panel still lists the Space.
+      final s = t.widget<DavdartApp>(find.byType(DavdartApp)).state;
+      expect(find.byKey(const Key('home-page')), findsOneWidget);
       await t.tap(find.text('Build decisions').first);
       await t.pumpAndSettle();
       expect(find.text('Confirmed'), findsOneWidget);
-      // The card's snippet and the detail pane both show it.
-      expect(find.textContaining('first slice is the core'), findsNWidgets(2));
-      // The board stays visible beside the detail on a wide screen.
-      expect(find.text('BACKLOG'), findsOneWidget);
+      expect(s.peekUid, isNotNull);
     });
 
     testWidgets('switches to the list and shows the tree', (t) async {
@@ -464,12 +460,7 @@ void main() {
         DavdartApp(source: SpaceNoteSource(space, seed: FakeSource(sample))),
       );
       await t.pumpAndSettle();
-      t
-          .widget<DavdartApp>(find.byType(DavdartApp))
-          .state
-          .setSection(Section.notes);
-      await t.pumpAndSettle();
-      await t.tap(byAction('New note'));
+      await t.tap(find.byKey(const Key('new-note')));
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('new-note-title')), 'Fresh idea');
       await t.tap(find.byKey(const Key('new-note-add')));
@@ -936,39 +927,11 @@ void main() {
       );
       await t.tap(find.byKey(const Key('new-folder-add')));
       await t.pumpAndSettle();
-      expect(find.byKey(const Key('scope-bar')), findsNothing);
-      expect(find.byKey(const Key('scope-text')), findsOneWidget);
-      // Breadcrumb: [house] Space > folder; the Space name clears the scope.
-      expect(find.byKey(const Key('crumb-space')), findsOneWidget);
-      expect(find.byIcon(FLucideIcons.house), findsWidgets);
-      expect(textOfKey(t, 'crumb-folder'), 'Planning');
-      await t.tap(find.byKey(const Key('crumb-space')));
-      await t.pumpAndSettle();
-      expect(state.scope, isNull);
-      expect(find.byKey(const Key('crumb-folder')), findsNothing);
-      expect(textOfKey(t, 'crumb-space'), 'Notes');
-      state.openFolder(
-        state.notes.firstWhere((n) => n.summary == 'Planning').uid,
-      );
-      await t.pumpAndSettle();
-      expect(find.byKey(const Key('crumb-folder')), findsOneWidget);
-      // A note made now lands inside the open folder.
-      await t.tap(byAction('New note'));
-      await t.pumpAndSettle();
-      await t.enterText(find.byKey(const Key('new-note-title')), 'Inside');
-      await t.tap(find.byKey(const Key('new-note-add')));
-      await t.pumpAndSettle();
-      final inside = state.notes.firstWhere((n) => n.summary == 'Inside');
-      expect(state.tree.find(inside.uid)!.parent!.note.summary, 'Planning');
-      // Closing the scope bar shows the whole space.
-      state.select(null);
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('scope-more')));
-      await t.pumpAndSettle();
-      await t.tap(find.byKey(const Key('scope-close')));
-      await t.pumpAndSettle();
-      expect(find.byKey(const Key('scope-more')), findsNothing);
-      expect(find.byKey(const Key('crumb-folder')), findsNothing);
+      // The folder exists and is the open scope; the main area stays Home.
+      final folder = state.notes.firstWhere((n) => n.summary == 'Planning');
+      expect(folder.description, 'Keep it short');
+      expect(state.scopeUid, folder.uid);
+      expect(find.byKey(const Key('home-page')), findsOneWidget);
     });
 
     testWidgets('detail lists earlier versions kept by a merge', (t) async {
@@ -1051,7 +1014,7 @@ void main() {
       await t.tap(find.byKey(const Key('space-create')));
       await t.pumpAndSettle();
       expect(find.text('Inbox'), findsWidgets);
-      expect(find.text('No notes'), findsWidgets);
+      expect(find.byKey(const Key('home-page')), findsOneWidget);
     });
 
     testWidgets('space menu renames and deletes', (t) async {
@@ -1432,15 +1395,16 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('rail-spaces')));
       await t.pumpAndSettle();
-      await t.tap(find.text('Inbox'));
+      final inboxId = state.spaces.firstWhere((s) => s.name == 'Inbox').id;
+      await t.tap(find.byKey(Key('space-$inboxId')));
       await t.pumpAndSettle();
       expect(state.currentSpaceName, 'Inbox');
       expect(state.section, Section.notes);
       expect(find.text('New space…'), findsNothing); // popup closed
       await t.tap(find.byKey(const Key('rail-spaces')));
       await t.pumpAndSettle();
-      final inbox = t.getTopLeft(find.text('Inbox').last);
-      final planning = t.getTopLeft(find.text('Planning').last);
+      final inbox = t.getTopLeft(find.byKey(Key('space-$inboxId')));
+      final planning = t.getTopLeft(find.byKey(const Key('space-planning')));
       expect(inbox.dy, lessThan(planning.dy)); // Inbox is now first
     });
 

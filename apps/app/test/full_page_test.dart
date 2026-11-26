@@ -43,7 +43,6 @@ Future<AppState> _pump(
     prefs: MemoryStorage(),
   );
   if (side != null) state.setLayoutSide(side);
-  state.setSection(Section.notes); // the old Day | Board main view, not Home
   await t.pumpWidget(DavdartApp(state: state));
   await t.pumpAndSettle();
   if (select) {
@@ -173,7 +172,7 @@ void main() {
       final s = await _pump(t);
       final g = await t.startGesture(t.getCenter(_k('detail-drag')));
       await t.pump();
-      await g.moveTo(t.getCenter(find.text('TODO').first));
+      await g.moveTo(t.getCenter(_k('home-page')));
       await t.pump();
       await g.up();
       await _settle(t);
@@ -336,7 +335,7 @@ void main() {
       expect(PlanItem.fromNote(n).text, 'New body');
       expect(PlanItem.fromNote(n).status, 'todo');
       // The card's snippet and the detail body both show it.
-      expect(find.text('New body'), findsNWidgets(2));
+      expect(find.text('New body'), findsOneWidget);
     });
 
     testWidgets('Ctrl+S saves', (t) async {

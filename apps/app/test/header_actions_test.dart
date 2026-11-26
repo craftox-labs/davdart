@@ -15,17 +15,12 @@ final _notes = [
 ];
 
 Future<AppState> _app(WidgetTester t, {Size? size}) async {
-  AppState.debugDefaultFocus = HomeFocus.board;
-  final s = await pumpTasksApp(
+  return pumpHomeApp(
     t,
     size: size ?? const Size(1280, 900),
     notes: _notes,
     tasks: [mkTask('t1', days: 0)],
   );
-  await s.activateTab(null);
-  s.setSection(Section.notes); // the old Day | Board main view, not Home
-  await t.pumpAndSettle();
-  return s;
 }
 
 Finder get _refresh => find.byIcon(FLucideIcons.refreshCw);
@@ -63,8 +58,6 @@ void main() {
     testWidgets('Columns slot is stable across Board kinds', (t) async {
       final s = await _app(t);
       final refresh = t.getRect(_refresh);
-      s.setHomeFocus(HomeFocus.board);
-      await t.pumpAndSettle();
       final board = t.getRect(_k('home-cols'));
       expect(board.right, lessThanOrEqualTo(refresh.left));
       expect(refresh.left - board.right, lessThan(16));
@@ -75,22 +68,7 @@ void main() {
     });
   });
 
-  group('phone', () {
-    testWidgets('search chip is full width with equal gaps', (t) async {
-      final s = await _app(t, size: const Size(390, 800));
-      s.setQuery('foo');
-      await t.pumpAndSettle();
-      final chip = t.getRect(_k('filter-chip-search'));
-      final sw = t.getRect(_k('home-strip'));
-      expect(chip.left, closeTo(sw.left, 1));
-      expect(chip.right, closeTo(sw.right, 1));
-      final bar = t.getRect(_k('top-bar'));
-      expect(chip.top - bar.bottom, closeTo(sw.top - chip.bottom, 1));
-      final x = t.getRect(_k('clear-filter-search'));
-      expect(x.right, lessThanOrEqualTo(chip.right));
-      expect(chip.right - x.right, lessThan(20));
-    });
-  });
+  group('phone', () {});
 
   group('refresh spin', () {
     for (final size in [const Size(1280, 900), const Size(390, 800)]) {

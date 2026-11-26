@@ -288,9 +288,9 @@ class _Card extends StatelessWidget {
         ? const <String>[]
         : allTags.take(boardCardMaxTags).toList();
     final moreTags = allTags.length - shownTags.length;
-    final folder = compact || state.scopeUid != null
-        ? null
-        : state.folderNameOf(item.uid);
+    // A card's folder is the one it sits in, relative to the scope (the
+    // project on its Board tab); the scope folder itself is not shown.
+    final folder = compact ? null : state.folderNameOf(item.uid);
     final snippet = note == null || compact ? '' : noteSnippet(plan!.text);
     // Phone and desktop share one title size (one step under the old desktop
     // title).

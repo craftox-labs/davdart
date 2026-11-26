@@ -2,10 +2,7 @@ import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/key_nav.dart';
-import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/board_layout.dart';
-import 'package:davdart_app/ui/home_day.dart';
-import 'package:davdart_app/ui/theme.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -25,85 +22,6 @@ Task _done(int i, {String? status}) => Task(
 void main() {
   setUp(() => LocalZone.use('Asia/Bangkok'));
   tearDown(() => LocalZone.use(null));
-
-  group('Day shows dated tasks only', () {
-    testWidgets('undated tasks are gone; overdue only on today', (t) async {
-      final s = await pumpHomeApp(
-        t,
-        tasks: [
-          mkTask('undated'),
-          mkTask('today', days: 0),
-          mkTask('late', days: -3),
-          mkTask('next', days: 1),
-          mkTask('lateDone', days: -3, status: 'COMPLETED'),
-        ],
-      );
-      expect(_k('home-today-tasks-undated'), findsNothing);
-      expect(_k('home-today-tasks-nodate'), findsNothing);
-      expect(_k('home-today-tasks-today'), findsOneWidget);
-      expect(_k('home-today-tasks-late'), findsOneWidget);
-      expect(_k('home-today-tasks-lateDone'), findsNothing);
-      final n = DateTime.now().add(const Duration(days: 1));
-      s.selectHomeDay(DateTime.utc(n.year, n.month, n.day));
-      await t.pumpAndSettle();
-      expect(_k('home-today-tasks-next'), findsOneWidget);
-      expect(_k('home-today-tasks-late'), findsNothing);
-      expect(_k('home-today-tasks-today'), findsNothing);
-      expect(_k('home-today-tasks-undated'), findsNothing);
-    });
-
-    testWidgets('timezone edge: a UTC evening due is the next viewer day', (
-      t,
-    ) async {
-      LocalZone.use('Pacific/Auckland'); // UTC+13 in November
-      final s = await pumpHomeApp(
-        t,
-        tasks: [
-          // 21 Nov 09:00 in Auckland, still 20 Nov in UTC.
-          Task(
-            uid: 'z',
-            summary: 'Late UTC',
-            due: const ICalDate('20261120T200000Z'),
-            lastModified: DateTime.utc(2026, 11, 1),
-          ),
-          // 22 Nov 09:00 Auckland: overdue never, due on another day.
-          Task(
-            uid: 'y',
-            summary: 'Later UTC',
-            due: const ICalDate('20261121T200000Z'),
-            lastModified: DateTime.utc(2026, 11, 1),
-          ),
-        ],
-      );
-      final clock = DateTime.utc(2026, 11, 20, 20, 30); // 21 Nov 09:30 there
-      final tk = Tokens.light;
-      await t.pumpWidget(
-        FTheme(
-          data: buildTheme(Brightness.light, touch: false, tokens: tk),
-          child: Directionality(
-            textDirection: TextDirection.ltr,
-            child: TokensScope(
-              tokens: tk,
-              child: Overlay(
-                initialEntries: [
-                  OverlayEntry(
-                    builder: (_) => SizedBox(
-                      width: 900,
-                      height: 800,
-                      child: HomeDayFocus(state: s, now: () => clock),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-      await t.pumpAndSettle();
-      expect(_k('home-today-tasks-z'), findsOneWidget);
-      expect(_k('home-today-tasks-y'), findsNothing);
-    });
-  });
 
   group('backlog column only when used', () {
     testWidgets('task board hides an empty backlog, shows a used one', (
@@ -373,8 +291,6 @@ void main() {
           ),
         ],
       );
-      await t.tap(_k('home-focus-board'));
-      await t.pumpAndSettle();
       expect([for (final c in s.homeColumns()) c.$1], ['todo', 'doing']);
       s.toggleHomeCol('todo');
       expect([for (final c in s.homeColumns()) c.$1], ['doing']);
@@ -427,9 +343,7 @@ void main() {
       s.toggleHomeCol('doing');
       await t.pumpAndSettle();
       expect(_k('home-cols-badge'), findsOneWidget);
-      await t.tap(_k('home-focus-day'));
-      await t.pumpAndSettle();
-      expect(_k('home-cols'), findsNothing);
+      expect(_k('home-cols'), findsOneWidget);
     });
 
     testWidgets('phone layout has no toggle', (t) async {

@@ -180,59 +180,6 @@ void main() {
       expect([for (final i in s.homeItems) i.isTask], [true]);
     });
 
-    testWidgets('dropdown: inactive on Day, glyph follows the kind', (t) async {
-      final s = await pumpHomeApp(
-        t,
-        notes: [_note('n1')],
-        tasks: [mkTask('t1', summary: 'Bug')],
-      );
-      // Day: the square keeps its place but does nothing.
-      expect(_k('home-kind-icon-all'), findsOneWidget);
-      await t.tap(_k('home-kind'), warnIfMissed: false);
-      await t.pumpAndSettle();
-      expect(_k('home-kind-tasks'), findsNothing);
-      await t.tap(_k('home-focus-board'));
-      await t.pumpAndSettle();
-      await t.tap(_k('home-kind'));
-      await t.pumpAndSettle();
-      for (final k in ['all', 'notes', 'tasks']) {
-        expect(_k('home-kind-$k'), findsOneWidget);
-      }
-      await t.tap(_k('home-kind-notes'));
-      await t.pumpAndSettle();
-      expect(s.homeKind, HomeKind.notes);
-      expect(_k('home-kind-icon-notes'), findsOneWidget);
-      expect(_k('card-kind-n1'), findsOneWidget);
-      expect(_k('card-kind-t1'), findsNothing);
-      await t.tap(_k('home-kind'));
-      await t.pumpAndSettle();
-      await t.tap(_k('home-kind-all'));
-      await t.pumpAndSettle();
-      expect(_k('card-kind-n1'), findsOneWidget);
-      expect(_k('card-kind-t1'), findsOneWidget);
-      expect(_k('home-kind-icon-all'), findsOneWidget);
-    });
-
-    testWidgets('+ leads with add-task on Tasks, add-note otherwise', (
-      t,
-    ) async {
-      await pumpHomeApp(t);
-      await t.tap(_k('home-focus-board'));
-      await t.pumpAndSettle();
-      await t.tap(_k('home-add'));
-      await t.pumpAndSettle();
-      expect(_k('new-task-title'), findsNothing);
-      await t.tapAt(const Offset(5, 5));
-      await t.pumpAndSettle();
-      await t.tap(_k('home-kind'));
-      await t.pumpAndSettle();
-      await t.tap(_k('home-kind-tasks'));
-      await t.pumpAndSettle();
-      await t.tap(_k('home-add'));
-      await t.pumpAndSettle();
-      expect(_k('new-task-title'), findsOneWidget);
-    });
-
     testWidgets('kind is remembered per Space; All clears it', (t) async {
       final prefs = MemoryStorage();
       final s = await pumpHomeApp(t, prefs: prefs);
@@ -260,8 +207,6 @@ void main() {
       final s = await pumpHomeApp(t, prefs: legacy(), tasks: [mkTask('a')]);
       expect(s.homeFocus, HomeFocus.board);
       expect(s.homeKind, HomeKind.tasks);
-      expect(_k('home-kind-icon-tasks'), findsOneWidget);
-      expect(find.byType(Column), findsWidgets);
       // The old Tasks view's hidden columns still apply.
       expect(s.homeHiddenCols(), {'doing'});
       expect(_k('board-drop-doing'), findsNothing);

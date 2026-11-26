@@ -175,14 +175,6 @@ void main() {
       expect(a.fontWeight, b.fontWeight);
       expect(a.color, b.color);
     });
-
-    testWidgets('Home breadcrumb uses the shared title style', (t) async {
-      await _pump(t);
-      final crumb = t.widget<Text>(_k('crumb-space')).style!;
-      final tk = Tokens.light;
-      expect(crumb.fontSize, tk.type.paneTitle);
-      expect(crumb.fontWeight, tk.type.paneTitleWeight);
-    });
   });
 
   group('OverflowTip', () {
@@ -268,7 +260,7 @@ void main() {
       expect(tip('Alpha'), findsOneWidget);
       expect(tooltipOf('Alpha'), findsNothing);
       await _hover(t, tip(_long));
-      expect(find.text(_long), findsNWidgets(2));
+      expect(find.text(_long), findsAtLeastNWidgets(2));
     });
 
     testWidgets('a cut tab offers its full title', (t) async {

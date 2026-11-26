@@ -13,9 +13,7 @@ import '../state/app_state.dart';
 import '../state/note_draft.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
-import 'home_board.dart';
 import 'home_columns_toggle.dart';
-import 'home_day.dart';
 import 'command_palette.dart';
 import 'detail_header.dart';
 import 'detail_view.dart';
@@ -379,50 +377,11 @@ class _ShellState extends State<Shell>
       mirror: mirror,
     );
 
-    Widget board({bool embedded = false}) => ListenableBuilder(
-      listenable: state,
-      builder: (context, _) {
-        publishBoardNav(state);
-        state.nav.homeStacked = false;
-        return HomeBoard(state: state, embedded: embedded);
-      },
-    );
-
-    // The main area: a project's Overview page when one is open, the Home
-    // dashboard after the Home action (or at the start), otherwise the Home
-    // section's Day | Board view, whichever panel is showing.
-    Widget sectionMain() {
-      if (state.section == Section.overview && state.scopeUid != null) {
-        return ProjectOverviewPage(state: state);
-      }
-      if (state.showingHome) return HomePage(state: state);
-      final narrow = MediaQuery.sizeOf(context).width < Tokens.stackBreakpoint;
-      return Column(
-        children: [
-          HomeSwitch(state: state),
-          Expanded(
-            child: state.homeFocus == HomeFocus.day
-                ? HomeDayFocus(state: state)
-                : narrow
-                // Phone: the board accordions in one scroll view.
-                ? SingleChildScrollView(
-                    key: const Key('home-scroll'),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        board(embedded: true),
-                        SizedBox(height: fabInset(context)),
-                      ],
-                    ),
-                  )
-                : board(),
-          ),
-        ],
-      );
-    }
-
     Widget mainBody() => state.noSpace
         ? FirstRunView(state: state)
+        : state.mainProjectUid != null
+        // A project's page is its own tab.
+        ? ProjectOverviewPage(state: state)
         : mainNote != null
         ? DetailView(
             key: const Key('main-note'),
@@ -435,12 +394,13 @@ class _ShellState extends State<Shell>
         : Column(
             children: [
               // Narrow: the thin row above the content carries what the pill
-              // cannot: the folders below a project, and a saved view's name.
-              if (!wide) NarrowCrumbs(state: state),
-              ScopeText(state: state),
-              if (state.activeTab == null) ...[
-                Expanded(child: sectionMain()),
-              ] else
+              // cannot: a saved view's name.
+              if (!wide && state.activeTab != null) NarrowCrumbs(state: state),
+              if (state.activeTab != null && state.mainProjectUid == null)
+                ScopeText(state: state),
+              if (state.activeTab == null)
+                Expanded(child: HomePage(state: state))
+              else
                 Expanded(
                   child: state.view == ViewMode.board
                       ? BoardView(state: state)
@@ -913,8 +873,13 @@ class TopBar extends StatelessWidget {
   /// Left side of the row: the breadcrumb on Home and view tabs, nothing
   /// where a note fills the main area (it has its own header).
   Widget _lead(Tokens t) {
-    // A note filling the main area carries its title in its own header.
-    if (state.mainItemUid != null) return const SizedBox.shrink();
+    // A note filling the main area carries its title in its own header; Home
+    // and project pages name themselves (no breadcrumb row).
+    if (state.mainItemUid != null ||
+        state.activeTab == null ||
+        state.mainProjectUid != null) {
+      return const SizedBox.shrink();
+    }
     return Align(
       alignment: Alignment.centerLeft,
       child: ScopeCrumbs(state: state, label: state.activeViewName),
@@ -939,7 +904,9 @@ class TopBar extends StatelessWidget {
     );
     // Per-view controls: the Board/List switch on a view tab.
     final Widget viewControl =
-        state.activeTab == null || (showMenu && state.mainIsPage)
+        state.activeTab == null ||
+            state.mainProjectUid != null ||
+            (showMenu && state.mainIsPage)
         ? const SizedBox.shrink()
         : !narrow
         ? Row(
@@ -987,11 +954,9 @@ class TopBar extends StatelessWidget {
           // Menu first: Columns and refresh keep their place whether or not
           // a folder is open.
           if (home) ScopeActions(state: state),
-          if (home &&
-              !showMenu &&
-              state.activeTab == null &&
-              !state.showingHome &&
-              state.homeFocus != HomeFocus.day)
+          if (!showMenu &&
+              state.mainProjectUid != null &&
+              state.projectTab(state.mainProjectUid!) == ProjectTab.board)
             HomeColumnsToggle(state: state),
           refresh,
         ],

@@ -72,11 +72,7 @@ void main() {
     ) async {
       final s = await pumpHomeApp(
         t,
-        notes: [
-          _note('a', rank: 1),
-          _note('b', rank: 2),
-          _note('c', rank: 3),
-        ],
+        notes: [_note('a', rank: 1), _note('b', rank: 2), _note('c', rank: 3)],
       );
       expect(_uids(s, 'todo'), ['a', 'b', 'c']);
       await s.placeBoardItem('c', 'todo', index: 1);
@@ -141,8 +137,6 @@ void main() {
         t,
         notes: [_note('a', rank: 1), _note('b', rank: 2), _note('c', rank: 3)],
       );
-      await t.tap(_k('home-focus-board'));
-      await t.pumpAndSettle();
       final a = find.byKey(const ValueKey('nav-card-a'));
       final c = find.byKey(const ValueKey('nav-card-c'));
       final rect = t.getRect(c);
@@ -174,8 +168,6 @@ void main() {
         t,
         notes: [_note('a', rank: 1), _note('b', rank: 2)],
       );
-      await t.tap(_k('home-focus-board'));
-      await t.pumpAndSettle();
       final a = find.byKey(const ValueKey('nav-card-a'));
       await _drag(t, t.getCenter(a), t.getCenter(a) + const Offset(0, 4));
       expect(s.tree.find('a')!.note.rank, 1);

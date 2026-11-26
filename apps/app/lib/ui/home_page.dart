@@ -112,10 +112,8 @@ class HomePage extends StatelessWidget {
         return y.compareTo(x);
       });
 
-    Future<void> openProject(String uid) => state.guarded(() async {
-      state.openFolder(uid);
-      state.setSection(Section.overview);
-    });
+    Future<void> openProject(String uid) =>
+        state.guarded(() => state.openProjectTab(uid));
 
     Widget projectRow(Note p) {
       final s = ix.statsOf(p.uid);
@@ -411,39 +409,52 @@ class HomePage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: t.space.lg,
         children: [
-          Row(
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: t.space.xxs,
             children: [
-              Expanded(
-                child: Text(
-                  'Home',
-                  key: const Key('home-title'),
-                  style: t.type.titleStyle,
-                ),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Home',
+                      key: const Key('home-title'),
+                      style: t.type.titleStyle,
+                    ),
+                  ),
+                  if (state.tasksEditable)
+                    IconAction(
+                      key: const Key('home-new-task'),
+                      compact: true,
+                      tooltip: 'New task',
+                      icon: FLucideIcons.listChecks,
+                      onPress: () =>
+                          showNewTaskDialog(context, state, personal: true),
+                    ),
+                  if (state.editable)
+                    IconAction(
+                      key: const Key('home-new-note'),
+                      compact: true,
+                      tooltip: 'New note',
+                      icon: FLucideIcons.filePlus,
+                      onPress: () =>
+                          showNewNoteDialog(context, state, personal: true),
+                    ),
+                  if (state.editable)
+                    IconAction(
+                      key: const Key('home-new-project'),
+                      compact: true,
+                      tooltip: 'New project',
+                      icon: FLucideIcons.folderPlus,
+                      onPress: () => showNewProjectDialog(context, state),
+                    ),
+                ],
               ),
-              if (state.tasksEditable)
-                IconAction(
-                  key: const Key('home-new-task'),
-                  compact: true,
-                  tooltip: 'New task',
-                  icon: FLucideIcons.listChecks,
-                  onPress: () => showNewTaskDialog(context, state),
-                ),
-              if (state.editable)
-                IconAction(
-                  key: const Key('home-new-note'),
-                  compact: true,
-                  tooltip: 'New note',
-                  icon: FLucideIcons.filePlus,
-                  onPress: () => showNewNoteDialog(context, state),
-                ),
-              if (state.editable)
-                IconAction(
-                  key: const Key('home-new-project'),
-                  compact: true,
-                  tooltip: 'New project',
-                  icon: FLucideIcons.folderPlus,
-                  onPress: () => showNewProjectDialog(context, state),
-                ),
+              Text(
+                state.currentSpaceName ?? 'This Space',
+                key: const Key('home-space'),
+                style: t.type.captionStyle.copyWith(color: t.muted),
+              ),
             ],
           ),
           tiles,
