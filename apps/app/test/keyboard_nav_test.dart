@@ -389,9 +389,13 @@ void main() {
       await _press(t, _j);
       await _press(t, _j);
       expect(s.nav.cursorId(KeyNav.railList), 'events');
-      // Past it the tools follow, Calendar included in the one list.
+      // The editable Space keeps Projects on the rail even with none; past
+      // it the tools follow, Calendar included in the one list.
+      await _press(t, _j);
+      expect(s.nav.cursorId(KeyNav.railList), 'projects');
       await _press(t, _j);
       expect(s.nav.cursorId(KeyNav.railList), 'search');
+      await _press(t, _k_);
       await _press(t, _k_); // back to Calendar
       expect(s.nav.cursorId(KeyNav.railList), 'events');
       await _press(t, LogicalKeyboardKey.enter);
