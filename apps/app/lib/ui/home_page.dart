@@ -8,14 +8,10 @@ import '../state/key_nav.dart';
 import '../state/task_rules.dart';
 import 'events_panel.dart';
 import 'key_nav_ui.dart';
-import 'new_note_dialog.dart';
 import 'overflow_tip.dart';
-import 'parts.dart';
 import 'project_overview.dart';
 import 'placeholder_card.dart';
-import 'projects_panel.dart'
-    show ProjectProgressBar, projectCounts, showNewProjectDialog;
-import 'task_menu.dart';
+import 'projects_panel.dart' show ProjectProgressBar, projectCounts;
 import 'theme.dart';
 
 /// Home: the individual's page, scoped to the open Space and ignoring the
@@ -414,54 +410,6 @@ class HomePage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: t.space.lg,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: t.space.xxs,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      'Home',
-                      key: const Key('home-title'),
-                      style: t.type.titleStyle,
-                    ),
-                  ),
-                  if (state.tasksEditable)
-                    IconAction(
-                      key: const Key('home-new-task'),
-                      compact: true,
-                      tooltip: 'New task',
-                      icon: FLucideIcons.listChecks,
-                      onPress: () =>
-                          showNewTaskDialog(context, state, personal: true),
-                    ),
-                  if (state.editable)
-                    IconAction(
-                      key: const Key('home-new-note'),
-                      compact: true,
-                      tooltip: 'New note',
-                      icon: FLucideIcons.filePlus,
-                      onPress: () =>
-                          showNewNoteDialog(context, state, personal: true),
-                    ),
-                  if (state.editable)
-                    IconAction(
-                      key: const Key('home-new-project'),
-                      compact: true,
-                      tooltip: 'New project',
-                      icon: FLucideIcons.folderPlus,
-                      onPress: () => showNewProjectDialog(context, state),
-                    ),
-                ],
-              ),
-              Text(
-                state.currentSpaceName ?? 'This Space',
-                key: const Key('home-space'),
-                style: t.type.captionStyle.copyWith(color: t.muted),
-              ),
-            ],
-          ),
           tiles,
           PlaceholderCard(
             name: 'inbox',

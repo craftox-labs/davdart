@@ -92,10 +92,12 @@ void main() {
   testWidgets('header, tiles and the Home page itself', (t) async {
     final s = await _app(t);
     expect(_k('home-page'), findsOneWidget);
-    expect(t.widget<Text>(_k('home-title')).data, 'Home');
-    expect(_k('home-new-task'), findsOneWidget);
-    expect(_k('home-new-note'), findsOneWidget);
-    expect(_k('home-new-project'), findsOneWidget);
+    // The page header row names the Space; the Home tab says Home.
+    expect(t.widget<Text>(_k('page-title')).data, 'This Space');
+    // Creation lives in the panel, the palette and the phone + button.
+    expect(_k('home-new-task'), findsNothing);
+    expect(_k('home-new-note'), findsNothing);
+    expect(_k('home-new-project'), findsNothing);
     expect(_k('home-tiles'), findsOneWidget);
     // The whole Space, not the open project scope.
     s.openFolder('a');

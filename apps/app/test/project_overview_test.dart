@@ -98,6 +98,8 @@ void main() {
 
     testWidgets('the project page carries the marked placeholders', (t) async {
       await _app(t);
+      // The header row names the project; the old chips are gone.
+      expect(_text(t, 'page-title'), 'Alpha');
       for (final chip in [
         'proj-chip-star',
         'proj-chip-status',
@@ -105,7 +107,7 @@ void main() {
         'proj-chip-share',
         'proj-chip-settings',
       ]) {
-        expect(_k(chip), findsOneWidget);
+        expect(_k(chip), findsNothing);
       }
       expect(_k('placeholder-project-about'), findsOneWidget);
       expect(_k('placeholder-project-milestones'), findsOneWidget);

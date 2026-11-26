@@ -56,10 +56,6 @@ class ProjectOverviewPage extends StatelessWidget {
     final tab = projectUid == null
         ? ProjectTab.overview
         : state.projectTab(projectUid);
-    final scope = state.scope;
-    final name = scope == null || scope.summary.isEmpty
-        ? 'Overview'
-        : scope.summary;
     final counts = projectUid == null
         ? null
         : state.projectTaskCounts(projectUid, clock);
@@ -101,58 +97,7 @@ class ProjectOverviewPage extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
-          padding: EdgeInsets.fromLTRB(
-            t.space.xl,
-            t.space.lg,
-            t.space.xl,
-            t.space.sm,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            spacing: t.space.sm,
-            children: [
-              Text(
-                name,
-                key: const Key('overview-title'),
-                style: t.type.titleStyle,
-              ),
-              Wrap(
-                spacing: t.space.xs,
-                runSpacing: t.space.xs,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: const [
-                  _PlaceholderChip(
-                    name: 'star',
-                    icon: FLucideIcons.star,
-                    label: 'Star',
-                  ),
-                  _PlaceholderChip(
-                    name: 'status',
-                    icon: FLucideIcons.flag,
-                    label: 'Status',
-                  ),
-                  _PlaceholderChip(
-                    name: 'members',
-                    icon: FLucideIcons.users,
-                    label: 'Members',
-                  ),
-                  _PlaceholderChip(
-                    name: 'share',
-                    icon: FLucideIcons.share2,
-                    label: 'Share',
-                  ),
-                  _PlaceholderChip(
-                    name: 'settings',
-                    icon: FLucideIcons.settings,
-                    label: 'Settings',
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: EdgeInsets.symmetric(horizontal: t.space.xl),
+          padding: EdgeInsets.fromLTRB(t.space.xl, t.space.lg, t.space.xl, 0),
           child: Segmented<ProjectTab>(
             key: const Key('proj-tabs'),
             value: tab,
@@ -174,40 +119,6 @@ class ProjectOverviewPage extends StatelessWidget {
         SizedBox(height: t.space.sm),
         Expanded(child: tabBody()),
       ],
-    );
-  }
-}
-
-/// A muted, dashed chip that marks a header action not built yet. No action.
-class _PlaceholderChip extends StatelessWidget {
-  const _PlaceholderChip({
-    required this.name,
-    required this.icon,
-    required this.label,
-  });
-  final String name, label;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return DashedOutline(
-      key: Key('proj-chip-$name'),
-      radius: t.radii.card,
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal: t.space.sm,
-          vertical: t.space.xxs,
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: t.icons.sm, color: t.muted),
-            SizedBox(width: t.space.xxs),
-            Text(label, style: t.type.captionStyle.copyWith(color: t.muted)),
-          ],
-        ),
-      ),
     );
   }
 }
