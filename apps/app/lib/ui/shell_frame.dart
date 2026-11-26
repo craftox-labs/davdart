@@ -449,7 +449,7 @@ class IconRail extends StatelessWidget {
     final item = strip ? t.sizes.touchTarget : t.sizes.railItem;
     // The strip marks the section the panel shows, which is not
     // [AppState.section] when the Space cannot hold the stored one. Home is
-    // not a panel section: it is marked while the main area shows it.
+    // not a panel section, so it has no marked rail entry.
     final active = strip ? visibleSection(state) : state.section;
     final top = railEntries(state);
     final bottom = railBottomEntries(state);

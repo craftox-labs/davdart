@@ -1,9 +1,12 @@
 import 'package:davdart/davdart.dart';
+import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/key_nav.dart';
+import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'catalog_helper.dart';
 import 'tasks_helper.dart';
 
 Finder _k(String k) => find.byKey(Key(k));
@@ -144,11 +147,14 @@ void main() {
     expect(_uids(s, 'tasks'), {'late', 'lt'}); // overdue first, no project task
     expect(_k('home-task-late'), findsOneWidget);
     expect(_k('home-task-pt'), findsNothing);
+    // See all keeps the open project scope (the Tasks panel's own scope).
+    s.openFolder('a');
+    await t.pumpAndSettle();
     await t.ensureVisible(_k('home-tasks-all'));
     await t.tap(_k('home-tasks-all'));
     await t.pumpAndSettle();
     expect(s.section, Section.tasks);
-    expect(s.scopeUid, isNull);
+    expect(s.scopeUid, 'a');
   });
 
   testWidgets('personal calendar: loose events and dated loose tasks', (
@@ -174,6 +180,79 @@ void main() {
     expect(uids, containsAll(['n1', 'lt']));
     expect(uids, isNot(contains('pn'))); // project note
     expect(uids, isNot(contains('pt'))); // project task
+  });
+
+  testWidgets('items under the Projects container or a project never leak', (
+    t,
+  ) async {
+    final s = await _app(
+      t,
+      notes: [
+        _folder('c', 'Projects', container: true),
+        _folder('a', 'Alpha', parent: 'c'),
+        _note('under', 'c'), // directly under the container
+        _note('deep', 'a'), // inside the project
+        _folder('loose', 'Loose'),
+        _note('loose-note', 'loose'), // a plain folder is personal
+      ],
+      tasks: [
+        mkTask('under-task', parent: 'c'),
+        mkTask('deep-task', parent: 'a'),
+        mkTask('loose-task', days: 1, parent: 'loose'),
+      ],
+      events: [
+        mkEvent('under-event', parent: 'c'),
+        mkEvent('deep-event', parent: 'a'),
+        mkEvent('loose-event', parent: 'loose'),
+      ],
+    );
+    final tasks = _uids(s, 'tasks');
+    final calendar = _uids(s, 'calendar');
+    final recent = _uids(s, 'recent');
+    expect(tasks, {'loose-task'});
+    expect(calendar, {'loose-task', 'loose-event'});
+    expect(recent, containsAll(['loose-note', 'loose-task']));
+    for (final leak in [
+      'under',
+      'deep',
+      'under-task',
+      'deep-task',
+      'under-event',
+      'deep-event',
+    ]) {
+      expect(find.byKey(Key('home-recent-$leak')), findsNothing);
+    }
+  });
+
+  testWidgets('switching Space on Home keeps Home', (t) async {
+    final storage = MemoryStorage();
+    final c = catalogWithPlanning(
+      storage,
+      planningSeed: SeedNotes([Note(uid: 'n1', summary: 'Planning note')]),
+    );
+    final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
+    await t.pumpWidget(DavdartApp(state: s));
+    await t.pumpAndSettle();
+    expect(_k('home-page'), findsOneWidget);
+    await s.createSpace('Other');
+    final other = s.currentSpaceId!;
+    await s.switchSpace('planning');
+    // The Spaces panel keeps a list section; Home must stay Home.
+    s.setSection(Section.overview); // not supported here: resolves to Notes
+    s.showHome();
+    await s.switchSpace(other);
+    s.keepListSection();
+    await t.pumpAndSettle();
+    expect(s.showingHome, isTrue);
+    expect(_k('home-page'), findsOneWidget);
+    // A panel section that cannot land in the new Space is rewritten without
+    // leaving Home (the Overview case).
+    s.section = Section.overview;
+    s.keepListSection();
+    await t.pumpAndSettle();
+    expect(s.section, Section.notes);
+    expect(s.showingHome, isTrue);
+    expect(_k('home-page'), findsOneWidget);
   });
 
   testWidgets('previews stop at five rows', (t) async {

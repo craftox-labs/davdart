@@ -46,7 +46,7 @@ class ProjectOverviewPage extends StatelessWidget {
             StatTileData(
               'overdue',
               'Overdue',
-              open.where((k) => isTaskOverdue(k, clock)).length,
+              state.overdueIn(state.scopeUid, clock).length,
             ),
             StatTileData(
               'done',
@@ -54,7 +54,7 @@ class ProjectOverviewPage extends StatelessWidget {
               state.doneThisWeek(clock).length,
             ),
             StatTileData('notes', 'Notes', notes.length),
-            StatTileData('events', 'Events', events.length),
+            StatTileData('events', 'Calendar', events.length),
           ],
         );
         final tasks = _Tasks(state: state, tasks: open, now: clock);

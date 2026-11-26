@@ -513,11 +513,11 @@ class AppState extends ChangeNotifier {
   /// A press on a rail icon: the open section folds the side panel away,
   /// any other section (or any icon while folded) opens that section.
   void pressRail(Section s) {
-    showingHome = false;
     if (s == section && !sidebarCollapsed) {
       setSidebarCollapsed(true);
       notifyListeners();
     } else {
+      // Only opening a section leaves Home; folding the panel does not.
       setSection(s);
     }
   }
@@ -597,11 +597,19 @@ class AppState extends ChangeNotifier {
   /// the rail survives), any other section falls back to Notes (a project
   /// page too: the other Space's project scope is gone).
   void keepListSection() {
-    if (section != Section.tasks &&
-        section != Section.events &&
-        section != Section.projects) {
-      setSection(Section.notes);
+    if (section == Section.tasks ||
+        section == Section.events ||
+        section == Section.projects) {
+      return;
     }
+    // A Space switch keeps the main area where it was (Home stays Home); it
+    // only moves a panel that cannot land in the new Space. Writing the
+    // field directly is deliberate: setSection would also leave Home.
+    final s = _supportedSection(Section.notes);
+    if (section == s) return;
+    section = s;
+    prefs?.write(_sectionKey, s.name);
+    notifyListeners();
   }
 
   NoteSource source;
@@ -1169,27 +1177,7 @@ class AppState extends ChangeNotifier {
 
   /// True for a note inside the Space's Projects container (a project, a
   /// folder or note in one) and for the container itself.
-  bool inProjectsLayer(String uid) {
-    final ix = projectIndex;
-    if (ix.isProject(uid) || ix.projectOf(uid) != null) return true;
-    // The container itself, and anything sitting directly under it without
-    // being a project. Tasks and events are not in the note tree, so the walk
-    // goes through [findItem] like the scope checks do.
-    String? cur = uid;
-    for (var i = 0; cur != null && i <= notes.length + tasks.length; i++) {
-      final n = tree.find(cur)?.note;
-      if (n != null && isProjectsContainer(n)) return true;
-      final item = findItem(cur);
-      cur = item is Note
-          ? item.parentUid
-          : item is Task
-          ? item.parentUid
-          : item is Event
-          ? item.parentUid
-          : null;
-    }
-    return false;
-  }
+  bool inProjectsLayer(String uid) => projectIndex.inProjectsLayer(uid);
 
   /// The notes the Notes panel lists: [scopeUid]'s subtree in a project
   /// scope, and the Space's own (loose) notes in Personal scope. Folders are
@@ -2447,15 +2435,20 @@ class AppState extends ChangeNotifier {
     ]..sort((a, b) => compareTasks(a, b, n));
   }
 
-  /// Open tasks past due (see [isTaskOverdue] for how zoned times are
-  /// treated), most overdue first.
-  List<Task> overdueTasks([DateTime? now]) {
+  /// Open tasks past due in [scope] (a folder at any depth; null means the
+  /// whole Space), in [openTasksIn] order. One rule for the Overview, Home
+  /// and the project page.
+  List<Task> overdueIn(String? scope, [DateTime? now]) {
     final n = now ?? DateTime.now();
     return [
-      for (final t in openTasks(n))
+      for (final t in openTasksIn(scope, n))
         if (isTaskOverdue(t, n)) t,
     ];
   }
+
+  /// Open tasks past due in the open scope (see [isTaskOverdue] for how zoned
+  /// times are treated), most overdue first.
+  List<Task> overdueTasks([DateTime? now]) => overdueIn(scopeUid, now);
 
   /// Open tasks due on the user's current day, not yet past due.
   List<Task> dueTodayTasks([DateTime? now]) {

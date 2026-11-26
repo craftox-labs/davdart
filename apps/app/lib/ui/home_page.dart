@@ -75,11 +75,7 @@ class HomePage extends StatelessWidget {
       stats: [
         StatTileData('projects', 'Projects', ix.projects().length),
         StatTileData('open', 'Open tasks', open.length),
-        StatTileData(
-          'overdue',
-          'Overdue',
-          open.where((k) => isTaskOverdue(k, clock)).length,
-        ),
+        StatTileData('overdue', 'Overdue', state.overdueIn(null, clock).length),
         StatTileData(
           'done',
           'Done this week',
@@ -221,10 +217,11 @@ class HomePage extends StatelessWidget {
         if (loose(e.uid) && state.isMine(e)) e,
     ];
 
-    void seeAll(Section section) => state.guarded(() {
-      state.openFolder(null);
-      state.setSection(section);
-    });
+    // Personal Tasks and Calendar hold loose items, but switching there
+    // keeps the open project scope (the panel's own scope); a loose-only
+    // list would need a Tasks/Calendar mode of its own.
+    void seeAll(Section section) =>
+        state.guarded(() => state.setSection(section));
 
     Widget taskRow(Task k) {
       final day = taskDueDay(k);

@@ -131,6 +131,26 @@ class ProjectIndex {
     return found;
   }
 
+  /// Whether [uid] belongs to the projects layer: a project, anything under
+  /// one, the Projects container itself, or anything directly under it.
+  /// Walks the same parent map as [projectOf] (no scans), memoised because
+  /// Home asks for every item on each build.
+  bool inProjectsLayer(String uid) => _layer[uid] ??= _inLayer(uid);
+
+  final _layer = <String, bool>{};
+
+  bool _inLayer(String uid) {
+    if (isProject(uid) || projectOf(uid) != null) return true;
+    final seen = <String>{};
+    String? cur = uid;
+    while (cur != null && seen.add(cur)) {
+      final n = _byUid[cur];
+      if (n != null && isProjectsContainer(n)) return true;
+      cur = _parent[cur];
+    }
+    return false;
+  }
+
   /// Counts of project [uid] (zeros for an unknown uid).
   ProjectStats statsOf(String uid) {
     _compute();
