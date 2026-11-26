@@ -62,6 +62,7 @@ class _Panel extends StatelessWidget {
     final body = pinned == null
         ? list
         : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               pinned!,
               Expanded(child: list),

@@ -79,6 +79,16 @@ void main() {
       await _end(t);
     });
 
+    testWidgets('the toggle sits at the left of the panel, not centred', (
+      t,
+    ) async {
+      await pumpTasksApp(t, notes: _notes);
+      final left = t.getTopLeft(_k('notes-view-toggle')).dx;
+      final panel = t.getTopLeft(_k('side-header')).dx;
+      expect(left, lessThan(panel + 40), reason: 'near the panel start');
+      await _end(t);
+    });
+
     testWidgets('the project scope does not narrow the Personal panel', (
       t,
     ) async {

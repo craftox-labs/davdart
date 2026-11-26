@@ -82,12 +82,22 @@ class Segmented<T> extends StatelessWidget {
               borderRadius: BorderRadius.circular(t.radii.card),
             ),
             child: Padding(
-              // Only the icon segments need breathing room; the label-only
-              // switchers keep their original look.
-              padding: EdgeInsets.symmetric(
-                horizontal: icon == null ? 0 : t.space.xs,
+              // Same padding for icon and label-only segments, so every
+              // switcher in the app has the same size.
+              padding: EdgeInsets.symmetric(horizontal: t.space.xs),
+              child: Center(
+                heightFactor: 1,
+                // Icon-only content has no text line: give it the label's
+                // line height so it can never render shorter.
+                child: icon != null && narrow
+                    ? SizedBox(
+                        height:
+                            t.type.captionStyle.fontSize! *
+                            (t.type.captionStyle.height ?? 1.2),
+                        child: Center(child: content()),
+                      )
+                    : content(),
               ),
-              child: Center(child: content()),
             ),
           ),
         ),
@@ -95,7 +105,7 @@ class Segmented<T> extends StatelessWidget {
       return fullWidth ? Expanded(child: tap) : tap;
     }
 
-    return DecoratedBox(
+    final box = DecoratedBox(
       decoration: BoxDecoration(
         border: Border.all(color: t.cardBorder),
         borderRadius: BorderRadius.circular(t.radii.card),
@@ -105,5 +115,14 @@ class Segmented<T> extends StatelessWidget {
         children: [for (final s in segments) seg(s)],
       ),
     );
+    // Full width spans its parent; otherwise it sits at the start, never
+    // centred by whatever Column or Row it happens to be in.
+    return fullWidth
+        ? box
+        : Align(
+            alignment: AlignmentDirectional.centerStart,
+            heightFactor: 1,
+            child: box,
+          );
   }
 }
