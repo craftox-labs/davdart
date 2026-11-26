@@ -205,6 +205,29 @@ void main() {
     expect(s.nav.rowsOf(KeyNav.homeList), isEmpty);
   });
 
+  testWidgets('the Home action returns to the dashboard from an Overview', (
+    t,
+  ) async {
+    final s = await _app(t);
+    await t.tap(_k('home-project-a'));
+    await t.pumpAndSettle();
+    expect(s.section, Section.overview);
+    await t.tap(_k('rail-home'));
+    await t.pumpAndSettle();
+    expect(_k('home-page'), findsOneWidget);
+    expect(s.section, Section.notes); // the panel falls back from Overview
+    expect(s.scopeUid, 'a'); // the project scope is kept; Home ignores it
+  });
+
+  testWidgets('Home has no Day | Board switch and no Columns toggle', (
+    t,
+  ) async {
+    await _app(t);
+    expect(_k('home-strip'), findsNothing);
+    expect(_k('home-focus-day'), findsNothing);
+    expect(_k('home-cols'), findsNothing);
+  });
+
   testWidgets('phone: one column, nothing overflows', (t) async {
     await _app(t, size: const Size(360, 800));
     expect(_k('home-page'), findsOneWidget);
