@@ -166,7 +166,7 @@ Future<AppState> _pump(
   HomeFocus focus = HomeFocus.board,
 }) async {
   AppState.debugDefaultFocus = focus;
-  return pumpHomeApp(
+  return pumpTasksApp(
     t,
     notes: _notes(),
     tasks: _tasks(),
@@ -240,26 +240,6 @@ void main() {
 
   for (final w in _widths) {
     final at = '@${w.toInt()}px';
-
-    testWidgets('home board $at', (t) async {
-      await _pump(t, w);
-      _present(t, 'home board', w, _k('board-accordion'));
-      // One section starts open (doing): its card carries the long title and
-      // the eight tags that must fit.
-      _present(t, 'home board', w, _k('nav-card-n2'));
-      _clean(t, 'home board', w);
-      // The accordion sections all span the same content width.
-      if (_k('board-acc-todo').evaluate().isNotEmpty &&
-          _k('board-acc-doing').evaluate().isNotEmpty) {
-        _spans(t, 'home board', w, _k('board-acc-todo'), 'board-acc-doing');
-      }
-    });
-
-    testWidgets('home day $at', (t) async {
-      await _pump(t, w, focus: HomeFocus.day);
-      _present(t, 'home day', w, _k('home-strip'));
-      _clean(t, 'home day', w);
-    });
 
     testWidgets('notes tree in the side menu $at', (t) async {
       final s = await _pump(t, w);

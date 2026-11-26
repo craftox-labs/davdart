@@ -162,8 +162,12 @@ class TabStrip extends StatelessWidget {
                           child: FTappable(
                             key: const Key('tab-new'),
                             semanticsLabel: 'New note',
-                            onPress: () =>
-                                showNewNoteDialog(context, state, inTab: true),
+                            onPress: () => showNewNoteDialog(
+                              context,
+                              state,
+                              inTab: true,
+                              personal: true,
+                            ),
                             builder: (context, states, _) => _Box(
                               size: t.sizes.tabClose + t.space.sm,
                               hovered: states.contains(
@@ -213,7 +217,9 @@ class _ReorderableTab extends StatelessWidget {
     Widget item = TabItem(
       key: Key('tab-${tab.code}'),
       width: width,
-      icon: tab.kind == TabKind.view
+      icon: tab.kind == TabKind.project
+          ? FLucideIcons.folderKanban
+          : tab.kind == TabKind.view
           ? FLucideIcons.bookmark
           : tab.kind == TabKind.task
           ? FLucideIcons.listChecks
@@ -247,6 +253,27 @@ class _ReorderableTab extends StatelessWidget {
         state: state,
         uid: tab.id,
         surface: NoteSurface.mainTab,
+        child: item,
+      );
+    } else if (tab.kind == TabKind.project) {
+      item = ActionContextMenu(
+        groups: [
+          [
+            NoteMenuItem(
+              'Close tab',
+              FLucideIcons.x,
+              () => state.closeTab(tab),
+              key: const Key('menu-close'),
+            ),
+            if (state.tabs.length > 1)
+              NoteMenuItem(
+                'Close other tabs',
+                FLucideIcons.x,
+                () => state.closeOtherTabs(tab),
+                key: const Key('menu-close-others'),
+              ),
+          ],
+        ],
         child: item,
       );
     } else {

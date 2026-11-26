@@ -44,7 +44,7 @@ List<AddEntry> addEntries(AppState state) {
         'add-note',
         'New note',
         FLucideIcons.filePlus,
-        (c) => showNewNoteDialog(c, state),
+        (c) => showNewNoteDialog(c, state, personal: true),
         Section.notes,
       ),
     if (state.tasksEditable)
@@ -52,12 +52,12 @@ List<AddEntry> addEntries(AppState state) {
         'add-task',
         'New task',
         FLucideIcons.listPlus,
-        (c) => showNewTaskDialog(c, state),
+        (c) => showNewTaskDialog(c, state, personal: true),
         Section.tasks,
       ),
     if (state.eventsEditable)
       AddEntry('add-event', 'New event', FLucideIcons.calendarPlus, (c) async {
-        final uid = await showNewEventDialog(c, state);
+        final uid = await showNewEventDialog(c, state, personal: true);
         if (uid != null) await state.clickEvent(uid);
       }, Section.events),
   ];
@@ -381,6 +381,8 @@ String tabPreview(AppState state, DocTab tab) {
       return d.isNotEmpty ? d : e.location;
     case TabKind.view:
       return 'Saved view';
+    case TabKind.project:
+      return 'Project';
   }
 }
 
@@ -390,6 +392,7 @@ IconData tabIcon(AppState state, DocTab tab) => switch (tab.kind) {
   TabKind.task => FLucideIcons.listChecks,
   TabKind.event => FLucideIcons.calendar,
   TabKind.view => FLucideIcons.bookmark,
+  TabKind.project => FLucideIcons.folderKanban,
 };
 
 /// The open items as a full page of two-column cards. A card opens its item,
@@ -444,7 +447,7 @@ class _OpenItemsGridState extends State<OpenItemsGrid>
               children: [
                 Expanded(
                   child: Text(
-                    'Open items (${tabs.length})',
+                    'Open items (${tabs.length + 1})',
                     style: t.type.labelStyle,
                   ),
                 ),
@@ -478,23 +481,50 @@ class _OpenItemsGridState extends State<OpenItemsGrid>
             ),
           ),
           Expanded(
-            child: tabs.isEmpty
-                ? Center(
-                    child: Text(
-                      'No open items',
-                      style: t.type.captionStyle.copyWith(color: t.muted),
-                    ),
-                  )
-                : GridView.count(
-                    crossAxisCount: 2,
-                    padding: EdgeInsets.all(t.space.lg),
-                    mainAxisSpacing: t.space.md,
-                    crossAxisSpacing: t.space.md,
-                    childAspectRatio: 1.25,
-                    children: [for (final tab in tabs) _card(t, tab)],
-                  ),
+            child: GridView.count(
+              crossAxisCount: 2,
+              padding: EdgeInsets.all(t.space.lg),
+              mainAxisSpacing: t.space.md,
+              crossAxisSpacing: t.space.md,
+              childAspectRatio: 1.25,
+              children: [_homeCard(t), for (final tab in tabs) _card(t, tab)],
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// Home is always the first card: it cannot be closed.
+  Widget _homeCard(Tokens t) {
+    final active = widget.state.activeTab == null;
+    return FTappable(
+      key: const Key('grid-card-home'),
+      semanticsLabel: 'Home',
+      onPress: () => widget.onOpen(null),
+      child: Container(
+        padding: EdgeInsets.all(t.space.md),
+        decoration: BoxDecoration(
+          color: t.panel,
+          borderRadius: BorderRadius.circular(t.radii.card),
+          border: Border.all(
+            color: active ? t.accent : t.panelBorder,
+            width: active ? t.borders.hairline * 2 : t.borders.hairline,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(FLucideIcons.house, size: t.icons.md, color: t.muted),
+            SizedBox(height: t.space.sm),
+            Text(
+              'Home',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: t.type.bodyStyle,
+            ),
+          ],
+        ),
       ),
     );
   }

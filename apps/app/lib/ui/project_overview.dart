@@ -77,21 +77,21 @@ class ProjectOverviewPage extends StatelessWidget {
         key: ValueKey('proj-board-$projectUid'),
         child: KeyedSubtree(
           key: const Key('proj-board-tab'),
-          child: HomeBoard(state: state),
+          child: _BoardTab(state: state),
         ),
       ),
       ProjectTab.notes => KeyedSubtree(
         key: ValueKey('proj-notes-$projectUid'),
         child: KeyedSubtree(
           key: const Key('proj-notes-tab'),
-          child: NotesSection(state: state, onPick: () {}),
+          child: NotesSection(state: state, onPick: () {}, scoped: true),
         ),
       ),
       ProjectTab.calendar => KeyedSubtree(
         key: ValueKey('proj-calendar-$projectUid'),
         child: KeyedSubtree(
           key: const Key('proj-calendar-tab'),
-          child: EventsPanel(state: state),
+          child: EventsPanel(state: state, scoped: true),
         ),
       ),
     };
@@ -533,6 +533,23 @@ class _Card extends StatelessWidget {
       ),
     );
   }
+}
+
+/// The project Board tab: the unified board, with its keyboard rows
+/// published like Home's board used to.
+class _BoardTab extends StatelessWidget {
+  const _BoardTab({required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) => ListenableBuilder(
+    listenable: state,
+    builder: (context, _) {
+      publishBoardNav(state);
+      state.nav.homeStacked = false;
+      return HomeBoard(state: state);
+    },
+  );
 }
 
 /// One number for [StatTiles]: [id] is used in its keys.

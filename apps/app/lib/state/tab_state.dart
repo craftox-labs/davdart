@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 /// What a document tab shows.
-enum TabKind { note, view, task, event }
+enum TabKind { note, view, task, event, project }
 
 /// One closable tab of the strip: a note opened full page, or an applied
 /// saved view. Identified by the note's uid (for a view, the uid of the note
@@ -13,6 +13,7 @@ class DocTab {
   const DocTab.view(String uid) : this(TabKind.view, uid);
   const DocTab.task(String uid) : this(TabKind.task, uid);
   const DocTab.event(String uid) : this(TabKind.event, uid);
+  const DocTab.project(String uid) : this(TabKind.project, uid);
 
   final TabKind kind;
   final String id;
@@ -23,6 +24,7 @@ class DocTab {
         TabKind.view => 'v',
         TabKind.task => 't',
         TabKind.event => 'e',
+        TabKind.project => 'p',
       }}:$id';
 
   static DocTab? parse(String s) {
@@ -33,6 +35,7 @@ class DocTab {
       'v' => DocTab.view(id),
       't' => DocTab.task(id),
       'e' => DocTab.event(id),
+      'p' => DocTab.project(id),
       _ => null,
     };
   }

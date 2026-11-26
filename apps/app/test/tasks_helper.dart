@@ -83,8 +83,12 @@ Future<AppState> pumpTasksApp(
   return s;
 }
 
-/// Pumps the app with the Home section's old Day | Board main view showing
-/// (not the dashboard the Home action shows).
+/// A project uid the board helpers put their items in: the project Board tab
+/// is where the unified board lives now.
+const testProjectUid = 'test-project';
+
+/// Pumps the app with [testProjectUid]'s Board tab open: every seeded item
+/// that had no parent goes into that project, so the board shows them.
 Future<AppState> pumpHomeApp(
   WidgetTester t, {
   List<Note> notes = const [],
@@ -95,17 +99,57 @@ Future<AppState> pumpHomeApp(
   bool readOnly = false,
   Space? into,
 }) async {
+  final shaped = <Note>[
+    Note(
+      uid: 'test-container',
+      summary: 'Projects',
+      categories: [folderTag, projectsTag],
+    ),
+    Note(
+      uid: testProjectUid,
+      summary: 'Test project',
+      parentUid: 'test-container',
+      categories: [folderTag],
+    ),
+    for (final n in notes)
+      Note(
+        uid: n.uid,
+        summary: n.summary,
+        description: n.description,
+        parentUid: n.parentUid ?? testProjectUid,
+        categories: n.categories,
+        status: n.status,
+        created: n.created,
+        lastModified: n.lastModified,
+        dtstamp: n.dtstamp,
+        extraLines: n.extraLines,
+        calendarLines: n.calendarLines,
+        siblingLines: n.siblingLines,
+        propertyParams: n.propertyParams,
+        href: n.href,
+        etag: n.etag,
+      ),
+  ];
+  final shapedTasks = [
+    for (final k in tasks)
+      k.parentUid == null ? k.copyWith(parentUid: testProjectUid) : k,
+  ];
+  final shapedEvents = [
+    for (final e in events)
+      e.parentUid == null ? e.copyWith(parentUid: testProjectUid) : e,
+  ];
   final s = await pumpTasksApp(
     t,
-    notes: notes,
-    tasks: tasks,
-    events: events,
+    notes: shaped,
+    tasks: shapedTasks,
+    events: shapedEvents,
     size: size,
     prefs: prefs,
     readOnly: readOnly,
     into: into,
   );
-  s.setSection(Section.notes); // leaves Home: the old Day | Board main view
+  s.openProjectTab(testProjectUid);
+  s.setProjectTab(testProjectUid, ProjectTab.board);
   await t.pumpAndSettle();
   return s;
 }
@@ -149,12 +193,14 @@ Event mkEvent(
   lastModified: DateTime.now().toUtc(),
 );
 
-/// Opens Home's Board narrowed to tasks (Board segment, then the kind menu).
+/// Narrows the project Board tab to tasks (the kind setting has no menu any
+/// more; the board is the same unified board).
 Future<void> showTasksBoard(WidgetTester t) async {
-  await t.tap(find.byKey(const Key('home-focus-board')));
+  await t.tap(find.byKey(const Key('proj-tab-board')));
   await t.pumpAndSettle();
-  await t.tap(find.byKey(const Key('home-kind')));
-  await t.pumpAndSettle();
-  await t.tap(find.byKey(const Key('home-kind-tasks')));
+  t
+      .widget<DavdartApp>(find.byType(DavdartApp))
+      .state
+      .setHomeKind(HomeKind.tasks);
   await t.pumpAndSettle();
 }

@@ -135,7 +135,7 @@ void main() {
     await t.tap(_k('home-project-a'));
     await t.pumpAndSettle();
     expect(s.scopeUid, 'a');
-    expect(s.section, Section.overview);
+    expect(s.mainProjectUid, 'a');
     expect(_k('overview-page'), findsOneWidget);
   });
 
@@ -243,7 +243,6 @@ void main() {
     await s.switchSpace(other);
     s.keepListSection();
     await t.pumpAndSettle();
-    expect(s.showingHome, isTrue);
     expect(_k('home-page'), findsOneWidget);
     // A panel section that cannot land in the new Space is rewritten without
     // leaving Home (the Overview case).
@@ -251,7 +250,6 @@ void main() {
     s.keepListSection();
     await t.pumpAndSettle();
     expect(s.section, Section.notes);
-    expect(s.showingHome, isTrue);
     expect(_k('home-page'), findsOneWidget);
   });
 
@@ -290,12 +288,12 @@ void main() {
     final s = await _app(t);
     await t.tap(_k('home-project-a'));
     await t.pumpAndSettle();
-    expect(s.section, Section.overview);
+    expect(s.mainProjectUid, 'a');
     await t.tap(_k('rail-home'));
     await t.pumpAndSettle();
     expect(_k('home-page'), findsOneWidget);
-    expect(s.section, Section.notes); // the panel falls back from Overview
-    expect(s.scopeUid, 'a'); // the project scope is kept; Home ignores it
+    expect(s.activeTab, isNull);
+    expect(s.scopeUid, isNull, reason: 'Home is personal');
   });
 
   testWidgets('Home has no Day | Board switch and no Columns toggle', (

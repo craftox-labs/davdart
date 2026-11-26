@@ -2,7 +2,6 @@ import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
-import 'package:davdart_app/ui/app_actions.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -49,8 +48,7 @@ Future<AppState> _app(
     events: [mkEvent('ev', summary: 'Kickoff', days: 1, parent: 'p')],
   );
   await s.activateTab(null);
-  s.openFolder('p');
-  s.setSection(Section.overview);
+  s.openProjectTab('p');
   await t.pumpAndSettle();
   return s;
 }
@@ -121,7 +119,8 @@ void main() {
 
     testWidgets('a restored project scope opens its page again', (t) async {
       final prefs = MemoryStorage()
-        ..write('davdart.section.v1', 'overview')
+        ..write('davdart.tabs.v1.default', '["p:p"]')
+        ..write('davdart.activetab.v1.default', 'p:p')
         ..write('davdart.scope.v1', '{"default":"p"}');
       final s = await pumpTasksApp(
         t,
@@ -129,14 +128,15 @@ void main() {
         prefs: prefs,
         tasks: [mkTask('open-soon', summary: 'Soon', days: 1, parent: 'p')],
       );
-      await s.activateTab(null);
       await t.pumpAndSettle();
       expect(s.scopeUid, 'p');
-      expect(s.section, Section.overview);
+      expect(s.mainProjectUid, 'p');
       expect(_k('overview-page'), findsOneWidget);
     });
 
-    testWidgets('a plain folder leaves the project page for a list', (t) async {
+    testWidgets('opening another folder does not close the project tab', (
+      t,
+    ) async {
       final prefs = MemoryStorage();
       final s = await pumpTasksApp(
         t,
@@ -148,24 +148,14 @@ void main() {
         ],
       );
       await s.activateTab(null);
-      s.openFolder('p');
-      s.setSection(Section.overview);
+      s.openProjectTab('p');
       await t.pumpAndSettle();
       expect(_k('overview-page'), findsOneWidget);
-      // A plain folder is no project: the page cannot stay open.
+      // The page belongs to its tab: a folder scope does not close it.
       s.openFolder('loose');
       await t.pumpAndSettle();
-      expect(s.section, Section.notes);
-      expect(_k('overview-page'), findsNothing);
-      expect(prefs.read('davdart.section.v1'), 'notes');
-      // Back on a project, then the Projects container: same rule.
-      s.openFolder('p');
-      s.setSection(Section.overview);
-      await t.pumpAndSettle();
-      s.openFolder('c');
-      await t.pumpAndSettle();
-      expect(s.section, Section.notes);
-      expect(_k('overview-page'), findsNothing);
+      expect(s.mainProjectUid, 'p');
+      expect(_k('overview-page'), findsOneWidget);
     });
 
     testWidgets('each project remembers its own tab', (t) async {
@@ -182,41 +172,25 @@ void main() {
         ],
       );
       await s.activateTab(null);
-      s.openFolder('p');
-      s.setSection(Section.overview);
+      s.openProjectTab('p');
       await t.pumpAndSettle();
       await t.tap(_k('proj-tab-events'));
       await t.pumpAndSettle();
       expect(s.projectTab('p'), ProjectTab.calendar);
       // Another project opens on its own tab (Overview), not Alpha's.
-      s.openFolder('q');
+      s.openProjectTab('q');
       await t.pumpAndSettle();
-      expect(s.section, Section.overview);
+      expect(s.mainProjectUid, 'q');
       expect(s.projectTab('q'), ProjectTab.overview);
       expect(_k('overview-page'), findsOneWidget);
       await t.tap(_k('proj-tab-notes'));
       await t.pumpAndSettle();
       expect(s.projectTab('q'), ProjectTab.notes);
       // Back to Alpha: its Calendar tab is still its own.
-      s.openFolder('p');
+      s.openProjectTab('p');
       await t.pumpAndSettle();
       expect(s.projectTab('p'), ProjectTab.calendar);
       expect(_k('proj-calendar-tab'), findsOneWidget);
-    });
-
-    testWidgets('the Overview palette entry applies only to real projects', (
-      t,
-    ) async {
-      final s = await _app(t);
-      bool enabled() =>
-          buildActions(s).firstWhere((a) => a.id == 'go.overview').enabled(s);
-      expect(enabled(), isTrue);
-      s.openFolder(null);
-      expect(enabled(), isFalse);
-      s.openFolder('c'); // the Projects container, not a project
-      expect(enabled(), isFalse);
-      s.openFolder('p');
-      expect(enabled(), isTrue);
     });
 
     testWidgets(
@@ -226,7 +200,7 @@ void main() {
         expect(_k('overview-page'), findsOneWidget);
         await t.tap(_k('proj-tab-board'));
         await t.pumpAndSettle();
-        expect(s.section, Section.overview);
+        expect(s.mainProjectUid, 'p');
         expect(_k('proj-board-tab'), findsOneWidget);
         expect(_k('overview-page'), findsNothing);
         expect(_k('board-drop-todo'), findsOneWidget);
@@ -296,8 +270,7 @@ void main() {
         ],
       );
       await s.activateTab(null);
-      s.openFolder('p');
-      s.setSection(Section.overview);
+      s.openProjectTab('p');
       await t.pumpAndSettle();
       expect(_text(t, 'proj-percent'), '0%');
       expect(_text(t, 'proj-done-line'), '0 of 0 tasks done');
@@ -326,8 +299,7 @@ void main() {
         ],
       );
       await s.activateTab(null);
-      s.openFolder('p');
-      s.setSection(Section.overview);
+      s.openProjectTab('p');
       await t.pumpAndSettle();
       expect(_text(t, 'proj-done-line'), '0 of 1 tasks done');
       expect(_k('overview-task-deep-task'), findsOneWidget);

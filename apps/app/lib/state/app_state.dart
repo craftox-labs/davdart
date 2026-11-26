@@ -236,9 +236,6 @@ class AppState extends ChangeNotifier {
       orElse: () => Section.notes,
     );
     section = _landing(savedSection);
-    // A saved Overview only lands once the project scope is back: the page
-    // needs a real project (see load).
-    _overviewToRestore = savedSection == Section.overview;
     sidebarCollapsed = prefs?.read(_collapsedKey) == 'true';
     final w = double.tryParse(prefs?.read(_widthKey) ?? '');
     sidebarWidth = (w == null || !w.isFinite) ? null : w;
@@ -530,18 +527,14 @@ class AppState extends ChangeNotifier {
   /// Which section the side panel shows.
   Section section = Section.notes;
 
-  /// Set on start when the saved section was Overview; it is applied after
-  /// the saved scope comes back, and only when that scope is a project.
-  bool _overviewToRestore = false;
-
   /// Whether the current Space's collection can hold what [s] lists.
   bool supportsSection(Section s) => switch (s) {
     Section.notes => supportsNotes,
     Section.tasks => supportsTasks,
     Section.events => supportsEvents,
     Section.projects => supportsNotes,
-    // A project's page is only about a real project (or a folder inside one).
-    Section.overview => supportsNotes && scopeInProject,
+    // The old main-area Overview section is retired: projects open in tabs.
+    Section.overview => false,
     _ => true,
   };
 
@@ -580,7 +573,6 @@ class AppState extends ChangeNotifier {
   void setSection(Section s) {
     s = _supportedSection(s);
     setSidebarCollapsed(false);
-    showingHome = false;
     if (section == s) {
       notifyListeners();
       return;
@@ -590,21 +582,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Whether the main area shows the Home page rather than a section's own
-  /// main view (Tasks' board, Calendar's day). Home is not a panel section:
-  /// it keeps the open panel and only takes the main area, so this is
-  /// transient, not a stored section. A dirty draft is not settled here; the
-  /// UI goes through [guarded] where that matters.
-  bool showingHome = true;
-
-  /// Shows the Home page in the main area (the Home rail action and palette
-  /// entry). A project Overview is a main-area page too, so the panel falls
-  /// back to Notes; the project scope is kept (Home ignores it).
-  void showHome() {
-    if (section == Section.overview) setSection(Section.notes);
-    showingHome = true;
-    notifyListeners();
-  }
+  /// Shows the Home tab in the main area (the Home rail action and the
+  /// palette entry). Home is personal, so it clears the project scope.
+  void showHome() => _show(null);
 
   /// After a Space switch: the Tasks and Events lists stay (the choice on
   /// the rail survives), any other section falls back to Notes.
@@ -1194,7 +1174,132 @@ class AppState extends ChangeNotifier {
   /// folder or note in one) and for the container itself.
   bool inProjectsLayer(String uid) => projectIndex.inProjectsLayer(uid);
 
-  /// The notes the Notes panel lists: [scopeUid]'s subtree in a project
+  // --- Personal layer ---
+  //
+  // Personal is the individual's own bucket: a folder tagged `kind-personal`
+  // (created lazily) plus anything outside the Projects container. The
+  // Personal sections (Notes, Tasks, Calendar) read only this layer; the
+  // project scope belongs to project pages and does not narrow them.
+
+  Note? get personalContainer {
+    for (final n in notes) {
+      if (isPersonalContainer(n)) return n;
+    }
+    return null;
+  }
+
+  /// The Personal container's uid, created when the Space has none.
+  Future<String?> ensurePersonalContainer() async {
+    final existing = personalContainer;
+    if (existing != null) return existing.uid;
+    final n = _newFolder(personalTitle, tags: const [personalTag]);
+    if (n == null) return null;
+    await _save(n);
+    if (error != null) return null;
+    return n.uid;
+  }
+
+  /// The personal notes (folders and views left out), oldest first.
+  List<Note> get personalNotes => [
+    for (final n in notes)
+      if (!isFolder(n) && !isViewNote(n) && !inProjectsLayer(n.uid)) n,
+  ]..sort(NoteTree.byCreated);
+
+  /// Personal notes after the search and tag filters.
+  List<Note> get filteredPersonal => [
+    for (final n in notes)
+      if (!isFolder(n) && !inProjectsLayer(n.uid) && matches(n)) n,
+  ]..sort(NoteTree.byCreated);
+
+  /// The tree's top rows for Personal: the Personal container's children,
+  /// the container itself hidden, plus top-level items outside it.
+  List<NoteNode> get personalTreeRoots {
+    final container = personalContainer;
+    if (container == null) {
+      return [
+        for (final r in tree.roots)
+          if (!inProjectsLayer(r.note.uid) && !isProjectsContainer(r.note)) r,
+      ];
+    }
+    final inside = tree.find(container.uid)?.children ?? const <NoteNode>[];
+    final top = [
+      for (final r in tree.roots)
+        if (r.note.uid != container.uid &&
+            !isPersonalContainer(r.note) &&
+            !inProjectsLayer(r.note.uid))
+          r,
+    ];
+    return [...inside, ...top];
+  }
+
+  /// The folders Personal can drop into: the container's child folders, or
+  /// the loose top-level folders when there is no container.
+  List<Note> get personalSubFolders {
+    final container = personalContainer;
+    if (container == null) {
+      return [
+        for (final r in tree.roots)
+          if (isFolder(r.note) &&
+              !isProjectsContainer(r.note) &&
+              !inProjectsLayer(r.note.uid))
+            r.note,
+      ];
+    }
+    return [
+      for (final c in tree.find(container.uid)?.children ?? const <NoteNode>[])
+        if (isFolder(c.note)) c.note,
+    ];
+  }
+
+  /// The folder a personal note is grouped under (the container itself is
+  /// hidden), or null for a note directly in Personal or at the top level.
+  Note? personalGroupOf(String uid) {
+    final container = personalContainer?.uid;
+    var p = tree.find(uid)?.note.parentUid;
+    Note? group;
+    while (p != null) {
+      final n = tree.find(p)?.note;
+      if (n == null || p == container || isPersonalContainer(n)) break;
+      group = n;
+      p = n.parentUid;
+    }
+    return group;
+  }
+
+  /// Open personal tasks (outside the projects layer), in task order.
+  List<Task> personalOpenTasks([DateTime? now]) {
+    final n = now ?? DateTime.now();
+    return [
+      for (final t in tasks)
+        if (!t.isClosed && !inProjectsLayer(t.uid)) t,
+    ]..sort((a, b) => compareTasks(a, b, n));
+  }
+
+  /// Personal tasks after the tag filter (status is the panel's own filter).
+  List<Task> get filteredPersonalTasks => [
+    for (final t in tasks)
+      if ((taskTagFilter == null || t.categories.contains(taskTagFilter)) &&
+          !inProjectsLayer(t.uid))
+        t,
+  ];
+
+  /// Personal events after the tag filter.
+  List<Event> get filteredPersonalEvents => [
+    for (final e in events)
+      if ((eventTagFilter == null || e.categories.contains(eventTagFilter)) &&
+          !inProjectsLayer(e.uid))
+        e,
+  ];
+
+  List<AgendaGroup> upcomingPersonalOccurrences(DateTime from, int days) =>
+      upcomingGroups(filteredPersonalEvents, from, days);
+
+  List<EventOccurrence> pastPersonalOccurrences(
+    DateTime from, [
+    int days = 30,
+  ]) => pastAgenda(filteredPersonalEvents, from, days);
+
+  /// The notes the Notes panel lists: [scopeUid]'s subtree in a project  /// The notes the Notes panel lists: [scopeUid]'s subtree in a project
   /// scope, and the Space's own (loose) notes in Personal scope. Folders are
   /// not notes here; the tree shows those.
   List<Note> get notesInScope {
@@ -1272,12 +1377,6 @@ class AppState extends ChangeNotifier {
   /// a recent one.
   void openFolder(String? uid) {
     scopeUid = uid;
-    // A project's page needs a real project scope. Leaving one for the whole
-    // Space, a plain folder or the Projects container goes back to a list.
-    if (section == Section.overview && !supportsSection(Section.overview)) {
-      section = _supportedSection(Section.notes);
-      prefs?.write(_sectionKey, section.name);
-    }
     _persistScope();
     if (uid != null) {
       // A project, or a folder inside one, makes that project recent.
@@ -1862,9 +1961,11 @@ class AppState extends ChangeNotifier {
       if (_restoreScopePending) {
         _restoreScopePending = false;
         _restoreScope();
-        if (_overviewToRestore) {
-          _overviewToRestore = false;
-          if (supportsSection(Section.overview)) section = Section.overview;
+        // A restored project tab owns the scope: its page reads the project.
+        final activeProject = mainProjectUid;
+        if (activeProject != null && scopeUid != activeProject) {
+          scopeUid = activeProject;
+          _persistScope();
         }
       }
     } catch (e) {
@@ -2294,10 +2395,14 @@ class AppState extends ChangeNotifier {
     String? parentUid,
     String? status,
     bool inTab = false,
+    bool personal = false,
   }) async {
     final t = title.trim();
     if (t.isEmpty) return;
     final now = DateTime.now().toUtc();
+    // Personal items go under the Personal container (created on demand).
+    if (personal && parentUid == null)
+      parentUid = await ensurePersonalContainer();
     // Nothing loose under a Projects container (same rule as tasks/events).
     final pn = parentUid == null ? null : tree.find(parentUid)?.note;
     final n = Note(
@@ -2658,10 +2763,14 @@ class AppState extends ChangeNotifier {
     ICalDate? due,
     int? priority,
     List<String> tags = const [],
+    bool personal = false,
   }) async {
     final t = title.trim();
     if (t.isEmpty) return null;
     final now = DateTime.now().toUtc();
+    final parent = personal && parentUid == null
+        ? await ensurePersonalContainer()
+        : _parentOrScope(parentUid);
     final task = Task(
       uid: 'davdart-${now.microsecondsSinceEpoch}',
       summary: t,
@@ -2669,7 +2778,7 @@ class AppState extends ChangeNotifier {
       status: 'NEEDS-ACTION',
       due: due,
       priority: priority,
-      parentUid: _parentOrScope(parentUid),
+      parentUid: parent,
       categories: _plainTags(tags),
       created: now,
       lastModified: now,
@@ -3242,6 +3351,7 @@ class AppState extends ChangeNotifier {
     String location = '',
     String? description,
     List<String> tags = const [],
+    bool personal = false,
   }) async {
     final t = title.trim();
     if (t.isEmpty) return null;
@@ -3263,7 +3373,9 @@ class AppState extends ChangeNotifier {
       description: description ?? '',
       location: location.trim(),
       categories: _plainTags(tags),
-      parentUid: _parentOrScope(null),
+      parentUid: personal
+          ? await ensurePersonalContainer()
+          : _parentOrScope(null),
       dtstart: eventDate(first, allDay: allDay),
       dtend: last,
       created: now,
@@ -3567,6 +3679,16 @@ class AppState extends ChangeNotifier {
         : null;
   }
 
+  /// The project whose page fills the main pane, when its tab is one.
+  String? get mainProjectUid {
+    final t = activeTab;
+    return t != null &&
+            t.kind == TabKind.project &&
+            projectIndex.isProject(t.id)
+        ? t.id
+        : null;
+  }
+
   /// The note, task or event the main pane shows full page, if any.
   String? get mainItemUid => mainNoteUid ?? mainTaskUid ?? mainEventUid;
 
@@ -3575,6 +3697,8 @@ class AppState extends ChangeNotifier {
   bool get mainIsPage => mainItemUid != null;
 
   String get _tabsKey => 'davdart.tabs.v1.${catalog?.current ?? 'default'}';
+  String get _activeTabKey =>
+      'davdart.activetab.v1.${catalog?.current ?? 'default'}';
 
   void _saveTabs() {
     if (!_tabsLoaded) return;
@@ -3582,6 +3706,12 @@ class AppState extends ChangeNotifier {
       prefs?.remove(_tabsKey);
     } else {
       prefs?.write(_tabsKey, _tabs.encode());
+    }
+    final a = activeTab;
+    if (a == null) {
+      prefs?.remove(_activeTabKey);
+    } else {
+      prefs?.write(_activeTabKey, a.code);
     }
   }
 
@@ -3597,6 +3727,7 @@ class AppState extends ChangeNotifier {
     TabKind.view => _viewNotes.containsKey(t.id),
     TabKind.task => _taskById(t.id) != null,
     TabKind.event => _eventById(t.id) != null,
+    TabKind.project => projectIndex.isProject(t.id),
   };
 
   void _pruneTabs() {
@@ -3612,6 +3743,8 @@ class AppState extends ChangeNotifier {
     _tabs.decode(prefs?.read(_tabsKey));
     _tabsLoaded = true;
     _pruneTabs();
+    final active = DocTab.parse(prefs?.read(_activeTabKey) ?? '');
+    if (active != null && _tabs.contains(active)) _activeViewTab = active;
     _saveTabs();
   }
 
@@ -3619,6 +3752,15 @@ class AppState extends ChangeNotifier {
   void openTaskTab(String uid) {
     if (_taskById(uid) == null) return;
     final t = DocTab.task(uid);
+    if (_tabs.add(t)) _saveTabs();
+    _show(t);
+  }
+
+  /// Opens (or focuses) the tab of project [uid]. Projects always open in a
+  /// tab (never the peek).
+  void openProjectTab(String uid) {
+    if (!projectIndex.isProject(uid)) return;
+    final t = DocTab.project(uid);
     if (_tabs.add(t)) _saveTabs();
     _show(t);
   }
@@ -3677,6 +3819,7 @@ class AppState extends ChangeNotifier {
     TabKind.view => _viewByUid(t.id)?.name ?? '',
     TabKind.task => _taskById(t.id)?.summary ?? '',
     TabKind.event => _eventById(t.id)?.summary ?? '',
+    TabKind.project => tree.find(t.id)?.note.summary ?? '',
   };
 
   bool tabIsFolder(DocTab t) =>
@@ -3716,21 +3859,41 @@ class AppState extends ChangeNotifier {
     }
     if (t == null) {
       _activeViewTab = null;
+      // Home is personal: the project scope belongs to a project page.
+      if (scopeUid != null) {
+        scopeUid = null;
+        _persistScope();
+      }
+      _saveTabs();
       notifyListeners();
     } else if (t.kind == TabKind.note) {
       if (tree.find(t.id) == null) return;
       _activeViewTab = t;
       if (peekUid == t.id) _setPeek(null);
+      _saveTabs();
       notifyListeners();
     } else if (t.kind == TabKind.task) {
       if (_taskById(t.id) == null) return;
       _activeViewTab = t;
       if (peekUid == t.id) _setPeek(null);
+      _saveTabs();
       notifyListeners();
     } else if (t.kind == TabKind.event) {
       if (_eventById(t.id) == null) return;
       _activeViewTab = t;
       if (peekUid == t.id) _setPeek(null);
+      _saveTabs();
+      notifyListeners();
+    } else if (t.kind == TabKind.project) {
+      if (!projectIndex.isProject(t.id)) return;
+      _activeViewTab = t;
+      if (scopeUid != t.id) {
+        scopeUid = t.id;
+        _persistScope();
+      }
+      _rememberProject(t.id);
+      if (peekUid == t.id) _setPeek(null);
+      _saveTabs();
       notifyListeners();
     } else {
       final v = _viewByUid(t.id);
