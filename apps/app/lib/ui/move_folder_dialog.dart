@@ -18,6 +18,18 @@ Future<void> showMoveFolderDialog(
   // No container yet: an editable Space creates one on the move; a
   // read-only Space's Personal is the top level.
   final canCreatePersonal = personal == null && state.editable;
+  // A project moved into Personal stops being a project: not offered.
+  final isProject = state.projectIndex.isProject(note.uid);
+  Future<void> move(String? target) async {
+    final ok = await state.moveNote(note.uid, target);
+    if (!ok && context.mounted) {
+      showFToast(
+        context: context,
+        title: Text('Could not move "${note.summary}" there'),
+      );
+    }
+  }
+
   final atPersonal = personal != null
       ? parentUid == personal.uid
       : (!canCreatePersonal && parentUid == null);
@@ -67,7 +79,7 @@ Future<void> showMoveFolderDialog(
               if (onPress != null) {
                 onPress();
               } else {
-                state.moveNote(note.uid, uid);
+                move(uid);
               }
             },
           ),
@@ -84,11 +96,11 @@ Future<void> showMoveFolderDialog(
               0,
               FLucideIcons.arrowUpToLine,
               keyName: 'personal',
-              enabled: !atPersonal,
+              enabled: !atPersonal && !isProject,
               onPress: () async {
                 final target =
                     personal?.uid ?? await state.ensurePersonalContainer();
-                await state.moveNote(note.uid, target);
+                await move(target);
               },
             ),
             for (final p in projects)

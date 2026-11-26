@@ -17,6 +17,7 @@ import 'parts.dart';
 import 'shell_frame.dart';
 import 'sidebar.dart';
 import 'task_menu.dart';
+import 'tab_strip.dart' show tabStripIcon;
 import 'theme.dart';
 import '../theme/tokens.dart';
 
@@ -44,7 +45,7 @@ List<AddEntry> addEntries(AppState state) {
         'add-note',
         'New note',
         FLucideIcons.filePlus,
-        (c) => showNewNoteDialog(c, state, personal: true),
+        (c) => showNewNoteDialog(c, state, personal: createsPersonal(state)),
         Section.notes,
       ),
     if (state.tasksEditable)
@@ -52,12 +53,16 @@ List<AddEntry> addEntries(AppState state) {
         'add-task',
         'New task',
         FLucideIcons.listPlus,
-        (c) => showNewTaskDialog(c, state, personal: true),
+        (c) => showNewTaskDialog(c, state, personal: createsPersonal(state)),
         Section.tasks,
       ),
     if (state.eventsEditable)
       AddEntry('add-event', 'New event', FLucideIcons.calendarPlus, (c) async {
-        final uid = await showNewEventDialog(c, state, personal: true);
+        final uid = await showNewEventDialog(
+          c,
+          state,
+          personal: createsPersonal(state),
+        );
         if (uid != null) await state.clickEvent(uid);
       }, Section.events),
   ];
@@ -386,15 +391,6 @@ String tabPreview(AppState state, DocTab tab) {
   }
 }
 
-IconData tabIcon(AppState state, DocTab tab) => switch (tab.kind) {
-  TabKind.note =>
-    state.tabIsFolder(tab) ? FLucideIcons.folder : FLucideIcons.fileText,
-  TabKind.task => FLucideIcons.listChecks,
-  TabKind.event => FLucideIcons.calendar,
-  TabKind.view => FLucideIcons.bookmark,
-  TabKind.project => FLucideIcons.folderKanban,
-};
-
 /// The open items as a full page of two-column cards. A card opens its item,
 /// its X closes it (the last one leaves for Home), + adds, Done goes back.
 class OpenItemsGrid extends StatefulWidget {
@@ -447,7 +443,7 @@ class _OpenItemsGridState extends State<OpenItemsGrid>
               children: [
                 Expanded(
                   child: Text(
-                    'Open items (${tabs.length + 1})',
+                    'Open items (${tabs.length})',
                     style: t.type.labelStyle,
                   ),
                 ),
@@ -553,7 +549,11 @@ class _OpenItemsGridState extends State<OpenItemsGrid>
           children: [
             Row(
               children: [
-                Icon(tabIcon(state, tab), size: t.icons.md, color: t.muted),
+                Icon(
+                  tabStripIcon(state, tab),
+                  size: t.icons.md,
+                  color: t.muted,
+                ),
                 const Spacer(),
                 SizedBox(
                   width: t.sizes.touchTarget,
@@ -571,7 +571,7 @@ class _OpenItemsGridState extends State<OpenItemsGrid>
               ],
             ),
             OverflowTip(
-              title.isEmpty ? '(untitled)' : title,
+              title.isEmpty ? 'Untitled' : title,
               style: t.type.labelStyle,
             ),
             if (preview.isNotEmpty)

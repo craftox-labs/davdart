@@ -198,7 +198,7 @@ class _CommandPaletteState extends State<CommandPalette> {
       }
       rows.add(
         _Row(
-          key: _keys[i] = GlobalKey(),
+          key: _keys.putIfAbsent(i, GlobalKey.new),
           entry: e,
           selected: i == _index,
           onHover: () {
@@ -322,7 +322,7 @@ class _Row extends StatelessWidget {
             children: [
               Expanded(
                 child: Text(
-                  entry.title.isEmpty ? '(untitled)' : entry.title,
+                  entry.title.isEmpty ? 'Untitled' : entry.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: t.type.bodyStyle.copyWith(color: t.fg),

@@ -41,36 +41,39 @@ void main() {
     });
   }
 
-  testWidgets('phone sheet: a submenu drills in, shows its options and goes back', (t) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    final s = await pumpHomeApp(
-      t,
-      tasks: [mkTask('k1', summary: 'Pay rent', priority: 1)],
-      size: const Size(390, 844),
-    );
-    s.openTaskTab('k1');
-    await t.pumpAndSettle();
-    await t.tap(_k('item-more'));
-    await t.pumpAndSettle();
-    expect(_k('menu-sheet'), findsOneWidget);
-    // Submenu rows sit at the top level; their options only after a tap.
-    expect(_k('menu-priority'), findsOneWidget);
-    expect(_k('menu-priority-low'), findsNothing);
-    await t.tap(_k('menu-priority'));
-    await t.pumpAndSettle();
-    expect(_k('menu-back'), findsOneWidget);
-    expect(_k('menu-priority'), findsNothing);
-    expect(_k('menu-priority-low'), findsOneWidget);
-    await t.tap(_k('menu-back'));
-    await t.pumpAndSettle();
-    expect(_k('menu-priority'), findsOneWidget);
-    expect(_k('menu-priority-low'), findsNothing);
-    await t.tap(_k('menu-priority'));
-    await t.pumpAndSettle();
-    await t.tap(_k('menu-priority-low'));
-    await t.pumpAndSettle();
-    expect(s.taskById('k1')!.priority, 9);
-    expect(_k('menu-sheet'), findsNothing);
-  });
+  testWidgets(
+    'phone sheet: a submenu drills in, shows its options and goes back',
+    (t) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final s = await pumpHomeApp(
+        t,
+        tasks: [mkTask('k1', summary: 'Pay rent', priority: 1)],
+        size: const Size(390, 844),
+      );
+      s.openTaskTab('k1');
+      await t.pumpAndSettle();
+      await t.tap(_k('item-more'));
+      await t.pumpAndSettle();
+      expect(_k('menu-sheet'), findsOneWidget);
+      // Submenu rows sit at the top level; their options only after a tap.
+      expect(_k('menu-priority'), findsOneWidget);
+      expect(_k('menu-priority-low'), findsNothing);
+      await t.tap(_k('menu-priority'));
+      await t.pumpAndSettle();
+      expect(_k('menu-back'), findsOneWidget);
+      expect(_k('menu-priority'), findsNothing);
+      expect(_k('menu-priority-low'), findsOneWidget);
+      await t.tap(_k('menu-back'));
+      await t.pumpAndSettle();
+      expect(_k('menu-priority'), findsOneWidget);
+      expect(_k('menu-priority-low'), findsNothing);
+      await t.tap(_k('menu-priority'));
+      await t.pumpAndSettle();
+      await t.tap(_k('menu-priority-low'));
+      await t.pumpAndSettle();
+      expect(s.taskById('k1')!.priority, 9);
+      expect(_k('menu-sheet'), findsNothing);
+    },
+  );
 }

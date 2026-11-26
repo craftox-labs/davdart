@@ -131,7 +131,7 @@ void main() {
     expect(_k('open-grid'), findsOneWidget);
     expect(_k('grid-card-home'), findsOneWidget);
     expect(_k('grid-card-p:p'), findsOneWidget);
-    expect(find.text('Open items (2)'), findsOneWidget);
+    expect(find.text('Open items (1)'), findsOneWidget);
     expect(_k('grid-close-p:p'), findsOneWidget);
     // Home is not closable.
     expect(_k('grid-close-home'), findsNothing);

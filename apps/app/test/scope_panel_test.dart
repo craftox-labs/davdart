@@ -268,7 +268,7 @@ void main() {
         await t.pumpAndSettle();
         await t.tap(_k('scope-edit'));
         await t.pumpAndSettle();
-        expect(find.text('Edit folder'), findsOneWidget);
+        expect(find.text('Edit project'), findsOneWidget);
         await t.tap(find.text('Cancel'));
         await t.pumpAndSettle();
         // Delete folder, same route: the confirm dialog, for this folder.
@@ -276,7 +276,7 @@ void main() {
         await t.pumpAndSettle();
         await t.tap(_k('scope-delete'));
         await t.pumpAndSettle();
-        expect(find.text('Delete note?'), findsOneWidget);
+        expect(find.text('Delete project?'), findsOneWidget);
         expect(
           find.textContaining('Alpha project'),
           findsWidgets,
@@ -300,7 +300,7 @@ void main() {
         expect(_k('menu-project-delete-p2'), findsOneWidget);
         await t.tap(_k('menu-project-delete-p2'));
         await t.pumpAndSettle();
-        expect(find.text('Delete note?'), findsOneWidget);
+        expect(find.text('Delete project?'), findsOneWidget);
         expect(find.textContaining('Beta'), findsWidgets);
         await t.tap(find.text('Cancel'));
         await t.pumpAndSettle();
@@ -313,6 +313,10 @@ void main() {
         s.openFolder('p1');
         await t.pumpAndSettle();
         Future<void> add(String entry, String titleKey, String addKey) async {
+          // Back to the project itself: a new item opens as a page and would
+          // be the next one's parent.
+          s.openFolder('p1');
+          await t.pumpAndSettle();
           await t.tap(_k('bar-add'));
           await t.pumpAndSettle();
           await t.tap(_k(entry));
@@ -326,21 +330,20 @@ void main() {
           await t.pumpAndSettle();
         }
 
+        await add('add-note', 'new-note-title', 'new-note-add');
+        expect(
+          s.notes.firstWhere((e) => e.summary == 'In the project').parentUid,
+          'p1',
+        );
         await add('add-task', 'new-task-title', 'new-task-add');
-        final personal = s.personalContainer!.uid;
         expect(
           s.tasks.firstWhere((e) => e.summary == 'In the project').parentUid,
-          personal,
+          'p1',
         );
         await add('add-event', 'new-event-title', 'new-event-add');
         expect(
           s.events.firstWhere((e) => e.summary == 'In the project').parentUid,
-          personal,
-        );
-        await add('add-note', 'new-note-title', 'new-note-add');
-        expect(
-          s.notes.firstWhere((e) => e.summary == 'In the project').parentUid,
-          personal,
+          'p1',
         );
         _noError(t);
       });
@@ -374,7 +377,7 @@ void main() {
         // Whole space: the loose note is found too.
         await t.tap(_k('search-scope-space'));
         await t.pumpAndSettle();
-        expect(find.text('Search this space'), findsOneWidget);
+        expect(find.text('Search this Space'), findsOneWidget);
         expect(
           find.descendant(of: results, matching: find.text('Outside note')),
           findsWidgets,

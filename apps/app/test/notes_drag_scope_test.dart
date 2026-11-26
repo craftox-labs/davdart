@@ -47,9 +47,7 @@ Future<void> _end(WidgetTester t) => t.pump(const Duration(seconds: 1));
 
 void main() {
   group('folder drag scope', () {
-    testWidgets('the list has no drop targets and no folder drags', (
-      t,
-    ) async {
+    testWidgets('the list has no drop targets and no folder drags', (t) async {
       final s = await pumpTasksApp(t, notes: _notes);
       expect(s.notesView, NotesView.list);
       // The panel body is there (it takes the right-click menu), but nothing
@@ -57,7 +55,10 @@ void main() {
       expect(_k('notes-body'), findsOneWidget);
       expect(_k('drop-root'), findsNothing);
       expect(_dropTargets(_k('notes-body')), findsNothing);
-      expect(_dragged(t, _k('notes-body')), unorderedMatches(['in-f', 'loose']));
+      expect(
+        _dragged(t, _k('notes-body')),
+        unorderedMatches(['in-f', 'loose']),
+      );
       await _end(t);
     });
 

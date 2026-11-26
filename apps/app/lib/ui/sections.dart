@@ -25,8 +25,8 @@ import 'panel_tags_drawer.dart';
 import 'section_registry.dart' show spacesLabel;
 import 'space_actions.dart';
 
-/// The panels the side panel shows, one per rail section. Each takes
-/// [onPick], run after an action that should close the narrow sheet.
+// The panels the side panel shows, one per rail section. Each takes
+// [onPick], run after an action that should close the narrow sheet.
 
 /// Heading line plus a scrolling list body, on the shared [SidePanelFrame].
 class _Panel extends StatelessWidget {
@@ -232,7 +232,7 @@ class SpacesSection extends _Section {
           [
             if (!on)
               NoteMenuItem(
-                'Switch to this space',
+                'Switch to this Space',
                 FLucideIcons.arrowRightToLine,
                 open,
                 key: Key('menu-space-switch-${sp.id}'),
@@ -270,12 +270,12 @@ class SpacesSection extends _Section {
           space(sp),
         if (state.catalog != null) ...[
           _label(context, 'MANAGE'),
-          _item(FLucideIcons.plus, 'New space…', () {
+          _item(FLucideIcons.plus, 'New Space…', () {
             onPick();
             showNewSpaceDialog(context, state);
           }),
           if (state.currentSpaceId != null) ...[
-            _item(FLucideIcons.pencil, 'Rename this space…', () {
+            _item(FLucideIcons.pencil, 'Rename this Space…', () {
               onPick();
               showRenameSpaceDialog(context, state);
             }),
@@ -302,8 +302,9 @@ class SpacesSection extends _Section {
 
 /// Notes: the Space name, then the current scope's notes as a list (the
 /// default), with folders named as group labels, or as the folder tree. A
-/// Tree | List toggle appears when the scope has sub-folders; the choice is
-/// saved ([NotesView]). Folder rows drag and take drops in the tree only. The tags drawer stays at the end.
+/// List | Tree toggle appears when the scope has sub-folders; the choice is
+/// saved ([NotesView]). Folder rows drag and take drops in the tree only.
+/// The tags drawer stays at the end.
 class NotesSection extends _Section {
   const NotesSection({
     super.key,
@@ -937,7 +938,7 @@ class _SearchSectionState extends State<SearchSection> {
       key: const Key('search-all-field'),
       focusNode: state.nav.searchNode,
       controller: state.searchController,
-      hint: scoped && _inProject ? 'Search this project' : 'Search this space',
+      hint: scoped && _inProject ? 'Search this project' : 'Search this Space',
       prefixIcon: FLucideIcons.search,
       onChange: (v) {
         state.setQuery(v);
@@ -965,7 +966,7 @@ class _SearchSectionState extends State<SearchSection> {
                 value: _inProject,
                 segments: const [
                   Segment(true, 'This project', 'search-scope-project'),
-                  Segment(false, 'Whole space', 'search-scope-space'),
+                  Segment(false, 'Whole Space', 'search-scope-space'),
                 ],
                 onChanged: (v) {
                   if (v == _inProject) return;
@@ -1010,7 +1011,7 @@ class _SearchSectionState extends State<SearchSection> {
                     ? Icon(
                         h.isTask
                             ? FLucideIcons.listChecks
-                            : FLucideIcons.calendarDays,
+                            : FLucideIcons.calendar,
                         size: t.icons.md,
                         color: t.muted,
                       )

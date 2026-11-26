@@ -1006,7 +1006,7 @@ void main() {
       expect(find.text('Planning'), findsWidgets);
       await t.tap(find.byKey(const Key('rail-spaces')));
       await t.pumpAndSettle();
-      await t.tap(find.text('New space…'));
+      await t.tap(find.text('New Space…'));
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('space-name')), 'Inbox');
       await t.tap(find.byKey(const Key('space-create')));
@@ -1032,13 +1032,13 @@ void main() {
       await t.tap(find.byKey(const Key('rail-spaces')));
       await t.pumpAndSettle();
       expect(find.text('Delete this space…'), findsOneWidget);
-      await t.tap(find.text('New space…'));
+      await t.tap(find.text('New Space…'));
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('space-name')), 'Inbox');
       await t.tap(find.byKey(const Key('space-create')));
       await t.pumpAndSettle();
       // The Spaces panel stays open: no second press (it would fold it).
-      await t.tap(find.text('Rename this space…'));
+      await t.tap(find.text('Rename this Space…'));
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('space-rename-name')), 'Later');
       await t.tap(find.byKey(const Key('space-rename')));
@@ -1371,8 +1371,8 @@ void main() {
       await t.pumpAndSettle();
       expect(state.section, Section.spaces);
       expect(find.text('On this device only'), findsNWidgets(2));
-      expect(find.text('New space…'), findsOneWidget);
-      expect(find.text('Rename this space…'), findsOneWidget);
+      expect(find.text('New Space…'), findsOneWidget);
+      expect(find.text('Rename this Space…'), findsOneWidget);
       final planning = t.getTopLeft(find.byKey(const Key('space-planning')));
       final inbox = t.getTopLeft(
         find.byKey(Key('space-${state.spaces.last.id}')),
@@ -1398,7 +1398,7 @@ void main() {
       await t.pumpAndSettle();
       expect(state.currentSpaceName, 'Inbox');
       expect(state.section, Section.notes);
-      expect(find.text('New space…'), findsNothing); // popup closed
+      expect(find.text('New Space…'), findsNothing); // popup closed
       await t.tap(find.byKey(const Key('rail-spaces')));
       await t.pumpAndSettle();
       final inbox = t.getTopLeft(find.byKey(Key('space-$inboxId')));
@@ -1454,7 +1454,7 @@ void main() {
         await t.tap(find.byKey(const Key('logo-slot')));
         await t.pumpAndSettle();
         expect(find.byKey(const Key('rail-spaces')), findsOneWidget);
-        expect(find.text('New space…'), findsNothing);
+        expect(find.text('New Space…'), findsNothing);
       },
     );
 

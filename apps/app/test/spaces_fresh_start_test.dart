@@ -234,7 +234,7 @@ void main() {
           }
           await t.tap(find.byKey(const Key('rail-spaces')));
           await t.pumpAndSettle();
-          expect(find.text('New space…'), findsOneWidget);
+          expect(find.text('New Space…'), findsOneWidget);
           expect(find.text('Delete this space…'), findsNothing);
           expect(t.takeException(), isNull);
         }

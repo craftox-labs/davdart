@@ -4,8 +4,8 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 
 /// The one list of sections: the rail (wide [IconRail] and the phone strip)
-/// and the palette's "Go to" group are built from it, so a section is added,
-/// renamed or reordered in one place.
+/// is built from it, so a section is added, renamed or reordered in one
+/// place. The palette's `go.*` entries are listed by hand in `app_actions`.
 ///
 /// Keys stay tied to the [Section] names (`rail-notes`, `drop-…`), so a
 /// renamed label ('Calendar' for [Section.events]) keeps its keys.
@@ -32,7 +32,6 @@ class SectionDef {
     required this.icon,
     required this.group,
     this.section,
-    this.onRail = true,
   });
 
   /// The rail key suffix (`rail-<id>`), the palette id suffix (`go.<id>`) and
@@ -46,10 +45,6 @@ class SectionDef {
 
   /// The panel section it shows; null for Home.
   final Section? section;
-
-  /// Whether the rail lists it: the project views are listed in the Projects
-  /// panel, not on the rail.
-  final bool onRail;
 }
 
 const spacesIcon = FLucideIcons.layoutGrid;
@@ -130,17 +125,6 @@ const List<SectionDef> sectionDefs = [
   ),
 ];
 
-/// The entry for [s], if it has one.
-SectionDef? sectionDefOf(Section s) {
-  for (final d in sectionDefs) {
-    if (d.section == s) return d;
-  }
-  return null;
-}
-
-/// The user-facing name of [s] ('Calendar' for [Section.events]).
-String sectionLabel(Section s) => sectionDefOf(s)?.label ?? s.name;
-
 /// The project views, in the order a project expands to: Overview, Board,
 /// Notes, Calendar. Board has no panel of its own yet and opens the scoped
 /// Tasks list.
@@ -174,17 +158,18 @@ projectViews = [
 
 /// Whether the rail shows [d] in this Space.
 bool showsInRail(SectionDef d, AppState? state) {
-  if (!d.onRail) return false;
   if (state == null) return d.id != 'account';
   return switch (d.id) {
     'account' => state.canSignIn,
     'notes' => state.supportsNotes,
     'tasks' => state.supportsTasks,
     'events' => state.supportsEvents,
-    // Projects are an optional layer: without one the rail leaves the item
-    // out, so a Space with none looks like a plain one. The panel itself
-    // stays reachable (the scope pill opens it: it lists "No project").
-    'projects' => state.supportsSection(Section.projects) && state.hasProjects,
+    // Projects are an optional layer: a read-only Space with none leaves the
+    // item out. An editable one keeps it, so the first project can be made
+    // from the panel's empty state.
+    'projects' =>
+      state.supportsSection(Section.projects) &&
+          (state.hasProjects || state.editable),
     _ => true,
   };
 }

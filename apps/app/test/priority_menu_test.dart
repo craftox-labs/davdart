@@ -61,7 +61,11 @@ void main() {
         await t.pumpAndSettle();
         expect(s.taskById('t')!.priority, p, reason: bucket);
         await openSubmenu();
-        expect(_marked('menu-priority-$bucket'), findsOneWidget, reason: bucket);
+        expect(
+          _marked('menu-priority-$bucket'),
+          findsOneWidget,
+          reason: bucket,
+        );
         expect(_marked('menu-priority-none'), findsNothing, reason: bucket);
       }
       await t.tap(_k('menu-priority-none'));

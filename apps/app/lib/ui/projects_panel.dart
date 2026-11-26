@@ -94,13 +94,11 @@ class ProjectProgressBar extends StatelessWidget {
   }
 }
 
-/// The Projects panel: the Space's projects, most recent first, each with its
-/// own views. A project row expands (chevron) to Overview, Board, Notes and
-/// Calendar: picking one sets the project scope and the section together.
-/// The row's name sets the scope alone (as before). "No project" clears the
-/// scope. Row actions are behind the ⋯ and a long press. Folders are not
-/// drilled here: their notes are the project's Notes view. [onPick] runs after
-/// a pick, to close the phone's side menu.
+/// The Projects panel: the Space's projects, most recent first, as cards. A
+/// card opens (or focuses) that project's own tab; the Space's name row
+/// leaves any project and goes Home. Row actions are behind the ⋯ and a long
+/// press. Folders are not drilled here: their notes are the project's Notes
+/// view. [onPick] runs after a pick, to close the phone's side menu.
 class ProjectsPanel extends StatefulWidget {
   const ProjectsPanel({super.key, required this.state, this.onPick});
   final AppState state;
@@ -207,9 +205,9 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
             if (ix.projectOf(folder.uid)?.uid == folder.uid && state.editable)
               [
                 NoteMenuItem(
-                  'Rename…',
+                  'Edit project',
                   FLucideIcons.pencil,
-                  () => showEditNoteDialog(context, state, folder),
+                  () => showEditProjectDialog(context, state, folder),
                   key: Key('menu-project-rename-${folder.uid}'),
                 ),
                 NoteMenuItem(
@@ -226,9 +224,9 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
                     key: const Key('scope-move'),
                   ),
                 NoteMenuItem(
-                  'Delete…',
+                  'Delete project…',
                   FLucideIcons.trash2,
-                  () => confirmDeleteNote(context, state, folder),
+                  () => confirmDeleteProject(context, state, folder),
                   key: Key('menu-project-delete-${folder.uid}'),
                 ),
               ]
@@ -388,9 +386,24 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
                     horizontal: t.space.md,
                     vertical: t.space.xs,
                   ),
-                  child: Text(
-                    'No projects yet',
-                    style: t.type.captionStyle.copyWith(color: t.muted),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    spacing: t.space.sm,
+                    children: [
+                      Text(
+                        'No projects yet',
+                        style: t.type.captionStyle.copyWith(color: t.muted),
+                      ),
+                      if (state.editable)
+                        ActionButton(
+                          'New project',
+                          key: const Key('projects-empty-new'),
+                          onPress: (_) {
+                            onPick?.call();
+                            showNewProjectDialog(context, state);
+                          },
+                        ),
+                    ],
                   ),
                 ),
               for (final p in projects) project(p),

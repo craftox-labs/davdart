@@ -23,7 +23,7 @@ IconData tabStripIcon(AppState state, DocTab tab) => switch (tab.kind) {
   TabKind.project => FLucideIcons.folderKanban,
   TabKind.view => FLucideIcons.bookmark,
   TabKind.task => FLucideIcons.listChecks,
-  TabKind.event => FLucideIcons.calendarDays,
+  TabKind.event => FLucideIcons.calendar,
   TabKind.note =>
     state.tabIsFolder(tab) ? FLucideIcons.folder : FLucideIcons.fileText,
 };
@@ -179,7 +179,7 @@ class TabStrip extends StatelessWidget {
                               context,
                               state,
                               inTab: true,
-                              personal: true,
+                              personal: createsPersonal(state),
                             ),
                             builder: (context, states, _) => _Box(
                               size: t.sizes.tabClose + t.space.sm,

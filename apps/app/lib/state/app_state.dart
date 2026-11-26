@@ -2497,6 +2497,50 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Deletes project [uid]. Its notes, tasks and events are kept: they move
+  /// to the Personal container (a visible home, unlike the hidden Projects
+  /// container the plain note delete would leave them in). Not a project:
+  /// the plain [deleteNote].
+  Future<void> deleteProject(String uid) async {
+    if (!projectIndex.isProject(uid)) return deleteNote(uid);
+    final home = await ensurePersonalContainer();
+    final kidNotes = [
+      for (final n in notes)
+        if (n.parentUid == uid) n.copyWith(parentUid: home),
+    ];
+    final kidTasks = [
+      for (final k in tasks)
+        if (k.parentUid == uid) k.copyWith(parentUid: home),
+    ];
+    final kidEvents = [
+      for (final k in events)
+        if (k.parentUid == uid) k.copyWith(parentUid: home),
+    ];
+    if (kidNotes.isNotEmpty) {
+      await _edit((src) async {
+        for (final k in kidNotes) {
+          await src.save(k);
+        }
+      });
+    }
+    if (kidTasks.isNotEmpty) {
+      await _taskEdit((src) async {
+        for (final k in kidTasks) {
+          await src.saveTask(k);
+        }
+      });
+    }
+    if (kidEvents.isNotEmpty) {
+      await _eventEdit((src) async {
+        for (final k in kidEvents) {
+          await src.saveEvent(k);
+        }
+      });
+    }
+    if (error != null) return;
+    await deleteNote(uid);
+  }
+
   /// Adds a note (a child of [parentUid] if given) and selects it.
   Future<void> addNote(
     String title, {

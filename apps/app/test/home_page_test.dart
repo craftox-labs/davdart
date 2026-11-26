@@ -149,14 +149,14 @@ void main() {
     expect(_uids(s, 'tasks'), {'late', 'lt'}); // overdue first, no project task
     expect(_k('home-task-late'), findsOneWidget);
     expect(_k('home-task-pt'), findsNothing);
-    // See all keeps the open project scope (the Tasks panel's own scope).
+    // See all drops a leftover project scope: the list matches the heading.
     s.openFolder('a');
     await t.pumpAndSettle();
     await t.ensureVisible(_k('home-tasks-all'));
     await t.tap(_k('home-tasks-all'));
     await t.pumpAndSettle();
     expect(s.section, Section.tasks);
-    expect(s.scopeUid, 'a');
+    expect(s.scopeUid, isNull);
   });
 
   testWidgets('personal calendar: loose events and dated loose tasks', (

@@ -15,11 +15,10 @@ import 'sections.dart' show NotesSection;
 import 'segmented.dart';
 import 'theme.dart';
 
-/// A project's page in the main area: the project's name, a switcher across
-/// its views (Overview, Board, Notes, Calendar) and, on Overview, a summary
-/// built from what already exists (progress, coming up, recent). Everything
-/// new is a marked placeholder: the header chips, About, the details and
-/// milestones.
+/// A project's page in the main area: a switcher across its views (Overview,
+/// Board, Notes, Calendar) and, on Overview, a summary built from what
+/// already exists (progress, coming up, recent). Everything new is a marked
+/// placeholder: About, the details and milestones.
 ///
 /// The page needs a real project in scope; [AppState.section] is
 /// [Section.overview] for every tab, so the switcher never changes the side
@@ -610,7 +609,7 @@ class _Row extends StatelessWidget {
             SizedBox(width: t.space.sm),
             Expanded(
               child: OverflowTip(
-                title.isEmpty ? '(untitled)' : title,
+                title.isEmpty ? 'Untitled' : title,
                 style: t.type.bodyStyle,
               ),
             ),
@@ -668,9 +667,16 @@ class _Tasks extends StatelessWidget {
         if (tasks.length > limit)
           Padding(
             padding: EdgeInsets.only(top: t.space.xs),
-            child: Text(
-              '+${tasks.length - limit} more in Tasks',
-              style: t.type.captionStyle.copyWith(color: t.muted),
+            child: FTappable(
+              key: const Key('overview-tasks-more'),
+              onPress: () {
+                final p = state.mainProjectUid;
+                if (p != null) state.setProjectTab(p, ProjectTab.board);
+              },
+              builder: (_, _, _) => Text(
+                '+${tasks.length - limit} more on the Board',
+                style: t.type.captionStyle.copyWith(color: t.muted),
+              ),
             ),
           ),
       ],

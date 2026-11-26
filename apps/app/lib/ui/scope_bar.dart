@@ -178,7 +178,7 @@ class _ScopeCrumbsState extends State<ScopeCrumbs>
               ? FTappable(
                   key: const Key('crumb-space'),
                   semanticsLabel: 'Back to all projects',
-                  onPress: () => state.openFolder(null),
+                  onPress: () => leaveProject(state),
                   builder: (_, _, _) =>
                       OverflowTip(space, style: style.copyWith(color: t.muted)),
                 )
@@ -231,19 +231,16 @@ class NarrowCrumbs extends StatelessWidget {
   }
 }
 
-/// The folder's path below the Space: its name and its ancestors', with the
-/// Projects container level skipped.
-String folderPath(AppState state, String uid) {
-  final names = <String>[];
-  for (var n = state.tree.find(uid); n != null; n = n.parent) {
-    if (isProjectsContainer(n.note)) continue;
-    names.insert(0, n.note.summary.isEmpty ? 'Untitled' : n.note.summary);
-  }
-  return names.join(' › ');
+/// Back to all projects: clears the scope and, when a project page fills the
+/// main area, leaves it for Home (the page needs its project).
+void leaveProject(AppState state) {
+  final onPage = state.mainProjectUid != null;
+  state.openFolder(null);
+  if (onPage) state.showHome();
 }
 
-/// The actions a folder offers, in row order. [includeClose] adds "Show the
-/// whole space": the wide bar's menu and the Projects panel's row menu offer
+/// The actions a folder offers, in row order. [includeClose] adds "Back to all
+/// projects": the wide bar's menu and the Projects panel's row menu offer
 /// it.
 List<NoteMenuItem> scopeActionItems(
   BuildContext context,
@@ -262,13 +259,17 @@ List<NoteMenuItem> scopeActionItems(
     NoteMenuItem(
       'Edit project',
       FLucideIcons.pencil,
-      () => showEditNoteDialog(context, state, folder),
+      () => state.projectIndex.isProject(folder.uid)
+          ? showEditProjectDialog(context, state, folder)
+          : showEditNoteDialog(context, state, folder),
       key: const Key('scope-edit'),
     ),
     NoteMenuItem(
       'Delete project…',
       FLucideIcons.trash2,
-      () => confirmDeleteNote(context, state, folder),
+      () => state.projectIndex.isProject(folder.uid)
+          ? confirmDeleteProject(context, state, folder)
+          : confirmDeleteNote(context, state, folder),
       key: const Key('scope-delete'),
     ),
   ],
@@ -276,7 +277,7 @@ List<NoteMenuItem> scopeActionItems(
     NoteMenuItem(
       'Back to all projects',
       FLucideIcons.x,
-      () => state.openFolder(null),
+      () => leaveProject(state),
       key: const Key('scope-close'),
     ),
 ];
@@ -362,74 +363,6 @@ class ScopeText extends StatelessWidget {
           textKey: const Key('scope-text'),
           maxLines: 3,
           style: t.type.captionStyle.copyWith(color: t.muted),
-        ),
-      ),
-    );
-  }
-}
-
-/// The active search as one slim chip, `search "foo" x`: its x clears the
-/// search. The folder scope is not repeated here (the breadcrumb shows it and
-/// has its own clear). Nothing, and no space, when no search is active. The
-/// Home switcher places it: in its row on wide screens, on a line above it on
-/// phones.
-class FilterChips extends StatelessWidget {
-  const FilterChips({super.key, required this.state, this.fullWidth = false});
-  final AppState state;
-
-  /// Phone: the chip runs the full width of its parent, text left, x right.
-  final bool fullWidth;
-
-  @override
-  Widget build(BuildContext context) {
-    final q = state.query.trim();
-    if (q.isEmpty) return const SizedBox.shrink();
-    final t = tokensOf(context);
-    return Semantics(
-      container: true,
-      label: 'Filtered by search "$q"',
-      child: ConstrainedBox(
-        key: const Key('filter-chips'),
-        constraints: BoxConstraints(maxHeight: t.sizes.filterChipRow),
-        child: Align(
-          alignment: Alignment.centerLeft,
-          widthFactor: fullWidth ? null : 1,
-          heightFactor: 1,
-          child: SizedBox(
-            width: fullWidth ? double.infinity : null,
-            child: FBadge(
-              key: const Key('filter-chip-search'),
-              variant: FBadgeVariant.outline,
-              child: Row(
-                mainAxisSize: fullWidth ? MainAxisSize.max : MainAxisSize.min,
-                children: [
-                  if (fullWidth)
-                    Expanded(
-                      child: Text(
-                        'search "$q"',
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.left,
-                      ),
-                    )
-                  else
-                    Flexible(
-                      child: Text(
-                        'search "$q"',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  SizedBox(width: t.space.xs),
-                  FTappable(
-                    key: const Key('clear-filter-search'),
-                    semanticsLabel: 'Clear search',
-                    onPress: state.clearSearch,
-                    builder: (_, _, _) =>
-                        Icon(FLucideIcons.x, size: t.icons.sm),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );
