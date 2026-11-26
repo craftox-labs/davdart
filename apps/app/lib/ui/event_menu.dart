@@ -73,7 +73,7 @@ class EventContextMenu extends StatelessWidget {
     final manage = <NoteMenuItem>[
       if (edit && state.spaces.length > 1)
         NoteMenuItem(
-          'Move to space…',
+          'Move to Space…',
           FLucideIcons.arrowRightToLine,
           () => showMoveEventDialog(context, state, event),
           key: const Key('menu-move-space'),

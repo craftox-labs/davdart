@@ -106,7 +106,7 @@ class DetailView extends StatelessWidget {
                 if (state.spaces.length > 1)
                   IconAction(
                     key: const Key('move-note'),
-                    tooltip: 'Move to another space',
+                    tooltip: 'Move to Space…',
                     icon: FLucideIcons.folderInput,
                     onPress: () => showMoveSpaceDialog(context, state, note),
                   ),

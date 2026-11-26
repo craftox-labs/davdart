@@ -175,7 +175,7 @@ class TaskContextMenu extends StatelessWidget {
         ),
       if (edit && state.spaces.length > 1)
         NoteMenuItem(
-          'Move to space…',
+          'Move to Space…',
           FLucideIcons.arrowRightToLine,
           () => showMoveTaskDialog(context, state, task),
           key: const Key('menu-move-space'),

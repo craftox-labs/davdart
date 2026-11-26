@@ -274,9 +274,17 @@ List<AppAction> buildActions(AppState state) {
       ),
     AppAction(
       id: 'project.go.all',
-      title: 'Go to project: the whole Space',
+      title: 'Back to all projects',
       group: 'Go to',
-      keywords: const ['project', 'folder', 'scope', 'everything', 'back'],
+      keywords: const [
+        'project',
+        'all',
+        'space',
+        'scope',
+        'everything',
+        'back',
+        'whole',
+      ],
       enabled: (s) => s.scopeUid != null,
       run: (c) => c.state.guarded(() => c.state.openFolder(null)),
     ),
@@ -500,9 +508,9 @@ List<AppAction> buildActions(AppState state) {
     ),
     AppAction(
       id: 'note.move-folder',
-      title: 'Move selected note into a folder',
+      title: 'Move selected note to a project…',
       group: 'Selected item',
-      keywords: const ['move', 'folder', 'directory', 'parent'],
+      keywords: const ['move', 'project', 'personal', 'folder', 'parent'],
       enabled: (s) => itemIs<Note>(s) && s.editable,
       run: (c) {
         final n = targetItem(c.state);

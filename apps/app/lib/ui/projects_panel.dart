@@ -195,7 +195,7 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
           builder: (ctx, controller, _) => IconAction(
             key: Key('scope-more-${folder.uid}'),
             compact: true,
-            tooltip: 'Folder actions',
+            tooltip: 'Project actions',
             icon: FLucideIcons.ellipsis,
             onPress: controller.toggle,
           ),
@@ -220,7 +220,7 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
                 ),
                 if (state.spaces.length > 1)
                   NoteMenuItem(
-                    'Move to another space',
+                    'Move to Space…',
                     FLucideIcons.folderInput,
                     () => showMoveSpaceDialog(context, state, folder),
                     key: const Key('scope-move'),
@@ -405,7 +405,7 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
                   spacing: t.space.xs,
                   children: [
                     Text(
-                      'Everything else',
+                      'Not in a project',
                       style: t.type.bodyStyle.copyWith(color: t.muted),
                     ),
                     Text(

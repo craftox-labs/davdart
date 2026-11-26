@@ -141,8 +141,7 @@ void main() {
     },
   );
 
-  test('a save of an event deleted meanwhile fails, keeps the draft',
-      () async {
+  test('a save of an event deleted meanwhile fails, keeps the draft', () async {
     final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
     final s = AppState(_VanishEventSource(space, seed: _Seed()));
     await s.load();

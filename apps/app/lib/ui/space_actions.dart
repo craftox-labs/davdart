@@ -48,7 +48,7 @@ Future<void> moveNoteToSpace(
   if (node.children.isNotEmpty || AppState.isFolder(node.note)) {
     final ok = await showAppDialog<bool>(
       context,
-      title: 'Move folder?',
+      title: 'Move project?',
       content: Text(
         '"${node.note.summary}" and everything in it will move to '
         '"${sp.name}".',

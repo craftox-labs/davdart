@@ -175,9 +175,8 @@ class SheetMenuScope extends InheritedWidget {
 
   static bool of(BuildContext context) => navOf(context) != null;
 
-  static SheetMenuNav? navOf(BuildContext context) => context
-      .getInheritedWidgetOfExactType<SheetMenuScope>()
-      ?.nav;
+  static SheetMenuNav? navOf(BuildContext context) =>
+      context.getInheritedWidgetOfExactType<SheetMenuScope>()?.nav;
 
   @override
   bool updateShouldNotify(SheetMenuScope old) => false;
@@ -538,14 +537,14 @@ class NoteContextMenu extends StatelessWidget {
         ),
       if (edit)
         NoteMenuItem(
-          'Move to folder…',
+          'Move to project…',
           FLucideIcons.folderInput,
           () => showMoveFolderDialog(context, state, note),
           key: const Key('menu-move-folder'),
         ),
       if (edit && state.spaces.length > 1)
         NoteMenuItem(
-          'Move to space…',
+          'Move to Space…',
           FLucideIcons.arrowRightToLine,
           () => showMoveSpaceDialog(context, state, note),
           key: const Key('menu-move-space'),
