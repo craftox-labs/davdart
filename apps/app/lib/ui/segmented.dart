@@ -82,7 +82,11 @@ class Segmented<T> extends StatelessWidget {
               borderRadius: BorderRadius.circular(t.radii.card),
             ),
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: t.space.xs),
+              // Only the icon segments need breathing room; the label-only
+              // switchers keep their original look.
+              padding: EdgeInsets.symmetric(
+                horizontal: icon == null ? 0 : t.space.xs,
+              ),
               child: Center(child: content()),
             ),
           ),
