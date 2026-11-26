@@ -176,8 +176,6 @@ void main() {
 
   group('show all follow-ups', () {
     testWidgets('keyboard rows follow Show all and Show fewer', (t) async {
-      AppState.debugDefaultFocus = HomeFocus.board;
-      addTearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
       final s = await pumpHomeApp(
         t,
         size: const Size(1280, 2400),

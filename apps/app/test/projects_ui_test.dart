@@ -39,7 +39,6 @@ Future<AppState> _app(
   Size size = const Size(1280, 900),
   List<Note>? notes,
 }) async {
-  AppState.debugDefaultFocus = HomeFocus.board;
   final s = await pumpTasksApp(
     t,
     size: size,

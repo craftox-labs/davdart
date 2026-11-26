@@ -42,11 +42,9 @@ String? _status(AppState s, String uid) =>
 void main() {
   setUp(() {
     LocalZone.use('Asia/Bangkok');
-    AppState.debugDefaultFocus = HomeFocus.board;
   });
   tearDown(() {
     LocalZone.use(null);
-    AppState.debugDefaultFocus = HomeFocus.day;
   });
 
   testWidgets('drop in another column toasts the item, Undo restores status', (

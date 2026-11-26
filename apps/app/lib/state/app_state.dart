@@ -223,9 +223,6 @@ enum OpenMode { peek, main }
 /// Which tasks the Tasks view lists.
 enum TaskFilter { open, all, completed }
 
-/// The two halves of Home.
-enum HomeFocus { day, board }
-
 class AppState extends ChangeNotifier {
   AppState(this.source, {this.prefs, this.catalog}) {
     // Home collapse prefs of headers that no longer exist.
@@ -4661,38 +4658,12 @@ class AppState extends ChangeNotifier {
   String get _taskTagsOpenKey => 'davdart.tasktags.open.v1.$_spaceKey';
   String get _eventTagsOpenKey => 'davdart.eventtags.open.v1.$_spaceKey';
 
-  // ---- Home focus (Day | Board) and the selected day ----
+  // ---- The selected day and the Home Board's kinds ----
 
-  String get _homeFocusKey => 'davdart.home.focus.v1.$_spaceKey';
+  /// The old Home focus pref (Day | Board). Nothing sets it any more; a saved
+  /// 'tasks' still means the Tasks kind until a kind is chosen.
+  String get _legacyFocusKey => 'davdart.home.focus.v1.$_spaceKey';
   String get _homeCalKey => 'davdart.home.cal.open.v1.$_spaceKey';
-
-  /// Which half of Home shows, remembered per Space; Day by default. A saved
-  /// 'tasks' (the old Tasks segment) now means Board with the Tasks kind.
-  HomeFocus get homeFocus => switch (prefs?.read(_homeFocusKey)) {
-    'board' => HomeFocus.board,
-    'tasks' => supportsTasks ? HomeFocus.board : HomeFocus.day,
-    'day' => HomeFocus.day,
-    _ => debugDefaultFocus,
-  };
-
-  /// The focus of a Space with no saved choice (Day; tests may change it).
-  @visibleForTesting
-  static HomeFocus debugDefaultFocus = HomeFocus.day;
-
-  void setHomeFocus(HomeFocus f) {
-    if (f == homeFocus) return;
-    // Pin the kind a legacy 'tasks' pref implied before it is overwritten.
-    if (prefs?.read(_homeFocusKey) == 'tasks' &&
-        prefs?.read(_homeKindKey) == null) {
-      prefs?.write(_homeKindKey, HomeKind.tasks.name);
-    }
-    if (f == debugDefaultFocus) {
-      prefs?.remove(_homeFocusKey);
-    } else {
-      prefs?.write(_homeFocusKey, f.name);
-    }
-    notifyListeners();
-  }
 
   String get _homeKindKey => 'davdart.home.kind.v1.$_spaceKey';
 
@@ -4706,7 +4677,7 @@ class AppState extends ChangeNotifier {
       'tasks' => HomeKind.tasks,
       'all' => HomeKind.all,
       _ =>
-        prefs?.read(_homeFocusKey) == 'tasks' ? HomeKind.tasks : HomeKind.all,
+        prefs?.read(_legacyFocusKey) == 'tasks' ? HomeKind.tasks : HomeKind.all,
     };
     if (kind == HomeKind.tasks && !supportsTasks) return HomeKind.all;
     if (kind == HomeKind.notes && !supportsNotes) return HomeKind.all;
@@ -4716,7 +4687,7 @@ class AppState extends ChangeNotifier {
   void setHomeKind(HomeKind k) {
     if (k == homeKind) return;
     // All is the default, but a legacy 'tasks' focus pref needs it written.
-    if (k == HomeKind.all && prefs?.read(_homeFocusKey) != 'tasks') {
+    if (k == HomeKind.all && prefs?.read(_legacyFocusKey) != 'tasks') {
       prefs?.remove(_homeKindKey);
     } else {
       prefs?.write(_homeKindKey, k.name);

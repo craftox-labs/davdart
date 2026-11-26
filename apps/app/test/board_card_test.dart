@@ -41,11 +41,9 @@ void main() {
   setUp(() => LocalZone.use('Asia/Bangkok'));
   tearDown(() {
     LocalZone.use(null);
-    AppState.debugDefaultFocus = HomeFocus.day;
   });
 
   Future<AppState> pump(WidgetTester t, {Size? size}) async {
-    AppState.debugDefaultFocus = HomeFocus.board;
     return pumpHomeApp(
       t,
       notes: [
@@ -95,7 +93,6 @@ void main() {
   });
 
   testWidgets('each priority has its own colour: red, orange, cool', (t) async {
-    AppState.debugDefaultFocus = HomeFocus.board;
     await pumpHomeApp(
       t,
       tasks: [
@@ -133,7 +130,6 @@ void main() {
   testWidgets('phone: the flag shows for every priority, without its word', (
     t,
   ) async {
-    AppState.debugDefaultFocus = HomeFocus.board;
     await pumpHomeApp(
       t,
       tasks: [
@@ -166,7 +162,6 @@ void main() {
   });
 
   testWidgets('doing is green and done is blue on the column dots', (t) async {
-    AppState.debugDefaultFocus = HomeFocus.board;
     await pumpHomeApp(
       t,
       notes: [
@@ -205,7 +200,6 @@ void main() {
   testWidgets('overdue due uses the error colour, a future one does not', (
     t,
   ) async {
-    AppState.debugDefaultFocus = HomeFocus.board;
     await pumpHomeApp(
       t,
       tasks: [mkTask('late', days: -3), mkTask('soon', days: 3)],
@@ -229,7 +223,6 @@ void main() {
     testWidgets('$name: a plan item card is titled by its summary, not slug', (
       t,
     ) async {
-      AppState.debugDefaultFocus = HomeFocus.board;
       await pumpHomeApp(
         t,
         notes: [
@@ -256,7 +249,6 @@ void main() {
   }
 
   testWidgets('owner and decided-by are not on cards', (t) async {
-    AppState.debugDefaultFocus = HomeFocus.board;
     await pumpHomeApp(
       t,
       notes: [
@@ -338,7 +330,6 @@ void main() {
   testWidgets('phone: the grip drags, a drop on a card ranks', (t) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    AppState.debugDefaultFocus = HomeFocus.board;
     final s = await pumpHomeApp(
       t,
       notes: [

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
-import 'package:davdart_app/data/space_catalog.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/tab_state.dart';
 import 'package:flutter_test/flutter_test.dart';
