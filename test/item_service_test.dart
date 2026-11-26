@@ -80,6 +80,27 @@ void main() {
     expect((await svc.get(n)).tags, isNot(contains(projectsTag)));
   });
 
+  test('tags set and kind-personal/kind-view respect the kind guard', () async {
+    final p = (await svc.create(ItemKind.note, 'Personal',
+            tags: [personalTag], folder: true))
+        .item
+        .uid;
+    final n = await mk(ItemKind.note, 'N2');
+    for (final t in [projectsTag, folderTag, personalTag, viewTag]) {
+      await expectLater(
+          svc.setTags(n, set: ['a', t]), throwsA(isA<ItemServiceException>()));
+    }
+    for (final t in [personalTag, viewTag]) {
+      await expectLater(
+          svc.setTags(n, add: [t]), throwsA(isA<ItemServiceException>()));
+      await expectLater(
+          svc.setTags(p, remove: [t]), throwsA(isA<ItemServiceException>()));
+    }
+    await svc.setTags(p, set: []);
+    expect((await svc.get(p)).tags, contains(personalTag));
+    expect((await svc.get(n)).tags, isNot(contains(folderTag)));
+  });
+
   test('overview gives tree and counts', () async {
     final f = await mk(ItemKind.note, 'Folder', folder: true);
     final sub = await mk(ItemKind.note, 'Sub', parent: f, folder: true);

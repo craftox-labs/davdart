@@ -12,6 +12,7 @@ import 'note.dart';
 import 'note_tree.dart';
 import 'plan_item.dart';
 import 'projects.dart' show projectsTag;
+import 'personal.dart' show personalTag;
 import 'rank.dart' show planRanks;
 import 'saved_view.dart';
 import 'status.dart';
@@ -1070,23 +1071,27 @@ class ItemService {
           String? writer,
           bool dryRun = false}) =>
       _edit(id, 'tags', kind, dryRun, (e, _) {
+        final before = List.of(e.tags);
+        bool reserved(String x) => x.startsWith('kind-');
         for (final x in [..._cleanTags(add), ..._cleanTags(remove)]) {
-          if (x == projectsTag || x == folderTag) {
+          if (reserved(x)) {
             throw ItemServiceException('"$x" cannot be added or removed with '
-                'tags: it would turn a folder into a Projects container or '
-                'back, or un-project its children. Use create --folder (or '
-                'the Projects actions in the app) instead');
+                'tags: kind-* tags ($folderTag, $projectsTag, $personalTag, '
+                '$viewTag) decide what a note is. Use create --folder (or '
+                'the Projects and Personal actions in the app) instead');
           }
         }
-        final before = List.of(e.tags);
+        for (final x in _cleanTags(set ?? const [])) {
+          if (reserved(x) && !before.contains(x)) {
+            throw ItemServiceException('"$x" cannot be set with tags: '
+                'kind-* tags decide what a note is');
+          }
+        }
         var t = set == null
             ? List.of(before)
             : [
-                ..._cleanTags(set),
-                ...before.where((x) =>
-                    x.startsWith('status-') ||
-                    x == folderTag ||
-                    x == projectsTag)
+                ..._cleanTags(set).where((x) => !reserved(x)),
+                ...before.where((x) => x.startsWith('status-') || reserved(x))
               ];
         for (final a in _cleanTags(add)) {
           if (!t.contains(a)) t.add(a);
