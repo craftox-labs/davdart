@@ -1,4 +1,5 @@
 import 'package:davdart/davdart.dart';
+import 'package:davdart_app/ui/move_folder_dialog.dart';
 import 'package:davdart_app/ui/new_note_dialog.dart';
 import 'package:davdart_app/ui/tab_strip.dart';
 import 'package:forui/forui.dart';
@@ -125,5 +126,33 @@ void _mediumTests() {
     await t.pumpAndSettle();
     expect(s.activeTab, isNull);
     expect(_k('scope-more'), findsNothing);
+  });
+  testWidgets('"more" on the Overview opens the project Board', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: _notes,
+      tasks: [for (var i = 0; i < 10; i++) mkTask('t$i', parent: 'a')],
+    );
+    s.openProjectTab('a');
+    await t.pumpAndSettle();
+    await t.ensureVisible(_k('overview-tasks-more'));
+    await t.tap(_k('overview-tasks-more'));
+    await t.pumpAndSettle();
+    expect(s.mainProjectTab, ProjectTab.board);
+  });
+
+  testWidgets('a project cannot be moved into Personal', (t) async {
+    final s = await pumpTasksApp(t, notes: _notes);
+    final ctx = t.element(
+      find
+          .descendant(
+            of: find.byType(Navigator).first,
+            matching: find.byType(Overlay),
+          )
+          .first,
+    );
+    showMoveFolderDialog(ctx, s, s.notes.firstWhere((n) => n.uid == 'a'));
+    await t.pumpAndSettle();
+    expect(t.widget<FItem>(_k('move-folder-personal')).enabled, isFalse);
   });
 }

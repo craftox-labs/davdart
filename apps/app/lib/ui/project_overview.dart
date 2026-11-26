@@ -667,9 +667,16 @@ class _Tasks extends StatelessWidget {
         if (tasks.length > limit)
           Padding(
             padding: EdgeInsets.only(top: t.space.xs),
-            child: Text(
-              '+${tasks.length - limit} more in Tasks',
-              style: t.type.captionStyle.copyWith(color: t.muted),
+            child: FTappable(
+              key: const Key('overview-tasks-more'),
+              onPress: () {
+                final p = state.mainProjectUid;
+                if (p != null) state.setProjectTab(p, ProjectTab.board);
+              },
+              builder: (_, _, _) => Text(
+                '+${tasks.length - limit} more on the Board',
+                style: t.type.captionStyle.copyWith(color: t.muted),
+              ),
             ),
           ),
       ],
