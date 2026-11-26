@@ -194,10 +194,13 @@ void main() {
   });
 
   group('notes tree, crumbs, tags, new items', () {
-    testWidgets('project children get the project icon', (t) async {
-      await _app(t);
+    testWidgets('project rows get the project icon', (t) async {
+      final s = await _app(t);
+      // The Projects panel lists the projects with the project icon (the
+      // Notes panel shows one scope's notes now, not the whole tree).
+      s.setSection(Section.projects);
+      await t.pumpAndSettle();
       expect(find.byIcon(FLucideIcons.folderKanban), findsNWidgets(3));
-      // Alpha, Beta in the tree (the rail item has the same icon).
       await _end(t);
     });
 

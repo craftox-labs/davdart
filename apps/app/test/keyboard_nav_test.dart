@@ -232,6 +232,9 @@ void main() {
           Note(uid: 'z', summary: 'Zed'),
         ],
       );
+      // The tree's keys: the Notes panel lists notes by default now.
+      s.setNotesView(NotesView.tree);
+      await t.pumpAndSettle();
       expect(s.section, Section.notes);
       await _press(t, _k_); // from nothing: the first row
       expect(s.nav.cursorId('notes'), 'f');

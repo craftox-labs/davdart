@@ -1610,11 +1610,38 @@ void main() {
 
     testWidgets('chevron toggles and is a labelled button', (t) async {
       final sem = t.ensureSemantics();
-      await pump(t);
+      t.view.physicalSize = const Size(1400, 900);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.reset);
+      // The tree view: the list is the Notes panel's default now.
+      final storage = MemoryStorage();
+      final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+      final s = AppState(
+        SpaceNoteSource(
+          space,
+          seed: FakeSource([
+            Note(
+              uid: 'f',
+              summary: 'Plans',
+              categories: const [AppState.folderTag],
+            ),
+            Note(uid: 'n', summary: 'In the folder', parentUid: 'f'),
+          ]),
+        ),
+        prefs: storage,
+      );
+      await t.pumpWidget(DavdartApp(state: s));
+      await t.pumpAndSettle();
+      await t.tap(find.byKey(const Key('notes-view-tree')));
+      await t.pumpAndSettle();
       expect(find.bySemanticsLabel('Collapse'), findsWidgets);
       await t.tap(find.bySemanticsLabel('Collapse').first);
       await t.pumpAndSettle();
       expect(find.bySemanticsLabel('Expand'), findsWidgets);
+      await t.tap(find.bySemanticsLabel('Expand').first);
+      await t.pumpAndSettle();
+      expect(find.bySemanticsLabel('Collapse'), findsWidgets);
+      expect(s.notesView, NotesView.tree);
       sem.dispose();
     });
 

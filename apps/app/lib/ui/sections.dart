@@ -299,135 +299,244 @@ class SpacesSection extends _Section {
   }
 }
 
-/// Notes (the tree): the Space name, then the tree with folders and the tags
-/// at the end. Spaces are switched from the rail's Spaces popup.
+/// Notes: the Space name, then the current scope's notes as a list (the
+/// default), with folders named as group labels, or as the folder tree. A
+/// Tree | List toggle appears when the scope has sub-folders; the choice is
+/// saved ([NotesView]). The tags drawer stays at the end.
 class NotesSection extends _Section {
   const NotesSection({super.key, required super.state, required super.onPick});
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final tree = <Widget>[];
+    final body = <Widget>[];
     final rows = <NavEntry>[];
     final projects = state.projectIndex;
-    void walk(List<NoteNode> nodes, int depth) {
-      for (final n in nodes) {
-        final kids = n.children.isNotEmpty;
-        final open = !state.collapsed.contains(n.note.uid);
-        final on = state.peekUid == n.note.uid || state.scopeUid == n.note.uid;
-        Widget entry = NoteContextMenu(
+    final folders = state.subFolders;
+    // No sub-folders to show: the list, whatever is saved.
+    final view = folders.isEmpty ? NotesView.list : state.notesView;
+    final scopeOn = state.scopeUid;
+
+    /// One row's furniture: the context menu, the drag, the selected tone.
+    Widget entry(String uid, {required NoteDragSource source, required Widget child, bool on = false}) =>
+        NoteContextMenu(
           state: state,
-          uid: n.note.uid,
+          uid: uid,
           onOpen: onPick,
           child: NoteDraggable(
-            uid: n.note.uid,
-            source: NoteDragSource.tree,
-            label: n.note.summary,
+            uid: uid,
+            source: source,
+            label: state.tree.find(uid)?.note.summary ?? '',
             child: FTappable(
               onPress: () {
-                if (AppState.isFolder(n.note)) {
-                  state.guarded(() => state.openFolder(n.note.uid));
+                final n = state.tree.find(uid)?.note;
+                if (n == null) return;
+                if (AppState.isFolder(n)) {
+                  state.guarded(() => state.openFolder(uid));
                 } else {
-                  state.clickNote(n.note.uid);
+                  state.clickNote(uid);
                 }
                 onPick();
               },
               child: Container(
-                padding: EdgeInsets.fromLTRB(
-                  t.space.xs + depth * t.sizes.treeIndent,
-                  t.space.sm - t.borders.hairline,
-                  t.space.md,
-                  t.space.sm - t.borders.hairline,
+                color: on ? t.selected : null,
+                padding: EdgeInsets.symmetric(
+                  horizontal: t.space.md,
+                  vertical: t.space.sm - t.borders.hairline,
                 ),
-                decoration: BoxDecoration(
-                  color: on ? t.selected : null,
-                  borderRadius: BorderRadius.circular(t.radii.small),
-                ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: t.sizes.chevronBox,
-                      child: kids
-                          ? FTappable(
-                              semanticsLabel: open ? 'Collapse' : 'Expand',
-                              behavior: HitTestBehavior.opaque,
-                              onPress: () => state.toggle(n.note.uid),
-                              child: Icon(
-                                open
-                                    ? FLucideIcons.chevronDown
-                                    : FLucideIcons.chevronRight,
-                                size: t.icons.md,
-                                color: t.muted,
-                              ),
-                            )
-                          : null,
-                    ),
-                    if (AppState.isFolder(n.note)) ...[
-                      Icon(
-                        projects.isProject(n.note.uid)
-                            ? FLucideIcons.folderKanban
-                            : open && kids
-                            ? FLucideIcons.folderOpen
-                            : FLucideIcons.folder,
-                        size: t.icons.tree,
-                        color: t.muted,
-                      ),
-                      SizedBox(width: t.space.sm),
-                    ],
-                    Expanded(
-                      child: OverflowTip(
-                        n.note.summary,
-                        style: t.type.bodyStyle,
-                      ),
-                    ),
-                  ],
-                ),
+                child: child,
               ),
             ),
           ),
         );
-        if (AppState.isFolder(n.note)) {
-          entry = MoveDropTarget(
-            key: Key('drop-${n.note.uid}'),
-            state: state,
-            folderUid: n.note.uid,
-            child: entry,
+
+    if (view == NotesView.tree) {
+      void walk(List<NoteNode> nodes, int depth) {
+        for (final n in nodes) {
+          final kids = n.children.isNotEmpty;
+          final open = !state.collapsed.contains(n.note.uid);
+          final on = state.peekUid == n.note.uid || scopeOn == n.note.uid;
+          Widget row = entry(
+            n.note.uid,
+            source: NoteDragSource.tree,
+            on: on,
+            child: Padding(
+              padding: EdgeInsets.only(left: depth * t.sizes.treeIndent),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: t.sizes.chevronBox,
+                    child: kids
+                        ? FTappable(
+                            semanticsLabel: open ? 'Collapse' : 'Expand',
+                            behavior: HitTestBehavior.opaque,
+                            onPress: () => state.toggle(n.note.uid),
+                            child: Icon(
+                              open
+                                  ? FLucideIcons.chevronDown
+                                  : FLucideIcons.chevronRight,
+                              size: t.icons.md,
+                              color: t.muted,
+                            ),
+                          )
+                        : null,
+                  ),
+                  if (AppState.isFolder(n.note)) ...[
+                    Icon(
+                      projects.isProject(n.note.uid)
+                          ? FLucideIcons.folderKanban
+                          : open && kids
+                          ? FLucideIcons.folderOpen
+                          : FLucideIcons.folder,
+                      size: t.icons.tree,
+                      color: t.muted,
+                    ),
+                    SizedBox(width: t.space.sm),
+                  ],
+                  Expanded(
+                    child: OverflowTip(n.note.summary, style: t.type.bodyStyle),
+                  ),
+                ],
+              ),
+            ),
           );
+          if (AppState.isFolder(n.note)) {
+            row = MoveDropTarget(
+              key: Key('drop-${n.note.uid}'),
+              state: state,
+              folderUid: n.note.uid,
+              child: row,
+            );
+          }
+          final uid = n.note.uid;
+          rows.add(
+            NavEntry(
+              uid,
+              uid: uid,
+              open: (mode) async {
+                if (AppState.isFolder(n.note)) {
+                  await state.guarded(() => state.openFolder(uid));
+                } else {
+                  await state.openNote(uid, mode: mode);
+                }
+              },
+            ),
+          );
+          body.add(
+            NavRow(
+              key: ValueKey('nav-notes-$uid'),
+              nav: state.nav,
+              list: 'notes',
+              id: uid,
+              child: row,
+            ),
+          );
+          if (kids && open) walk(n.children, depth + 1);
         }
-        final uid = n.note.uid;
+      }
+
+      walk(state.noteTreeRoots, 0);
+    } else {
+      // The list: the scope's notes grouped under the folder they sit in.
+      final scopeNotes = [...state.notesInScope]
+        ..sort((a, b) {
+          final ga = state.notesGroupOf(a.uid)?.summary ?? '';
+          final gb = state.notesGroupOf(b.uid)?.summary ?? '';
+          final g = ga.toLowerCase().compareTo(gb.toLowerCase());
+          return g != 0 ? g : a.summary.toLowerCase().compareTo(b.summary.toLowerCase());
+        });
+      String? group;
+      for (final n in scopeNotes) {
+        final g = state.notesGroupOf(n.uid)?.summary ?? '';
+        if (g != group) {
+          group = g;
+          if (g.isNotEmpty) {
+            body.add(
+              Padding(
+                key: Key('notes-group-${n.uid}'),
+                padding: EdgeInsets.fromLTRB(
+                  t.space.md,
+                  t.space.lg + t.space.xxs,
+                  t.space.md,
+                  t.space.xs,
+                ),
+                child: Text(
+                  g,
+                  style: t.type.labelStyle.copyWith(color: t.muted),
+                ),
+              ),
+            );
+          }
+        }
+        final on = state.peekUid == n.uid;
+        final uid = n.uid;
         rows.add(
           NavEntry(
             uid,
             uid: uid,
-            open: (mode) async {
-              if (AppState.isFolder(n.note)) {
-                await state.guarded(() => state.openFolder(uid));
-              } else {
-                await state.openNote(uid, mode: mode);
-              }
-            },
+            open: (mode) => state.openNote(uid, mode: mode),
           ),
         );
-        tree.add(
+        body.add(
           NavRow(
             key: ValueKey('nav-notes-$uid'),
             nav: state.nav,
             list: 'notes',
             id: uid,
-            child: entry,
+            child: entry(
+              uid,
+              source: NoteDragSource.list,
+              on: on,
+              child: Row(
+                children: [
+                  Icon(FLucideIcons.fileText, size: t.icons.tree, color: t.muted),
+                  SizedBox(width: t.space.sm),
+                  Expanded(
+                    child: OverflowTip(n.summary, style: t.type.bodyStyle),
+                  ),
+                ],
+              ),
+            ),
           ),
         );
-        if (kids && open) walk(n.children, depth + 1);
+      }
+      if (scopeNotes.isEmpty) {
+        body.add(
+          Padding(
+            key: const Key('notes-empty'),
+            padding: EdgeInsets.all(t.space.md),
+            child: Text(
+              'No notes here yet',
+              style: t.type.captionStyle.copyWith(color: t.muted),
+            ),
+          ),
+        );
       }
     }
-
-    walk(state.tree.roots, 0);
     state.nav.publish('notes', rows);
 
-    final heading = _title('Notes');
-
     return _Panel(
-      heading: heading,
+      heading: _title('Notes'),
+      pinned: folders.isEmpty
+          ? null
+          : Padding(
+              padding: EdgeInsets.fromLTRB(
+                t.space.lg,
+                t.space.sm,
+                t.space.lg,
+                t.space.xs,
+              ),
+              child: Segmented<NotesView>(
+                key: const Key('notes-view-toggle'),
+                fullWidth: narrowLayout(context),
+                value: view,
+                onChanged: state.setNotesView,
+                segments: const [
+                  Segment(NotesView.list, 'List', 'notes-view-list'),
+                  Segment(NotesView.tree, 'Tree', 'notes-view-tree'),
+                ],
+              ),
+            ),
       drawer: (body) => PanelTagsDrawer(
         body: body,
         tags: state.tags,
@@ -529,7 +638,7 @@ class NotesSection extends _Section {
               style: t.type.bodyStyle.copyWith(color: t.muted),
             ),
           ),
-        ...tree,
+        ...body,
       ],
     );
   }

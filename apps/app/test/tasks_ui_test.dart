@@ -746,6 +746,9 @@ void main() {
         notes: _notes(),
         tasks: [mkTask('k', summary: 'Hidden task', parent: 'f')],
       );
+      // The tree view; the list is the Notes panel's default now.
+      s.setNotesView(NotesView.tree);
+      await t.pumpAndSettle();
       expect(
         find.descendant(
           of: _k('drop-root'),

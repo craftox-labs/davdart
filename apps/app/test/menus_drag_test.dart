@@ -56,6 +56,8 @@ Future<AppState> _pump(
   final s =
       state ??
       AppState(SpaceNoteSource(space, seed: _Seed()), prefs: MemoryStorage());
+  // These are the tree's drags: the Notes panel's tree view.
+  s.setNotesView(NotesView.tree);
   await t.pumpWidget(DavdartApp(state: s));
   await t.pumpAndSettle();
   return s;

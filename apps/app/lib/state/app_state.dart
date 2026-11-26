@@ -42,6 +42,10 @@ enum Section {
   settings,
 }
 
+/// How the Notes panel lists the current scope: a plain list (the default)
+/// or the folder tree.
+enum NotesView { list, tree }
+
 /// The fixed status set, in board order.
 const boardOrder = allowedStatuses;
 
@@ -240,6 +244,9 @@ class AppState extends ChangeNotifier {
     openMode = prefs?.read(_openModeKey) == OpenMode.main.name
         ? OpenMode.main
         : OpenMode.peek;
+    notesView = prefs?.read(_notesViewKey) == NotesView.tree.name
+        ? NotesView.tree
+        : NotesView.list;
     vimKeys = prefs?.read(_vimKeysKey) != 'false';
     vimEditor = prefs?.read(_vimEditorKey) != 'false';
     _readScopePrefs();
@@ -1134,6 +1141,91 @@ class AppState extends ChangeNotifier {
   /// The folder whose notes Board and List show; null means the whole Space.
   String? scopeUid;
   Note? get scope => scopeUid == null ? null : tree.find(scopeUid!)?.note;
+
+  // --- The Notes panel's scope and views ---
+
+  /// True for a note inside the Space's Projects container (a project, a
+  /// folder or note in one) and for the container itself.
+  bool inProjectsLayer(String uid) {
+    final n = tree.find(uid)?.note;
+    if (n == null) return false;
+    if (isProjectsContainer(n)) return true;
+    final ix = projectIndex;
+    return ix.isProject(uid) || ix.projectOf(uid) != null;
+  }
+
+  /// The notes the Notes panel lists: [scopeUid]'s subtree in a project
+  /// scope, and the Space's own (loose) notes in Personal scope. Folders are
+  /// not notes here; the tree shows those.
+  List<Note> get notesInScope {
+    final scope = scopeUid;
+    if (scope != null) {
+      return [
+        for (final n in tree.descendants(scope))
+          if (!isFolderNote(n)) n,
+      ];
+    }
+    return [
+      for (final n in notes)
+        if (!isFolderNote(n) && !inProjectsLayer(n.uid)) n,
+    ];
+  }
+
+  /// The folder a note is grouped under in the Notes list: the folder just
+  /// below the open scope, or null for a note directly in it (Personal: the
+  /// top folder, or none for a loose note).
+  Note? notesGroupOf(String uid) {
+    var p = tree.find(uid)?.note.parentUid;
+    Note? group;
+    while (p != null) {
+      final n = tree.find(p)?.note;
+      if (n == null || p == scopeUid) break;
+      group = n;
+      p = n.parentUid;
+    }
+    return group;
+  }
+
+  /// The folders directly in the current scope: what the Tree view can show
+  /// and what the folder drops accept. Personal scope leaves out the Projects
+  /// container (it is the project layer, not a folder of notes).
+  List<Note> get subFolders {
+    final scope = scopeUid;
+    if (scope != null) {
+      return [
+        for (final c in tree.find(scope)?.children ?? const <NoteNode>[])
+          if (isFolderNote(c.note)) c.note,
+      ];
+    }
+    return [
+      for (final r in tree.roots)
+        if (isFolderNote(r.note) && !inProjectsLayer(r.note.uid)) r.note,
+    ];
+  }
+
+  /// The tree's top rows for the current scope: the scope folder's children,
+  /// or the loose roots (the projects layer is shown in the Projects panel).
+  List<NoteNode> get noteTreeRoots {
+    final scope = scopeUid;
+    if (scope != null) return tree.find(scope)?.children ?? const [];
+    return [
+      for (final r in tree.roots)
+        if (!inProjectsLayer(r.note.uid)) r,
+    ];
+  }
+
+  static const _notesViewKey = 'davdart.notesview.v1';
+
+  /// How the Notes panel shows the scope: the plain list (default) or the
+  /// tree. Trees without sub-folders fall back to the list.
+  NotesView notesView = NotesView.list;
+
+  void setNotesView(NotesView v) {
+    if (notesView == v) return;
+    notesView = v;
+    prefs?.write(_notesViewKey, v.name);
+    notifyListeners();
+  }
 
   /// Shows only what is inside folder [uid] (null: the whole Space). The
   /// scope is kept per Space, and a project opened this way is remembered as
