@@ -571,7 +571,7 @@ class _OpenItemsGridState extends State<OpenItemsGrid>
               ],
             ),
             OverflowTip(
-              title.isEmpty ? '(untitled)' : title,
+              title.isEmpty ? 'Untitled' : title,
               style: t.type.labelStyle,
             ),
             if (preview.isNotEmpty)

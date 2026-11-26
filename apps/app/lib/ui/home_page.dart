@@ -249,7 +249,7 @@ class HomePage extends StatelessWidget {
                 SizedBox(width: t.space.sm),
                 Expanded(
                   child: OverflowTip(
-                    k.summary.isEmpty ? '(untitled)' : k.summary,
+                    k.summary.isEmpty ? 'Untitled' : k.summary,
                     style: t.type.bodyStyle,
                   ),
                 ),
@@ -379,7 +379,7 @@ class HomePage extends StatelessWidget {
                       SizedBox(width: t.space.sm),
                       Expanded(
                         child: OverflowTip(
-                          i.title.isEmpty ? '(untitled)' : i.title,
+                          i.title.isEmpty ? 'Untitled' : i.title,
                           style: t.type.bodyStyle,
                         ),
                       ),

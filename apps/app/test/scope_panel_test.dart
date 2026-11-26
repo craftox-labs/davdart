@@ -377,7 +377,7 @@ void main() {
         // Whole space: the loose note is found too.
         await t.tap(_k('search-scope-space'));
         await t.pumpAndSettle();
-        expect(find.text('Search this space'), findsOneWidget);
+        expect(find.text('Search this Space'), findsOneWidget);
         expect(
           find.descendant(of: results, matching: find.text('Outside note')),
           findsWidgets,

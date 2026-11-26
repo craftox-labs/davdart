@@ -94,13 +94,11 @@ class ProjectProgressBar extends StatelessWidget {
   }
 }
 
-/// The Projects panel: the Space's projects, most recent first, each with its
-/// own views. A project row expands (chevron) to Overview, Board, Notes and
-/// Calendar: picking one sets the project scope and the section together.
-/// The row's name sets the scope alone (as before). "No project" clears the
-/// scope. Row actions are behind the ⋯ and a long press. Folders are not
-/// drilled here: their notes are the project's Notes view. [onPick] runs after
-/// a pick, to close the phone's side menu.
+/// The Projects panel: the Space's projects, most recent first, as cards. A
+/// card opens (or focuses) that project's own tab; the Space's name row
+/// leaves any project and goes Home. Row actions are behind the ⋯ and a long
+/// press. Folders are not drilled here: their notes are the project's Notes
+/// view. [onPick] runs after a pick, to close the phone's side menu.
 class ProjectsPanel extends StatefulWidget {
   const ProjectsPanel({super.key, required this.state, this.onPick});
   final AppState state;
