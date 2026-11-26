@@ -680,8 +680,8 @@ void main() {
       await s.addEvent('Kept event', start: _day);
       await Future<void>.delayed(const Duration(milliseconds: 100));
       await s.sync();
-      expect(s.eventError, contains('Events'));
-      expect(s.syncMessage, contains('Events'));
+      expect(s.eventError, contains('Calendar'));
+      expect(s.syncMessage, contains('Calendar'));
       expect(s.syncMessage, startsWith('Synced'));
       expect(s.error, isNull);
       expect(s.taskError, isNull);

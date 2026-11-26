@@ -305,6 +305,12 @@ void main() {
       await _app(t, size: const Size(320, 568));
       expect(_k('overview-page'), findsOneWidget);
       expect(_k('proj-progress'), findsOneWidget);
+      // The switcher's four icon segments fit the phone with no overflow.
+      for (final tab in ['board', 'notes', 'events', 'overview']) {
+        await t.tap(_k('proj-tab-$tab'));
+        await t.pumpAndSettle();
+        expect(t.takeException(), isNull, reason: tab);
+      }
       // Scroll the page to its end: every block lays out at that width.
       await t.drag(_k('overview-page'), const Offset(0, -600));
       await t.pumpAndSettle();

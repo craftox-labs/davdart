@@ -461,7 +461,10 @@ class _Details extends StatelessWidget {
           padding: EdgeInsets.symmetric(vertical: t.space.xxs),
           child: Row(
             children: [
-              SizedBox(width: 88, child: Text(label, style: muted)),
+              SizedBox(
+                width: t.space.huge * 2,
+                child: Text(label, style: muted),
+              ),
               Expanded(
                 child: Text(
                   value,
@@ -855,7 +858,7 @@ class _Recent extends StatelessWidget {
     final today = wallDay(wallNow(now));
     return _Block(
       id: 'recent',
-      title: 'Recent',
+      title: 'Recent activity',
       empty: 'Nothing changed yet',
       emptyKey: 'overview-recent-empty',
       children: [
