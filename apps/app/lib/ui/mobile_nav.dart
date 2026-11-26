@@ -44,7 +44,7 @@ List<AddEntry> addEntries(AppState state) {
         'add-note',
         'New note',
         FLucideIcons.filePlus,
-        (c) => showNewNoteDialog(c, state, personal: true),
+        (c) => showNewNoteDialog(c, state, personal: createsPersonal(state)),
         Section.notes,
       ),
     if (state.tasksEditable)
@@ -52,12 +52,16 @@ List<AddEntry> addEntries(AppState state) {
         'add-task',
         'New task',
         FLucideIcons.listPlus,
-        (c) => showNewTaskDialog(c, state, personal: true),
+        (c) => showNewTaskDialog(c, state, personal: createsPersonal(state)),
         Section.tasks,
       ),
     if (state.eventsEditable)
       AddEntry('add-event', 'New event', FLucideIcons.calendarPlus, (c) async {
-        final uid = await showNewEventDialog(c, state, personal: true);
+        final uid = await showNewEventDialog(
+          c,
+          state,
+          personal: createsPersonal(state),
+        );
         if (uid != null) await state.clickEvent(uid);
       }, Section.events),
   ];

@@ -17,6 +17,7 @@ import 'move_folder_dialog.dart';
 import 'move_space_dialog.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
+import 'scope_bar.dart';
 import 'new_space_dialog.dart';
 import 'projects_panel.dart';
 import 'parts.dart';
@@ -286,7 +287,7 @@ List<AppAction> buildActions(AppState state) {
         'whole',
       ],
       enabled: (s) => s.scopeUid != null,
-      run: (c) => c.state.guarded(() => c.state.openFolder(null)),
+      run: (c) => c.state.guarded(() => leaveProject(c.state)),
     ),
     AppAction(
       id: 'note.new',
@@ -294,7 +295,11 @@ List<AppAction> buildActions(AppState state) {
       group: 'Create',
       keywords: const ['add', 'create', 'page'],
       enabled: notes,
-      run: (c) => showNewNoteDialog(c.context, c.state, personal: true),
+      run: (c) => showNewNoteDialog(
+        c.context,
+        c.state,
+        personal: createsPersonal(c.state),
+      ),
     ),
     AppAction(
       id: 'folder.new',
@@ -318,7 +323,11 @@ List<AppAction> buildActions(AppState state) {
       group: 'Create',
       keywords: const ['add', 'create', 'todo'],
       enabled: (s) => s.tasksEditable,
-      run: (c) => showNewTaskDialog(c.context, c.state, personal: true),
+      run: (c) => showNewTaskDialog(
+        c.context,
+        c.state,
+        personal: createsPersonal(c.state),
+      ),
     ),
     AppAction(
       id: 'event.new',
@@ -326,7 +335,11 @@ List<AppAction> buildActions(AppState state) {
       group: 'Create',
       keywords: const ['add', 'create', 'meeting', 'appointment'],
       enabled: (s) => s.eventsEditable,
-      run: (c) => showNewEventDialog(c.context, c.state, personal: true),
+      run: (c) => showNewEventDialog(
+        c.context,
+        c.state,
+        personal: createsPersonal(c.state),
+      ),
     ),
     for (final sp in state.spaces)
       AppAction(
@@ -568,12 +581,20 @@ List<AppAction> buildActions(AppState state) {
         _ => false,
       },
       run: (c) => switch (c.state.section) {
-        Section.notes => showNewNoteDialog(c.context, c.state, personal: true),
-        Section.tasks => showNewTaskDialog(c.context, c.state, personal: true),
+        Section.notes => showNewNoteDialog(
+          c.context,
+          c.state,
+          personal: createsPersonal(c.state),
+        ),
+        Section.tasks => showNewTaskDialog(
+          c.context,
+          c.state,
+          personal: createsPersonal(c.state),
+        ),
         Section.events => showNewEventDialog(
           c.context,
           c.state,
-          personal: true,
+          personal: createsPersonal(c.state),
         ),
         Section.projects => showNewProjectDialog(c.context, c.state),
         _ => null,

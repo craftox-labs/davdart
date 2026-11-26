@@ -179,7 +179,7 @@ class TabStrip extends StatelessWidget {
                               context,
                               state,
                               inTab: true,
-                              personal: true,
+                              personal: createsPersonal(state),
                             ),
                             builder: (context, states, _) => _Box(
                               size: t.sizes.tabClose + t.space.sm,

@@ -207,9 +207,9 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
             if (ix.projectOf(folder.uid)?.uid == folder.uid && state.editable)
               [
                 NoteMenuItem(
-                  'Rename…',
+                  'Edit project',
                   FLucideIcons.pencil,
-                  () => showEditNoteDialog(context, state, folder),
+                  () => showEditProjectDialog(context, state, folder),
                   key: Key('menu-project-rename-${folder.uid}'),
                 ),
                 NoteMenuItem(
@@ -226,9 +226,9 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
                     key: const Key('scope-move'),
                   ),
                 NoteMenuItem(
-                  'Delete…',
+                  'Delete project…',
                   FLucideIcons.trash2,
-                  () => confirmDeleteNote(context, state, folder),
+                  () => confirmDeleteProject(context, state, folder),
                   key: Key('menu-project-delete-${folder.uid}'),
                 ),
               ]

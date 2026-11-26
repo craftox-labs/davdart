@@ -6,6 +6,14 @@ import '../state/app_state.dart';
 import 'parts.dart';
 import 'theme.dart';
 
+/// True when "New ..." from a global entry (phone +, palette, tab strip)
+/// makes a Personal item: no project or folder is open. With one open, the
+/// item is created inside it (the dialogs fall back to the scope).
+bool createsPersonal(AppState state) {
+  final scope = state.scope;
+  return scope == null || isProjectsContainer(scope);
+}
+
 /// Asks for a title and adds the note, under the selected note if chosen.
 Future<void> showNewNoteDialog(
   BuildContext context,

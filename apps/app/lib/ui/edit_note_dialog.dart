@@ -6,6 +6,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import 'parts.dart';
+import 'scope_bar.dart';
 import 'theme.dart';
 
 /// Edits a note's title and body text. Header lines are kept as they are.
@@ -143,6 +144,75 @@ Future<void> confirmDeleteNote(
         onPress: (ctx) {
           Navigator.of(ctx).pop();
           state.deleteNote(note.uid);
+        },
+      ),
+    ],
+  );
+}
+
+/// Edits a project's name and description. A project has no "Inside" choice:
+/// it always stays under the Projects container.
+Future<void> showEditProjectDialog(
+  BuildContext context,
+  AppState state,
+  Note project,
+) {
+  final title = TextEditingController(text: project.summary);
+  final body = TextEditingController(text: PlanItem.fromNote(project).text);
+  void save(BuildContext ctx) {
+    if (title.text.trim().isEmpty) return;
+    Navigator.of(ctx).pop();
+    state.updateNote(project.uid, title: title.text, text: body.text);
+  }
+
+  return showAppDialog(
+    context,
+    title: 'Edit project',
+    width: tokensOf(context).sizes.dialogXl,
+    content: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      spacing: tokensOf(context).space.lg,
+      children: [
+        field(key: const Key('edit-title'), controller: title, label: 'Name'),
+        field(
+          key: const Key('edit-body'),
+          controller: body,
+          minLines: 6,
+          maxLines: 14,
+          label: 'About this project',
+        ),
+      ],
+    ),
+    actions: [
+      const CancelButton(),
+      ActionButton('Save', key: const Key('edit-save'), onPress: save),
+    ],
+  );
+}
+
+/// Confirms deleting a project and says what becomes of its contents.
+Future<void> confirmDeleteProject(
+  BuildContext context,
+  AppState state,
+  Note project,
+) {
+  return showAppDialog(
+    context,
+    title: 'Delete project?',
+    content: Text(
+      '"${project.summary}" will be deleted. Its notes, tasks and events are '
+      'kept and move to Personal.',
+    ),
+    actions: [
+      const CancelButton(),
+      ActionButton(
+        'Delete',
+        key: const Key('delete-confirm'),
+        onPress: (ctx) {
+          Navigator.of(ctx).pop();
+          if (state.scopeUid == project.uid) leaveProject(state);
+          state.deleteProject(project.uid);
         },
       ),
     ],

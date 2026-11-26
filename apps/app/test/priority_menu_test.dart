@@ -36,14 +36,9 @@ void main() {
   tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
   group('task context menu', () {
-    testWidgets('each priority is set, cleared and marked current', (
-      t,
-    ) async {
+    testWidgets('each priority is set, cleared and marked current', (t) async {
       AppState.debugDefaultFocus = HomeFocus.board;
-      final s = await pumpHomeApp(
-        t,
-        tasks: [mkTask('t', summary: 'Fix it')],
-      );
+      final s = await pumpHomeApp(t, tasks: [mkTask('t', summary: 'Fix it')]);
       Future<void> openSubmenu() async {
         await t.tap(
           find.descendant(of: _k('nav-card-t'), matching: find.text('Fix it')),
@@ -63,7 +58,11 @@ void main() {
         await t.pumpAndSettle();
         expect(s.taskById('t')!.priority, p, reason: bucket);
         await openSubmenu();
-        expect(_marked('menu-priority-$bucket'), findsOneWidget, reason: bucket);
+        expect(
+          _marked('menu-priority-$bucket'),
+          findsOneWidget,
+          reason: bucket,
+        );
         expect(_marked('menu-priority-none'), findsNothing, reason: bucket);
       }
       await t.tap(_k('menu-priority-none'));

@@ -242,6 +242,14 @@ String folderPath(AppState state, String uid) {
   return names.join(' › ');
 }
 
+/// Back to all projects: clears the scope and, when a project page fills the
+/// main area, leaves it for Home (the page needs its project).
+void leaveProject(AppState state) {
+  final onPage = state.mainProjectUid != null;
+  state.openFolder(null);
+  if (onPage) state.showHome();
+}
+
 /// The actions a folder offers, in row order. [includeClose] adds "Show the
 /// whole space": the wide bar's menu and the Projects panel's row menu offer
 /// it.
@@ -262,13 +270,17 @@ List<NoteMenuItem> scopeActionItems(
     NoteMenuItem(
       'Edit project',
       FLucideIcons.pencil,
-      () => showEditNoteDialog(context, state, folder),
+      () => state.projectIndex.isProject(folder.uid)
+          ? showEditProjectDialog(context, state, folder)
+          : showEditNoteDialog(context, state, folder),
       key: const Key('scope-edit'),
     ),
     NoteMenuItem(
       'Delete project…',
       FLucideIcons.trash2,
-      () => confirmDeleteNote(context, state, folder),
+      () => state.projectIndex.isProject(folder.uid)
+          ? confirmDeleteProject(context, state, folder)
+          : confirmDeleteNote(context, state, folder),
       key: const Key('scope-delete'),
     ),
   ],
@@ -276,7 +288,7 @@ List<NoteMenuItem> scopeActionItems(
     NoteMenuItem(
       'Back to all projects',
       FLucideIcons.x,
-      () => state.openFolder(null),
+      () => leaveProject(state),
       key: const Key('scope-close'),
     ),
 ];
