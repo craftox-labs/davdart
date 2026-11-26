@@ -2300,14 +2300,15 @@ class AppState extends ChangeNotifier {
       if (taskInScope(t)) t,
   ];
 
-  /// Tasks completed this week (from Monday): the Overview's done tile.
+  /// Tasks completed this week (from Monday; a cancelled one is not done):
+  /// the Overview's done tile.
   List<Task> doneThisWeek([DateTime? now]) {
     final n = now ?? DateTime.now();
     final today = wallDay(wallNow(n));
     final monday = today.subtract(Duration(days: today.weekday - 1));
     return [
       for (final t in scopedTasks)
-        if (t.isClosed &&
+        if (t.isCompleted &&
             t.completed != null &&
             !wallDay(wallNow(t.completed!)).isBefore(monday))
           t,

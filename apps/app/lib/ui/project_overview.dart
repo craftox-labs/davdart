@@ -33,20 +33,33 @@ class ProjectOverviewPage extends StatelessWidget {
       builder: (context, _) {
         final clock = now ?? DateTime.now();
         final scope = state.scope;
+        // Every list is read once per build and passed down: a rebuild
+        // sorts nothing twice.
         final open = state.openTasks(clock);
-        final overdue = state.overdueTasks(clock);
         final notes = state.notesInScope;
+        final allTasks = state.scopedTasks;
         final events = state.scopedEvents;
         final tiles = _Tiles(
           open: open.length,
-          overdue: overdue.length,
+          overdue: open.where((k) => isTaskOverdue(k, clock)).length,
           done: state.doneThisWeek(clock).length,
           notes: notes.length,
           events: events.length,
         );
-        final tasks = _Tasks(state: state, tasks: open);
-        final upcoming = _Upcoming(state: state, now: clock);
-        final recent = _Recent(state: state, now: clock);
+        final tasks = _Tasks(state: state, tasks: open, now: clock);
+        final upcoming = _Upcoming(
+          state: state,
+          tasks: open,
+          events: events,
+          now: clock,
+        );
+        final recent = _Recent(
+          state: state,
+          notes: notes,
+          tasks: allTasks,
+          events: events,
+          now: clock,
+        );
         return SingleChildScrollView(
           key: const Key('overview-page'),
           padding: EdgeInsets.fromLTRB(
@@ -259,21 +272,22 @@ class _Row extends StatelessWidget {
 /// The project's open tasks, soonest due first (the order [AppState.openTasks]
 /// keeps); the first few here, the rest through the Tasks section.
 class _Tasks extends StatelessWidget {
-  const _Tasks({required this.state, required this.tasks});
+  const _Tasks({required this.state, required this.tasks, required this.now});
   final AppState state;
   final List<Task> tasks;
+  final DateTime now;
 
   static const limit = 8;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final today = wallDay(wallNow(DateTime.now()));
+    final today = wallDay(wallNow(now));
     String when(Task k) {
       final day = taskDueDay(k);
       if (day == null) return '';
       final d = day.difference(today).inDays;
-      if (isTaskOverdue(k, DateTime.now())) return 'Overdue';
+      if (isTaskOverdue(k, now)) return 'Overdue';
       return d == 0
           ? 'Today'
           : d == 1
@@ -308,20 +322,31 @@ class _Tasks extends StatelessWidget {
   }
 }
 
-/// Today, Tomorrow and This week: the agenda's own rows for events and for
-/// tasks with a due date, taken from the same grouping the Calendar uses.
+/// Today, Tomorrow and This week: the agenda's own rows for the project's
+/// events and for its tasks with a due date, grouped with [upcomingGroups].
+/// The Calendar's tag filters do not narrow the Overview.
 class _Upcoming extends StatelessWidget {
-  const _Upcoming({required this.state, required this.now});
+  const _Upcoming({
+    required this.state,
+    required this.tasks,
+    required this.events,
+    required this.now,
+  });
   final AppState state;
+
+  /// The project's open tasks and events; the Calendar's tag filter is not
+  /// the Overview's business.
+  final List<Task> tasks;
+  final List<Event> events;
   final DateTime now;
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final groups = state.upcomingOccurrences(now, 7);
+    final groups = upcomingGroups(events, now, 7);
     final today0 = wallDay(wallNow(now));
     final tasks = <String, List<Task>>{'today': [], 'tomorrow': [], 'week': []};
-    for (final k in state.openTasks(now)) {
+    for (final k in this.tasks) {
       final day = taskDueDay(k);
       if (day == null) continue;
       final d = day.difference(today0).inDays;
@@ -374,8 +399,17 @@ class _Upcoming extends StatelessWidget {
 /// The most recently changed notes, tasks and events of the project, newest
 /// first; who changed them is not kept.
 class _Recent extends StatelessWidget {
-  const _Recent({required this.state, required this.now});
+  const _Recent({
+    required this.state,
+    required this.notes,
+    required this.tasks,
+    required this.events,
+    required this.now,
+  });
   final AppState state;
+  final List<Note> notes;
+  final List<Task> tasks;
+  final List<Event> events;
   final DateTime now;
 
   static const limit = 6;
@@ -383,21 +417,21 @@ class _Recent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final items = <({String uid, String title, IconData icon, DateTime at})>[
-      for (final n in state.notesInScope)
+      for (final n in notes)
         (
           uid: n.uid,
           title: n.summary,
           icon: FLucideIcons.fileText,
           at: n.lastModified ?? n.dtstamp,
         ),
-      for (final k in state.scopedTasks)
+      for (final k in tasks)
         (
           uid: k.uid,
           title: k.summary,
           icon: FLucideIcons.listChecks,
           at: k.lastModified ?? k.dtstamp,
         ),
-      for (final e in state.scopedEvents)
+      for (final e in events)
         (
           uid: e.uid,
           title: e.summary,

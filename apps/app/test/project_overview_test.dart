@@ -1,4 +1,5 @@
 import 'package:davdart/davdart.dart';
+import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -56,6 +57,20 @@ String _tile(WidgetTester t, String id) =>
     t.widget<Text>(_k('overview-tile-$id-value')).data!;
 
 Future<void> _end(WidgetTester t) => t.pump(const Duration(seconds: 1));
+
+/// A loaded state over a memory Space holding [tasks] (no widgets).
+Future<AppState> _stateWith(WidgetTester t, List<Task> tasks) async {
+  final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+  final src = SpaceNoteSource(space);
+  await t.runAsync(() async {
+    for (final k in tasks) {
+      await src.saveTask(k);
+    }
+  });
+  final s = AppState(src);
+  await t.runAsync(s.load);
+  return s;
+}
 
 void main() {
   setUp(() => LocalZone.use('Asia/Bangkok'));
@@ -152,6 +167,84 @@ void main() {
       expect(_k('overview-tasks-empty'), findsOneWidget);
       expect(_k('overview-upcoming-empty'), findsOneWidget);
       expect(_k('overview-recent-empty'), findsOneWidget);
+      await _end(t);
+    });
+
+    testWidgets('a sub-folder of the project is part of it', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        notes: [
+          _folder('c', 'Projects', container: true),
+          _folder('p', 'Alpha', parent: 'c'),
+          _folder('sub', 'Design', parent: 'p'),
+          Note(uid: 'deep', summary: 'Deep note', parentUid: 'sub'),
+        ],
+        tasks: [
+          mkTask('deep-task', summary: 'Deep task', days: 1, parent: 'sub'),
+        ],
+        events: [
+          mkEvent('deep-event', summary: 'Deep event', days: 2, parent: 'sub'),
+        ],
+      );
+      await s.activateTab(null);
+      s.openFolder('p');
+      s.setSection(Section.overview);
+      await t.pumpAndSettle();
+      expect(_tile(t, 'open'), '1');
+      expect(_tile(t, 'notes'), '1');
+      expect(_tile(t, 'events'), '1');
+      expect(_k('overview-task-deep-task'), findsOneWidget);
+      expect(_k('overview-recent-deep'), findsOneWidget);
+      await _end(t);
+    });
+
+    testWidgets('the Calendar tag filter does not empty Upcoming', (t) async {
+      final s = await _app(t);
+      s.setEventTagFilter('not-this-one');
+      await t.pumpAndSettle();
+      // The Calendar panel filters its events; the Overview's own list does
+      // not (its events are the project's, whatever the tag).
+      expect(s.filteredEvents, isEmpty);
+      expect(
+        find.descendant(
+          of: _k('overview-upcoming'),
+          matching: find.text('Kickoff'),
+        ),
+        findsOneWidget,
+      );
+      await _end(t);
+    });
+
+    testWidgets('done this week starts on Monday and leaves cancelled out', (
+      t,
+    ) async {
+      final now = DateTime(2026, 11, 26, 12); // a Thursday
+      Task completed(String uid, DateTime at, {String status = 'COMPLETED'}) =>
+          Task(uid: uid, summary: uid, status: status, completed: at);
+      final s = await _stateWith(t, [
+        completed('monday', DateTime(2026, 11, 23, 0, 30)),
+        completed('sunday', DateTime(2026, 11, 22, 23, 30)),
+        completed('cancelled', DateTime(2026, 11, 25, 9), status: 'CANCELLED'),
+        completed('today', DateTime(2026, 11, 26, 10)),
+      ]);
+      final uids = s.doneThisWeek(now).map((k) => k.uid).toList()..sort();
+      expect(uids, ['monday', 'today']);
+      await _end(t);
+    });
+
+    testWidgets('320dp wide: no overflow', (t) async {
+      await _app(t, size: const Size(320, 568));
+      expect(_k('overview-page'), findsOneWidget);
+      expect(_k('overview-tiles'), findsOneWidget);
+      // Scroll the page to its end: every block lays out at that width.
+      await t.drag(_k('overview-page'), const Offset(0, -600));
+      await t.pumpAndSettle();
+      final ex = t.takeException();
+      expect(
+        ex,
+        isNull,
+        reason: ex is FlutterError ? ex.toStringDeep() : '$ex',
+      );
       await _end(t);
     });
 
