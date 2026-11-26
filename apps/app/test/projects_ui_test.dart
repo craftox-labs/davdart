@@ -51,6 +51,7 @@ Future<AppState> _app(
     ],
   );
   await s.activateTab(null);
+  s.setSection(Section.notes); // the old Day | Board main view, not Home
   await t.pumpAndSettle();
   return s;
 }

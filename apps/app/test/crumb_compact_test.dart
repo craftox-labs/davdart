@@ -47,6 +47,7 @@ Future<AppState> _app(WidgetTester t, Size size) async {
     tasks: [mkTask('t1', days: 0)],
   );
   await s.activateTab(null);
+  s.setSection(Section.notes); // the old Day | Board main view, not Home
   await t.pumpAndSettle();
   return s;
 }

@@ -40,7 +40,7 @@ void main() {
       t,
     ) async {
       AppState.debugDefaultFocus = HomeFocus.board;
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         tasks: [mkTask('t', summary: 'Fix it')],
       );
@@ -79,7 +79,7 @@ void main() {
       t,
     ) async {
       AppState.debugDefaultFocus = HomeFocus.board;
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [_note('n', 'Alpha', priority: 'medium')],
       );
@@ -124,7 +124,7 @@ void main() {
     ) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         tasks: [mkTask('k1', summary: 'Pay rent', priority: 1)],
         size: _phone,
@@ -157,7 +157,7 @@ void main() {
     ) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [_note('n', 'Alpha', priority: 'high')],
         size: _phone,

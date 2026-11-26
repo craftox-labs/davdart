@@ -231,6 +231,7 @@ List<AppAction> buildActions(AppState state) {
       enabled: yes,
       run: (c) async {
         await c.state.activateTab(null);
+        c.state.showHome();
         void f() => c.state.nav.focusArea(
           NavArea.main,
           list: navListId(c.state, NavArea.main),

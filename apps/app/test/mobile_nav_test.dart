@@ -81,7 +81,7 @@ void main() {
       testWidgets(
         'the bar has Back, Home, Search, counter at 44dp; + floats above',
         (t) async {
-          await pumpTasksApp(t, size: size);
+          await pumpHomeApp(t, size: size);
           expect(_k('mobile-bar'), findsOneWidget);
           for (final k in ['bar-back', 'bar-home', 'bar-search', 'bar-count']) {
             expect(_k(k), findsOneWidget);
@@ -124,7 +124,7 @@ void main() {
       testWidgets(
         'side menu: button, rail strip beside the panel, gear, logo',
         (t) async {
-          final s = await pumpTasksApp(
+          final s = await pumpHomeApp(
             t,
             notes: [_note('n1', 'Alpha')],
             tasks: [mkTask('k1', summary: 'Pay rent')],
@@ -184,14 +184,14 @@ void main() {
       );
 
       testWidgets('a left-edge swipe opens the side menu', (t) async {
-        await pumpTasksApp(t, size: size);
+        await pumpHomeApp(t, size: size);
         await t.dragFrom(Offset(4, size.height / 2), const Offset(120, 0));
         await t.pumpAndSettle();
         expect(_k('side-menu'), findsOneWidget);
       });
 
       testWidgets('a short drag from 28dp in opens the menu', (t) async {
-        await pumpTasksApp(t, size: size);
+        await pumpHomeApp(t, size: size);
         await t.dragFrom(Offset(28, size.height / 2), const Offset(40, 0));
         await t.pumpAndSettle();
         expect(_k('side-menu'), findsOneWidget);
@@ -201,7 +201,7 @@ void main() {
       testWidgets('a vertical drag in the edge strip does not open the menu', (
         t,
       ) async {
-        await pumpTasksApp(t, size: size);
+        await pumpHomeApp(t, size: size);
         await t.dragFrom(Offset(4, size.height / 2), const Offset(0, -120));
         await t.pumpAndSettle();
         expect(_k('side-menu'), findsNothing);
@@ -211,7 +211,7 @@ void main() {
       testWidgets('the + hides on an open item and while the keyboard is up', (
         t,
       ) async {
-        final s = await pumpTasksApp(
+        final s = await pumpHomeApp(
           t,
           notes: [_note('n1', 'Alpha')],
           size: size,
@@ -232,7 +232,7 @@ void main() {
 
       testWidgets('Home leaves room under its last row for the +', (t) async {
         AppState.debugDefaultFocus = HomeFocus.board;
-        await pumpTasksApp(
+        await pumpHomeApp(
           t,
           notes: [
             for (var i = 0; i < 30; i++)
@@ -253,7 +253,7 @@ void main() {
       testWidgets('edge strip beats a task swipe inside 32dp, not beyond', (
         t,
       ) async {
-        final s = await pumpTasksApp(
+        final s = await pumpHomeApp(
           t,
           tasks: [mkTask('k1', summary: 'Pay rent', days: 0)],
           size: size,
@@ -276,7 +276,7 @@ void main() {
       testWidgets('the Space chip is a joined tab on the top bar edge', (
         t,
       ) async {
-        await pumpTasksApp(t, size: size);
+        await pumpHomeApp(t, size: size);
         final chip = find.descendant(
           of: _k('space-chip'),
           matching: _k('joined-tab'),
@@ -300,7 +300,7 @@ void main() {
       testWidgets('the chip content is on the logo centre line, logo-sized', (
         t,
       ) async {
-        await pumpTasksApp(t, size: size);
+        await pumpHomeApp(t, size: size);
         final logo = t.getRect(_k('top-logo'));
         final icon = find.descendant(
           of: _k('space-chip'),
@@ -324,7 +324,7 @@ void main() {
       testWidgets('the top bar, chip and sync show on an open item too', (
         t,
       ) async {
-        final s = await pumpTasksApp(
+        final s = await pumpHomeApp(
           t,
           notes: [_note('n1', 'Alpha')],
           tasks: [mkTask('k1', summary: 'Pay rent')],
@@ -348,7 +348,7 @@ void main() {
       });
 
       testWidgets('the strip ends with Settings below a gap', (t) async {
-        final s = await pumpTasksApp(t, size: size);
+        final s = await pumpHomeApp(t, size: size);
         await _openMenu(t);
         // The sections in rail order, then Settings (no sign-in here).
         final ys = [
@@ -409,7 +409,7 @@ void main() {
       );
 
       testWidgets('Search on the strip focuses the field', (t) async {
-        final s = await pumpTasksApp(t, size: size);
+        final s = await pumpHomeApp(t, size: size);
         await _openMenu(t);
         await t.tap(_k('rail-search'));
         await t.pumpAndSettle();
@@ -419,7 +419,7 @@ void main() {
       });
 
       testWidgets('system Back closes the menu', (t) async {
-        await pumpTasksApp(t, size: size);
+        await pumpHomeApp(t, size: size);
         await _openMenu(t);
         expect(await t.binding.handlePopRoute(), isTrue);
         await t.pumpAndSettle();
@@ -430,7 +430,7 @@ void main() {
       testWidgets('Search keeps its field pinned when the list scrolls', (
         t,
       ) async {
-        final s = await pumpTasksApp(
+        final s = await pumpHomeApp(
           t,
           notes: [for (var i = 0; i < 30; i++) _note('n$i', 'Alpha $i')],
           size: size,
@@ -459,7 +459,7 @@ void main() {
       testWidgets('Home "All tasks" and "All events" open the side menu', (
         t,
       ) async {
-        final s = await pumpTasksApp(
+        final s = await pumpHomeApp(
           t,
           tasks: [mkTask('k1', summary: 'Pay rent', days: 0)],
           events: [mkEvent('e1', summary: 'Standup')],
@@ -492,7 +492,7 @@ void main() {
       });
 
       testWidgets('the covered page is out of focus and semantics', (t) async {
-        await pumpTasksApp(t, size: size);
+        await pumpHomeApp(t, size: size);
         await _openMenu(t);
         expect(
           find
@@ -507,7 +507,7 @@ void main() {
       testWidgets('a task swipe starting inside the row completes it', (
         t,
       ) async {
-        final s = await pumpTasksApp(
+        final s = await pumpHomeApp(
           t,
           tasks: [mkTask('k1', summary: 'Pay rent')],
           size: size,
@@ -525,7 +525,7 @@ void main() {
       });
 
       testWidgets('menus offer no Open in peek on narrow', (t) async {
-        await pumpTasksApp(t, notes: [_note('n1', 'Alpha')], size: size);
+        await pumpHomeApp(t, notes: [_note('n1', 'Alpha')], size: size);
         await _openMenu(t);
         await t.longPress(find.text('Alpha').first);
         await t.pumpAndSettle();
@@ -535,7 +535,7 @@ void main() {
       });
 
       testWidgets('an item opens full screen and closes the menu', (t) async {
-        final s = await pumpTasksApp(
+        final s = await pumpHomeApp(
           t,
           notes: [_note('n1', 'Alpha')],
           size: size,
@@ -553,7 +553,7 @@ void main() {
       });
 
       testWidgets('+ menu follows the filter and the Space flags', (t) async {
-        await pumpTasksApp(t, size: size);
+        await pumpHomeApp(t, size: size);
         await t.tap(_k('bar-add'));
         await t.pumpAndSettle();
         expect(_k('add-note'), findsOneWidget);
@@ -588,7 +588,7 @@ void main() {
       });
 
       testWidgets('read-only tasks and events have no + entries', (t) async {
-        await pumpTasksApp(t, size: size, readOnly: true);
+        await pumpHomeApp(t, size: size, readOnly: true);
         await t.tap(_k('bar-add'), warnIfMissed: false);
         await t.pumpAndSettle();
         // Tasks and events are read-only here; notes are not.
@@ -635,7 +635,7 @@ void main() {
       testWidgets('open-items grid: cards, close, Done, last goes Home', (
         t,
       ) async {
-        final s = await pumpTasksApp(
+        final s = await pumpHomeApp(
           t,
           notes: [_note('n1', 'Alpha'), _note('n2', 'Beta')],
           tasks: [mkTask('k1', summary: 'Pay rent')],
@@ -688,7 +688,7 @@ void main() {
       });
 
       testWidgets('the grid + adds and closes the grid', (t) async {
-        await pumpTasksApp(t, size: size);
+        await pumpHomeApp(t, size: size);
         await t.tap(_k('bar-count'));
         await t.pumpAndSettle();
         expect(find.text('No open items'), findsOneWidget);
@@ -702,7 +702,7 @@ void main() {
       });
 
       testWidgets('Back closes grid, sheet, menu, then the item', (t) async {
-        final s = await pumpTasksApp(
+        final s = await pumpHomeApp(
           t,
           notes: [_note('n1', 'Alpha')],
           size: size,
@@ -743,7 +743,7 @@ void main() {
       testWidgets('long press opens actions as a sheet; swipe completes', (
         t,
       ) async {
-        final s = await pumpTasksApp(
+        final s = await pumpHomeApp(
           t,
           notes: [_note('n1', 'Alpha')],
           tasks: [mkTask('k1', summary: 'Pay rent')],
@@ -771,7 +771,7 @@ void main() {
   testWidgets('wide layout is unchanged: rail, no bar, menu, grid or edge', (
     t,
   ) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       notes: [_note('n1', 'Alpha')],
       tasks: [mkTask('k1')],
@@ -803,7 +803,7 @@ void main() {
   });
 
   testWidgets('880 wide keeps the rail and no bar', (t) async {
-    await pumpTasksApp(t, size: const Size(880, 700));
+    await pumpHomeApp(t, size: const Size(880, 700));
     expect(_k('mobile-bar'), findsNothing);
     expect(_k('rail-notes'), findsOneWidget);
     _noError(t);
@@ -812,7 +812,7 @@ void main() {
   testWidgets('growing to wide closes the menu and keeps the desktop shell', (
     t,
   ) async {
-    await pumpTasksApp(t, size: const Size(360, 640));
+    await pumpHomeApp(t, size: const Size(360, 640));
     await _openMenu(t);
     t.view.physicalSize = const Size(1280, 900);
     await t.pumpAndSettle();

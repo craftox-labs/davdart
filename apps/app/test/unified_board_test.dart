@@ -116,7 +116,7 @@ void main() {
 
   group('merged board', () {
     testWidgets('notes and tasks with a status, grouped by status', (t) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [
           _note('n1', status: 'todo'),
@@ -142,7 +142,7 @@ void main() {
     testWidgets('Done: newest modified first; canceled has its own column', (
       t,
     ) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         tasks: [
           Task(
@@ -166,7 +166,7 @@ void main() {
 
   group('kind filter', () {
     testWidgets('narrows the board; Tasks keeps the core columns', (t) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [_note('n1', status: 'review')],
         tasks: [mkTask('t1', summary: 'Bug')],
@@ -181,7 +181,7 @@ void main() {
     });
 
     testWidgets('dropdown: inactive on Day, glyph follows the kind', (t) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [_note('n1')],
         tasks: [mkTask('t1', summary: 'Bug')],
@@ -216,7 +216,7 @@ void main() {
     testWidgets('+ leads with add-task on Tasks, add-note otherwise', (
       t,
     ) async {
-      await pumpTasksApp(t);
+      await pumpHomeApp(t);
       await t.tap(_k('home-focus-board'));
       await t.pumpAndSettle();
       await t.tap(_k('home-add'));
@@ -235,10 +235,10 @@ void main() {
 
     testWidgets('kind is remembered per Space; All clears it', (t) async {
       final prefs = MemoryStorage();
-      final s = await pumpTasksApp(t, prefs: prefs);
+      final s = await pumpHomeApp(t, prefs: prefs);
       s.setHomeKind(HomeKind.notes);
       await t.pumpWidget(const SizedBox());
-      final again = await pumpTasksApp(t, prefs: prefs);
+      final again = await pumpHomeApp(t, prefs: prefs);
       expect(again.homeKind, HomeKind.notes);
       again.setHomeKind(HomeKind.all);
       expect(
@@ -257,7 +257,7 @@ void main() {
       ..write('davdart.home.hidden.v1.tasks.s', 'doing');
 
     testWidgets("a saved 'tasks' focus loads as Board with Tasks", (t) async {
-      final s = await pumpTasksApp(t, prefs: legacy(), tasks: [mkTask('a')]);
+      final s = await pumpHomeApp(t, prefs: legacy(), tasks: [mkTask('a')]);
       expect(s.homeFocus, HomeFocus.board);
       expect(s.homeKind, HomeKind.tasks);
       expect(_k('home-kind-icon-tasks'), findsOneWidget);
@@ -271,7 +271,7 @@ void main() {
     testWidgets('leaving the Board keeps the kind the old pref implied', (
       t,
     ) async {
-      final s = await pumpTasksApp(t, prefs: legacy());
+      final s = await pumpHomeApp(t, prefs: legacy());
       s.setHomeFocus(HomeFocus.day);
       expect(s.homeFocus, HomeFocus.day);
       expect(s.homeKind, HomeKind.tasks);
@@ -280,7 +280,7 @@ void main() {
     });
 
     testWidgets('choosing All on a legacy pref sticks', (t) async {
-      final s = await pumpTasksApp(t, prefs: legacy());
+      final s = await pumpHomeApp(t, prefs: legacy());
       s.setHomeKind(HomeKind.all);
       expect(s.homeKind, HomeKind.all);
     });

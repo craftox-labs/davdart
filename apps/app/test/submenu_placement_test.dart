@@ -18,7 +18,7 @@ void main() {
       debugDefaultTargetPlatformOverride = p;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
       AppState.debugDefaultFocus = HomeFocus.board;
-      final s = await pumpTasksApp(t, tasks: [mkTask('t', summary: 'Fix it')]);
+      final s = await pumpHomeApp(t, tasks: [mkTask('t', summary: 'Fix it')]);
       await t.tap(
         find.descendant(of: _k('nav-card-t'), matching: find.text('Fix it')),
         buttons: kSecondaryButton,
@@ -47,7 +47,7 @@ void main() {
   testWidgets('phone sheet: a submenu drills in, shows its options and goes back', (t) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       tasks: [mkTask('k1', summary: 'Pay rent', priority: 1)],
       size: const Size(390, 844),

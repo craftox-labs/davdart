@@ -62,7 +62,7 @@ void main() {
     });
 
     testWidgets('Home with Today has no overflow at $size', (t) async {
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         tasks: [
           for (var i = 0; i < 6; i++)
@@ -103,7 +103,7 @@ void main() {
       t,
     ) async {
       AppState.debugDefaultFocus = HomeFocus.board;
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         notes: [
           Note(uid: 'a', summary: 'Alpha', description: 'status: todo\n\nx'),
@@ -133,7 +133,7 @@ void main() {
     testWidgets('top bar buttons and task rows are touch-sized at $size', (
       t,
     ) async {
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         tasks: [mkTask('a', summary: 'Pay rent', days: 0)],
         size: size,
@@ -160,7 +160,7 @@ void main() {
   }
 
   testWidgets('desktop keeps columns and compact buttons', (t) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       notes: [
         Note(uid: 'b', summary: 'Bravo', description: 'status: doing\n\nx'),
@@ -205,7 +205,7 @@ void main() {
     t,
   ) async {
     AppState.debugDefaultFocus = HomeFocus.board;
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       notes: [
         Note(uid: 'a', summary: 'Alpha', description: 'status: todo\n\nx'),
@@ -233,7 +233,7 @@ void main() {
   testWidgets(
     'split Home (620 wide) puts the calendar beside a scrolling list',
     (t) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         tasks: [
           for (var i = 0; i < 6; i++)
@@ -268,7 +268,7 @@ void main() {
   testWidgets('wide window with a narrow main pane keeps Today uncapped', (
     t,
   ) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       tasks: [
         for (var i = 0; i < 6; i++)

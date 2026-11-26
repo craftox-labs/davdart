@@ -98,6 +98,9 @@ Future<void> pump(WidgetTester t, {Size size = const Size(1400, 900)}) async {
     DavdartApp(source: SpaceNoteSource(space, seed: FakeSource(sample))),
   );
   await t.pumpAndSettle();
+  // These tests are about the old Day | Board main view, not the Home page.
+  t.widget<DavdartApp>(find.byType(DavdartApp)).state.setSection(Section.notes);
+  await t.pumpAndSettle();
 }
 
 String textOfKey(WidgetTester t, String key) =>
@@ -460,6 +463,11 @@ void main() {
       await t.pumpWidget(
         DavdartApp(source: SpaceNoteSource(space, seed: FakeSource(sample))),
       );
+      await t.pumpAndSettle();
+      t
+          .widget<DavdartApp>(find.byType(DavdartApp))
+          .state
+          .setSection(Section.notes);
       await t.pumpAndSettle();
       await t.tap(byAction('New note'));
       await t.pumpAndSettle();
@@ -917,6 +925,8 @@ void main() {
       final state = AppState(src);
       await t.pumpWidget(DavdartApp(state: state));
       await t.pumpAndSettle();
+      state.setSection(Section.notes);
+      await t.pumpAndSettle();
       await t.tap(byAction('New folder'));
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('new-folder-title')), 'Planning');
@@ -1029,6 +1039,7 @@ void main() {
         prefs: storage,
         catalog: c,
       );
+      state.setSection(Section.notes);
       await t.pumpWidget(DavdartApp(state: state));
       await t.pumpAndSettle();
       expect(find.text('Planning'), findsWidgets);
@@ -1054,6 +1065,7 @@ void main() {
         prefs: storage,
         catalog: c,
       );
+      state.setSection(Section.notes);
       await t.pumpWidget(DavdartApp(state: state));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('rail-spaces')));
@@ -1161,6 +1173,7 @@ void main() {
         prefs: storage,
         catalog: c,
       );
+      state.setSection(Section.notes);
       await t.pumpWidget(DavdartApp(state: state));
       await t.pumpAndSettle();
       return state;

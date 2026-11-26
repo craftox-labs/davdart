@@ -459,10 +459,8 @@ class IconRail extends StatelessWidget {
     Future<void> home() async {
       state.clearSearch();
       await state.activateTab(null);
-      state.nav.focusArea(
-        NavArea.main,
-        list: navListId(state, NavArea.main),
-      );
+      state.showHome();
+      state.nav.focusArea(NavArea.main, list: navListId(state, NavArea.main));
       onHome?.call();
     }
 
@@ -533,8 +531,7 @@ class IconRail extends StatelessWidget {
     /// Projects stay together, the global tools are set apart.
     List<Widget> entries(List<SectionDef> defs) => [
       for (final (i, d) in defs.indexed) ...[
-        if (i > 0 && d.group != defs[i - 1].group)
-          SizedBox(height: t.space.md),
+        if (i > 0 && d.group != defs[i - 1].group) SizedBox(height: t.space.md),
         button(d),
       ],
     ];

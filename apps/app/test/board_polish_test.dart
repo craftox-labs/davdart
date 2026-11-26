@@ -28,7 +28,7 @@ void main() {
 
   group('Day shows dated tasks only', () {
     testWidgets('undated tasks are gone; overdue only on today', (t) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         tasks: [
           mkTask('undated'),
@@ -56,7 +56,7 @@ void main() {
       t,
     ) async {
       LocalZone.use('Pacific/Auckland'); // UTC+13 in November
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         tasks: [
           // 21 Nov 09:00 in Auckland, still 20 Nov in UTC.
@@ -109,7 +109,7 @@ void main() {
     testWidgets('task board hides an empty backlog, shows a used one', (
       t,
     ) async {
-      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      final s = await pumpHomeApp(t, tasks: [mkTask('a')]);
       s.setHomeKind(HomeKind.tasks);
       expect(
         [for (final c in s.homeColumns()) c.$1],
@@ -125,7 +125,7 @@ void main() {
     });
 
     testWidgets('phone accordion has no empty backlog section', (t) async {
-      await pumpTasksApp(t, size: const Size(400, 800), tasks: [mkTask('a')]);
+      await pumpHomeApp(t, size: const Size(400, 800), tasks: [mkTask('a')]);
       await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('board-acc-backlog'), findsNothing);
@@ -135,7 +135,7 @@ void main() {
     testWidgets('a hidden backlog is still reachable by the status menu', (
       t,
     ) async {
-      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      final s = await pumpHomeApp(t, tasks: [mkTask('a')]);
       await s.setTaskStatus('a', 'backlog');
       expect(s.taskById('a')!.boardStatus, 'backlog');
     });
@@ -156,7 +156,7 @@ void main() {
     });
 
     testWidgets('wide: Show all (X) expands the done column', (t) async {
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         size: const Size(1280, 1600),
         tasks: [for (var i = 0; i < 13; i++) _done(i)],
@@ -175,14 +175,14 @@ void main() {
     });
 
     testWidgets('no control at or under the cap', (t) async {
-      await pumpTasksApp(t, tasks: [for (var i = 0; i < 10; i++) _done(i)]);
+      await pumpHomeApp(t, tasks: [for (var i = 0; i < 10; i++) _done(i)]);
       await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('board-done-show-all'), findsNothing);
     });
 
     testWidgets('phone accordion: capped with Show all', (t) async {
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         size: const Size(400, 1600),
         tasks: [for (var i = 0; i < 12; i++) _done(i)],
@@ -199,7 +199,7 @@ void main() {
 
   group('task card priority and due', () {
     testWidgets('shown when set, omitted when not', (t) async {
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         tasks: [
           mkTask('p', priority: 1, days: 3),
@@ -219,7 +219,7 @@ void main() {
     });
 
     testWidgets('overdue due uses the error colour; done never', (t) async {
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         tasks: [
           mkTask('late', days: -2),
@@ -243,7 +243,7 @@ void main() {
     testWidgets('phone cards show the meta line too, flag without word', (
       t,
     ) async {
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         size: const Size(400, 800),
         tasks: [mkTask('a', priority: 5, days: 0)],
@@ -260,7 +260,7 @@ void main() {
     testWidgets('keyboard rows follow Show all and Show fewer', (t) async {
       AppState.debugDefaultFocus = HomeFocus.board;
       addTearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         size: const Size(1280, 2400),
         notes: [
@@ -288,7 +288,7 @@ void main() {
     });
 
     testWidgets('Show fewer collapses the done column again', (t) async {
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         size: const Size(1280, 1600),
         tasks: [for (var i = 0; i < 12; i++) _done(i)],
@@ -314,7 +314,7 @@ void main() {
     });
 
     testWidgets('meta line wraps instead of overflowing at 320', (t) async {
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         size: const Size(320, 800),
         tasks: [
@@ -337,7 +337,7 @@ void main() {
   group('home column toggle', () {
     testWidgets('hidden columns are saved and the last one stays', (t) async {
       final prefs = MemoryStorage();
-      final s = await pumpTasksApp(t, prefs: prefs, tasks: [mkTask('a')]);
+      final s = await pumpHomeApp(t, prefs: prefs, tasks: [mkTask('a')]);
       await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('board-drop-doing'), findsOneWidget);
@@ -358,7 +358,7 @@ void main() {
     });
 
     testWidgets('note board hides columns', (t) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [
           Note(
@@ -383,7 +383,7 @@ void main() {
     testWidgets('absent hidden column stays listed; counts match the board', (
       t,
     ) async {
-      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      final s = await pumpHomeApp(t, tasks: [mkTask('a')]);
       s.setHomeKind(HomeKind.tasks);
       s.toggleHomeCol('blocked'); // absent: still saved
       final (names, hidden, _) = s.homeColumnChoices();
@@ -398,7 +398,7 @@ void main() {
 
     testWidgets('hidden columns survive a rebuilt state', (t) async {
       final prefs = MemoryStorage();
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         prefs: prefs,
         tasks: [
@@ -406,7 +406,7 @@ void main() {
         ],
       );
       s.toggleHomeCol('doing');
-      final s2 = await pumpTasksApp(
+      final s2 = await pumpHomeApp(
         t,
         prefs: prefs,
         tasks: [
@@ -419,7 +419,7 @@ void main() {
     testWidgets('toggle is a header icon: wide only, badge when hidden', (
       t,
     ) async {
-      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      final s = await pumpHomeApp(t, tasks: [mkTask('a')]);
       await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('home-cols'), findsOneWidget);
@@ -433,7 +433,7 @@ void main() {
     });
 
     testWidgets('phone layout has no toggle', (t) async {
-      await pumpTasksApp(t, size: const Size(320, 800), tasks: [mkTask('a')]);
+      await pumpHomeApp(t, size: const Size(320, 800), tasks: [mkTask('a')]);
       await showTasksBoard(t);
       await t.pumpAndSettle();
       expect(_k('home-cols'), findsNothing);
@@ -442,7 +442,7 @@ void main() {
     testWidgets('absent hidden column is unchecked and counted hidden', (
       t,
     ) async {
-      final s = await pumpTasksApp(t, tasks: [mkTask('a')]);
+      final s = await pumpHomeApp(t, tasks: [mkTask('a')]);
       s.toggleHomeCol('blocked');
       await showTasksBoard(t);
       await t.pumpAndSettle();

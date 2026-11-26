@@ -58,6 +58,7 @@ Future<AppState> _pump(
       AppState(SpaceNoteSource(space, seed: _Seed()), prefs: MemoryStorage());
   // These are the tree's drags: the Notes panel's tree view.
   s.setNotesView(NotesView.tree);
+  s.setSection(Section.notes); // the old Day | Board main view, not Home
   await t.pumpWidget(DavdartApp(state: s));
   await t.pumpAndSettle();
   return s;
@@ -273,14 +274,12 @@ void main() {
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.reset);
       final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
-      await t.pumpWidget(
-        DavdartApp(
-          state: AppState(
-            SpaceNoteSource(space, seed: _Plain()),
-            prefs: MemoryStorage(),
-          ),
-        ),
+      final state = AppState(
+        SpaceNoteSource(space, seed: _Plain()),
+        prefs: MemoryStorage(),
       );
+      state.setSection(Section.notes);
+      await t.pumpWidget(DavdartApp(state: state));
       await t.pumpAndSettle();
       expect(find.textContaining('No work items yet'), findsOneWidget);
       expect(find.text('No notes'), findsNothing);

@@ -13,7 +13,7 @@ void main() {
   tearDown(() => LocalZone.use(null));
 
   testWidgets('Tasks focus shows a board with a column per status', (t) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       tasks: [
         mkTask('a', summary: 'Open bug', status: 'NEEDS-ACTION'),
@@ -55,7 +55,7 @@ void main() {
   testWidgets(
     'taskColumns follows the tag filter and keeps empty core columns, not backlog',
     (t) async {
-      final state = await pumpTasksApp(
+      final state = await pumpHomeApp(
         t,
         tasks: [
           mkTask('a', summary: 'Tagged', tags: ['bug']),
@@ -74,7 +74,7 @@ void main() {
   testWidgets(
     'backlog and blocked tags get columns; canceled has its own column',
     (t) async {
-      final state = await pumpTasksApp(
+      final state = await pumpHomeApp(
         t,
         tasks: [
           mkTask('a', summary: 'Later', tags: ['status-backlog']),
@@ -98,7 +98,7 @@ void main() {
   testWidgets('phone: one collapsible section per status, titles only', (
     t,
   ) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       size: const Size(400, 800),
       tasks: [
@@ -116,7 +116,7 @@ void main() {
   testWidgets('wide Home: + adds the focus type, chevron lists all three', (
     t,
   ) async {
-    await pumpTasksApp(t);
+    await pumpHomeApp(t);
     // Day leads with an event; the chevron lists note, task and event.
     await t.tap(_k('home-add-more'));
     await t.pumpAndSettle();
@@ -139,7 +139,7 @@ void main() {
     await t.tap(_k('home-add'));
     await t.pumpAndSettle();
     expect(_k('new-task-title'), findsOneWidget);
-    await pumpTasksApp(t, size: const Size(400, 800));
+    await pumpHomeApp(t, size: const Size(400, 800));
     expect(_k('home-add'), findsNothing);
     expect(_k('home-add-more'), findsNothing);
   });

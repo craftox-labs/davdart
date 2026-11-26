@@ -25,7 +25,7 @@ void main() {
   tearDown(() => LocalZone.use(null));
 
   testWidgets('Day | Board switch; Day is the default', (t) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       tasks: [mkTask('a', days: 0, status: 'NEEDS-ACTION')],
     );
@@ -44,7 +44,7 @@ void main() {
 
   testWidgets('focus is remembered per Space', (t) async {
     final prefs = MemoryStorage();
-    final s = await pumpTasksApp(t, prefs: prefs);
+    final s = await pumpHomeApp(t, prefs: prefs);
     await t.tap(_k('home-focus-board'));
     await t.pumpAndSettle();
     expect(s.homeFocus, HomeFocus.board);
@@ -55,7 +55,7 @@ void main() {
     );
     // A fresh app on the same prefs and Space comes back on the board.
     await t.pumpWidget(const SizedBox());
-    final again = await pumpTasksApp(t, prefs: prefs);
+    final again = await pumpHomeApp(t, prefs: prefs);
     expect(again.homeFocus, HomeFocus.board);
     expect(find.byType(HomeBoard), findsOneWidget);
     // Back to Day clears it.
@@ -69,7 +69,7 @@ void main() {
     t,
   ) async {
     final tom = _tomorrow();
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       tasks: [
         mkTask('over', days: -3),
@@ -98,7 +98,7 @@ void main() {
   });
 
   testWidgets('dots: events and tasks have their own tone', (t) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       tasks: [mkTask('a', days: 0)],
       events: [mkEvent('e', days: 0)],
@@ -112,7 +112,7 @@ void main() {
     t,
   ) async {
     final prefs = MemoryStorage();
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       size: const Size(400, 800),
       prefs: prefs,
@@ -153,7 +153,7 @@ void main() {
   });
 
   testWidgets('wide: calendar left of the list', (t) async {
-    await pumpTasksApp(t, size: const Size(1280, 900));
+    await pumpHomeApp(t, size: const Size(1280, 900));
     final cal = t.getTopLeft(_k('home-calendar'));
     final list = t.getTopLeft(_k('home-today'));
     expect(cal.dx, lessThan(list.dx));
@@ -163,7 +163,7 @@ void main() {
     t,
   ) async {
     LocalZone.use('Pacific/Auckland'); // UTC+13 in November
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       events: [
         Event(
@@ -209,7 +209,7 @@ void main() {
   testWidgets('resume resets only a stale selection, quietly otherwise', (
     t,
   ) async {
-    final s = await pumpTasksApp(t);
+    final s = await pumpHomeApp(t);
     var n = 0;
     s.addListener(() => n++);
     s.resetHomeDayIfStale(); // nothing selected
@@ -229,7 +229,7 @@ void main() {
   testWidgets('phone: day cells are 44dp tall and ~40dp wide at 320', (
     t,
   ) async {
-    await pumpTasksApp(t, size: const Size(320, 568));
+    await pumpHomeApp(t, size: const Size(320, 568));
     await t.tap(_k('home-cal-toggle'));
     await t.pumpAndSettle();
     final r = t.getRect(_k(_dayKey(_tomorrow())));
@@ -241,7 +241,7 @@ void main() {
   testWidgets(
     'wide and short: the calendar sits in a scroll view, no overflow',
     (t) async {
-      await pumpTasksApp(t, size: const Size(1280, 350));
+      await pumpHomeApp(t, size: const Size(1280, 350));
       expect(_k('home-calendar-scroll'), findsOneWidget);
       expect(t.takeException(), isNull);
     },
@@ -250,7 +250,7 @@ void main() {
   testWidgets('a repeating overdue task also shows its occurrence today', (
     t,
   ) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       tasks: [
         mkTask('rep', days: -3, rrule: 'FREQ=DAILY'),
@@ -266,7 +266,7 @@ void main() {
   group('calendar header', () {
     for (final w in [320.0, 360.0]) {
       testWidgets('phone $w: centred title, no overlap, September', (t) async {
-        final s = await pumpTasksApp(t, size: Size(w, 640));
+        final s = await pumpHomeApp(t, size: Size(w, 640));
         final sep = DateTime.utc(DateTime.now().year + 1, 9, 29);
         double mid(String k) => t.getCenter(_k(k)).dx;
         final card = t.getRect(_k('home-calendar-card'));
@@ -309,7 +309,7 @@ void main() {
   });
 
   testWidgets('Segmented fills the width on a phone, not on wide', (t) async {
-    await pumpTasksApp(t, size: const Size(400, 800));
+    await pumpHomeApp(t, size: const Size(400, 800));
     final box = t.getRect(_k('home-strip'));
     final a = t.getRect(_k('home-focus-day'));
     final b = t.getRect(_k('home-focus-board'));
@@ -322,14 +322,14 @@ void main() {
     expect(k.right, closeTo(box.right, 1.5));
     expect(k.left, greaterThanOrEqualTo(b.right - 0.5));
     expect(b.width + k.width, closeTo(box.width / 2, 3));
-    await pumpTasksApp(t, size: const Size(1280, 800));
+    await pumpHomeApp(t, size: const Size(1280, 800));
     expect(t.getRect(_k('home-strip')).width, lessThanOrEqualTo(320));
   });
 
   testWidgets('section collapse is remembered per Space key', (t) async {
     final prefs = MemoryStorage()
       ..write('davdart.home.card.collapsed.v1.tasks.other', 'true');
-    await pumpTasksApp(t, prefs: prefs, tasks: [mkTask('a', days: 0)]);
+    await pumpHomeApp(t, prefs: prefs, tasks: [mkTask('a', days: 0)]);
     // Another Space's choice does not apply here.
     expect(_k('home-today-tasks'), findsOneWidget);
     await t.tap(_k('home-today-tasks-toggle'));
@@ -342,7 +342,7 @@ void main() {
   group('wide grid', () {
     for (final w in [700.0, 1280.0, 1700.0]) {
       testWidgets('50/50 columns at $w', (t) async {
-        await pumpTasksApp(t, size: Size(w, 900));
+        await pumpHomeApp(t, size: Size(w, 900));
         final cal = t.getRect(_k('home-calendar'));
         final list = t.getRect(_k('home-today'));
         // Left column = card + its left margin; right column = the padded
@@ -359,9 +359,9 @@ void main() {
       t,
     ) async {
       double cell() => t.getSize(find.byKey(Key(_dayKey(_tomorrow())))).height;
-      await pumpTasksApp(t, size: const Size(1700, 520));
+      await pumpHomeApp(t, size: const Size(1700, 520));
       expect(cell(), greaterThanOrEqualTo(44));
-      await pumpTasksApp(t, size: const Size(1700, 2400));
+      await pumpHomeApp(t, size: const Size(1700, 2400));
       expect(cell(), closeTo(72, 0.5));
       expect(t.takeException(), isNull);
     });

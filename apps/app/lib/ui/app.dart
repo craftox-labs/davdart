@@ -14,14 +14,15 @@ import '../state/note_draft.dart';
 import '../theme/tokens.dart';
 import 'board_view.dart';
 import 'home_board.dart';
-import 'command_palette.dart';
-import 'key_nav_ui.dart';
-import '../state/key_nav.dart';
 import 'home_columns_toggle.dart';
 import 'home_day.dart';
+import 'command_palette.dart';
 import 'detail_header.dart';
 import 'detail_view.dart';
 import 'first_run_view.dart';
+import 'home_page.dart';
+import 'key_nav_ui.dart';
+import '../state/key_nav.dart';
 import 'list_view.dart';
 import '../state/tab_state.dart';
 import 'logo.dart';
@@ -378,15 +379,47 @@ class _ShellState extends State<Shell>
       mirror: mirror,
     );
 
-    Widget homeBoard({bool embedded = false}) => ListenableBuilder(
+    Widget board({bool embedded = false}) => ListenableBuilder(
       listenable: state,
       builder: (context, _) {
         publishBoardNav(state);
         state.nav.homeStacked = false;
-        // The status columns (or accordions) alone, no overall header.
         return HomeBoard(state: state, embedded: embedded);
       },
     );
+
+    // The main area: a project's Overview page when one is open, the Home
+    // dashboard after the Home action (or at the start), otherwise the Home
+    // section's Day | Board view, whichever panel is showing.
+    Widget sectionMain() {
+      if (state.section == Section.overview && state.scopeUid != null) {
+        return ProjectOverviewPage(state: state);
+      }
+      if (state.showingHome) return HomePage(state: state);
+      final narrow = MediaQuery.sizeOf(context).width < Tokens.stackBreakpoint;
+      return Column(
+        children: [
+          HomeSwitch(state: state),
+          Expanded(
+            child: state.homeFocus == HomeFocus.day
+                ? HomeDayFocus(state: state)
+                : narrow
+                // Phone: the board accordions in one scroll view.
+                ? SingleChildScrollView(
+                    key: const Key('home-scroll'),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        board(embedded: true),
+                        SizedBox(height: fabInset(context)),
+                      ],
+                    ),
+                  )
+                : board(),
+          ),
+        ],
+      );
+    }
 
     Widget mainBody() => state.noSpace
         ? FirstRunView(state: state)
@@ -406,32 +439,7 @@ class _ShellState extends State<Shell>
               if (!wide) NarrowCrumbs(state: state),
               ScopeText(state: state),
               if (state.activeTab == null) ...[
-                // A project's Overview is a page of its own, in the main
-                // area (the side panel lists projects, not their pages).
-                if (state.section == Section.overview && state.scopeUid != null)
-                  Expanded(child: ProjectOverviewPage(state: state))
-                else ...[
-                  HomeSwitch(state: state),
-                  if (state.homeFocus == HomeFocus.day)
-                    Expanded(child: HomeDayFocus(state: state))
-                  else if (MediaQuery.sizeOf(context).width <
-                      Tokens.stackBreakpoint)
-                    // Phone: the board accordions in one scroll view.
-                    Expanded(
-                      child: SingleChildScrollView(
-                        key: const Key('home-scroll'),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            homeBoard(embedded: true),
-                            SizedBox(height: fabInset(context)),
-                          ],
-                        ),
-                      ),
-                    )
-                  else
-                    Expanded(child: homeBoard()),
-                ],
+                Expanded(child: sectionMain()),
               ] else
                 Expanded(
                   child: state.view == ViewMode.board
@@ -982,6 +990,7 @@ class TopBar extends StatelessWidget {
           if (home &&
               !showMenu &&
               state.activeTab == null &&
+              !state.showingHome &&
               state.homeFocus != HomeFocus.day)
             HomeColumnsToggle(state: state),
           refresh,

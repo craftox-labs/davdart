@@ -50,6 +50,7 @@ Future<AppState> _pump(
     SpaceNoteSource(space, seed: _Seed()),
     prefs: prefs ?? MemoryStorage(),
   );
+  s.setSection(Section.notes); // the old Day | Board main view, not Home
   await t.pumpWidget(DavdartApp(state: s));
   await t.pumpAndSettle();
   return s;

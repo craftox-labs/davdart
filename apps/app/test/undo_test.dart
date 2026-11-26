@@ -54,7 +54,7 @@ void main() {
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       notes: [
         _note('a', 'Alpha', rank: 4),
@@ -79,7 +79,7 @@ void main() {
   testWidgets(
     'rank-only move says "in", Undo restores rank (null stays null)',
     (t) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [_note('a', 'Alpha'), _note('b', 'Beta')],
       );
@@ -96,7 +96,7 @@ void main() {
   );
 
   testWidgets('task menu Set priority toasts, Undo restores', (t) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       tasks: [mkTask('t', summary: 'Fix it', priority: 5)],
     );
@@ -119,7 +119,7 @@ void main() {
   testWidgets('a second change replaces the first undo; other edits stay', (
     t,
   ) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       notes: [_note('a', 'Alpha'), _note('b', 'Beta')],
     );
@@ -144,7 +144,7 @@ void main() {
     t,
   ) async {
     final done = DateTime.utc(2026, 3, 4, 5, 6);
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       tasks: [
         Task(
@@ -168,7 +168,7 @@ void main() {
   });
 
   testWidgets('undo of a drop restores neighbouring ranks too', (t) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       notes: [
         _note('a', 'Alpha'),
@@ -192,7 +192,7 @@ void main() {
   });
 
   testWidgets('undo back into Done respects the completion blocker', (t) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       tasks: [
         Task(
@@ -214,7 +214,7 @@ void main() {
   });
 
   testWidgets('note priority undo restores a raw non-word line', (t) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       notes: [_note('a', 'Alpha', priority: '3 (urgent)')],
     );
@@ -229,7 +229,7 @@ void main() {
   });
 
   testWidgets('undo of an item deleted meanwhile does nothing', (t) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       notes: [_note('a', 'Alpha')],
       tasks: [mkTask('t', summary: 'Fix', priority: 5)],

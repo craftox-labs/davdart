@@ -16,7 +16,7 @@ final _notes = [
 
 Future<AppState> _app(WidgetTester t, {Size? size}) async {
   AppState.debugDefaultFocus = HomeFocus.day;
-  final s = await pumpTasksApp(
+  final s = await pumpHomeApp(
     t,
     size: size ?? const Size(1280, 900),
     notes: _notes,

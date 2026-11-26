@@ -369,6 +369,7 @@ void main() {
         size: const Size(1700, 900),
       );
       await s.activateTab(null);
+      s.setSection(Section.notes);
       await t.pumpAndSettle();
       s.nav.focusArea(NavArea.main, list: KeyNav.homeList);
       await t.pump();

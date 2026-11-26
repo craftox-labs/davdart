@@ -83,6 +83,33 @@ Future<AppState> pumpTasksApp(
   return s;
 }
 
+/// Pumps the app with the Home section's old Day | Board main view showing
+/// (not the dashboard the Home action shows).
+Future<AppState> pumpHomeApp(
+  WidgetTester t, {
+  List<Note> notes = const [],
+  List<Task> tasks = const [],
+  List<Event> events = const [],
+  Size size = const Size(1280, 900),
+  MemoryStorage? prefs,
+  bool readOnly = false,
+  Space? into,
+}) async {
+  final s = await pumpTasksApp(
+    t,
+    notes: notes,
+    tasks: tasks,
+    events: events,
+    size: size,
+    prefs: prefs,
+    readOnly: readOnly,
+    into: into,
+  );
+  s.setSection(Section.notes); // leaves Home: the old Day | Board main view
+  await t.pumpAndSettle();
+  return s;
+}
+
 /// The ICalDate (timed, floating) of local day offset [days] at [hour]:[min].
 ICalDate timedIn(int days, int hour, [int min = 0]) {
   final n = DateTime.now().add(Duration(days: days));

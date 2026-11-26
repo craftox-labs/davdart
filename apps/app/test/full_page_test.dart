@@ -43,6 +43,7 @@ Future<AppState> _pump(
     prefs: MemoryStorage(),
   );
   if (side != null) state.setLayoutSide(side);
+  state.setSection(Section.notes); // the old Day | Board main view, not Home
   await t.pumpWidget(DavdartApp(state: state));
   await t.pumpAndSettle();
   if (select) {

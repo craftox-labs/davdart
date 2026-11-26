@@ -99,7 +99,7 @@ void main() {
   });
 
   testWidgets('Events above Tasks, one card each, empty states', (t) async {
-    await pumpTasksApp(t, size: const Size(1700, 900));
+    await pumpHomeApp(t, size: const Size(1700, 900));
     expect(_k('home-today-doing'), findsNothing);
     expect(find.text('Nothing due today'), findsOneWidget);
     expect(find.text('Nothing on the Calendar today'), findsOneWidget);
@@ -115,7 +115,7 @@ void main() {
   });
 
   testWidgets('Tasks card: overdue then today only, overdue marked', (t) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       tasks: [
         mkTask('later', days: 9),
@@ -153,7 +153,7 @@ void main() {
   testWidgets('Tasks card lists every task, no cap and no "more" link', (
     t,
   ) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       tasks: [for (var i = 0; i < 8; i++) mkTask('k$i', days: 0)],
     );
@@ -165,7 +165,7 @@ void main() {
   });
 
   testWidgets('checkbox completes a task and it leaves the card', (t) async {
-    final s = await pumpTasksApp(t, tasks: [mkTask('a', days: 0)]);
+    final s = await pumpHomeApp(t, tasks: [mkTask('a', days: 0)]);
     await t.tap(_k('task-check-a'));
     await t.pumpAndSettle();
     expect(s.taskById('a')!.isCompleted, isTrue);
@@ -176,7 +176,7 @@ void main() {
   testWidgets('tap opens a task per the setting; All tasks switches rail', (
     t,
   ) async {
-    final s = await pumpTasksApp(t, tasks: [mkTask('k', days: 0)]);
+    final s = await pumpHomeApp(t, tasks: [mkTask('k', days: 0)]);
     await t.tap(find.text('k').first);
     await t.pumpAndSettle();
     expect(s.peekUid, 'k');
@@ -187,7 +187,7 @@ void main() {
   });
 
   testWidgets('+ adds a task due today', (t) async {
-    final s = await pumpTasksApp(t);
+    final s = await pumpHomeApp(t);
     await t.tap(_k('home-today-tasks-add'));
     await t.pumpAndSettle();
     await t.enterText(_k('new-task-title'), 'Buy milk');
@@ -198,7 +198,7 @@ void main() {
   });
 
   testWidgets('ignores panel tag filters, follows the folder scope', (t) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       notes: [
         Note(uid: 'f', summary: 'Plans', categories: ['kind-folder']),
@@ -226,7 +226,7 @@ void main() {
   });
 
   testWidgets('rolls over at local midnight (fake clock)', (t) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       tasks: [
         Task(uid: 'd21', summary: 'd21', due: ICalDate.date(2026, 11, 21)),
@@ -273,7 +273,7 @@ void main() {
   testWidgets('Events card: today only, all-day first, then by time', (
     t,
   ) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       events: [
         mkEvent('late', summary: 'Late', hour: 18),
@@ -297,7 +297,7 @@ void main() {
   });
 
   testWidgets('event tap opens it; Open Calendar switches rail', (t) async {
-    final s = await pumpTasksApp(t, events: [mkEvent('e', summary: 'Sync')]);
+    final s = await pumpHomeApp(t, events: [mkEvent('e', summary: 'Sync')]);
     await t.tap(find.text('Sync').first);
     await t.pumpAndSettle();
     expect(s.peekUid, 'e');
@@ -307,7 +307,7 @@ void main() {
   });
 
   testWidgets('read-only Space: no add buttons, still listed', (t) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       tasks: [mkTask('a', days: 0)],
       events: [mkEvent('e')],
@@ -320,7 +320,7 @@ void main() {
   });
 
   testWidgets('not shown on a saved-view tab', (t) async {
-    final s = await pumpTasksApp(t);
+    final s = await pumpHomeApp(t);
     await t.runAsync(() => s.saveView('V'));
     s.applyView(s.savedViews.single);
     await t.pumpAndSettle();
@@ -329,7 +329,7 @@ void main() {
   });
 
   testWidgets('narrow width: Events above Tasks, same width', (t) async {
-    await pumpTasksApp(t, size: const Size(400, 900));
+    await pumpHomeApp(t, size: const Size(400, 900));
     final e = t.getRect(_k('home-today-events'));
     final k = t.getRect(_k('home-today-tasks'));
     expect(k.top, greaterThanOrEqualTo(e.bottom));
@@ -339,7 +339,7 @@ void main() {
 
   for (final w in [320.0, 880.0, 1280.0, 1911.0]) {
     testWidgets('no overflow at $w', (t) async {
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         tasks: [
           mkTask('late', summary: 'A rather long overdue task title', days: -2),
@@ -363,7 +363,7 @@ void main() {
   testWidgets('each section collapses on its header and remembers it', (
     t,
   ) async {
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       size: const Size(1280, 900),
       tasks: [mkTask('a', days: 0)],

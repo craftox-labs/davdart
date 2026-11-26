@@ -46,7 +46,7 @@ void main() {
 
   Future<AppState> pump(WidgetTester t, {Size? size}) async {
     AppState.debugDefaultFocus = HomeFocus.board;
-    return pumpTasksApp(
+    return pumpHomeApp(
       t,
       notes: [
         _folder,
@@ -96,7 +96,7 @@ void main() {
 
   testWidgets('each priority has its own colour: red, orange, cool', (t) async {
     AppState.debugDefaultFocus = HomeFocus.board;
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       tasks: [
         mkTask('h', priority: 1),
@@ -134,7 +134,7 @@ void main() {
     t,
   ) async {
     AppState.debugDefaultFocus = HomeFocus.board;
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       tasks: [
         mkTask('h', priority: 1),
@@ -167,7 +167,7 @@ void main() {
 
   testWidgets('doing is green and done is blue on the column dots', (t) async {
     AppState.debugDefaultFocus = HomeFocus.board;
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       notes: [
         Note(
@@ -206,7 +206,7 @@ void main() {
     t,
   ) async {
     AppState.debugDefaultFocus = HomeFocus.board;
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       tasks: [mkTask('late', days: -3), mkTask('soon', days: 3)],
       size: const Size(1280, 900),
@@ -230,7 +230,7 @@ void main() {
       t,
     ) async {
       AppState.debugDefaultFocus = HomeFocus.board;
-      await pumpTasksApp(
+      await pumpHomeApp(
         t,
         notes: [
           Note(
@@ -257,7 +257,7 @@ void main() {
 
   testWidgets('owner and decided-by are not on cards', (t) async {
     AppState.debugDefaultFocus = HomeFocus.board;
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       notes: [
         Note(
@@ -340,7 +340,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     AppState.debugDefaultFocus = HomeFocus.board;
-    final s = await pumpTasksApp(
+    final s = await pumpHomeApp(
       t,
       notes: [
         Note(

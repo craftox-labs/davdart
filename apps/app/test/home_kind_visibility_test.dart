@@ -32,6 +32,7 @@ Future<AppState> _pump(
   addTearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
   final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
   final s = make(SpaceNoteSource(space, seed: SeedNotes(const [])));
+  s.setSection(Section.notes);
   await t.pumpWidget(DavdartApp(state: s));
   await t.pumpAndSettle();
   return s;

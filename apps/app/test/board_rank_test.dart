@@ -70,7 +70,7 @@ void main() {
     testWidgets('within a column writes one rank between the neighbours', (
       t,
     ) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [
           _note('a', rank: 1),
@@ -90,7 +90,7 @@ void main() {
     testWidgets('unranked column: cards above get ranks, tasks work too', (
       t,
     ) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [_note('a'), _note('b')],
         tasks: [mkTask('k', summary: 'K')],
@@ -106,7 +106,7 @@ void main() {
     testWidgets('another column: status changes and lands at the index', (
       t,
     ) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [
           _note('a', rank: 1),
@@ -121,7 +121,7 @@ void main() {
     });
 
     testWidgets('status-only drop drops the old rank', (t) async {
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [_note('x', status: 'doing', rank: 9)],
       );
@@ -137,7 +137,7 @@ void main() {
       t,
     ) async {
       _desktop();
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [_note('a', rank: 1), _note('b', rank: 2), _note('c', rank: 3)],
       );
@@ -170,7 +170,7 @@ void main() {
 
     testWidgets('onto itself changes nothing', (t) async {
       _desktop();
-      final s = await pumpTasksApp(
+      final s = await pumpHomeApp(
         t,
         notes: [_note('a', rank: 1), _note('b', rank: 2)],
       );

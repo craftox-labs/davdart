@@ -166,7 +166,7 @@ Future<AppState> _pump(
   HomeFocus focus = HomeFocus.board,
 }) async {
   AppState.debugDefaultFocus = focus;
-  return pumpTasksApp(
+  return pumpHomeApp(
     t,
     notes: _notes(),
     tasks: _tasks(),

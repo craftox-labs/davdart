@@ -35,14 +35,14 @@ void main() {
   tearDown(() => AppState.debugDefaultFocus = HomeFocus.day);
 
   testWidgets('a "slug: Title" summary shows only the title', (t) async {
-    await pumpTasksApp(t, notes: [_plan('slug', 'slug: Title', itemId: 'slug')]);
+    await pumpHomeApp(t, notes: [_plan('slug', 'slug: Title', itemId: 'slug')]);
     expect(_k('nav-card-slug'), findsOneWidget);
     expect(_texts(t, 'slug'), contains('Title'));
     expect(_texts(t, 'slug'), isNot(contains('slug: Title')));
   });
 
   testWidgets('a summary without the slug prefix is shown whole', (t) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       notes: [_plan('plain', 'A plain title', itemId: 'plain')],
     );
@@ -50,13 +50,13 @@ void main() {
   });
 
   testWidgets('a slug alone falls back to the whole summary', (t) async {
-    await pumpTasksApp(t, notes: [_plan('bare', 'bare:', itemId: 'bare')]);
+    await pumpHomeApp(t, notes: [_plan('bare', 'bare:', itemId: 'bare')]);
     expect(_texts(t, 'bare'), contains('bare:'));
   });
 
   testWidgets('only the item id prefix is stripped, not any word before a colon',
       (t) async {
-    await pumpTasksApp(
+    await pumpHomeApp(
       t,
       notes: [_plan('colon', 'topic: Something', itemId: 'other')],
     );

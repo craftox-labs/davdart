@@ -44,7 +44,7 @@ Future<AppState> _home(
   bool board = false,
 }) async {
   AppState.debugDefaultFocus = board ? HomeFocus.board : HomeFocus.day;
-  final s = await pumpTasksApp(
+  final s = await pumpHomeApp(
     t,
     size: size,
     notes: [_note('n1', 'todo'), _note('n2', 'todo'), _note('n3', 'doing')],
