@@ -313,6 +313,16 @@ class _Ref {
         _ => null,
       };
 
+  /// Creation time for sorting: a missing CREATED is a fixed epoch (DTSTAMP
+  /// defaults to "now" on parse, which would shuffle the order each sync).
+  DateTime get sortCreated => switch (raw) {
+        Note n => n.created,
+        Task t => t.created,
+        Event e => e.created,
+        _ => null,
+      } ??
+      DateTime.utc(1970);
+
   List<String> get _extra => switch (raw) {
         Note n => n.extraLines,
         Task t => t.extraLines,
@@ -807,8 +817,10 @@ class ItemService {
           if (ba != null) return -1;
           if (bb != null) return 1;
         }
-        final c = a.created!.compareTo(b.created!);
-        return c != 0 ? c : a.title.compareTo(b.title);
+        final c = a.sortCreated.compareTo(b.sortCreated);
+        if (c != 0) return c;
+        final t = a.title.compareTo(b.title);
+        return t != 0 ? t : a.uid.compareTo(b.uid);
       });
     final lim = limit.clamp(1, 500);
     final off = offset < 0 ? 0 : offset;

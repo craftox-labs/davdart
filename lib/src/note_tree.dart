@@ -10,6 +10,8 @@ class NoteNode {
 /// Notes arranged by their parent links. Built the same way on every device:
 /// a note whose parent is missing (not synced yet, or deleted) or whose link
 /// would close a loop is shown at the top level instead of being lost.
+final _epoch = DateTime.utc(1970);
+
 class NoteTree {
   NoteTree._(this.roots, this._byUid);
 
@@ -18,9 +20,13 @@ class NoteTree {
 
   /// Default sibling order: oldest first, then title.
   static int byCreated(Note a, Note b) {
-    final ca = a.created ?? a.dtstamp, cb = b.created ?? b.dtstamp;
+    // No CREATED sorts first at a fixed time: DTSTAMP defaults to "now" on
+    // parse, which would shuffle those siblings on every sync.
+    final ca = a.created ?? _epoch, cb = b.created ?? _epoch;
     final c = ca.compareTo(cb);
-    return c != 0 ? c : a.summary.compareTo(b.summary);
+    if (c != 0) return c;
+    final t = a.summary.compareTo(b.summary);
+    return t != 0 ? t : a.uid.compareTo(b.uid);
   }
 
   factory NoteTree.build(Iterable<Note> notes,

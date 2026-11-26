@@ -32,9 +32,12 @@ class BoardItem {
   /// The due wall-clock (tasks only; notes have none).
   DateTime? get due => task?.due?.localWall;
 
-  DateTime get created => isTask
-      ? (task!.created ?? task!.dtstamp)
-      : (note!.created ?? note!.dtstamp);
+  /// Creation time; a missing CREATED is a fixed epoch, not DTSTAMP (which
+  /// defaults to "now" on parse and would shuffle the order every sync).
+  DateTime get created =>
+      (isTask ? task!.created : note!.created) ?? DateTime.utc(1970);
+
+  String get _uid => isTask ? task!.uid : note!.uid;
 
   DateTime? get lastModified =>
       isTask ? task!.lastModified : note!.lastModified;
@@ -73,5 +76,6 @@ int compareBoardItems(BoardItem a, BoardItem b) {
   }
   c = a.created.compareTo(b.created);
   if (c != 0) return c;
-  return a.title.compareTo(b.title);
+  c = a.title.compareTo(b.title);
+  return c != 0 ? c : a._uid.compareTo(b._uid);
 }
