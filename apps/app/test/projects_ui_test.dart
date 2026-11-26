@@ -142,6 +142,44 @@ void main() {
       await _end(t);
     });
 
+    testWidgets('a view row sets the scope and the section together', (
+      t,
+    ) async {
+      final s = await _app(t);
+      s.setSection(Section.projects);
+      await t.pumpAndSettle();
+      await t.tap(_k('project-toggle-a'));
+      await t.pumpAndSettle();
+      await t.tap(_k('project-view-a-notes'));
+      await t.pumpAndSettle();
+      expect(s.scopeUid, 'a');
+      expect(s.section, Section.notes);
+      // Board is the Tasks list scoped, until the board lands in the panel.
+      s.setSection(Section.projects);
+      await t.pumpAndSettle();
+      await t.tap(_k('project-view-a-board'));
+      await t.pumpAndSettle();
+      expect(s.scopeUid, 'a');
+      expect(s.section, Section.tasks);
+      // Overview is the project's own page (a placeholder for now).
+      s.setSection(Section.projects);
+      await t.pumpAndSettle();
+      await t.tap(_k('project-view-a-overview'));
+      await t.pumpAndSettle();
+      expect(s.scopeUid, 'a');
+      expect(s.section, Section.overview);
+      expect(_k('overview-panel'), findsOneWidget);
+      expect(
+        find.text('More coming: a summary of this project here.'),
+        findsOneWidget,
+      );
+      // Without the project scope the page has nothing to show: Notes.
+      s.openFolder(null);
+      await t.pumpAndSettle();
+      expect(s.section, Section.notes);
+      await _end(t);
+    });
+
     testWidgets('context menu offers rename, new folder, delete', (t) async {
       await _app(t);
       await t.tap(_k('rail-projects'));

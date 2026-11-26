@@ -231,56 +231,35 @@ void main() {
         _noError(t);
       });
 
-      testWidgets('the panel drills into a project\'s folders', (t) async {
+      testWidgets('a project expands to its views', (t) async {
         final s = await _app(t, size);
         s.openFolder('p1');
         await t.pumpAndSettle();
         await _openPicker(t);
-        // At the project: its own folders, one level, nothing to go up to.
-        expect(_k('projects-folder-sub'), findsOneWidget);
-        expect(_k('projects-folder-deep'), findsNothing);
+        // The project in scope starts expanded: Overview, Board, Notes,
+        // Calendar. No folder rows any more.
+        for (final v in ['overview', 'board', 'notes', 'events']) {
+          expect(_k('project-view-p1-$v'), findsOneWidget, reason: v);
+        }
+        expect(_k('project-view-p2-overview'), findsNothing);
+        expect(_k('projects-folder-sub'), findsNothing);
         expect(_k('projects-up'), findsNothing);
         expect(_k('projects-here'), findsNothing);
-        // The project row itself is the marked level.
-        expect(_k('projects-all'), findsOneWidget);
-        expect(_k('scope-more-p1'), findsOneWidget);
-        await t.tap(_k('projects-folder-sub'));
+        // A view sets the project scope and the section together, and the
+        // drawer closes on it.
+        await t.tap(_k('project-view-p1-events'));
         await t.pumpAndSettle();
-        expect(s.scopeUid, 'sub');
-        expect(_k('side-menu'), findsNothing);
-        // One level down: the way up, the folder in scope (marked), and its
-        // own folders.
-        await _openPicker(t);
-        expect(
-          find.descendant(
-            of: _k('projects-up'),
-            matching: find.text('Alpha project'),
-          ),
-          findsOneWidget,
-        );
-        final here = _k('projects-here');
-        expect(
-          find.descendant(of: here, matching: find.text('Design')),
-          findsOneWidget,
-        );
-        expect(_k('projects-folder-deep'), findsOneWidget);
-        // Only the scope's own row carries its actions.
-        expect(_k('scope-more-sub'), findsOneWidget);
-        expect(_k('scope-more-deep'), findsNothing);
-        // The ... offers its actions.
-        await t.tap(_k('scope-more-sub'));
-        await t.pumpAndSettle();
-        expect(_k('scope-edit'), findsOneWidget);
-        await t.tap(_k('scope-edit'));
-        await t.pumpAndSettle();
-        expect(find.text('Edit folder'), findsOneWidget);
-        await t.tap(find.text('Cancel'));
-        await t.pumpAndSettle();
-        // Up one level goes back to the project.
-        await t.tap(_k('projects-up'));
-        await t.pumpAndSettle();
-        expect(_k('side-menu'), findsNothing);
         expect(s.scopeUid, 'p1');
+        expect(s.section, Section.events);
+        expect(_k('side-menu'), findsNothing);
+        // The chevron shows and hides a project's views.
+        await _openPicker(t);
+        await t.tap(_k('project-toggle-p1'));
+        await t.pumpAndSettle();
+        expect(_k('project-view-p1-overview'), findsNothing);
+        await t.tap(_k('project-toggle-p1'));
+        await t.pumpAndSettle();
+        expect(_k('project-view-p1-overview'), findsOneWidget);
         _noError(t);
       });
 
@@ -307,32 +286,22 @@ void main() {
         _noError(t);
       });
 
-      testWidgets('a loose folder is its own path row', (t) async {
+      testWidgets('a loose folder has no row of its own', (t) async {
         final s = await _app(t, size);
         s.openFolder('loose');
         await t.pumpAndSettle();
         await _openPicker(t);
-        // Its own path row is the scope: no project row is marked.
-        final path = _k('projects-path');
-        expect(path, findsOneWidget);
-        expect(
-          find.descendant(of: path, matching: find.text('Loose notes')),
-          findsOneWidget,
-        );
-        expect(_k('scope-more-loose'), findsOneWidget);
-        expect(_k('scope-more-p1'), findsNothing);
-        // Tapping it keeps the scope and closes the menu.
-        await t.tap(path);
-        await t.pumpAndSettle();
-        expect(_k('side-menu'), findsNothing);
-        expect(s.scopeUid, 'loose');
-        // Inside a project the folder row carries the mark instead.
-        s.openFolder('sub');
-        await t.pumpAndSettle();
-        await _openPicker(t);
+        // Folders are reached through the Notes tree, not here: no path row,
+        // no folder rows, and no project row marked.
         expect(_k('projects-path'), findsNothing);
-        expect(_k('projects-here'), findsOneWidget);
-        expect(_k('scope-more-sub'), findsOneWidget);
+        expect(_k('projects-here'), findsNothing);
+        expect(_k('projects-folder-sub'), findsNothing);
+        expect(_k('projects-all'), findsOneWidget);
+        expect(s.scopeUid, 'loose', reason: 'the picker picked nothing');
+        // The whole-Space row clears the scope.
+        await t.tap(_k('projects-all'));
+        await t.pumpAndSettle();
+        expect(s.scopeUid, isNull);
         _noError(t);
       });
 

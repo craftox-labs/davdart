@@ -46,11 +46,13 @@ void main() {
       expect(find.byKey(const Key('content-crumbs')), findsOneWidget);
       await t.tap(find.byKey(const Key('space-chip')));
       await t.pumpAndSettle();
-      final loose = s.scopeUid!;
-      await t.tap(find.byKey(Key('scope-more-$loose')));
-      await t.pumpAndSettle();
-      expect(find.byKey(const Key('scope-delete')), findsOneWidget);
-      expect(find.byKey(const Key('scope-close')), findsOneWidget);
+      // No folder actions in the picker now (folders live in the Notes tree):
+      // its own row is the way back to the whole Space.
+      expect(
+        find.byKey(Key('scope-more-${s.scopeUid!}')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('projects-all')), findsOneWidget);
       final sheetEx = t.takeException();
       expect(
         sheetEx,
@@ -170,7 +172,7 @@ void main() {
     expect(r.height, lessThan(44));
   });
 
-  testWidgets("the loose folder's ⋯ actions act", (t) async {
+  testWidgets("a loose folder has no row in the picker", (t) async {
     t.view.physicalSize = const Size(320, 568);
     t.view.devicePixelRatio = 1;
     addTearDown(t.view.reset);
@@ -189,12 +191,11 @@ void main() {
     expect(s.scope, isNotNull);
     await t.tap(find.byKey(const Key('space-chip')));
     await t.pumpAndSettle();
-    // The panel shows the loose folder as a path row, its actions behind the
-    // ⋯; "Show the whole space" is in that menu, and the Space's own row.
-    expect(find.byKey(const Key('projects-path')), findsOneWidget);
-    await t.tap(find.byKey(Key('scope-more-${s.scopeUid}')));
-    await t.pumpAndSettle();
-    await t.tap(find.byKey(const Key('scope-close')));
+    // Folders are reached through the Notes tree now: the picker has no path
+    // row and no folder actions; the Space's own row clears the scope.
+    expect(find.byKey(const Key('projects-path')), findsNothing);
+    expect(find.byKey(Key('scope-more-${s.scopeUid}')), findsNothing);
+    await t.tap(find.byKey(const Key('projects-all')));
     await t.pumpAndSettle();
     expect(s.scope, isNull);
     expect(t.takeException(), isNull);

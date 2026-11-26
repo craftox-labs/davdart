@@ -10,6 +10,7 @@ import 'key_nav_ui.dart';
 import 'note_menu.dart';
 import 'move_space_dialog.dart';
 import 'scope_bar.dart';
+import 'section_registry.dart';
 import 'overflow_tip.dart';
 import 'parts.dart';
 import 'side_panel.dart';
@@ -92,21 +93,40 @@ class ProjectProgressBar extends StatelessWidget {
   }
 }
 
-/// The Projects panel: the scope picker. "All" is the whole Space; the
-/// projects follow, opened in the most recent first order. Inside a project
-/// the panel drills down a folder level at a time: the parent to go up to,
-/// the folder in scope (marked, with its actions behind a ⋯ and a long press)
-/// and its own folders. A loose folder (outside every project) is a path row
-/// of its own. Tapping a row sets the folder scope. [onPick] runs after a
-/// pick, to close the narrow sheet.
-class ProjectsPanel extends StatelessWidget {
+/// The Projects panel: the Space's projects, most recent first, each with its
+/// own views. A project row expands (chevron) to Overview, Board, Notes and
+/// Calendar: picking one sets the project scope and the section together.
+/// The row's name sets the scope alone (as before). "No project" clears the
+/// scope. Row actions are behind the ⋯ and a long press. Folders are not
+/// drilled here: their notes are the project's Notes view. [onPick] runs after
+/// a pick, to close the phone's side menu.
+class ProjectsPanel extends StatefulWidget {
   const ProjectsPanel({super.key, required this.state, this.onPick});
   final AppState state;
   final VoidCallback? onPick;
 
   @override
+  State<ProjectsPanel> createState() => _ProjectsPanelState();
+}
+
+class _ProjectsPanelState extends State<ProjectsPanel> {
+  /// The projects whose views are shown; the one in scope starts open.
+  late final Set<String> _open = _openProjects();
+
+  Set<String> _openProjects() {
+    final scope = widget.state.scopeUid;
+    if (scope == null) return {};
+    final ix = widget.state.projectIndex;
+    final project = ix.projectOf(scope)?.uid ??
+        (ix.isProject(scope) ? scope : null);
+    return {?project};
+  }
+
+  @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
+    final state = widget.state;
+    final onPick = widget.onPick;
     return ListenableBuilder(
       listenable: state,
       builder: (context, _) {
@@ -116,35 +136,38 @@ class ProjectsPanel extends StatelessWidget {
         final projects = state.projectsByRecent;
         final scope = state.scopeUid;
         final current = scope == null ? null : ix.projectOf(scope)?.uid;
-        final here = scope == null ? null : state.tree.find(scope);
         Future<void> open(String? uid) async {
           await state.guarded(() => state.openFolder(uid));
           onPick?.call();
         }
 
+        bool expanded(Note p) => _open.contains(p.uid);
+        void toggle(Note p) => setState(() {
+          if (!_open.remove(p.uid)) _open.add(p.uid);
+        });
+
+        /// A project view: the project becomes the scope and the section
+        /// follows it in one step (Board is the Tasks list scoped, until the
+        /// board itself lands in the panel).
+        Future<void> openView(String uid, Section section) async {
+          await state.guarded(() => state.openFolder(uid));
+          state.setSection(section);
+          onPick?.call();
+        }
+
         final rows = <NavEntry>[
           NavEntry('all', open: (_) => open(null)),
-          for (final p in projects)
+          for (final p in projects) ...[
             NavEntry(p.uid, uid: p.uid, open: (_) => open(p.uid)),
-        ];
-        // At a project's own level there is nothing above it to go to (the
-        // projects container is not a place).
-        final atProject =
-            here != null && ix.projectOf(here.note.uid)?.uid == here.note.uid;
-        final up = atProject ? null : here?.parent;
-        if (here != null) {
-          rows.addAll([
-            if (up != null) NavEntry('up', open: (_) => open(up.note.uid)),
-            NavEntry('here', uid: here.note.uid, open: (_) => open(scope)),
-            for (final c in here.children)
-              if (isFolderNote(c.note))
+            if (expanded(p))
+              for (final v in projectViews)
                 NavEntry(
-                  'folder:${c.note.uid}',
-                  uid: c.note.uid,
-                  open: (_) => open(c.note.uid),
+                  'view:${p.uid}:${v.id}',
+                  uid: p.uid,
+                  open: (_) => openView(p.uid, v.section),
                 ),
-          ]);
-        }
+          ],
+        ];
         state.nav.publish('projects', rows);
 
         Widget row({
@@ -248,12 +271,33 @@ class ProjectsPanel extends StatelessWidget {
         Widget project(Note p) {
           final s = ix.statsOf(p.uid);
           final on = current == p.uid;
+          final showing = expanded(p);
           final body = Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             spacing: t.space.xs,
             children: [
               Row(
                 children: [
+                  // The chevron shows the project's views; the row's name
+                  // still sets the scope alone.
+                  SizedBox(
+                    width: t.sizes.chevronBox,
+                    child: FTappable(
+                      key: Key('project-toggle-${p.uid}'),
+                      semanticsLabel: showing
+                          ? 'Hide the views of ${name(p)}'
+                          : 'Show the views of ${name(p)}',
+                      behavior: HitTestBehavior.opaque,
+                      onPress: () => toggle(p),
+                      child: Icon(
+                        showing
+                            ? FLucideIcons.chevronDown
+                            : FLucideIcons.chevronRight,
+                        size: t.icons.md,
+                        color: t.muted,
+                      ),
+                    ),
+                  ),
                   Icon(
                     FLucideIcons.folderKanban,
                     size: t.icons.tree,
@@ -283,15 +327,38 @@ class ProjectsPanel extends StatelessWidget {
               ),
             ],
           );
-          return withActions(
-            p,
-            row(
-              key: Key('project-${p.uid}'),
-              id: p.uid,
-              on: on,
-              onPress: () => open(p.uid),
-              child: body,
-            ),
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              withActions(
+                p,
+                row(
+                  key: Key('project-${p.uid}'),
+                  id: p.uid,
+                  on: on,
+                  onPress: () => open(p.uid),
+                  child: body,
+                ),
+              ),
+              if (showing)
+                for (final v in projectViews)
+                  row(
+                    key: Key('project-view-${p.uid}-${v.id}'),
+                    id: 'view:${p.uid}:${v.id}',
+                    on: on && state.section == v.section,
+                    onPress: () => openView(p.uid, v.section),
+                    child: Padding(
+                      padding: EdgeInsets.only(left: t.sizes.treeIndent),
+                      child: label(
+                        v.icon,
+                        v.label,
+                        color: on && state.section == v.section
+                            ? t.fg
+                            : null,
+                      ),
+                    ),
+                  ),
+            ],
           );
         }
 
@@ -342,71 +409,6 @@ class ProjectsPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              // Inside a project (or a loose folder): one level at a time.
-              if (here != null) ...[
-                if (up != null)
-                  row(
-                    key: const Key('projects-up'),
-                    id: 'up',
-                    onPress: () => open(up.note.uid),
-                    child: label(FLucideIcons.cornerLeftUp, name(up.note)),
-                  ),
-                if (current == null)
-                  // A loose folder has no project row to mark: its own path is
-                  // the scope.
-                  withActions(
-                    here.note,
-                    row(
-                      key: const Key('projects-path'),
-                      id: 'here',
-                      on: true,
-                      onPress: () => open(scope),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: label(
-                              FLucideIcons.folder,
-                              folderPath(state, here.note.uid),
-                            ),
-                          ),
-                          more(here.note),
-                        ],
-                      ),
-                    ),
-                  )
-                else if (!atProject)
-                  // Below a project: the folder in scope, marked, its children
-                  // under it. At the project's own level its row carries the
-                  // mark instead.
-                  withActions(
-                    here.note,
-                    row(
-                      key: const Key('projects-here'),
-                      id: 'here',
-                      on: true,
-                      onPress: () => open(scope),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: label(FLucideIcons.folder, name(here.note)),
-                          ),
-                          more(here.note),
-                        ],
-                      ),
-                    ),
-                  ),
-                for (final c in here.children)
-                  if (isFolderNote(c.note))
-                    withActions(
-                      c.note,
-                      row(
-                        key: Key('projects-folder-${c.note.uid}'),
-                        id: 'folder:${c.note.uid}',
-                        onPress: () => open(c.note.uid),
-                        child: label(FLucideIcons.folder, name(c.note)),
-                      ),
-                    ),
-              ],
               if (projects.isEmpty)
                 Padding(
                   key: const Key('projects-empty'),
