@@ -70,17 +70,29 @@ class ProjectOverviewPage extends StatelessWidget {
         clock: clock,
         counts: counts,
       ),
+      // The tab bodies keep local state (scroll, filters): the outer key
+      // changes with the project so nothing leaks from one project to the
+      // next. The inner keys stay stable for tests and callers.
       ProjectTab.board => KeyedSubtree(
-        key: const Key('proj-board-tab'),
-        child: HomeBoard(state: state),
+        key: ValueKey('proj-board-$projectUid'),
+        child: KeyedSubtree(
+          key: const Key('proj-board-tab'),
+          child: HomeBoard(state: state),
+        ),
       ),
       ProjectTab.notes => KeyedSubtree(
-        key: const Key('proj-notes-tab'),
-        child: NotesSection(state: state, onPick: () {}),
+        key: ValueKey('proj-notes-$projectUid'),
+        child: KeyedSubtree(
+          key: const Key('proj-notes-tab'),
+          child: NotesSection(state: state, onPick: () {}),
+        ),
       ),
       ProjectTab.calendar => KeyedSubtree(
-        key: const Key('proj-calendar-tab'),
-        child: EventsPanel(state: state),
+        key: ValueKey('proj-calendar-$projectUid'),
+        child: KeyedSubtree(
+          key: const Key('proj-calendar-tab'),
+          child: EventsPanel(state: state),
+        ),
       ),
     };
 

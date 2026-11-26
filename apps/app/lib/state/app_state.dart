@@ -1272,9 +1272,9 @@ class AppState extends ChangeNotifier {
   /// a recent one.
   void openFolder(String? uid) {
     scopeUid = uid;
-    // A project's own page needs a project (or folder) scope: without one the
-    // panel goes back to the list it came from.
-    if (uid == null && section == Section.overview) {
+    // A project's page needs a real project scope. Leaving one for the whole
+    // Space, a plain folder or the Projects container goes back to a list.
+    if (section == Section.overview && !supportsSection(Section.overview)) {
       section = _supportedSection(Section.notes);
       prefs?.write(_sectionKey, section.name);
     }
@@ -1323,11 +1323,9 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The tasks under project [uid] at any depth (no scope or filter applied).
-  List<Task> projectTasks(String uid) => [
-    for (final t in tasks)
-      if (projectIndex.projectOf(t.uid)?.uid == uid) t,
-  ];
+  /// The tasks under project [uid] at any depth (no scope or filter applied);
+  /// grouped once in the project index.
+  List<Task> projectTasks(String uid) => projectIndex.tasksOf(uid);
 
   /// The tasks of project [uid] counted for progress: canceled tasks left
   /// out; `done` versus the total, open, overdue, and a count per canonical
@@ -1360,25 +1358,9 @@ class AppState extends ChangeNotifier {
   }
 
   /// When the project last changed: the newest modification stamp of its
-  /// notes, tasks and events (the folder itself included), or null.
-  DateTime? projectLastChanged(String uid) {
-    final ix = projectIndex;
-    DateTime? at;
-    void touch(DateTime? d) {
-      if (d != null && (at == null || d.isAfter(at!))) at = d;
-    }
-
-    for (final n in notes) {
-      if (ix.projectOf(n.uid)?.uid == uid) touch(n.lastModified ?? n.dtstamp);
-    }
-    for (final t in tasks) {
-      if (ix.projectOf(t.uid)?.uid == uid) touch(t.lastModified ?? t.dtstamp);
-    }
-    for (final e in events) {
-      if (ix.projectOf(e.uid)?.uid == uid) touch(e.lastModified ?? e.dtstamp);
-    }
-    return at;
-  }
+  /// notes, tasks and events (the folder itself included), or null. Computed
+  /// once in the project index.
+  DateTime? projectLastChanged(String uid) => projectIndex.lastChangedOf(uid);
 
   /// The Space's projects, the ones opened most recently first: the scope
   /// picker and the palette list them in this order.

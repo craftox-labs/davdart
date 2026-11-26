@@ -136,6 +136,74 @@ void main() {
       expect(_k('overview-page'), findsOneWidget);
     });
 
+    testWidgets('a plain folder leaves the project page for a list', (t) async {
+      final prefs = MemoryStorage();
+      final s = await pumpTasksApp(
+        t,
+        prefs: prefs,
+        notes: [
+          _folder('c', 'Projects', container: true),
+          _folder('p', 'Alpha', parent: 'c'),
+          _folder('loose', 'Loose'),
+        ],
+      );
+      await s.activateTab(null);
+      s.openFolder('p');
+      s.setSection(Section.overview);
+      await t.pumpAndSettle();
+      expect(_k('overview-page'), findsOneWidget);
+      // A plain folder is no project: the page cannot stay open.
+      s.openFolder('loose');
+      await t.pumpAndSettle();
+      expect(s.section, Section.notes);
+      expect(_k('overview-page'), findsNothing);
+      expect(prefs.read('davdart.section.v1'), 'notes');
+      // Back on a project, then the Projects container: same rule.
+      s.openFolder('p');
+      s.setSection(Section.overview);
+      await t.pumpAndSettle();
+      s.openFolder('c');
+      await t.pumpAndSettle();
+      expect(s.section, Section.notes);
+      expect(_k('overview-page'), findsNothing);
+    });
+
+    testWidgets('each project remembers its own tab', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        notes: [
+          _folder('c', 'Projects', container: true),
+          _folder('p', 'Alpha', parent: 'c'),
+          _folder('q', 'Beta', parent: 'c'),
+        ],
+        tasks: [
+          mkTask('t1', summary: 'One', parent: 'p'),
+          mkTask('t2', summary: 'Two', parent: 'q'),
+        ],
+      );
+      await s.activateTab(null);
+      s.openFolder('p');
+      s.setSection(Section.overview);
+      await t.pumpAndSettle();
+      await t.tap(_k('proj-tab-events'));
+      await t.pumpAndSettle();
+      expect(s.projectTab('p'), ProjectTab.calendar);
+      // Another project opens on its own tab (Overview), not Alpha's.
+      s.openFolder('q');
+      await t.pumpAndSettle();
+      expect(s.section, Section.overview);
+      expect(s.projectTab('q'), ProjectTab.overview);
+      expect(_k('overview-page'), findsOneWidget);
+      await t.tap(_k('proj-tab-notes'));
+      await t.pumpAndSettle();
+      expect(s.projectTab('q'), ProjectTab.notes);
+      // Back to Alpha: its Calendar tab is still its own.
+      s.openFolder('p');
+      await t.pumpAndSettle();
+      expect(s.projectTab('p'), ProjectTab.calendar);
+      expect(_k('proj-calendar-tab'), findsOneWidget);
+    });
+
     testWidgets('the Overview palette entry applies only to real projects', (
       t,
     ) async {

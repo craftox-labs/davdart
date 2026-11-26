@@ -88,6 +88,58 @@ class ProjectIndex {
   Map<String, ProjectStats>? _stats;
   ProjectStats _rest = const ProjectStats.empty();
 
+  /// The tasks under project [uid], grouped once for all projects (the panel
+  /// and the page ask per project on every build).
+  List<Task> tasksOf(String uid) {
+    _groupTasks();
+    return _tasksOf?[uid] ?? const [];
+  }
+
+  Map<String, List<Task>>? _tasksOf;
+
+  void _groupTasks() {
+    if (_tasksOf != null) return;
+    final map = <String, List<Task>>{};
+    for (final t in _tasks) {
+      final p = _projectIdOf(t.uid);
+      if (p != null) (map[p] ??= []).add(t);
+    }
+    _tasksOf = map;
+  }
+
+  /// The newest modification stamp among project [uid]'s notes, tasks and
+  /// events (the folder itself included), or null. Computed once for all
+  /// projects, like [statsOf].
+  DateTime? lastChangedOf(String uid) {
+    _computeLastChanged();
+    return _lastChanged?[uid];
+  }
+
+  Map<String, DateTime>? _lastChanged;
+
+  void _computeLastChanged() {
+    if (_lastChanged != null) return;
+    final map = <String, DateTime>{};
+    void touch(String uid, DateTime? at) {
+      if (at == null) return;
+      final p = _projectIdOf(uid);
+      if (p == null) return;
+      final cur = map[p];
+      if (cur == null || at.isAfter(cur)) map[p] = at;
+    }
+
+    for (final n in _notes) {
+      touch(n.uid, n.lastModified ?? n.dtstamp);
+    }
+    for (final t in _tasks) {
+      touch(t.uid, t.lastModified ?? t.dtstamp);
+    }
+    for (final e in _events) {
+      touch(e.uid, e.lastModified ?? e.dtstamp);
+    }
+    _lastChanged = map;
+  }
+
   /// Every Projects container (several can exist, for example synced from
   /// another client), oldest first.
   List<Note> containers() => List.unmodifiable(_containers);
