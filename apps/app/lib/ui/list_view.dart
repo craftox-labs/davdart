@@ -53,76 +53,66 @@ class NoteListView extends StatelessWidget {
         final (n, depth) = rows[i];
         final p = PlanItem.fromNote(n);
         final kids = state.tree.find(n.uid)?.children.isNotEmpty ?? false;
-        Widget row = NoteContextMenu(
-          state: state,
-          uid: n.uid,
-          child: NoteDraggable(
-            uid: n.uid,
-            source: NoteDragSource.list,
-            label: n.summary,
-            child: FTappable(
-              onPress: () => state.clickNote(n.uid),
-              child: Container(
-                color: state.peekUid == n.uid ? t.selected : null,
-                padding: EdgeInsets.fromLTRB(
-                  t.space.lg + depth * t.sizes.listIndent,
-                  t.space.lg - t.space.xxs,
-                  t.space.lg,
-                  t.space.lg - t.space.xxs,
+        final folder = AppState.isFolder(n);
+        final body = FTappable(
+          onPress: () => state.clickNote(n.uid),
+          child: Container(
+            color: state.peekUid == n.uid ? t.selected : null,
+            padding: EdgeInsets.fromLTRB(
+              t.space.lg + depth * t.sizes.listIndent,
+              t.space.lg - t.space.xxs,
+              t.space.lg,
+              t.space.lg - t.space.xxs,
+            ),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: t.sizes.listChevronBox,
+                  child: kids && !filtering
+                      ? FTappable(
+                          semanticsLabel: state.collapsed.contains(n.uid)
+                              ? 'Expand'
+                              : 'Collapse',
+                          behavior: HitTestBehavior.opaque,
+                          onPress: () => state.toggle(n.uid),
+                          child: Icon(
+                            state.collapsed.contains(n.uid)
+                                ? FLucideIcons.chevronRight
+                                : FLucideIcons.chevronDown,
+                            size: t.icons.lg,
+                            color: t.muted,
+                          ),
+                        )
+                      : null,
                 ),
-                child: Row(
-                  children: [
-                    SizedBox(
-                      width: t.sizes.listChevronBox,
-                      child: kids && !filtering
-                          ? FTappable(
-                              semanticsLabel: state.collapsed.contains(n.uid)
-                                  ? 'Expand'
-                                  : 'Collapse',
-                              behavior: HitTestBehavior.opaque,
-                              onPress: () => state.toggle(n.uid),
-                              child: Icon(
-                                state.collapsed.contains(n.uid)
-                                    ? FLucideIcons.chevronRight
-                                    : FLucideIcons.chevronDown,
-                                size: t.icons.lg,
-                                color: t.muted,
-                              ),
-                            )
-                          : null,
-                    ),
-                    StatusDot(p.status),
-                    SizedBox(width: t.space.lg - t.space.xxs),
-                    Expanded(child: OverflowTip(n.summary)),
-                    if (p.owner != null)
-                      Text(
-                        p.owner!,
-                        style: t.type.captionStyle.copyWith(color: t.muted),
-                      ),
-                  ],
-                ),
-              ),
+                StatusDot(p.status),
+                SizedBox(width: t.space.lg - t.space.xxs),
+                Expanded(child: OverflowTip(n.summary)),
+                if (p.owner != null)
+                  Text(
+                    p.owner!,
+                    style: t.type.captionStyle.copyWith(color: t.muted),
+                  ),
+              ],
             ),
           ),
         );
-        if (!filtering && AppState.isFolder(n)) {
-          row = MoveDropTarget(
-            state: state,
-            folderUid: n.uid,
-            rounded: false,
-            child: row,
-          );
-        }
-        return row;
+        return NoteContextMenu(
+          state: state,
+          uid: n.uid,
+          // Folders neither drag nor take a drop here: folder moves belong to
+          // the Notes tree, so this view has no folder drop targets.
+          child: folder
+              ? body
+              : NoteDraggable(
+                  uid: n.uid,
+                  source: NoteDragSource.list,
+                  label: n.summary,
+                  child: body,
+                ),
+        );
       },
     );
-    if (filtering) return list;
-    return MoveDropTarget(
-      key: const Key('list-drop-root'),
-      state: state,
-      folderUid: null,
-      rounded: false,
-      child: list,
-    );
+    return list;
   }
 }
