@@ -1,5 +1,6 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/ui/move_folder_dialog.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,11 +13,16 @@ Note _folder(
   String name, {
   String? parent,
   bool container = false,
+  bool personal = false,
 }) => Note(
   uid: uid,
   summary: name,
   parentUid: parent,
-  categories: [folderTag, if (container) projectsTag],
+  categories: [
+    folderTag,
+    if (container) projectsTag,
+    if (personal) personalTag,
+  ],
 );
 
 Note _note(String uid, String summary, {String? parent}) =>
@@ -140,5 +146,94 @@ void main() {
       ),
       findsNothing,
     );
+  });
+
+  testWidgets('a Personal container is never an item or a tree row', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [
+        _folder('pc', 'Personal', personal: true),
+        _note('inside', 'Inside personal', parent: 'pc'),
+        _note('loose', 'Loose note'),
+      ],
+    );
+    expect(s.personalNotes.map((n) => n.uid), isNot(contains('pc')));
+    expect(s.filteredPersonal.map((n) => n.uid), isNot(contains('pc')));
+    // The whole-Space tree hides the container and promotes its children.
+    expect(s.spaceTreeRoots.map((n) => n.note.uid), contains('inside'));
+    expect(s.spaceTreeRoots.map((n) => n.note.uid), isNot(contains('pc')));
+    // Home's loose list never shows it as a recent note either.
+    expect(find.text('Personal'), findsNothing);
+  });
+
+  testWidgets('a read-only Space makes no container and does not fail', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(t, readOnly: true, notesReadOnly: true);
+    expect(await s.ensurePersonalContainer(), isNull);
+    expect(s.error, isNull);
+    expect(s.personalContainer, isNull);
+    // The item falls back to the top level instead of throwing.
+    final uid = await s.addTask('Read only task', personal: true);
+    expect(s.error, isNull);
+    expect(s.personalContainer, isNull);
+    if (uid != null) expect(s.taskById(uid)!.parentUid, isNull);
+  });
+
+  testWidgets('concurrent personal adds make one container', (t) async {
+    final s = await pumpTasksApp(t);
+    final ids = await Future.wait([
+      s.ensurePersonalContainer(),
+      s.ensurePersonalContainer(),
+    ]);
+    await t.pumpAndSettle();
+    expect(ids[0], isNotNull);
+    expect(ids[1], ids[0]);
+    expect(s.notes.where(isPersonalContainer).length, 1);
+  });
+
+  testWidgets('two containers: the oldest is used', (t) async {
+    final old = DateTime.utc(2026, 1, 1), young = DateTime.utc(2026, 2, 1);
+    final s = await pumpTasksApp(
+      t,
+      notes: [
+        Note(
+          uid: 'pc-young',
+          summary: 'Personal',
+          categories: [folderTag, personalTag],
+          created: young,
+        ),
+        Note(
+          uid: 'pc-old',
+          summary: 'Personal',
+          categories: [folderTag, personalTag],
+          created: old,
+        ),
+      ],
+    );
+    expect(s.personalContainer!.uid, 'pc-old');
+    expect(await s.ensurePersonalContainer(), 'pc-old');
+  });
+
+  testWidgets('non-personal move targets hide the Personal container', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(
+      t,
+      notes: [
+        _folder('pc', 'Personal', personal: true),
+        _folder('pf', 'A folder', parent: 'pc'),
+        _note('loose', 'Loose note'),
+      ],
+    );
+    showMoveFolderDialog(
+      t.element(find.byKey(const Key('home-page'))),
+      s,
+      s.tree.find('loose')!.note,
+    );
+    await t.pumpAndSettle();
+    expect(_k('move-folder-pc'), findsNothing);
+    // Its child folder stays reachable.
+    expect(_k('move-folder-pf'), findsOneWidget);
   });
 }

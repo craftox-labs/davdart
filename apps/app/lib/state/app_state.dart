@@ -1182,34 +1182,72 @@ class AppState extends ChangeNotifier {
   // project scope belongs to project pages and does not narrow them.
 
   Note? get personalContainer {
+    Note? oldest;
     for (final n in notes) {
-      if (isPersonalContainer(n)) return n;
+      if (!isPersonalContainer(n)) continue;
+      if (oldest == null || NoteTree.byCreated(n, oldest) < 0) oldest = n;
     }
-    return null;
+    return oldest;
   }
 
-  /// The Personal container's uid, created when the Space has none.
+  /// The Personal container's uid, created when the Space has none. Null in
+  /// a read-only Space or when the save fails (the item then stays top
+  /// level); concurrent calls share one save, and the oldest container wins.
   Future<String?> ensurePersonalContainer() async {
+    if (!editable) return null;
+    while (_personalBusy != null) {
+      await _personalBusy;
+    }
     final existing = personalContainer;
     if (existing != null) return existing.uid;
-    final n = _newFolder(personalTitle, tags: const [personalTag]);
-    if (n == null) return null;
-    await _save(n);
-    if (error != null) return null;
-    return n.uid;
+    final done = Completer<void>();
+    _personalBusy = done.future;
+    try {
+      final n = _newFolder(personalTitle, tags: const [personalTag]);
+      if (n == null) return null;
+      await _save(n);
+      if (error != null) return null;
+      // A sync may have landed a container meanwhile: the oldest wins.
+      return personalContainer?.uid ?? tree.find(n.uid)?.note.uid;
+    } finally {
+      _personalBusy = null;
+      done.complete();
+    }
   }
+
+  Future<void>? _personalBusy;
 
   /// The personal notes (folders and views left out), oldest first.
   List<Note> get personalNotes => [
     for (final n in notes)
-      if (!isFolder(n) && !isViewNote(n) && !inProjectsLayer(n.uid)) n,
+      if (!isFolder(n) &&
+          !isViewNote(n) &&
+          !isPersonalContainer(n) &&
+          !inProjectsLayer(n.uid))
+        n,
   ]..sort(NoteTree.byCreated);
 
   /// Personal notes after the search and tag filters.
   List<Note> get filteredPersonal => [
     for (final n in notes)
-      if (!isFolder(n) && !inProjectsLayer(n.uid) && matches(n)) n,
+      if (!isFolder(n) &&
+          !isPersonalContainer(n) &&
+          !inProjectsLayer(n.uid) &&
+          matches(n))
+        n,
   ]..sort(NoteTree.byCreated);
+
+  /// The whole-Space tree's top rows: the Personal container is hidden and
+  /// its children take its place (the Projects layer stays visible here).
+  List<NoteNode> get spaceTreeRoots {
+    final container = personalContainer;
+    final node = container == null ? null : tree.find(container.uid);
+    if (container == null || node == null) return tree.roots;
+    return [
+      for (final r in tree.roots)
+        if (r.note.uid == container.uid) ...node.children else r,
+    ];
+  }
 
   /// The tree's top rows for Personal: the Personal container's children,
   /// the container itself hidden, plus top-level items outside it.
@@ -1299,7 +1337,7 @@ class AppState extends ChangeNotifier {
     int days = 30,
   ]) => pastAgenda(filteredPersonalEvents, from, days);
 
-  /// The notes the Notes panel lists: [scopeUid]'s subtree in a project  /// The notes the Notes panel lists: [scopeUid]'s subtree in a project
+  /// The notes the Notes panel lists: [scopeUid]'s subtree in a project
   /// scope, and the Space's own (loose) notes in Personal scope. Folders are
   /// not notes here; the tree shows those.
   List<Note> get notesInScope {
@@ -1529,6 +1567,15 @@ class AppState extends ChangeNotifier {
     if (_scopes[key] == uid) return;
     _scopes[key] = uid;
     prefs?.write(_scopeKey, jsonEncode(_scopes));
+  }
+
+  /// Makes the scope follow the active tab: the project page's project, or
+  /// none for Home and the other pages.
+  void _syncScopeToTab() {
+    final project = mainProjectUid;
+    if (scopeUid == project) return;
+    scopeUid = project;
+    _persistScope();
   }
 
   /// Brings back the Space's saved folder scope once its notes are loaded:
@@ -1961,10 +2008,20 @@ class AppState extends ChangeNotifier {
       if (_restoreScopePending) {
         _restoreScopePending = false;
         _restoreScope();
-        // A restored project tab owns the scope: its page reads the project.
+        // The active tab owns the scope: a project page reads its project,
+        // Home has none. A stale project scope is dropped, while a loose
+        // folder scope (the panels' own) stays saved.
         final activeProject = mainProjectUid;
-        if (activeProject != null && scopeUid != activeProject) {
+        final savedScope = scopeUid;
+        final staleProject =
+            activeProject == null &&
+            savedScope != null &&
+            projectIndex.projectOf(savedScope) != null;
+        if (activeProject != null && savedScope != activeProject) {
           scopeUid = activeProject;
+          _persistScope();
+        } else if (staleProject) {
+          scopeUid = null;
           _persistScope();
         }
       }
@@ -2401,8 +2458,9 @@ class AppState extends ChangeNotifier {
     if (t.isEmpty) return;
     final now = DateTime.now().toUtc();
     // Personal items go under the Personal container (created on demand).
-    if (personal && parentUid == null)
+    if (personal && parentUid == null) {
       parentUid = await ensurePersonalContainer();
+    }
     // Nothing loose under a Projects container (same rule as tasks/events).
     final pn = parentUid == null ? null : tree.find(parentUid)?.note;
     final n = Note(
@@ -3690,6 +3748,12 @@ class AppState extends ChangeNotifier {
   }
 
   /// The note, task or event the main pane shows full page, if any.
+  /// The tab the open project page shows, if a project tab is active.
+  ProjectTab? get mainProjectTab {
+    final p = mainProjectUid;
+    return p == null ? null : projectTab(p);
+  }
+
   String? get mainItemUid => mainNoteUid ?? mainTaskUid ?? mainEventUid;
 
   /// Something other than Home or a view fills the main pane: a note, task
@@ -3731,9 +3795,12 @@ class AppState extends ChangeNotifier {
   };
 
   void _pruneTabs() {
+    final wasActive = _activeViewTab;
     if (_tabs.retain(_tabExists)) _saveTabs();
-    if (_activeViewTab != null && !_tabs.contains(_activeViewTab!)) {
+    if (wasActive != null && !_tabs.contains(wasActive)) {
       _activeViewTab = null;
+      // The project page went away: its scope goes with it.
+      _syncScopeToTab();
     }
   }
 
@@ -3924,6 +3991,7 @@ class AppState extends ChangeNotifier {
       }
       _saveTabs();
       if (wasActive) _show(next);
+      _syncScopeToTab();
       notifyListeners();
     }
 
@@ -4622,16 +4690,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// The day picked on Home: a plain date (UTC-flagged y-m-d, never an
-  /// instant), or null for today.
-  DateTime? homeDay;
-
-  /// The selected Home day as a plain date; [now] decides "today".
-  DateTime homeSelectedDay([DateTime? now]) =>
-      homeDay ?? wallDay(wallNow(now ?? DateTime.now()));
-
-  DateTime? _homeDayMadeOn;
-
   String _homeCardKey(String slug) =>
       'davdart.home.card.collapsed.v1.$slug.$_spaceKey';
 
@@ -4647,37 +4705,6 @@ class AppState extends ChangeNotifier {
       prefs?.remove(_homeCardKey(slug));
     }
     notifyListeners();
-  }
-
-  void selectHomeDay(DateTime? d) {
-    final n = d == null ? null : DateTime.utc(d.year, d.month, d.day);
-    if (n == homeDay) return;
-    homeDay = n;
-    _homeDayMadeOn = n == null ? null : wallDay(wallNow(DateTime.now()));
-    notifyListeners();
-  }
-
-  /// A new local day began: back to today and redraw Home.
-  void rollHomeDay() {
-    homeDay = null;
-    _homeDayMadeOn = null;
-    notifyListeners();
-  }
-
-  /// Back to today. Quiet when nothing is selected.
-  void resetHomeDay() {
-    if (homeDay == null) return;
-    homeDay = null;
-    _homeDayMadeOn = null;
-    notifyListeners();
-  }
-
-  /// On app resume: back to today only when the selection was made on an
-  /// earlier day (a new day has begun since).
-  void resetHomeDayIfStale([DateTime? now]) {
-    final made = _homeDayMadeOn;
-    if (homeDay == null || made == null) return;
-    if (made != wallDay(wallNow(now ?? DateTime.now()))) resetHomeDay();
   }
 
   void setTaskTagsOpen(bool v) {

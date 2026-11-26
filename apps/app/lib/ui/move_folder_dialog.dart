@@ -17,7 +17,8 @@ Future<void> showMoveFolderDialog(
   final targets = <(String?, String, int)>[];
   void collect(List<NoteNode> nodes, int depth) {
     for (final n in nodes) {
-      if (AppState.isFolder(n.note) &&
+      if (!isPersonalContainer(n.note) &&
+          AppState.isFolder(n.note) &&
           state.tree.canMove(note.uid, n.note.uid)) {
         targets.add((n.note.uid, n.note.summary, depth));
       }

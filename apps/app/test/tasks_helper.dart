@@ -15,12 +15,20 @@ class SeedNotes implements NoteSource {
 
 /// An app state whose tasks can be switched read-only.
 class FlagState extends AppState {
-  FlagState(super.source, {super.prefs, this.readOnly = false});
+  FlagState(
+    super.source, {
+    super.prefs,
+    this.readOnly = false,
+    this.notesReadOnly = false,
+  });
   bool readOnly;
+  bool notesReadOnly;
   @override
   bool get tasksEditable => !readOnly && super.tasksEditable;
   @override
   bool get eventsEditable => !readOnly && super.eventsEditable;
+  @override
+  bool get editable => !notesReadOnly && super.editable;
 }
 
 /// The ICalDate of the local day [days] from today.
@@ -61,6 +69,7 @@ Future<AppState> pumpTasksApp(
   Size size = const Size(1280, 900),
   MemoryStorage? prefs,
   bool readOnly = false,
+  bool notesReadOnly = false,
   Space? into,
 }) async {
   t.view.physicalSize = size;
@@ -77,7 +86,12 @@ Future<AppState> pumpTasksApp(
       await src.saveEvent(e);
     }
   });
-  final s = FlagState(src, prefs: prefs ?? MemoryStorage(), readOnly: readOnly);
+  final s = FlagState(
+    src,
+    prefs: prefs ?? MemoryStorage(),
+    readOnly: readOnly,
+    notesReadOnly: notesReadOnly,
+  );
   await t.pumpWidget(DavdartApp(state: s));
   await t.pumpAndSettle();
   return s;

@@ -202,13 +202,18 @@ class HomePage extends StatelessWidget {
 
     // --- Personal lists: loose items only, through the "is this mine" seam ---
     bool loose(String uid) => !state.inProjectsLayer(uid);
+    final personal = state.personalContainer?.uid;
     final looseTasks = [
       for (final k in open)
         if (loose(k.uid) && state.isMine(k)) k,
     ];
     final looseNotes = [
       for (final n in state.notes)
-        if (!AppState.isFolder(n) && loose(n.uid) && state.isMine(n)) n,
+        if (!AppState.isFolder(n) &&
+            n.uid != personal &&
+            loose(n.uid) &&
+            state.isMine(n))
+          n,
     ];
     final looseEvents = [
       for (final e in state.events)

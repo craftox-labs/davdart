@@ -37,7 +37,7 @@ class NoteListView extends StatelessWidget {
         }
       }
 
-      walk(state.tree.roots, 0);
+      walk(state.spaceTreeRoots, 0);
     }
     if (rows.isEmpty && !state.loading) {
       return Center(

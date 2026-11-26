@@ -26,7 +26,8 @@ Future<void> showEditNoteDialog(
   final targets = <(String?, String, bool)>[(null, 'Top level', false)];
   void collect(List<NoteNode> nodes, int depth) {
     for (final n in nodes) {
-      if (state.tree.canMove(note.uid, n.note.uid)) {
+      if (!isPersonalContainer(n.note) &&
+          state.tree.canMove(note.uid, n.note.uid)) {
         targets.add((
           n.note.uid,
           '${'    ' * depth}${n.note.summary}',

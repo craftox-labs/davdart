@@ -34,7 +34,8 @@ class NoteEditor extends StatelessWidget {
     ];
     void collect(List<NoteNode> nodes, int depth) {
       for (final n in nodes) {
-        if (state.tree.canMove(note.uid, n.note.uid)) {
+        if (!isPersonalContainer(n.note) &&
+            state.tree.canMove(note.uid, n.note.uid)) {
           targets.add((
             n.note.uid,
             n.note.summary,

@@ -71,6 +71,7 @@ class TaskEditor extends StatelessWidget {
     ];
     void collect(List<NoteNode> nodes, int depth) {
       for (final n in nodes) {
+        if (isPersonalContainer(n.note)) continue;
         targets.add((
           n.note.uid,
           n.note.summary,
