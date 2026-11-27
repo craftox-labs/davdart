@@ -54,8 +54,10 @@ void main() {
       expect((await client.getNote(updated.href!)).summary, 'two');
 
       // created still carries the stale etag.
-      await expectLater(client.putNote(created.copyWith(summary: 'three')),
-          throwsA(isA<ConflictException>()));
+      await expectLater(
+        client.putNote(created.copyWith(summary: 'three')),
+        throwsA(isA<ConflictException>()),
+      );
 
       await client.deleteNote(updated);
       current = null;
@@ -66,19 +68,22 @@ void main() {
     test('two devices: push, pull, merge disjoint edits, delete', () async {
       final tag = DateTime.now().microsecondsSinceEpoch;
       CalDavClient mk() => CalDavClient(
-            collection: Uri.parse(url!),
-            username: env['DAVDART_TEST_USER'] ?? '',
-            password: env['DAVDART_TEST_PASSWORD'] ?? '',
-          );
+        collection: Uri.parse(url!),
+        username: env['DAVDART_TEST_USER'] ?? '',
+        password: env['DAVDART_TEST_PASSWORD'] ?? '',
+      );
       final a = SyncEngine(mk(), MemoryNoteStore());
       final b = SyncEngine(mk(), MemoryNoteStore());
       final uid = 'davdart-it-two-$tag';
       try {
-        await a.save(Note(
+        await a.save(
+          Note(
             uid: uid,
             summary: 'live $tag',
             description: 'item_id: it\nstatus: todo\n\nline1\nline2\nline3',
-            categories: ['status-todo']));
+            categories: ['status-todo'],
+          ),
+        );
         final ra = await a.sync();
         expect(ra.errors, isEmpty);
         expect(ra.pushed, 1);
@@ -89,11 +94,13 @@ void main() {
 
         // A edits the top line, B the bottom line; no overlap.
         final na = (await a.notes()).firstWhere((n) => n.uid == uid);
-        await a.save(na.copyWith(
-            description: na.description.replaceFirst('line1', 'A1')));
+        await a.save(
+          na.copyWith(description: na.description.replaceFirst('line1', 'A1')),
+        );
         final nb = (await b.notes()).firstWhere((n) => n.uid == uid);
-        await b.save(nb.copyWith(
-            description: nb.description.replaceFirst('line3', 'B3')));
+        await b.save(
+          nb.copyWith(description: nb.description.replaceFirst('line3', 'B3')),
+        );
         expect((await a.sync()).errors, isEmpty);
         final rb2 = await b.sync();
         expect(rb2.errors, isEmpty);
@@ -120,38 +127,55 @@ void main() {
     });
   });
 
-  test('create a collection, find it by name, delete it', skip: skipReason,
-      () async {
-    final user = env['DAVDART_TEST_USER'] ?? '';
-    final pw = env['DAVDART_TEST_PASSWORD'] ?? '';
-    final home = Uri.parse(url!).resolve('../');
-    final name = 'davdart-it-tmp-${DateTime.now().microsecondsSinceEpoch}';
-    final made = await CalDavClient.createCollection(home, name,
-        username: user, password: pw);
-    try {
-      final found =
-          await CalDavClient.discover(home, username: user, password: pw);
-      final mine = found.where((c) => c.name == name).toList();
-      expect(mine, hasLength(1));
-      expect(mine.single.holdsNotes, isTrue);
-      // Renaming sets the display name on the server.
-      await CalDavClient.renameCollection(made, '$name-renamed',
-          username: user, password: pw);
-      final again =
-          await CalDavClient.discover(home, username: user, password: pw);
-      expect(again.any((c) => c.name == '$name-renamed'), isTrue);
-      // It takes notes.
-      final c = CalDavClient(collection: made, username: user, password: pw);
-      final n = await c.putNote(Note(uid: 'x1', summary: 'hi'));
-      expect((await c.listNotes()).map((e) => e.summary), ['hi']);
-      c.close();
-      expect(n.etag, isNotNull);
-    } finally {
-      final r = http.Request('DELETE', made)
-        ..headers['Authorization'] =
-            'Basic ${base64.encode(utf8.encode('$user:$pw'))}';
-      final resp = await http.Response.fromStream(await r.send());
-      expect(resp.statusCode, anyOf(200, 204));
-    }
-  });
+  test(
+    'create a collection, find it by name, delete it',
+    skip: skipReason,
+    () async {
+      final user = env['DAVDART_TEST_USER'] ?? '';
+      final pw = env['DAVDART_TEST_PASSWORD'] ?? '';
+      final home = Uri.parse(url!).resolve('../');
+      final name = 'davdart-it-tmp-${DateTime.now().microsecondsSinceEpoch}';
+      final made = await CalDavClient.createCollection(
+        home,
+        name,
+        username: user,
+        password: pw,
+      );
+      try {
+        final found = await CalDavClient.discover(
+          home,
+          username: user,
+          password: pw,
+        );
+        final mine = found.where((c) => c.name == name).toList();
+        expect(mine, hasLength(1));
+        expect(mine.single.holdsNotes, isTrue);
+        // Renaming sets the display name on the server.
+        await CalDavClient.renameCollection(
+          made,
+          '$name-renamed',
+          username: user,
+          password: pw,
+        );
+        final again = await CalDavClient.discover(
+          home,
+          username: user,
+          password: pw,
+        );
+        expect(again.any((c) => c.name == '$name-renamed'), isTrue);
+        // It takes notes.
+        final c = CalDavClient(collection: made, username: user, password: pw);
+        final n = await c.putNote(Note(uid: 'x1', summary: 'hi'));
+        expect((await c.listNotes()).map((e) => e.summary), ['hi']);
+        c.close();
+        expect(n.etag, isNotNull);
+      } finally {
+        final r = http.Request('DELETE', made)
+          ..headers['Authorization'] =
+              'Basic ${base64.encode(utf8.encode('$user:$pw'))}';
+        final resp = await http.Response.fromStream(await r.send());
+        expect(resp.statusCode, anyOf(200, 204));
+      }
+    },
+  );
 }

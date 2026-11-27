@@ -15,7 +15,7 @@ import 'event_store.dart';
 /// edit wins that value, and the earlier local text is kept as a [Revision].
 class EventSyncEngine {
   EventSyncEngine(this.client, this.store, {DateTime Function()? now})
-      : _now = now ?? DateTime.now;
+    : _now = now ?? DateTime.now;
 
   final CalDavClient client;
   final EventStore store;
@@ -28,9 +28,14 @@ class EventSyncEngine {
     local.href = existing?.base?.href ?? existing?.local.href ?? event.href;
     local.etag = existing?.base?.etag;
     await store.put(
-        event.uid,
-        StoredEvent(
-            local: local, base: existing?.base, dirty: true, deleted: false));
+      event.uid,
+      StoredEvent(
+        local: local,
+        base: existing?.base,
+        dirty: true,
+        deleted: false,
+      ),
+    );
     return local;
   }
 
@@ -49,9 +54,9 @@ class EventSyncEngine {
 
   /// Events to show: everything not deleted locally.
   Future<List<Event>> events() async => [
-        for (final s in await store.all())
-          if (!s.deleted) s.local
-      ];
+    for (final s in await store.all())
+      if (!s.deleted) s.local,
+  ];
 
   String _path(String href) => client.collection.resolve(href).path;
 
@@ -123,8 +128,9 @@ class EventSyncEngine {
   bool _sameContent(Event a, Event b) =>
       _sameList(a.extraLines, b.extraLines) &&
       a.propertyParams.length == b.propertyParams.length &&
-      a.propertyParams.entries
-          .every((e) => b.propertyParams[e.key] == e.value) &&
+      a.propertyParams.entries.every(
+        (e) => b.propertyParams[e.key] == e.value,
+      ) &&
       a.parentUid == b.parentUid &&
       a.summary == b.summary &&
       a.description == b.description &&
@@ -151,13 +157,15 @@ class EventSyncEngine {
     if (s.deleted) {
       // Deleted here, edited there: the edit is someone's work, so the event
       // comes back, and the event is recorded rather than silent.
-      await store.addRevision(Revision(
-        uid: r.uid,
-        at: _now().toUtc(),
-        reason: 'deleted locally, edited on the server; restored',
-        summary: s.local.summary,
-        body: s.local.description,
-      ));
+      await store.addRevision(
+        Revision(
+          uid: r.uid,
+          at: _now().toUtc(),
+          reason: 'deleted locally, edited on the server; restored',
+          summary: s.local.summary,
+          body: s.local.description,
+        ),
+      );
       await store.put(r.uid, StoredEvent(local: r, base: r));
       report.restored++;
       return;
@@ -171,17 +179,22 @@ class EventSyncEngine {
     final m = mergeEvents(base, s.local, r);
     if (m.hadConflict) {
       report.conflicts.addAll(m.conflicts);
-      await store.addRevision(Revision(
-        uid: r.uid,
-        at: _now().toUtc(),
-        reason: 'merge conflict: ${m.conflicts.map((c) => c.what).join(", ")}',
-        summary: s.local.summary,
-        body: s.local.description,
-      ));
+      await store.addRevision(
+        Revision(
+          uid: r.uid,
+          at: _now().toUtc(),
+          reason:
+              'merge conflict: ${m.conflicts.map((c) => c.what).join(", ")}',
+          summary: s.local.summary,
+          body: s.local.description,
+        ),
+      );
     }
     report.merged++;
-    await store.put(r.uid,
-        StoredEvent(local: m.event, base: r, dirty: !_sameContent(m.event, r)));
+    await store.put(
+      r.uid,
+      StoredEvent(local: m.event, base: r, dirty: !_sameContent(m.event, r)),
+    );
   }
 
   Future<void> _push(SyncReport report) async {
@@ -207,9 +220,11 @@ class EventSyncEngine {
             }
             report.deleted++;
           } else {
-            final stored = await client.putEvent(s.local.copyWith()
-              ..href = s.local.href
-              ..etag = s.local.etag);
+            final stored = await client.putEvent(
+              s.local.copyWith()
+                ..href = s.local.href
+                ..etag = s.local.etag,
+            );
             final cur = await store.get(uid);
             if (cur != null &&
                 (cur.deleted ||
@@ -223,7 +238,9 @@ class EventSyncEngine {
               await store.put(uid, cur);
             } else {
               await store.put(
-                  uid, StoredEvent(local: stored, base: stored.copyWith()));
+                uid,
+                StoredEvent(local: stored, base: stored.copyWith()),
+              );
             }
             report.pushed++;
           }

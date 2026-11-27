@@ -1912,7 +1912,6 @@ class AppState extends ChangeNotifier {
 
   void _dropCaches() {
     _projectIndexCache = null;
-    _parentCache = null;
   }
 
   @override
@@ -2616,41 +2615,12 @@ class AppState extends ChangeNotifier {
   }
 
   /// True when [t] sits under [uid] (a folder, note or task) at any depth.
-  bool taskIsUnder(Task t, String uid) => _isUnder(t.parentUid, uid);
+  bool taskIsUnder(Task t, String uid) =>
+      projectIndex.isUnder(t.parentUid, uid);
 
   /// True when [e] sits under [uid] (a folder, note or task) at any depth.
-  bool eventIsUnder(Event e, String uid) => _isUnder(e.parentUid, uid);
-
-  /// Walks the parent chain from [start] with the cached uid-to-parent map
-  /// (one map per notification, not a search per step) and a seen-set, so a
-  /// parent loop ends instead of spinning.
-  bool _isUnder(String? start, String uid) {
-    final parents = _parentCache ??= _buildParents();
-    final seen = <String>{};
-    var cur = start;
-    while (cur != null && seen.add(cur)) {
-      if (cur == uid) return true;
-      cur = parents[cur];
-    }
-    return false;
-  }
-
-  Map<String, String?> _buildParents() {
-    // Notes win over tasks over events, as in [findItem].
-    final m = <String, String?>{};
-    for (final e in events) {
-      m[e.uid] = e.parentUid;
-    }
-    for (final t in tasks) {
-      m[t.uid] = t.parentUid;
-    }
-    for (final n in notes) {
-      m[n.uid] = n.parentUid;
-    }
-    return m;
-  }
-
-  Map<String, String?>? _parentCache;
+  bool eventIsUnder(Event e, String uid) =>
+      projectIndex.isUnder(e.parentUid, uid);
 
   /// Whether task [t] is in the open scope (always, with no scope).
   bool taskInScope(Task t) => scopeUid == null || taskIsUnder(t, scopeUid!);

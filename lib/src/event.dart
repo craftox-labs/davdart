@@ -30,16 +30,16 @@ class Event {
     Map<String, String>? propertyParams,
     this.href,
     this.etag,
-  })  : categories = categories ?? <String>[],
-        exdates = exdates ?? <String>[],
-        rdates = rdates ?? <String>[],
-        created = created?.toUtc(),
-        lastModified = lastModified?.toUtc(),
-        dtstamp = (dtstamp ?? DateTime.now()).toUtc(),
-        extraLines = extraLines ?? <String>[],
-        calendarLines = calendarLines ?? <String>[],
-        siblingLines = siblingLines ?? <String>[],
-        propertyParams = propertyParams ?? <String, String>{};
+  }) : categories = categories ?? <String>[],
+       exdates = exdates ?? <String>[],
+       rdates = rdates ?? <String>[],
+       created = created?.toUtc(),
+       lastModified = lastModified?.toUtc(),
+       dtstamp = (dtstamp ?? DateTime.now()).toUtc(),
+       extraLines = extraLines ?? <String>[],
+       calendarLines = calendarLines ?? <String>[],
+       siblingLines = siblingLines ?? <String>[],
+       propertyParams = propertyParams ?? <String, String>{};
 
   final String uid;
   String summary;
@@ -110,8 +110,9 @@ class Event {
       final same =
           ds.allDay == de.allDay && ds.isUtc == de.isUtc && ds.tzid == de.tzid;
       final i = ds.toInstant(), j = de.toInstant();
-      final len =
-          same || i == null || j == null ? e.difference(s) : j.difference(i);
+      final len = same || i == null || j == null
+          ? e.difference(s)
+          : j.difference(i);
       if (!len.isNegative) return len;
     }
     final d = duration == null ? null : parseIcalDuration(duration!);
@@ -150,31 +151,30 @@ class Event {
     String? parentUid,
     bool clearParent = false,
     DateTime? lastModified,
-  }) =>
-      Event(
-        uid: uid,
-        summary: summary ?? this.summary,
-        description: description ?? this.description,
-        location: location ?? this.location,
-        categories: categories ?? List.of(this.categories),
-        status: clearStatus ? null : (status ?? this.status),
-        dtstart: clearStart ? null : (dtstart ?? this.dtstart),
-        dtend: clearEnd ? null : (dtend ?? this.dtend),
-        duration: clearDuration ? null : (duration ?? this.duration),
-        rrule: clearRrule ? null : (rrule ?? this.rrule),
-        exdates: exdates ?? List.of(this.exdates),
-        rdates: rdates ?? List.of(this.rdates),
-        parentUid: clearParent ? null : (parentUid ?? this.parentUid),
-        created: created,
-        lastModified: lastModified ?? this.lastModified,
-        dtstamp: dtstamp,
-        extraLines: List.of(extraLines),
-        calendarLines: List.of(calendarLines),
-        siblingLines: siblingLines ?? List.of(this.siblingLines),
-        propertyParams: Map.of(propertyParams),
-        href: href,
-        etag: etag,
-      );
+  }) => Event(
+    uid: uid,
+    summary: summary ?? this.summary,
+    description: description ?? this.description,
+    location: location ?? this.location,
+    categories: categories ?? List.of(this.categories),
+    status: clearStatus ? null : (status ?? this.status),
+    dtstart: clearStart ? null : (dtstart ?? this.dtstart),
+    dtend: clearEnd ? null : (dtend ?? this.dtend),
+    duration: clearDuration ? null : (duration ?? this.duration),
+    rrule: clearRrule ? null : (rrule ?? this.rrule),
+    exdates: exdates ?? List.of(this.exdates),
+    rdates: rdates ?? List.of(this.rdates),
+    parentUid: clearParent ? null : (parentUid ?? this.parentUid),
+    created: created,
+    lastModified: lastModified ?? this.lastModified,
+    dtstamp: dtstamp,
+    extraLines: List.of(extraLines),
+    calendarLines: List.of(calendarLines),
+    siblingLines: siblingLines ?? List.of(this.siblingLines),
+    propertyParams: Map.of(propertyParams),
+    href: href,
+    etag: etag,
+  );
 
   @override
   String toString() => 'Event($uid, "$summary")';
@@ -184,11 +184,15 @@ class Event {
 /// does not parse.
 Duration? parseIcalDuration(String v) {
   final m = RegExp(
-          r'^([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$')
-      .firstMatch(v.trim().toUpperCase());
+    r'^([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$',
+  ).firstMatch(v.trim().toUpperCase());
   if (m == null || v.trim().length < 3) return null;
   int g(int i) => int.tryParse(m.group(i) ?? '') ?? 0;
   final d = Duration(
-      days: g(2) * 7 + g(3), hours: g(4), minutes: g(5), seconds: g(6));
+    days: g(2) * 7 + g(3),
+    hours: g(4),
+    minutes: g(5),
+    seconds: g(6),
+  );
   return m.group(1) == '-' ? -d : d;
 }

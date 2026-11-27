@@ -28,9 +28,9 @@ void setRankInLines(List<String> lines, double? rank) {
 
 /// [lines] without the rank line.
 List<String> linesWithoutRank(List<String> lines) => [
-      for (final l in lines)
-        if (!_isRankLine(l)) l,
-    ];
+  for (final l in lines)
+    if (!_isRankLine(l)) l,
+];
 
 /// The ranks to write when one card is dropped into a column.
 ///

@@ -34,7 +34,8 @@ class SpaceBook {
 
   /// Creates a local-only Space.
   Future<Space> createLocal(String name) async {
-    final id = '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+    final id =
+        '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
         '${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-')}';
     final config = SpaceConfig(id: id, name: name);
     _configs.add(config);
@@ -50,9 +51,10 @@ class SpaceBook {
     CalDavClient? client;
     if (c.hasServer && password != null) {
       client = CalDavClient(
-          collection: Uri.parse(c.url!),
-          username: c.user ?? '',
-          password: password);
+        collection: Uri.parse(c.url!),
+        username: c.user ?? '',
+        password: password,
+      );
     }
     return Space(c, store, client: client)..onConfigChanged = _save;
   }

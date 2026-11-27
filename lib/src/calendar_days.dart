@@ -22,7 +22,10 @@ class TaskOccurrence {
 /// day if it falls in the window. Tasks without a due date give nothing.
 /// Completion is not considered (closed tasks are returned too).
 List<TaskOccurrence> taskOccurrencesBetween(
-    Task t, DateTime from, DateTime to) {
+  Task t,
+  DateTime from,
+  DateTime to,
+) {
   final due = t.due;
   final w = due?.localWall;
   if (due == null || w == null) return const [];
@@ -43,16 +46,19 @@ List<TaskOccurrence> taskOccurrencesBetween(
     rrule: t.rrule,
     exdates: [
       for (final l in t.extraLines)
-        if (line(l, 'EXDATE')) l
+        if (line(l, 'EXDATE')) l,
     ],
     rdates: [
       for (final l in t.extraLines)
-        if (line(l, 'RDATE')) l
+        if (line(l, 'RDATE')) l,
     ],
   );
   return [
-    for (final o
-        in occurrencesBetween(ev, from, to.add(const Duration(days: 1))))
+    for (final o in occurrencesBetween(
+      ev,
+      from,
+      to.add(const Duration(days: 1)),
+    ))
       if (!o.start.isBefore(DateTime.utc(from.year, from.month, from.day)) &&
           DateTime.utc(o.start.year, o.start.month, o.start.day).isBefore(to))
         TaskOccurrence(t, o.start, due.allDay),

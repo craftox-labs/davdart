@@ -16,7 +16,8 @@ class FileEventStore extends MemoryEventStore {
     if (f.existsSync()) {
       try {
         store.loadJson(
-            jsonDecode(await f.readAsString()) as Map<String, dynamic>);
+          jsonDecode(await f.readAsString()) as Map<String, dynamic>,
+        );
       } on FormatException {
         // Truncated or damaged: keep it for inspection and start over, so the
         // next sync repopulates from the server.

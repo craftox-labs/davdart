@@ -90,7 +90,10 @@ const _maxOccurrences = 100000;
 /// keeps its UTC time), and each instance is then converted to the viewer's
 /// zone ([LocalZone]); floating series stay on their wall time.
 List<EventOccurrence> occurrencesBetween(
-    Event event, DateTime from, DateTime to) {
+  Event event,
+  DateTime from,
+  DateTime to,
+) {
   final startWall = event.startWall;
   if (startWall == null) return const [];
   final length = event.length;
@@ -104,7 +107,7 @@ List<EventOccurrence> occurrencesBetween(
   final overrides = _overrides(event);
   final overrideIds = <_Key>{
     for (final o in overrides)
-      if (_recurrenceId(o) != null) _key(_recurrenceId(o)!)
+      if (_recurrenceId(o) != null) _key(_recurrenceId(o)!),
   };
 
   if (plan.rule == null && event.rdates.isEmpty || plan.unsupported) {
@@ -114,19 +117,29 @@ List<EventOccurrence> occurrencesBetween(
     final hit = id == null ? null : _matchOverride(overrides, id);
     if (hit == null) {
       if (overlaps(s, e)) {
-        out.add(EventOccurrence(
+        out.add(
+          EventOccurrence(
             event: event,
             source: event,
             start: s,
             end: e,
             allDay: allDay,
             recurrenceId: id,
-            unsupported: plan.unsupported));
+            unsupported: plan.unsupported,
+          ),
+        );
       }
     }
     if (plan.unsupported || event.isRecurring) {
-      _addOverrides(out, event, overrides, overlaps, plan.unsupported,
-          skipBase: false, baseId: id);
+      _addOverrides(
+        out,
+        event,
+        overrides,
+        overlaps,
+        plan.unsupported,
+        skipBase: false,
+        baseId: id,
+      );
     }
     out.sort((a, b) => a.start.compareTo(b.start));
     return out;
@@ -151,24 +164,30 @@ List<EventOccurrence> occurrencesBetween(
       return;
     }
     if (overrideIds.contains(_Key(s, false)) ||
-        overrideIds
-            .contains(_Key(DateTime.utc(s.year, s.month, s.day), true))) {
+        overrideIds.contains(
+          _Key(DateTime.utc(s.year, s.month, s.day), true),
+        )) {
       return;
     }
     final e = s.add(length);
     if (overlaps(s, e)) {
-      out.add(EventOccurrence(
+      out.add(
+        EventOccurrence(
           event: event,
           source: event,
           start: s,
           end: e,
           allDay: allDay,
-          recurrenceId: _idFor(event.dtstart!, s)));
+          recurrenceId: _idFor(event.dtstart!, s),
+        ),
+      );
     }
   }
 
   void emit(DateTime base) => emitLocal(
-      first.localWallOf(base), DateTime.utc(base.year, base.month, base.day));
+    first.localWallOf(base),
+    DateTime.utc(base.year, base.month, base.day),
+  );
 
   final rule = plan.rule;
   if (rule != null) {
@@ -176,8 +195,11 @@ List<EventOccurrence> occurrencesBetween(
     var count = 0;
     var produced = 0;
     final baseStart = first.wall!;
-    final startDate =
-        DateTime.utc(baseStart.year, baseStart.month, baseStart.day);
+    final startDate = DateTime.utc(
+      baseStart.year,
+      baseStart.month,
+      baseStart.day,
+    );
     final tod = baseStart.difference(startDate);
     // RFC 5545 3.8.5.3: DTSTART is always the first instance, even when it
     // does not match BYDAY or BYMONTHDAY (weekly and monthly rules).
@@ -209,8 +231,15 @@ List<EventOccurrence> occurrencesBetween(
   for (final r in plan.rdates) {
     if (r.isBefore(to)) emitLocal(r);
   }
-  _addOverrides(out, event, overrides, overlaps, false,
-      skipBase: true, baseId: null);
+  _addOverrides(
+    out,
+    event,
+    overrides,
+    overlaps,
+    false,
+    skipBase: true,
+    baseId: null,
+  );
   out.sort((a, b) => a.start.compareTo(b.start));
   return out;
 }
@@ -233,7 +262,8 @@ void _addOverrides(
         ? s.add(event.length)
         : s.add(o.dtstart == null ? event.length : o.length);
     if (!overlaps(s, e)) continue;
-    out.add(EventOccurrence(
+    out.add(
+      EventOccurrence(
         event: event,
         source: o,
         start: s,
@@ -241,7 +271,9 @@ void _addOverrides(
         allDay: o.dtstart?.allDay ?? event.allDay,
         recurrenceId: id,
         isOverride: true,
-        unsupported: unsupported));
+        unsupported: unsupported,
+      ),
+    );
   }
 }
 
@@ -267,8 +299,11 @@ bool _afterUntil(DateTime s, ICalDate until, ICalDate first) {
   final u = until.wall;
   if (u == null) return false;
   if (until.allDay || first.allDay) {
-    return DateTime.utc(s.year, s.month, s.day)
-        .isAfter(DateTime.utc(u.year, u.month, u.day));
+    return DateTime.utc(
+      s.year,
+      s.month,
+      s.day,
+    ).isAfter(DateTime.utc(u.year, u.month, u.day));
   }
   final ui = until.toInstant();
   final si = ICalDate.fromLocalWall(first.localWallOf(s), first).toInstant();
@@ -300,7 +335,9 @@ ICalDate? _recurrenceId(Event o) {
         final head = l.substring(0, i);
         final semi = head.indexOf(';');
         final d = ICalDate(
-            l.substring(i + 1).trim(), semi < 0 ? '' : head.substring(semi));
+          l.substring(i + 1).trim(),
+          semi < 0 ? '' : head.substring(semi),
+        );
         return d.localWall == null ? null : d;
       }
     }
@@ -397,8 +434,16 @@ DateTime _addMonths(int year, int month, int n) {
 int _daysIn(int y, int m) => DateTime.utc(y, m + 1, 0).day;
 
 class _Rule {
-  _Rule(this.freq, this.interval, this.count, this.until, this.byday,
-      this.bymonthday, this.bymonth, this.wkst);
+  _Rule(
+    this.freq,
+    this.interval,
+    this.count,
+    this.until,
+    this.byday,
+    this.bymonthday,
+    this.bymonth,
+    this.wkst,
+  );
   final String freq;
   final int interval;
   final int? count;
@@ -415,7 +460,7 @@ class _Rule {
     'TH': 4,
     'FR': 5,
     'SA': 6,
-    'SU': 7
+    'SU': 7,
   };
 
   /// Null when the rule is outside what this expands.
@@ -434,7 +479,7 @@ class _Rule {
       'BYDAY',
       'BYMONTHDAY',
       'BYMONTH',
-      'WKST'
+      'WKST',
     };
     if (!m.keys.every(known.contains)) return null;
     final freq = m['FREQ']?.toUpperCase();
@@ -442,8 +487,9 @@ class _Rule {
         !{'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'}.contains(freq)) {
       return null;
     }
-    final interval =
-        m.containsKey('INTERVAL') ? int.tryParse(m['INTERVAL']!) : 1;
+    final interval = m.containsKey('INTERVAL')
+        ? int.tryParse(m['INTERVAL']!)
+        : 1;
     if (interval == null || interval < 1) return null;
     int? count;
     if (m.containsKey('COUNT')) {
@@ -511,8 +557,9 @@ class _Rule {
       case 'WEEKLY':
         final first = start.subtract(_day * ((start.weekday - wkst + 7) % 7));
         final ws = first.add(_day * (7 * interval * i));
-        final wds =
-            byday.isEmpty ? [start.weekday] : [for (final b in byday) b.$2];
+        final wds = byday.isEmpty
+            ? [start.weekday]
+            : [for (final b in byday) b.$2];
         final offs = {for (final w in wds) (w - wkst + 7) % 7}.toList()..sort();
         return _Period(ws, [for (final o in offs) ws.add(_day * o)]);
       case 'MONTHLY':
@@ -529,7 +576,7 @@ class _Rule {
           for (final (ord, wd) in byday) {
             final all = [
               for (var d = 1; d <= n; d++)
-                if (DateTime.utc(mo.year, mo.month, d).weekday == wd) d
+                if (DateTime.utc(mo.year, mo.month, d).weekday == wd) d,
             ];
             if (ord == 0) {
               days.addAll(all);
@@ -540,12 +587,14 @@ class _Rule {
           }
         }
         final sorted = days.toList()..sort();
-        return _Period(
-            mo, [for (final d in sorted) DateTime.utc(mo.year, mo.month, d)]);
+        return _Period(mo, [
+          for (final d in sorted) DateTime.utc(mo.year, mo.month, d),
+        ]);
       default: // YEARLY
         final y = start.year + i * interval;
-        final months =
-            bymonth.isEmpty ? [start.month] : (List.of(bymonth)..sort());
+        final months = bymonth.isEmpty
+            ? [start.month]
+            : (List.of(bymonth)..sort());
         final out = <DateTime>[];
         for (final mo in months) {
           final n = _daysIn(y, mo);
@@ -553,9 +602,8 @@ class _Rule {
           final ds = <int>{
             for (final d in src)
               if ((d > 0 ? d : n + d + 1) >= 1 && (d > 0 ? d : n + d + 1) <= n)
-                d > 0 ? d : n + d + 1
-          }.toList()
-            ..sort();
+                d > 0 ? d : n + d + 1,
+          }.toList()..sort();
           for (final d in ds) {
             out.add(DateTime.utc(y, mo, d));
           }

@@ -18,14 +18,14 @@ class Note {
     Map<String, String>? propertyParams,
     this.href,
     this.etag,
-  })  : categories = categories ?? <String>[],
-        created = created?.toUtc(),
-        lastModified = lastModified?.toUtc(),
-        dtstamp = (dtstamp ?? DateTime.now()).toUtc(),
-        extraLines = extraLines ?? <String>[],
-        calendarLines = calendarLines ?? <String>[],
-        siblingLines = siblingLines ?? <String>[],
-        propertyParams = propertyParams ?? <String, String>{};
+  }) : categories = categories ?? <String>[],
+       created = created?.toUtc(),
+       lastModified = lastModified?.toUtc(),
+       dtstamp = (dtstamp ?? DateTime.now()).toUtc(),
+       extraLines = extraLines ?? <String>[],
+       calendarLines = calendarLines ?? <String>[],
+       siblingLines = siblingLines ?? <String>[],
+       propertyParams = propertyParams ?? <String, String>{};
 
   /// Stable identifier (iCalendar UID).
   final String uid;
@@ -76,24 +76,23 @@ class Note {
     String? parentUid,
     bool clearParent = false,
     DateTime? lastModified,
-  }) =>
-      Note(
-        uid: uid,
-        summary: summary ?? this.summary,
-        description: description ?? this.description,
-        categories: categories ?? List.of(this.categories),
-        status: clearStatus ? null : (status ?? this.status),
-        parentUid: clearParent ? null : (parentUid ?? this.parentUid),
-        created: created,
-        lastModified: lastModified ?? this.lastModified,
-        dtstamp: dtstamp,
-        extraLines: List.of(extraLines),
-        calendarLines: List.of(calendarLines),
-        siblingLines: List.of(siblingLines),
-        propertyParams: Map.of(propertyParams),
-        href: href,
-        etag: etag,
-      );
+  }) => Note(
+    uid: uid,
+    summary: summary ?? this.summary,
+    description: description ?? this.description,
+    categories: categories ?? List.of(this.categories),
+    status: clearStatus ? null : (status ?? this.status),
+    parentUid: clearParent ? null : (parentUid ?? this.parentUid),
+    created: created,
+    lastModified: lastModified ?? this.lastModified,
+    dtstamp: dtstamp,
+    extraLines: List.of(extraLines),
+    calendarLines: List.of(calendarLines),
+    siblingLines: List.of(siblingLines),
+    propertyParams: Map.of(propertyParams),
+    href: href,
+    etag: etag,
+  );
 
   @override
   String toString() => 'Note($uid, "$summary")';

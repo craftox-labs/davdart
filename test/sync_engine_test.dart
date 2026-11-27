@@ -19,14 +19,15 @@ void main() {
   late DateTime clock;
 
   SyncEngine engine(NoteStore store) => SyncEngine(
-        CalDavClient(
-            collection: FakeCalDav.collection,
-            username: 'u',
-            password: 'p',
-            client: server.client),
-        store,
-        now: () => clock = clock.add(const Duration(minutes: 1)),
-      );
+    CalDavClient(
+      collection: FakeCalDav.collection,
+      username: 'u',
+      password: 'p',
+      client: server.client,
+    ),
+    store,
+    now: () => clock = clock.add(const Duration(minutes: 1)),
+  );
 
   setUp(() {
     server = FakeCalDav();
@@ -85,22 +86,24 @@ void main() {
     expect(body, contains('L3'));
   });
 
-  test('a true conflict picks one side, keeps a revision, no duplicate',
-      () async {
-    server.external('a.ics', ics('a', 'A', '${head}shared'));
-    final e = engine(MemoryNoteStore());
-    await e.sync();
-    final n = (await e.notes()).single;
-    n.description = '${head}local text';
-    await e.save(n); // saved after the server edit below? no: before
-    server.external('a.ics', ics('a', 'A', '${head}remote text'));
-    final r = await e.sync();
-    expect(r.conflicts, hasLength(1));
-    expect(server.ics.length, 1);
-    expect((await e.notes()).length, 1);
-    final revs = await e.store.revisions('a');
-    expect(revs.single.body, contains('local text'));
-  });
+  test(
+    'a true conflict picks one side, keeps a revision, no duplicate',
+    () async {
+      server.external('a.ics', ics('a', 'A', '${head}shared'));
+      final e = engine(MemoryNoteStore());
+      await e.sync();
+      final n = (await e.notes()).single;
+      n.description = '${head}local text';
+      await e.save(n); // saved after the server edit below? no: before
+      server.external('a.ics', ics('a', 'A', '${head}remote text'));
+      final r = await e.sync();
+      expect(r.conflicts, hasLength(1));
+      expect(server.ics.length, 1);
+      expect((await e.notes()).length, 1);
+      final revs = await e.store.revisions('a');
+      expect(revs.single.body, contains('local text'));
+    },
+  );
 
   test('remote deletion removes an unedited local copy', () async {
     server.external('a.ics', ics('a', 'A'));
@@ -148,8 +151,9 @@ void main() {
 
   test('two devices converge', () async {
     final a = engine(MemoryNoteStore()), b = engine(MemoryNoteStore());
-    await a
-        .save(Note(uid: 'n', summary: 'T', description: '${head}p1\np2\np3'));
+    await a.save(
+      Note(uid: 'n', summary: 'T', description: '${head}p1\np2\np3'),
+    );
     await a.sync();
     await b.sync();
     final na = (await a.notes()).single..description = '${head}P1\np2\np3';
@@ -185,14 +189,15 @@ void regressionTests() {
   late FakeCalDav server;
   late DateTime clock;
   SyncEngine engine(NoteStore store) => SyncEngine(
-        CalDavClient(
-            collection: FakeCalDav.collection,
-            username: 'u',
-            password: 'p',
-            client: server.client),
-        store,
-        now: () => clock = clock.add(const Duration(minutes: 1)),
-      );
+    CalDavClient(
+      collection: FakeCalDav.collection,
+      username: 'u',
+      password: 'p',
+      client: server.client,
+    ),
+    store,
+    now: () => clock = clock.add(const Duration(minutes: 1)),
+  );
   setUp(() {
     server = FakeCalDav();
     clock = DateTime.utc(2026, 11, 19, 12);
@@ -210,18 +215,20 @@ void regressionTests() {
     expect(server.ics['a.ics'], contains('New title'));
   });
 
-  test('delete locally then remote edit restores the note and records it',
-      () async {
-    server.external('a.ics', ics('a', 'A', 'x'));
-    final e = engine(MemoryNoteStore());
-    await e.sync();
-    await e.delete('a');
-    server.external('a.ics', ics('a', 'A', 'edited elsewhere'));
-    final r = await e.sync();
-    expect(r.restored, 1);
-    expect((await e.notes()).single.description, 'edited elsewhere');
-    expect(await e.store.revisions('a'), hasLength(1));
-  });
+  test(
+    'delete locally then remote edit restores the note and records it',
+    () async {
+      server.external('a.ics', ics('a', 'A', 'x'));
+      final e = engine(MemoryNoteStore());
+      await e.sync();
+      await e.delete('a');
+      server.external('a.ics', ics('a', 'A', 'edited elsewhere'));
+      final r = await e.sync();
+      expect(r.restored, 1);
+      expect((await e.notes()).single.description, 'edited elsewhere');
+      expect(await e.store.revisions('a'), hasLength(1));
+    },
+  );
 
   test('an edit made while the PUT is in flight is not lost', () async {
     server.external('a.ics', ics('a', 'A', 'v0'));
@@ -233,21 +240,23 @@ void regressionTests() {
     // Edit again as soon as the PUT reaches the server.
     var injected = false;
     final racing = SyncEngine(
-        CalDavClient(
-            collection: FakeCalDav.collection,
-            username: 'u',
-            password: 'p',
-            client: MockClient((req) async {
-              final res = await server.respond(req);
-              if (req.method == 'PUT' && !injected) {
-                injected = true;
-                n = (await store.get('a'))!.local..description = 'v2';
-                await e.save(n);
-              }
-              return res;
-            })),
-        store,
-        now: () => clock = clock.add(const Duration(minutes: 1)));
+      CalDavClient(
+        collection: FakeCalDav.collection,
+        username: 'u',
+        password: 'p',
+        client: MockClient((req) async {
+          final res = await server.respond(req);
+          if (req.method == 'PUT' && !injected) {
+            injected = true;
+            n = (await store.get('a'))!.local..description = 'v2';
+            await e.save(n);
+          }
+          return res;
+        }),
+      ),
+      store,
+      now: () => clock = clock.add(const Duration(minutes: 1)),
+    );
     await racing.sync();
     expect((await e.notes()).single.description, 'v2');
     await e.sync();
@@ -258,20 +267,22 @@ void regressionTests() {
     server.external('a.ics', ics('a', 'A'));
     final store = MemoryNoteStore();
     final c = CalDavClient(
-        collection: FakeCalDav.collection,
-        username: 'u',
-        password: 'p',
-        client: MockClient((req) async {
-          if (req.method == 'GET') return http.Response('', 503);
-          final res = await server.respond(req);
-          // Hide calendar-data so the client has to fetch each note.
-          return http.Response(
-              res.body.replaceAll(
-                  RegExp(r'<c:calendar-data>.*?</c:calendar-data>',
-                      dotAll: true),
-                  ''),
-              res.statusCode);
-        }));
+      collection: FakeCalDav.collection,
+      username: 'u',
+      password: 'p',
+      client: MockClient((req) async {
+        if (req.method == 'GET') return http.Response('', 503);
+        final res = await server.respond(req);
+        // Hide calendar-data so the client has to fetch each note.
+        return http.Response(
+          res.body.replaceAll(
+            RegExp(r'<c:calendar-data>.*?</c:calendar-data>', dotAll: true),
+            '',
+          ),
+          res.statusCode,
+        );
+      }),
+    );
     final e = SyncEngine(c, store);
     await expectLater(e.sync(), throwsA(isA<CalDavException>()));
     expect(await store.getSyncToken(), isNull);

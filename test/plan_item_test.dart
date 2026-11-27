@@ -2,7 +2,8 @@ import 'package:davdart/src/note.dart';
 import 'package:davdart/src/plan_item.dart';
 import 'package:test/test.dart';
 
-const body = 'item_id: davdart-x\n'
+const body =
+    'item_id: davdart-x\n'
     "status: backlog (proposed; tm's go moves it to todo)\n"
     'owner: tm (decides)\n'
     'github_ref: (none)\n'
@@ -13,8 +14,9 @@ const body = 'item_id: davdart-x\n'
 
 void main() {
   test('reads header fields and free text', () {
-    final p = PlanItem.fromNote(Note(
-        uid: 'u', summary: 'T', description: body, categories: ['davdart']));
+    final p = PlanItem.fromNote(
+      Note(uid: 'u', summary: 'T', description: body, categories: ['davdart']),
+    );
     expect(p.itemId, 'davdart-x');
     expect(p.status, 'backlog');
     expect(p.owner, 'tm (decides)');
@@ -31,7 +33,10 @@ void main() {
 
   test('setStatus updates the field and the status tag', () {
     final n = Note(
-        uid: 'u', description: body, categories: ['davdart', 'status-backlog']);
+      uid: 'u',
+      description: body,
+      categories: ['davdart', 'status-backlog'],
+    );
     final p = PlanItem.fromNote(n)..setStatus('todo');
     p.apply();
     expect(PlanItem.fromNote(n).status, 'todo');
@@ -55,15 +60,19 @@ void main() {
 
   test('falls back to the status-* tag when there is no status field', () {
     final p = PlanItem.fromNote(
-        Note(uid: 'u', description: 'owner: tm', categories: ['status-done']));
+      Note(uid: 'u', description: 'owner: tm', categories: ['status-done']),
+    );
     expect(p.status, 'done');
   });
 
   test('clearStatus removes the status line and tags, keeps the rest', () {
-    final p = PlanItem.fromNote(Note(
+    final p = PlanItem.fromNote(
+      Note(
         uid: 'u',
         description: body,
-        categories: ['davdart', 'status-backlog']));
+        categories: ['davdart', 'status-backlog'],
+      ),
+    );
     p.clearStatus();
     expect(p.status, isNull);
     expect(p.note.categories, ['davdart']);

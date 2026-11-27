@@ -48,9 +48,9 @@ class ProjectIndex {
     Iterable<Note> notes, [
     Iterable<Task> tasks = const [],
     Iterable<Event> events = const [],
-  ])  : _notes = notes.toList(),
-        _tasks = tasks.toList(),
-        _events = events.toList() {
+  ]) : _notes = notes.toList(),
+       _tasks = tasks.toList(),
+       _events = events.toList() {
     for (final n in _notes) {
       _parent[n.uid] = n.parentUid;
       _byUid[n.uid] = n;
@@ -149,6 +149,23 @@ class ProjectIndex {
   List<Note> projects() => List.unmodifiable(_projects);
 
   bool isProject(String uid) => _projectIds.contains(uid);
+
+  /// The uid of [uid]'s parent (null at a root, or for an unknown uid). The
+  /// map is built once for the whole index, so callers never scan a list.
+  String? parentOf(String uid) => _parent[uid];
+
+  /// Whether [start] or one of its ancestors is [scope]: one walk of the
+  /// parent map with a seen-set, so a parent loop ends instead of spinning.
+  /// The new parent wins for notes over tasks over events, as [NoteTree].
+  bool isUnder(String? start, String scope) {
+    final seen = <String>{};
+    var cur = start;
+    while (cur != null && seen.add(cur)) {
+      if (cur == scope) return true;
+      cur = _parent[cur];
+    }
+    return false;
+  }
 
   /// The project folder whose subtree holds item [uid] (a note, task or
   /// event) at any depth, or the project itself for its own uid; null when
@@ -254,7 +271,10 @@ class ProjectIndex {
     _stats = {
       for (final p in _projects)
         p.uid: ProjectStats(
-            open[p.uid] ?? 0, review[p.uid] ?? 0, done[p.uid] ?? 0),
+          open[p.uid] ?? 0,
+          review[p.uid] ?? 0,
+          done[p.uid] ?? 0,
+        ),
     };
     _rest = ProjectStats(ro, rr, rd);
   }

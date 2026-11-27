@@ -39,16 +39,16 @@ class LocalZone {
   /// The zone for a TZID, or null when it is not in the database. Tolerates
   /// a path prefix such as `/mozilla.org/20050126_1/Europe/Berlin`.
   static tz.Location? location(String tzid) => _cache.putIfAbsent(tzid, () {
-        _init();
-        if (tzid.toUpperCase() == 'UTC') return tz.UTC;
-        final parts = tzid.split('/').where((p) => p.isNotEmpty).toList();
-        for (var i = 0; i < parts.length; i++) {
-          try {
-            return tz.getLocation(parts.sublist(i).join('/'));
-          } catch (_) {}
-        }
-        return null;
-      });
+    _init();
+    if (tzid.toUpperCase() == 'UTC') return tz.UTC;
+    final parts = tzid.split('/').where((p) => p.isNotEmpty).toList();
+    for (var i = 0; i < parts.length; i++) {
+      try {
+        return tz.getLocation(parts.sublist(i).join('/'));
+      } catch (_) {}
+    }
+    return null;
+  });
 
   /// The wall fields (UTC-flagged) of [instant] in the viewer's zone.
   static DateTime wallOf(DateTime instant) {
@@ -68,13 +68,15 @@ class LocalZone {
 
   /// The instant (UTC) of wall fields [w] in zone [l].
   static DateTime instantIn(tz.Location l, DateTime w) => _plain(
-      tz.TZDateTime(l, w.year, w.month, w.day, w.hour, w.minute, w.second));
+    tz.TZDateTime(l, w.year, w.month, w.day, w.hour, w.minute, w.second),
+  );
 
   // A plain UTC DateTime: a TZDateTime would `toLocal()` into the package's
   // own local location instead of the platform zone.
-  static DateTime _plain(DateTime d) =>
-      DateTime.fromMicrosecondsSinceEpoch(d.microsecondsSinceEpoch,
-          isUtc: true);
+  static DateTime _plain(DateTime d) => DateTime.fromMicrosecondsSinceEpoch(
+    d.microsecondsSinceEpoch,
+    isUtc: true,
+  );
 
   /// The wall fields (UTC-flagged) of [instant] in zone [l].
   static DateTime wallIn(tz.Location l, DateTime instant) {

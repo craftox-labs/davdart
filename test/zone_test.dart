@@ -83,8 +83,10 @@ void main() {
     test('fromLocalWall inverts localWall and keeps the flavour', () {
       LocalZone.use('Asia/Bangkok');
       const z = ICalDate('20261125T090000Z');
-      expect(ICalDate.fromLocalWall(u(2026, 11, 25, 16), z).value,
-          '20261125T090000Z');
+      expect(
+        ICalDate.fromLocalWall(u(2026, 11, 25, 16), z).value,
+        '20261125T090000Z',
+      );
       const t = ICalDate('20261125T090000', ';TZID=Europe/Berlin');
       final r = ICalDate.fromLocalWall(u(2026, 11, 25, 15), t);
       expect(r.value, '20261125T090000');
@@ -99,10 +101,13 @@ void main() {
         LocalZone.use('America/New_York');
         const second = ICalDate('20261101T063000Z');
         expect(second.localWall, u(2026, 11, 1, 1, 30));
-        expect(ICalDate.fromLocalWall(u(2026, 11, 1, 1, 30), second).value,
-            '20261101T063000Z');
+        expect(
+          ICalDate.fromLocalWall(u(2026, 11, 1, 1, 30), second).value,
+          '20261101T063000Z',
+        );
       },
-      skip: 'wall fields are lossy here: 01:30 occurs twice, TZDateTime picks '
+      skip:
+          'wall fields are lossy here: 01:30 occurs twice, TZDateTime picks '
           'the first (EDT, 05:30Z), so the round trip moves a UTC instant by '
           'an hour. An exact inverse needs the original instant; the API only '
           'takes wall fields (real bug, not fixed)',
@@ -114,10 +119,13 @@ void main() {
         // New York skips 2026-03-08 02:00-02:59 (02:00 EST -> 03:00 EDT).
         LocalZone.use('America/New_York');
         const gap = ICalDate('20260308T023000', ';TZID=America/New_York');
-        expect(ICalDate.fromLocalWall(u(2026, 3, 8, 2, 30), gap).value,
-            '20260308T023000');
+        expect(
+          ICalDate.fromLocalWall(u(2026, 3, 8, 2, 30), gap).value,
+          '20260308T023000',
+        );
       },
-      skip: '02:30 does not exist in New York that night: toInstant resolves '
+      skip:
+          '02:30 does not exist in New York that night: toInstant resolves '
           'the gap to 03:30 EDT (07:30Z), and converting 02:30 back lands on '
           '03:30, an hour off. A non-existent wall time cannot survive a wall '
           'round trip; the original text would have to be kept (real bug, '

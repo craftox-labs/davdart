@@ -110,8 +110,8 @@ class SavedViewSpec {
   }
 
   static List<String> _splitTags(String? v) => [
-        if (v != null)
-          for (final t in v.split(','))
-            if (t.trim().isNotEmpty) t.trim(),
-      ];
+    if (v != null)
+      for (final t in v.split(','))
+        if (t.trim().isNotEmpty) t.trim(),
+  ];
 }

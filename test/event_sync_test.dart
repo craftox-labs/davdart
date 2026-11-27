@@ -20,11 +20,12 @@ void main() {
 
   CalDavClient client({void Function(String?, Object)? onError}) =>
       CalDavClient(
-          collection: FakeCalDav.collection,
-          username: 'u',
-          password: 'p',
-          client: server.client,
-          onResourceError: onError);
+        collection: FakeCalDav.collection,
+        username: 'u',
+        password: 'p',
+        client: server.client,
+        onResourceError: onError,
+      );
   DateTime tick() => clock = clock.add(const Duration(minutes: 1));
   EventSyncEngine eengine(EventStore s) =>
       EventSyncEngine(client(), s, now: tick);
@@ -38,25 +39,28 @@ void main() {
 
   group('merge', () {
     final base = Event(
-        uid: 'm',
-        summary: 'Base',
-        location: 'Here',
-        description: 'a\nb\nc',
-        dtstart: ICalDate('20261201T090000Z'),
-        categories: ['x'],
-        lastModified: DateTime.utc(2026, 11, 1));
+      uid: 'm',
+      summary: 'Base',
+      location: 'Here',
+      description: 'a\nb\nc',
+      dtstart: ICalDate('20261201T090000Z'),
+      categories: ['x'],
+      lastModified: DateTime.utc(2026, 11, 1),
+    );
 
     test('independent field edits combine', () {
       final l = base.copyWith(
-          dtend: ICalDate('20261201T100000Z'),
-          description: 'A\nb\nc',
-          categories: ['x', 'l'],
-          lastModified: DateTime.utc(2026, 11, 2));
+        dtend: ICalDate('20261201T100000Z'),
+        description: 'A\nb\nc',
+        categories: ['x', 'l'],
+        lastModified: DateTime.utc(2026, 11, 2),
+      );
       final r = base.copyWith(
-          location: 'There',
-          description: 'a\nb\nC',
-          categories: ['x', 'r'],
-          lastModified: DateTime.utc(2026, 11, 3));
+        location: 'There',
+        description: 'a\nb\nC',
+        categories: ['x', 'r'],
+        lastModified: DateTime.utc(2026, 11, 3),
+      );
       final m = mergeEvents(base, l, r);
       expect(m.hadConflict, isFalse);
       expect(m.event.dtend, ICalDate('20261201T100000Z'));
@@ -67,11 +71,13 @@ void main() {
 
     test('same field changed twice: later edit wins, loser reported', () {
       final l = base.copyWith(
-          dtstart: ICalDate('20261202T090000Z'),
-          lastModified: DateTime.utc(2026, 11, 5));
+        dtstart: ICalDate('20261202T090000Z'),
+        lastModified: DateTime.utc(2026, 11, 5),
+      );
       final r = base.copyWith(
-          dtstart: ICalDate('20261203T090000Z'),
-          lastModified: DateTime.utc(2026, 11, 4));
+        dtstart: ICalDate('20261203T090000Z'),
+        lastModified: DateTime.utc(2026, 11, 4),
+      );
       final m = mergeEvents(base, l, r);
       expect(m.event.dtstart!.value, '20261202T090000Z');
       expect(m.conflicts.single.what, 'start');
@@ -83,9 +89,10 @@ void main() {
       r.extraLines.add('X-FOO:1');
       r.siblingLines.addAll(['BEGIN:VEVENT', 'END:VEVENT']);
       final l = base.copyWith(
-          summary: 'L',
-          exdates: ['EXDATE:20261208T090000Z'],
-          lastModified: DateTime.utc(2026, 11, 2));
+        summary: 'L',
+        exdates: ['EXDATE:20261208T090000Z'],
+        lastModified: DateTime.utc(2026, 11, 2),
+      );
       final m = mergeEvents(base, l, r);
       expect(m.event.extraLines, ['X-FOO:1']);
       expect(m.event.siblingLines, hasLength(2));
@@ -110,7 +117,8 @@ void main() {
     test('put, get, conflict, delete', () async {
       final c = client();
       final stored = await c.putEvent(
-          Event(uid: 'a', summary: 'A', dtstart: ICalDate('20261201T090000Z')));
+        Event(uid: 'a', summary: 'A', dtstart: ICalDate('20261201T090000Z')),
+      );
       expect(server.ics['a.ics'], contains('BEGIN:VEVENT'));
       expect(stored.etag, isNotNull);
       expect((await c.getEvent('a.ics')).summary, 'A');
@@ -121,20 +129,24 @@ void main() {
       expect(server.ics, isEmpty);
     });
 
-    test('syncEvents, syncTasks and sync each keep their own component',
-        () async {
-      server.external('n.ics', serializeNote(Note(uid: 'n', summary: 'N')));
-      server.external('t.ics', tics('t', 'T'));
-      server.external('e.ics', eics('e', 'E'));
-      server.external('g.ics', google);
-      final skipped = <String?>[];
-      final c = client(onError: (h, e) => skipped.add(h));
-      expect((await c.syncEvents()).changed.map((x) => x.uid).toSet(),
-          {'e', 'e-1'});
-      expect((await c.syncTasks()).changed.map((x) => x.uid), ['t']);
-      expect((await c.sync()).changed.map((x) => x.uid), ['n']);
-      expect(skipped, isEmpty);
-    });
+    test(
+      'syncEvents, syncTasks and sync each keep their own component',
+      () async {
+        server.external('n.ics', serializeNote(Note(uid: 'n', summary: 'N')));
+        server.external('t.ics', tics('t', 'T'));
+        server.external('e.ics', eics('e', 'E'));
+        server.external('g.ics', google);
+        final skipped = <String?>[];
+        final c = client(onError: (h, e) => skipped.add(h));
+        expect((await c.syncEvents()).changed.map((x) => x.uid).toSet(), {
+          'e',
+          'e-1',
+        });
+        expect((await c.syncTasks()).changed.map((x) => x.uid), ['t']);
+        expect((await c.sync()).changed.map((x) => x.uid), ['n']);
+        expect(skipped, isEmpty);
+      },
+    );
 
     test('a task resource without VEVENT is skipped, not an error', () async {
       server.external('t.ics', nextcloud);
@@ -153,14 +165,21 @@ void main() {
           '${[for (final c in comps) '<c:comp name="$c"/>'].join()}'
           '</c:supported-calendar-component-set></d:prop>'
           '<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>';
-      final mock = MockClient((r) async => http.Response(
+      final mock = MockClient(
+        (r) async => http.Response(
           '<d:multistatus xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">'
           '${resp('all', ['VJOURNAL', 'VTODO', 'VEVENT'])}'
           '${resp('notes', ['VJOURNAL'])}'
           '${resp('cal', ['VEVENT'])}</d:multistatus>',
-          207));
-      final found = await CalDavClient.discover(Uri.parse('https://h/dav/u/'),
-          username: 'u', password: 'p', client: mock);
+          207,
+        ),
+      );
+      final found = await CalDavClient.discover(
+        Uri.parse('https://h/dav/u/'),
+        username: 'u',
+        password: 'p',
+        client: mock,
+      );
       expect(found.map((c) => c.holdsEvents), [true, false, true]);
       expect(found.map((c) => c.holdsNotes), [true, true, false]);
     });
@@ -183,7 +202,9 @@ void main() {
       expect(body, contains('BEGIN:VALARM'));
       expect(body, contains('X-FOO;X-P=1:bar'));
       expect(
-          body, contains('RECURRENCE-ID;TZID=Europe/Berlin:20261130T093000'));
+        body,
+        contains('RECURRENCE-ID;TZID=Europe/Berlin:20261130T093000'),
+      );
       expect(body, contains('BEGIN:VTIMEZONE'));
       expect(server.ics['n.ics'], contains('BEGIN:VJOURNAL'));
       expect(server.ics['t.ics'], tics('t', 'T'));
@@ -191,28 +212,35 @@ void main() {
       expect(r2.pulled + r2.pushed + r2.merged, 0);
     });
 
-    test('notes, tasks and events share a collection without interfering',
-        () async {
-      server.external('t.ics', tics('t', 'T'));
-      server.external('e.ics', eics('e', 'E'));
-      final ns = MemoryNoteStore(),
-          ts = MemoryTaskStore(),
-          es = MemoryEventStore();
-      final ne = nengine(ns), te = tengine(ts), ee = eengine(es);
-      await ne.save(Note(uid: 'n', summary: 'N'));
-      await te.save(Task(uid: 'tn', summary: 'New'));
-      await ee.save(Event(
-          uid: 'en', summary: 'New', dtstart: ICalDate('20261201T090000Z')));
-      for (var i = 0; i < 2; i++) {
-        await ne.sync();
-        await te.sync();
-        await ee.sync();
-      }
-      expect((await ne.notes()).map((n) => n.uid), ['n']);
-      expect((await te.tasks()).map((n) => n.uid).toSet(), {'t', 'tn'});
-      expect((await ee.events()).map((n) => n.uid).toSet(), {'e', 'en'});
-      expect(server.ics['e.ics'], eics('e', 'E'));
-    });
+    test(
+      'notes, tasks and events share a collection without interfering',
+      () async {
+        server.external('t.ics', tics('t', 'T'));
+        server.external('e.ics', eics('e', 'E'));
+        final ns = MemoryNoteStore(),
+            ts = MemoryTaskStore(),
+            es = MemoryEventStore();
+        final ne = nengine(ns), te = tengine(ts), ee = eengine(es);
+        await ne.save(Note(uid: 'n', summary: 'N'));
+        await te.save(Task(uid: 'tn', summary: 'New'));
+        await ee.save(
+          Event(
+            uid: 'en',
+            summary: 'New',
+            dtstart: ICalDate('20261201T090000Z'),
+          ),
+        );
+        for (var i = 0; i < 2; i++) {
+          await ne.sync();
+          await te.sync();
+          await ee.sync();
+        }
+        expect((await ne.notes()).map((n) => n.uid), ['n']);
+        expect((await te.tasks()).map((n) => n.uid).toSet(), {'t', 'tn'});
+        expect((await ee.events()).map((n) => n.uid).toSet(), {'e', 'en'});
+        expect(server.ics['e.ics'], eics('e', 'E'));
+      },
+    );
 
     test('remote delete, local delete', () async {
       server.external('a.ics', eics('a', 'A'));
@@ -226,24 +254,28 @@ void main() {
       expect(server.ics, isEmpty);
     });
 
-    test('overlapping edits merge field by field; conflict kept as revision',
-        () async {
-      server.external('a.ics', eics('a', 'A', extra: 'LOCATION:One\r\n'));
-      final s = MemoryEventStore();
-      final e = eengine(s);
-      await e.sync();
-      await e.save((await e.events()).single..summary = 'Local title');
-      server.external(
-          'a.ics', eics('a', 'Remote title', extra: 'LOCATION:Two\r\n'));
-      final r = await e.sync();
-      expect(r.merged, 1);
-      expect(r.conflicts.single.what, 'title');
-      final got = (await e.events()).single;
-      expect(got.location, 'Two');
-      expect(got.summary, 'Local title');
-      expect(server.ics['a.ics'], contains('SUMMARY:Local title'));
-      expect((await s.revisions('a')), hasLength(1));
-    });
+    test(
+      'overlapping edits merge field by field; conflict kept as revision',
+      () async {
+        server.external('a.ics', eics('a', 'A', extra: 'LOCATION:One\r\n'));
+        final s = MemoryEventStore();
+        final e = eengine(s);
+        await e.sync();
+        await e.save((await e.events()).single..summary = 'Local title');
+        server.external(
+          'a.ics',
+          eics('a', 'Remote title', extra: 'LOCATION:Two\r\n'),
+        );
+        final r = await e.sync();
+        expect(r.merged, 1);
+        expect(r.conflicts.single.what, 'title');
+        final got = (await e.events()).single;
+        expect(got.location, 'Two');
+        expect(got.summary, 'Local title');
+        expect(server.ics['a.ics'], contains('SUMMARY:Local title'));
+        expect((await s.revisions('a')), hasLength(1));
+      },
+    );
 
     test('store survives toJson and loadJson', () async {
       server.external('g.ics', google);
@@ -268,17 +300,21 @@ void main() {
       expect((await e.events()).length, 2);
     });
 
-    test('unparsable server copy: clean local event survives a full sync',
-        () async {
-      server.external('a.ics', eics('a', 'A'));
-      final e = eengine(MemoryEventStore());
-      await e.sync();
-      server.external('a.ics',
-          'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nSUMMARY:x\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n');
-      server.rejectTokens = true;
-      final r = await e.sync();
-      expect((await e.events()).single.summary, 'A');
-      expect(r.errors.single, contains('a.ics'));
-    });
+    test(
+      'unparsable server copy: clean local event survives a full sync',
+      () async {
+        server.external('a.ics', eics('a', 'A'));
+        final e = eengine(MemoryEventStore());
+        await e.sync();
+        server.external(
+          'a.ics',
+          'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nSUMMARY:x\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n',
+        );
+        server.rejectTokens = true;
+        final r = await e.sync();
+        expect((await e.events()).single.summary, 'A');
+        expect(r.errors.single, contains('a.ics'));
+      },
+    );
   });
 }

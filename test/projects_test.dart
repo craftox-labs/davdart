@@ -7,27 +7,32 @@ Note _f(String uid, String name, {String? parent, bool container = false}) =>
       summary: name,
       parentUid: parent,
       categories: [folderTag, if (container) projectsTag],
-      created:
-          DateTime.utc(2026, 1, 1).add(Duration(minutes: uid.hashCode % 50)),
+      created: DateTime.utc(
+        2026,
+        1,
+        1,
+      ).add(Duration(minutes: uid.hashCode % 50)),
     );
 
 Note _n(String uid, {String? parent, String? status}) => Note(
-      uid: uid,
-      summary: uid,
-      parentUid: parent,
-      description: status == null ? '' : 'status: $status\n\nx',
-    );
+  uid: uid,
+  summary: uid,
+  parentUid: parent,
+  description: status == null ? '' : 'status: $status\n\nx',
+);
 
-Task _t(String uid,
-        {String? parent,
-        String status = 'NEEDS-ACTION',
-        List<String> tags = const []}) =>
-    Task(
-        uid: uid,
-        summary: uid,
-        parentUid: parent,
-        status: status,
-        categories: tags);
+Task _t(
+  String uid, {
+  String? parent,
+  String status = 'NEEDS-ACTION',
+  List<String> tags = const [],
+}) => Task(
+  uid: uid,
+  summary: uid,
+  parentUid: parent,
+  status: status,
+  categories: tags,
+);
 
 void main() {
   group('derivation', () {
@@ -162,6 +167,66 @@ void main() {
       expect(r.open, 2); // out, t5
       expect(r.done, 1); // t6
       expect(r.review, 0);
+    });
+  });
+
+  group('parent map', () {
+    final notes = [
+      _f('c', 'Projects', container: true),
+      _f('a', 'A', parent: 'c'),
+      _f('sub', 'Sub', parent: 'a'),
+      _n('deep', parent: 'sub'),
+      _n('loose'),
+    ];
+    final tasks = [_t('t1', parent: 'sub'), _t('t2', parent: 't1')];
+    final events = [Event(uid: 'e1', summary: 'e1', parentUid: 't2')];
+    final ix = ProjectIndex(notes, tasks, events);
+
+    test('parentOf answers from the built map, notes first', () {
+      expect(ix.parentOf('deep'), 'sub');
+      expect(ix.parentOf('t1'), 'sub');
+      expect(ix.parentOf('e1'), 't2');
+      expect(ix.parentOf('loose'), isNull);
+      expect(ix.parentOf('gone'), isNull);
+    });
+
+    test('isUnder walks the chain across notes, tasks and events', () {
+      expect(ix.isUnder('e1', 'c'), isTrue);
+      expect(ix.isUnder('t1', 'sub'), isTrue);
+      expect(ix.isUnder('deep', 'deep'), isTrue, reason: 'the item itself');
+      expect(ix.isUnder('loose', 'c'), isFalse);
+      expect(ix.isUnder(null, 'c'), isFalse);
+    });
+
+    test('a parent loop ends instead of spinning', () {
+      final looped = ProjectIndex([_n('x', parent: 'y'), _n('y', parent: 'x')]);
+      expect(looped.isUnder('x', 'gone'), isFalse);
+      expect(looped.isUnder('x', 'y'), isTrue);
+    });
+
+    test('a few thousand items stay fast', () {
+      // A 4000-deep chain plus 4000 siblings: the old findItem walk did a
+      // list scan per step, so one lookup went quadratic and a page of them
+      // hung. The map walk is one step per ancestor.
+      final chain = <Note>[];
+      for (var i = 0; i < 4000; i++) {
+        chain.add(_n('c$i', parent: i == 0 ? null : 'c${i - 1}'));
+      }
+      for (var i = 0; i < 4000; i++) {
+        chain.add(_n('s$i'));
+      }
+      final clock = Stopwatch()..start();
+      final big = ProjectIndex(chain);
+      for (var i = 0; i < 4000; i++) {
+        expect(big.isUnder('c${3999 - i}', 'c0'), isTrue);
+      }
+      expect(big.isUnder('c3999', 'gone'), isFalse);
+      clock.stop();
+      expect(
+        clock.elapsedMilliseconds,
+        lessThan(2000),
+        reason: '4000 parent walks over 8000 items',
+      );
     });
   });
 

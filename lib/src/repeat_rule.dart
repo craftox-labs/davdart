@@ -72,9 +72,8 @@ class RepeatRule {
     if (parts.containsKey('UNTIL')) {
       // A date, or the end-of-day UTC form this class writes for timed
       // events; any other time stays a custom rule.
-      final m = RegExp(
-        r'^(\d{4})(\d{2})(\d{2})(T235959Z)?$',
-      ).firstMatch(parts['UNTIL']!);
+      final m = RegExp(r'^(\d{4})(\d{2})(\d{2})(T235959Z)?$')
+          .firstMatch(parts['UNTIL']!);
       if (m == null) return null;
       until = DateTime.utc(
         int.parse(m[1]!),

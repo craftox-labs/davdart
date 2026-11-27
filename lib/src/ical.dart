@@ -34,10 +34,10 @@ String fold(String line) {
     final n = ch.codeUnits.length == 1 && rune < 0x80
         ? 1
         : rune < 0x800
-            ? 2
-            : rune < 0x10000
-                ? 3
-                : 4;
+        ? 2
+        : rune < 0x10000
+        ? 3
+        : 4;
     final limit = first ? 75 : 74; // continuation lines start with a space
     if (octets + n > limit) {
       buf.write('\r\n ');
@@ -232,15 +232,17 @@ Note _journalFromLines(List<String> lines) {
       case 'RELATED-TO':
         // The first PARENT relation is the note's parent; any other relation
         // (CHILD, SIBLING, further parents) stays as a raw line.
-        final type = RegExp(r'RELTYPE="?([A-Za-z-]+)"?', caseSensitive: false)
-            .firstMatch(p.params)
-            ?.group(1)
-            ?.toUpperCase();
+        final type = RegExp(
+          r'RELTYPE="?([A-Za-z-]+)"?',
+          caseSensitive: false,
+        ).firstMatch(p.params)?.group(1)?.toUpperCase();
         if (parent == null &&
             p.value.trim().isNotEmpty &&
             p.params
                 .replaceAll(
-                    RegExp(r'RELTYPE="?[A-Za-z-]+"?', caseSensitive: false), '')
+                  RegExp(r'RELTYPE="?[A-Za-z-]+"?', caseSensitive: false),
+                  '',
+                )
                 .replaceAll(';', '')
                 .isEmpty &&
             (type == null || type == 'PARENT')) {
@@ -291,9 +293,9 @@ Note _journalFromLines(List<String> lines) {
 /// components are ignored. Use [parseNote] for a CalDAV resource you intend to
 /// write back.
 List<Note> parseNotes(String text) => [
-      for (final b in _splitCalendar(text).blocks)
-        if (b.type == 'VJOURNAL') _journalFromLines(b.lines),
-    ];
+  for (final b in _splitCalendar(text).blocks)
+    if (b.type == 'VJOURNAL') _journalFromLines(b.lines),
+];
 
 /// Parses one CalDAV resource into a single Note, keeping what a write-back
 /// must not lose: other VJOURNALs of the same resource (recurrence overrides)
@@ -304,18 +306,21 @@ Note parseNote(String text) {
   final cal = _splitCalendar(text);
   final journals = [
     for (final b in cal.blocks)
-      if (b.type == 'VJOURNAL') b
+      if (b.type == 'VJOURNAL') b,
   ];
   if (journals.isEmpty) throw ICalException('no VJOURNAL found');
   bool isOverride(_Block b) =>
       b.lines.any((l) => l.toUpperCase().startsWith('RECURRENCE-ID'));
-  final master =
-      journals.firstWhere((b) => !isOverride(b), orElse: () => journals.first);
+  final master = journals.firstWhere(
+    (b) => !isOverride(b),
+    orElse: () => journals.first,
+  );
   final note = _journalFromLines(master.lines);
   for (final b in cal.blocks) {
     if (identical(b, master)) continue;
-    (b.type == 'VJOURNAL' ? note.siblingLines : note.calendarLines)
-        .addAll(b.lines);
+    (b.type == 'VJOURNAL' ? note.siblingLines : note.calendarLines).addAll(
+      b.lines,
+    );
   }
   note.calendarLines.addAll(cal.looseLines);
   return note;
@@ -502,9 +507,9 @@ Task _todoFromLines(List<String> lines) {
 
 /// Parses every VTODO in an iCalendar document as its own Task.
 List<Task> parseTasks(String text) => [
-      for (final b in _splitCalendar(text).blocks)
-        if (b.type == 'VTODO') _todoFromLines(b.lines),
-    ];
+  for (final b in _splitCalendar(text).blocks)
+    if (b.type == 'VTODO') _todoFromLines(b.lines),
+];
 
 /// Parses one CalDAV resource into a single Task, keeping other VTODOs of the
 /// resource (recurrence overrides) in [Task.siblingLines] and VTIMEZONE and
@@ -514,18 +519,21 @@ Task parseTask(String text) {
   final cal = _splitCalendar(text);
   final todos = [
     for (final b in cal.blocks)
-      if (b.type == 'VTODO') b
+      if (b.type == 'VTODO') b,
   ];
   if (todos.isEmpty) throw ICalException('no VTODO found');
   bool isOverride(_Block b) =>
       b.lines.any((l) => l.toUpperCase().startsWith('RECURRENCE-ID'));
-  final master =
-      todos.firstWhere((b) => !isOverride(b), orElse: () => todos.first);
+  final master = todos.firstWhere(
+    (b) => !isOverride(b),
+    orElse: () => todos.first,
+  );
   final task = _todoFromLines(master.lines);
   for (final b in cal.blocks) {
     if (identical(b, master)) continue;
-    (b.type == 'VTODO' ? task.siblingLines : task.calendarLines)
-        .addAll(b.lines);
+    (b.type == 'VTODO' ? task.siblingLines : task.calendarLines).addAll(
+      b.lines,
+    );
   }
   task.calendarLines.addAll(cal.looseLines);
   return task;
@@ -720,9 +728,9 @@ Event _eventFromLines(List<String> lines) {
 
 /// Parses every VEVENT in an iCalendar document as its own Event.
 List<Event> parseEvents(String text) => [
-      for (final b in _splitCalendar(text).blocks)
-        if (b.type == 'VEVENT') _eventFromLines(b.lines),
-    ];
+  for (final b in _splitCalendar(text).blocks)
+    if (b.type == 'VEVENT') _eventFromLines(b.lines),
+];
 
 /// Parses one CalDAV resource into a single Event, keeping other VEVENTs of
 /// the resource (recurrence overrides) in [Event.siblingLines] and VTIMEZONE
@@ -732,18 +740,21 @@ Event parseEvent(String text) {
   final cal = _splitCalendar(text);
   final events = [
     for (final b in cal.blocks)
-      if (b.type == 'VEVENT') b
+      if (b.type == 'VEVENT') b,
   ];
   if (events.isEmpty) throw ICalException('no VEVENT found');
   bool isOverride(_Block b) =>
       b.lines.any((l) => l.toUpperCase().startsWith('RECURRENCE-ID'));
-  final master =
-      events.firstWhere((b) => !isOverride(b), orElse: () => events.first);
+  final master = events.firstWhere(
+    (b) => !isOverride(b),
+    orElse: () => events.first,
+  );
   final event = _eventFromLines(master.lines);
   for (final b in cal.blocks) {
     if (identical(b, master)) continue;
-    (b.type == 'VEVENT' ? event.siblingLines : event.calendarLines)
-        .addAll(b.lines);
+    (b.type == 'VEVENT' ? event.siblingLines : event.calendarLines).addAll(
+      b.lines,
+    );
   }
   event.calendarLines.addAll(cal.looseLines);
   return event;

@@ -14,8 +14,10 @@ class ICalDate {
   factory ICalDate.utc(DateTime d) {
     final u = d.toUtc();
     String t(int n, [int w = 2]) => n.toString().padLeft(w, '0');
-    return ICalDate('${t(u.year, 4)}${t(u.month)}${t(u.day)}T'
-        '${t(u.hour)}${t(u.minute)}${t(u.second)}Z');
+    return ICalDate(
+      '${t(u.year, 4)}${t(u.month)}${t(u.day)}T'
+      '${t(u.hour)}${t(u.minute)}${t(u.second)}Z',
+    );
   }
 
   /// An all-day date.
@@ -34,9 +36,10 @@ class ICalDate {
   bool get isUtc => value.endsWith('Z');
 
   /// The TZID parameter, or null.
-  String? get tzid => RegExp(r'TZID="?([^;":]+)"?', caseSensitive: false)
-      .firstMatch(params)
-      ?.group(1);
+  String? get tzid => RegExp(
+    r'TZID="?([^;":]+)"?',
+    caseSensitive: false,
+  ).firstMatch(params)?.group(1);
 
   /// The wall-clock fields as written, as a UTC-flagged [DateTime]: no zone
   /// is applied. Null if the value does not parse.
@@ -115,9 +118,10 @@ class ICalDate {
       if (z != null) x = LocalZone.wallIn(z, LocalZone.instantOf(w));
     }
     return ICalDate(
-        '${t(x.year, 4)}${t(x.month)}${t(x.day)}T${t(x.hour)}${t(x.minute)}'
-        '${t(x.second)}${like.isUtc ? 'Z' : ''}',
-        like.params);
+      '${t(x.year, 4)}${t(x.month)}${t(x.day)}T${t(x.hour)}${t(x.minute)}'
+      '${t(x.second)}${like.isUtc ? 'Z' : ''}',
+      like.params,
+    );
   }
 
   /// This value moved by [d] on the local wall clock (an all-day date moves
@@ -166,15 +170,15 @@ class Task {
     Map<String, String>? propertyParams,
     this.href,
     this.etag,
-  })  : categories = categories ?? <String>[],
-        created = created?.toUtc(),
-        lastModified = lastModified?.toUtc(),
-        completed = completed?.toUtc(),
-        dtstamp = (dtstamp ?? DateTime.now()).toUtc(),
-        extraLines = extraLines ?? <String>[],
-        calendarLines = calendarLines ?? <String>[],
-        siblingLines = siblingLines ?? <String>[],
-        propertyParams = propertyParams ?? <String, String>{};
+  }) : categories = categories ?? <String>[],
+       created = created?.toUtc(),
+       lastModified = lastModified?.toUtc(),
+       completed = completed?.toUtc(),
+       dtstamp = (dtstamp ?? DateTime.now()).toUtc(),
+       extraLines = extraLines ?? <String>[],
+       calendarLines = calendarLines ?? <String>[],
+       siblingLines = siblingLines ?? <String>[],
+       propertyParams = propertyParams ?? <String, String>{};
 
   final String uid;
   String summary;
@@ -327,31 +331,31 @@ class Task {
     String? parentUid,
     bool clearParent = false,
     DateTime? lastModified,
-  }) =>
-      Task(
-        uid: uid,
-        summary: summary ?? this.summary,
-        description: description ?? this.description,
-        categories: categories ?? List.of(this.categories),
-        status: clearStatus ? null : (status ?? this.status),
-        percentComplete:
-            clearPercent ? null : (percentComplete ?? this.percentComplete),
-        priority: clearPriority ? null : (priority ?? this.priority),
-        due: clearDue ? null : (due ?? this.due),
-        dtstart: clearStart ? null : (dtstart ?? this.dtstart),
-        completed: clearCompleted ? null : (completed ?? this.completed),
-        rrule: clearRrule ? null : (rrule ?? this.rrule),
-        parentUid: clearParent ? null : (parentUid ?? this.parentUid),
-        created: created,
-        lastModified: lastModified ?? this.lastModified,
-        dtstamp: dtstamp,
-        extraLines: List.of(extraLines),
-        calendarLines: List.of(calendarLines),
-        siblingLines: List.of(siblingLines),
-        propertyParams: Map.of(propertyParams),
-        href: href,
-        etag: etag,
-      );
+  }) => Task(
+    uid: uid,
+    summary: summary ?? this.summary,
+    description: description ?? this.description,
+    categories: categories ?? List.of(this.categories),
+    status: clearStatus ? null : (status ?? this.status),
+    percentComplete: clearPercent
+        ? null
+        : (percentComplete ?? this.percentComplete),
+    priority: clearPriority ? null : (priority ?? this.priority),
+    due: clearDue ? null : (due ?? this.due),
+    dtstart: clearStart ? null : (dtstart ?? this.dtstart),
+    completed: clearCompleted ? null : (completed ?? this.completed),
+    rrule: clearRrule ? null : (rrule ?? this.rrule),
+    parentUid: clearParent ? null : (parentUid ?? this.parentUid),
+    created: created,
+    lastModified: lastModified ?? this.lastModified,
+    dtstamp: dtstamp,
+    extraLines: List.of(extraLines),
+    calendarLines: List.of(calendarLines),
+    siblingLines: List.of(siblingLines),
+    propertyParams: Map.of(propertyParams),
+    href: href,
+    etag: etag,
+  );
 
   @override
   String toString() => 'Task($uid, "$summary")';

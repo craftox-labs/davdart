@@ -86,19 +86,24 @@ class TextMerge {
 /// Three-way line merge of [local] and [remote] against their common [base].
 /// Non-overlapping edits combine. Where both sides changed the same lines to
 /// different text, [preferLocal] picks the winner for that stretch only.
-TextMerge mergeText(String base, String local, String remote,
-    {required bool preferLocal}) {
+TextMerge mergeText(
+  String base,
+  String local,
+  String remote, {
+  required bool preferLocal,
+}) {
   if (local == remote) return TextMerge(local, []);
   if (local == base) return TextMerge(remote, []);
   if (remote == base) return TextMerge(local, []);
   final b = base.split('\n');
   final lh = _diff(b, local.split('\n'));
   final rh = _diff(b, remote.split('\n'));
-  final all = [
-    ...lh.map((h) => (h, true)),
-    ...rh.map((h) => (h, false)),
-  ]..sort((x, y) =>
-      x.$1.start != y.$1.start ? x.$1.start - y.$1.start : x.$1.end - y.$1.end);
+  final all = [...lh.map((h) => (h, true)), ...rh.map((h) => (h, false))]
+    ..sort(
+      (x, y) => x.$1.start != y.$1.start
+          ? x.$1.start - y.$1.start
+          : x.$1.end - y.$1.end,
+    );
   final out = <String>[];
   final conflicts = <MergeConflict>[];
   var pos = 0;
@@ -127,8 +132,9 @@ TextMerge mergeText(String base, String local, String remote,
         out.addAll(lt);
       } else {
         final win = preferLocal ? lt : rt;
-        conflicts.add(MergeConflict(
-            'text', lt.join('\n'), rt.join('\n'), win.join('\n')));
+        conflicts.add(
+          MergeConflict('text', lt.join('\n'), rt.join('\n'), win.join('\n')),
+        );
         out.addAll(win);
       }
     }
@@ -154,7 +160,10 @@ List<String> _oneStatus(List<String> tags, List<String> winner) {
   final all = tags.where((t) => t.startsWith('status-')).toList();
   if (all.length < 2) return tags;
   final keep = winner.firstWhere(all.contains, orElse: () => all.first);
-  return [for (final t in tags) if (!t.startsWith('status-') || t == keep) t];
+  return [
+    for (final t in tags)
+      if (!t.startsWith('status-') || t == keep) t,
+  ];
 }
 
 bool _sameMap(Map<String, String> a, Map<String, String> b) =>
@@ -207,8 +216,12 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
   final merged = remote.copyWith();
   merged.summary = scalar('title', base.summary, local.summary, remote.summary);
   merged.status = nullable('status', base.status, local.status, remote.status);
-  merged.parentUid =
-      nullable('parent', base.parentUid, local.parentUid, remote.parentUid);
+  merged.parentUid = nullable(
+    'parent',
+    base.parentUid,
+    local.parentUid,
+    remote.parentUid,
+  );
 
   // Raw lines this core does not model: take the side that changed them; if
   // both did, the winner's copy.
@@ -221,8 +234,8 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
     final pick = sameList(lx, bx)
         ? rx
         : sameList(rx, bx) || preferLocal
-            ? lx
-            : rx;
+        ? lx
+        : rx;
     merged.extraLines
       ..clear()
       ..addAll(pick);
@@ -233,8 +246,8 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
     final pick = _sameMap(local.propertyParams, base.propertyParams)
         ? remote.propertyParams
         : _sameMap(remote.propertyParams, base.propertyParams) || preferLocal
-            ? local.propertyParams
-            : remote.propertyParams;
+        ? local.propertyParams
+        : remote.propertyParams;
     final copy = Map.of(pick);
     merged.propertyParams
       ..clear()
@@ -251,7 +264,7 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
   }
   merged.categories = _oneStatus([
     for (final c in [...remote.categories, ...local.categories])
-      if (cats.remove(c)) c
+      if (cats.remove(c)) c,
   ], preferLocal ? local.categories : remote.categories);
 
   final fields = <String, String>{};
@@ -286,9 +299,10 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
     ..addAll(ordered);
   item.text = text.text;
   item.apply();
-  merged.lastModified = [lm, rm]
-      .whereType<DateTime>()
-      .fold<DateTime?>(null, (a, d) => a == null || d.isAfter(a) ? d : a);
+  merged.lastModified = [lm, rm].whereType<DateTime>().fold<DateTime?>(
+    null,
+    (a, d) => a == null || d.isAfter(a) ? d : a,
+  );
   return NoteMerge(merged, conflicts);
 }
 
@@ -330,17 +344,33 @@ TaskMerge mergeTasks(Task base, Task local, Task remote) {
   final merged = remote.copyWith();
   merged.summary = pick('title', base.summary, local.summary, remote.summary)!;
   merged.status = pick('status', base.status, local.status, remote.status);
-  merged.percentComplete = pick('percent', base.percentComplete,
-      local.percentComplete, remote.percentComplete);
-  merged.priority =
-      pick('priority', base.priority, local.priority, remote.priority);
+  merged.percentComplete = pick(
+    'percent',
+    base.percentComplete,
+    local.percentComplete,
+    remote.percentComplete,
+  );
+  merged.priority = pick(
+    'priority',
+    base.priority,
+    local.priority,
+    remote.priority,
+  );
   merged.due = pick('due', base.due, local.due, remote.due);
   merged.dtstart = pick('start', base.dtstart, local.dtstart, remote.dtstart);
-  merged.completed =
-      pick('completed', base.completed, local.completed, remote.completed);
+  merged.completed = pick(
+    'completed',
+    base.completed,
+    local.completed,
+    remote.completed,
+  );
   merged.rrule = pick('repeat', base.rrule, local.rrule, remote.rrule);
-  merged.parentUid =
-      pick('parent', base.parentUid, local.parentUid, remote.parentUid);
+  merged.parentUid = pick(
+    'parent',
+    base.parentUid,
+    local.parentUid,
+    remote.parentUid,
+  );
   if (merged.status != 'COMPLETED') merged.completed = null;
 
   // The rank line is a field of its own (last writer wins, no revision), so
@@ -352,8 +382,8 @@ TaskMerge mergeTasks(Task base, Task local, Task remote) {
     final src = sameList(lx, bx)
         ? rx
         : sameList(rx, bx) || preferLocal
-            ? lx
-            : rx;
+        ? lx
+        : rx;
     merged.extraLines
       ..clear()
       ..addAll(src);
@@ -364,8 +394,8 @@ TaskMerge mergeTasks(Task base, Task local, Task remote) {
     final src = _sameMap(local.propertyParams, base.propertyParams)
         ? remote.propertyParams
         : _sameMap(remote.propertyParams, base.propertyParams) || preferLocal
-            ? local.propertyParams
-            : remote.propertyParams;
+        ? local.propertyParams
+        : remote.propertyParams;
     final copy = Map.of(src);
     merged.propertyParams
       ..clear()
@@ -381,17 +411,21 @@ TaskMerge mergeTasks(Task base, Task local, Task remote) {
   }
   merged.categories = _oneStatus([
     for (final c in [...remote.categories, ...local.categories])
-      if (cats.remove(c)) c
+      if (cats.remove(c)) c,
   ], preferLocal ? local.categories : remote.categories);
 
   final text = mergeText(
-      base.description, local.description, remote.description,
-      preferLocal: preferLocal);
+    base.description,
+    local.description,
+    remote.description,
+    preferLocal: preferLocal,
+  );
   conflicts.addAll(text.conflicts);
   merged.description = text.text;
-  merged.lastModified = [lm, rm]
-      .whereType<DateTime>()
-      .fold<DateTime?>(null, (a, d) => a == null || d.isAfter(a) ? d : a);
+  merged.lastModified = [lm, rm].whereType<DateTime>().fold<DateTime?>(
+    null,
+    (a, d) => a == null || d.isAfter(a) ? d : a,
+  );
   return TaskMerge(merged, conflicts);
 }
 
@@ -421,8 +455,14 @@ EventMerge mergeEvents(Event base, Event local, Event remote) {
     if (l == b) return r;
     if (r == b) return l;
     final win = preferLocal ? l : r;
-    conflicts.add(MergeConflict(
-        what, l?.toString() ?? '', r?.toString() ?? '', win?.toString() ?? ''));
+    conflicts.add(
+      MergeConflict(
+        what,
+        l?.toString() ?? '',
+        r?.toString() ?? '',
+        win?.toString() ?? '',
+      ),
+    );
     return win;
   }
 
@@ -433,35 +473,55 @@ EventMerge mergeEvents(Event base, Event local, Event remote) {
   // Whole-list choice: the changed side wins; both changed: the later one.
   List<String> chooseList(List<String> b, List<String> l, List<String> r) {
     if (sameList(l, r)) return List.of(r);
-    return List.of(sameList(l, b)
-        ? r
-        : sameList(r, b) || preferLocal
-            ? l
-            : r);
+    return List.of(
+      sameList(l, b)
+          ? r
+          : sameList(r, b) || preferLocal
+          ? l
+          : r,
+    );
   }
 
   final merged = remote.copyWith();
   merged.summary = pick('title', base.summary, local.summary, remote.summary)!;
-  merged.location =
-      pick('location', base.location, local.location, remote.location)!;
+  merged.location = pick(
+    'location',
+    base.location,
+    local.location,
+    remote.location,
+  )!;
   merged.status = pick('status', base.status, local.status, remote.status);
   merged.dtstart = pick('start', base.dtstart, local.dtstart, remote.dtstart);
   merged.dtend = pick('end', base.dtend, local.dtend, remote.dtend);
-  merged.duration =
-      pick('duration', base.duration, local.duration, remote.duration);
+  merged.duration = pick(
+    'duration',
+    base.duration,
+    local.duration,
+    remote.duration,
+  );
   merged.rrule = pick('repeat', base.rrule, local.rrule, remote.rrule);
-  merged.parentUid =
-      pick('parent', base.parentUid, local.parentUid, remote.parentUid);
+  merged.parentUid = pick(
+    'parent',
+    base.parentUid,
+    local.parentUid,
+    remote.parentUid,
+  );
 
   merged.exdates = chooseList(base.exdates, local.exdates, remote.exdates);
   merged.rdates = chooseList(base.rdates, local.rdates, remote.rdates);
-  final extra =
-      chooseList(base.extraLines, local.extraLines, remote.extraLines);
+  final extra = chooseList(
+    base.extraLines,
+    local.extraLines,
+    remote.extraLines,
+  );
   merged.extraLines
     ..clear()
     ..addAll(extra);
-  final sib =
-      chooseList(base.siblingLines, local.siblingLines, remote.siblingLines);
+  final sib = chooseList(
+    base.siblingLines,
+    local.siblingLines,
+    remote.siblingLines,
+  );
   merged.siblingLines
     ..clear()
     ..addAll(sib);
@@ -469,8 +529,8 @@ EventMerge mergeEvents(Event base, Event local, Event remote) {
     final src = _sameMap(local.propertyParams, base.propertyParams)
         ? remote.propertyParams
         : _sameMap(remote.propertyParams, base.propertyParams) || preferLocal
-            ? local.propertyParams
-            : remote.propertyParams;
+        ? local.propertyParams
+        : remote.propertyParams;
     final copy = Map.of(src);
     merged.propertyParams
       ..clear()
@@ -486,16 +546,20 @@ EventMerge mergeEvents(Event base, Event local, Event remote) {
   }
   merged.categories = [
     for (final c in [...remote.categories, ...local.categories])
-      if (cats.remove(c)) c
+      if (cats.remove(c)) c,
   ];
 
   final text = mergeText(
-      base.description, local.description, remote.description,
-      preferLocal: preferLocal);
+    base.description,
+    local.description,
+    remote.description,
+    preferLocal: preferLocal,
+  );
   conflicts.addAll(text.conflicts);
   merged.description = text.text;
-  merged.lastModified = [lm, rm]
-      .whereType<DateTime>()
-      .fold<DateTime?>(null, (a, d) => a == null || d.isAfter(a) ? d : a);
+  merged.lastModified = [lm, rm].whereType<DateTime>().fold<DateTime?>(
+    null,
+    (a, d) => a == null || d.isAfter(a) ? d : a,
+  );
   return EventMerge(merged, conflicts);
 }

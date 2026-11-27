@@ -8,7 +8,7 @@ void main() {
     final dated = Note(uid: 'c', summary: 'A', created: DateTime.utc(2026));
     for (final order in [
       [a, b, dated],
-      [b, dated, a]
+      [b, dated, a],
     ]) {
       final roots = NoteTree.build(order).roots.map((n) => n.note.uid);
       expect(roots, ['a', 'b', 'c']);

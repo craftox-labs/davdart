@@ -9,12 +9,13 @@ import 'dart:math';
 /// collection, item, writer, arguments and a BEFORE snapshot of the item as
 /// ICS). Nothing here ever sees the bearer token or the CalDAV password.
 class HistoryLog {
-  HistoryLog(this.path,
-      {DateTime Function()? now,
-      this.maxLine = 262144,
-      this.maxBefore = 100000,
-      this.maxArg = 4000})
-      : _now = now ?? DateTime.now;
+  HistoryLog(
+    this.path, {
+    DateTime Function()? now,
+    this.maxLine = 262144,
+    this.maxBefore = 100000,
+    this.maxArg = 4000,
+  }) : _now = now ?? DateTime.now;
 
   final String path;
   final DateTime Function() _now;
@@ -53,8 +54,10 @@ class HistoryLog {
   Map<String, Object?> cleanArgs(Map<String, dynamic> args) {
     final out = <String, Object?>{};
     args.forEach((k, v) {
-      if (RegExp(r'token|password|secret|authorization', caseSensitive: false)
-          .hasMatch(k)) {
+      if (RegExp(
+        r'token|password|secret|authorization',
+        caseSensitive: false,
+      ).hasMatch(k)) {
         return;
       }
       out[k] = v is String ? _clip(v, maxArg) : v;
@@ -66,7 +69,8 @@ class HistoryLog {
   /// is a list of ICS texts, each clipped. Throws when the file cannot be
   /// written: the caller must then refuse the write.
   String append(Map<String, Object?> entry) {
-    final id = '${_now().toUtc().microsecondsSinceEpoch.toRadixString(36)}'
+    final id =
+        '${_now().toUtc().microsecondsSinceEpoch.toRadixString(36)}'
         '${_rand.nextInt(1 << 20).toRadixString(36)}';
     final e = <String, Object?>{
       'id': id,
@@ -76,7 +80,7 @@ class HistoryLog {
     final before = e['before'];
     if (before is List) {
       e['before'] = [
-        for (final b in before) b is String ? _clip(b, maxBefore) : b
+        for (final b in before) b is String ? _clip(b, maxBefore) : b,
       ];
     }
     var line = jsonEncode(e);
@@ -85,22 +89,23 @@ class HistoryLog {
       if (e['before'] is List) {
         e['before'] = [
           for (final b in e['before'] as List)
-            b is String ? _clip(b, maxLine ~/ 4) : b
+            b is String ? _clip(b, maxLine ~/ 4) : b,
         ];
       }
       line = jsonEncode(e);
       if (line.length > maxLine && e['args'] is Map) {
         e['args'] = {
           for (final en in (e['args'] as Map).entries)
-            en.key:
-                en.value is String ? _clip(en.value as String, 200) : en.value
+            en.key: en.value is String
+                ? _clip(en.value as String, 200)
+                : en.value,
         };
         line = jsonEncode(e);
       }
       if (line.length > maxLine) {
         e['before'] = [
           for (final b in (e['before'] as List? ?? const []))
-            b is String ? _clip(b, 2000) : b
+            b is String ? _clip(b, 2000) : b,
         ];
         e['truncated'] = true;
         line = jsonEncode(e);
@@ -116,8 +121,12 @@ class HistoryLog {
   /// Recent entries, newest first, optionally only those about [collection]
   /// and [item] (uid, href or exact title, case-insensitive). Bodies (the
   /// BEFORE snapshots and long arguments) are left out unless [bodies].
-  List<Map<String, Object?>> read(
-      {String? collection, String? item, int limit = 20, bool bodies = false}) {
+  List<Map<String, Object?>> read({
+    String? collection,
+    String? item,
+    int limit = 20,
+    bool bodies = false,
+  }) {
     final f = File(path);
     if (!f.existsSync()) return [];
     const tail = 16 * 1024 * 1024;
@@ -144,10 +153,14 @@ class HistoryLog {
       }
       if (collection != null && m['collection'] != collection) continue;
       if (low != null &&
-          !{m['uid'], m['href'], m['title']}
-              .any((v) => v is String && v.toLowerCase() == low) &&
-          !((m['children'] as List?) ?? const [])
-              .any((c) => c is Map && '${c['uid']}'.toLowerCase() == low)) {
+          !{
+            m['uid'],
+            m['href'],
+            m['title'],
+          }.any((v) => v is String && v.toLowerCase() == low) &&
+          !((m['children'] as List?) ?? const []).any(
+            (c) => c is Map && '${c['uid']}'.toLowerCase() == low,
+          )) {
         continue;
       }
       if (!bodies) {
@@ -159,7 +172,7 @@ class HistoryLog {
             for (final en in args.entries)
               en.key: en.value is String && (en.value as String).length > 200
                   ? '${(en.value as String).substring(0, 200)}...'
-                  : en.value
+                  : en.value,
           };
         }
       }

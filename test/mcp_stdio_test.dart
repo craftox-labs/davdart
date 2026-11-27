@@ -28,20 +28,27 @@ void main() {
     // `dart run` can take longer than the default 5s discovery probe to start
     // the server under load; a timeout makes the client fall back to
     // `initialize`, which the already-stateless server rejects.
-    final client = McpClient(const Implementation(name: 't', version: '1'),
-        options: const McpClientOptions(
-            legacyDiscoveryTimeout: Duration(seconds: 60)));
-    await client.connect(StdioClientTransport(StdioServerParameters(
-      command: Platform.resolvedExecutable,
-      args: ['run', 'bin/davdart_mcp.dart', '--stdio', ...flags],
-      environment: {
-        'DAVDART_CONFIG': '${tmp.path}/none',
-        'DAVDART_URL': dav.collectionUrl,
-        'DAVDART_USER': 'u',
-        'DAVDART_PASSWORD': 'p',
-      },
-      stderrMode: ProcessStartMode.normal,
-    )));
+    final client = McpClient(
+      const Implementation(name: 't', version: '1'),
+      options: const McpClientOptions(
+        legacyDiscoveryTimeout: Duration(seconds: 60),
+      ),
+    );
+    await client.connect(
+      StdioClientTransport(
+        StdioServerParameters(
+          command: Platform.resolvedExecutable,
+          args: ['run', 'bin/davdart_mcp.dart', '--stdio', ...flags],
+          environment: {
+            'DAVDART_CONFIG': '${tmp.path}/none',
+            'DAVDART_URL': dav.collectionUrl,
+            'DAVDART_USER': 'u',
+            'DAVDART_PASSWORD': 'p',
+          },
+          stderrMode: ProcessStartMode.normal,
+        ),
+      ),
+    );
     addTearDown(client.close);
     return client;
   }
@@ -67,7 +74,7 @@ void main() {
     final made = await call(c, 'create', {
       'kind': 'task',
       'title': 'From stdio',
-      'tags': ['x']
+      'tags': ['x'],
     });
     expect(made['item']['title'], 'From stdio');
     expect(fake.ics, hasLength(1));
@@ -85,39 +92,43 @@ void main() {
   }, timeout: const Timeout(Duration(seconds: 120)));
 
   test('admin without --backup-dir refuses to start', () async {
-    final r = await Process.run(Platform.resolvedExecutable, [
-      'run',
-      'bin/davdart_mcp.dart',
-      '--tools',
-      'admin'
-    ], environment: {
-      'DAVDART_CONFIG': '${tmp.path}/none',
-      'DAVDART_URL': dav.collectionUrl,
-      'DAVDART_USER': 'u',
-      'DAVDART_PASSWORD': 'p',
-    });
+    final r = await Process.run(
+      Platform.resolvedExecutable,
+      ['run', 'bin/davdart_mcp.dart', '--tools', 'admin'],
+      environment: {
+        'DAVDART_CONFIG': '${tmp.path}/none',
+        'DAVDART_URL': dav.collectionUrl,
+        'DAVDART_USER': 'u',
+        'DAVDART_PASSWORD': 'p',
+      },
+    );
     expect(r.exitCode, 2);
     expect(r.stderr, contains('--backup-dir'));
   }, timeout: const Timeout(Duration(seconds: 90)));
 
-  test('HTTP without a token refuses to start and never echoes secrets',
-      () async {
-    final env = {
-      'DAVDART_CONFIG': '${tmp.path}/none',
-      'DAVDART_URL': dav.collectionUrl,
-      'DAVDART_USER': 'u',
-      'DAVDART_PASSWORD': 'p-secret',
-    };
-    for (final args in [
-      ['--http', '0'],
-      ['--http', '0', '--token-env', 'NOPE_UNSET'],
-    ]) {
-      final r = await Process.run(
-          Platform.resolvedExecutable, ['run', 'bin/davdart_mcp.dart', ...args],
-          environment: env);
-      expect(r.exitCode, 2);
-      expect(r.stderr, contains('token'));
-      expect('${r.stderr}${r.stdout}', isNot(contains('p-secret')));
-    }
-  }, timeout: const Timeout(Duration(seconds: 90)));
+  test(
+    'HTTP without a token refuses to start and never echoes secrets',
+    () async {
+      final env = {
+        'DAVDART_CONFIG': '${tmp.path}/none',
+        'DAVDART_URL': dav.collectionUrl,
+        'DAVDART_USER': 'u',
+        'DAVDART_PASSWORD': 'p-secret',
+      };
+      for (final args in [
+        ['--http', '0'],
+        ['--http', '0', '--token-env', 'NOPE_UNSET'],
+      ]) {
+        final r = await Process.run(Platform.resolvedExecutable, [
+          'run',
+          'bin/davdart_mcp.dart',
+          ...args,
+        ], environment: env);
+        expect(r.exitCode, 2);
+        expect(r.stderr, contains('token'));
+        expect('${r.stderr}${r.stdout}', isNot(contains('p-secret')));
+      }
+    },
+    timeout: const Timeout(Duration(seconds: 90)),
+  );
 }

@@ -29,8 +29,10 @@ class NoteTree {
     return t != 0 ? t : a.uid.compareTo(b.uid);
   }
 
-  factory NoteTree.build(Iterable<Note> notes,
-      {int Function(Note, Note)? compare}) {
+  factory NoteTree.build(
+    Iterable<Note> notes, {
+    int Function(Note, Note)? compare,
+  }) {
     final cmp = compare ?? byCreated;
     final nodes = {for (final n in notes) n.uid: NoteNode(n)};
     // Attach in uid order so every device breaks a loop at the same place.
@@ -45,7 +47,7 @@ class NoteTree {
     }
     final roots = [
       for (final n in nodes.values)
-        if (n.parent == null) n
+        if (n.parent == null) n,
     ];
     void sortAll(List<NoteNode> l) {
       l.sort((a, b) => cmp(a.note, b.note));
