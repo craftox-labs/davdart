@@ -63,8 +63,9 @@ class MemoryTaskStore implements TaskStore {
   }
 
   @override
-  Future<List<StoredTask>> all() async =>
-      [for (final s in _tasks.values) _cloneStored(s)];
+  Future<List<StoredTask>> all() async => [
+        for (final s in _tasks.values) _cloneStored(s),
+      ];
 
   @override
   Future<void> put(String uid, StoredTask s) async {
@@ -97,8 +98,11 @@ class MemoryTaskStore implements TaskStore {
   Future<List<Revision>> revisions(String uid) async =>
       _revisions.where((r) => r.uid == uid).toList();
 
-  static Map<String, Object?> _encode(Task n) =>
-      {'ics': serializeTask(n), 'href': n.href, 'etag': n.etag};
+  static Map<String, Object?> _encode(Task n) => {
+        'ics': serializeTask(n),
+        'href': n.href,
+        'etag': n.etag,
+      };
 
   static Task _decode(Map<String, dynamic> m) => parseTask(m['ics'] as String)
     ..href = m['href'] as String?
@@ -116,7 +120,7 @@ class MemoryTaskStore implements TaskStore {
               'base': e.value.base == null ? null : _encode(e.value.base!),
               'dirty': e.value.dirty,
               'deleted': e.value.deleted,
-            }
+            },
         },
         'revisions': [
           for (final r in _revisions)
@@ -126,7 +130,7 @@ class MemoryTaskStore implements TaskStore {
               'reason': r.reason,
               'summary': r.summary,
               'body': r.body,
-            }
+            },
         ],
       };
 
@@ -148,13 +152,15 @@ class MemoryTaskStore implements TaskStore {
     }
     for (final r in j['revisions'] as List<dynamic>) {
       final m = r as Map<String, dynamic>;
-      _revisions.add(Revision(
-        uid: m['uid'] as String,
-        at: DateTime.parse(m['at'] as String),
-        reason: m['reason'] as String,
-        summary: m['summary'] as String,
-        body: m['body'] as String,
-      ));
+      _revisions.add(
+        Revision(
+          uid: m['uid'] as String,
+          at: DateTime.parse(m['at'] as String),
+          reason: m['reason'] as String,
+          summary: m['summary'] as String,
+          body: m['body'] as String,
+        ),
+      );
     }
   }
 }

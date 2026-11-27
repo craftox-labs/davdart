@@ -184,11 +184,15 @@ class Event {
 /// does not parse.
 Duration? parseIcalDuration(String v) {
   final m = RegExp(
-          r'^([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$')
-      .firstMatch(v.trim().toUpperCase());
+    r'^([+-])?P(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$',
+  ).firstMatch(v.trim().toUpperCase());
   if (m == null || v.trim().length < 3) return null;
   int g(int i) => int.tryParse(m.group(i) ?? '') ?? 0;
   final d = Duration(
-      days: g(2) * 7 + g(3), hours: g(4), minutes: g(5), seconds: g(6));
+    days: g(2) * 7 + g(3),
+    hours: g(4),
+    minutes: g(5),
+    seconds: g(6),
+  );
   return m.group(1) == '-' ? -d : d;
 }

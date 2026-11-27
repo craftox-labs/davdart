@@ -16,19 +16,23 @@ void main() {
     err = StringBuffer();
   });
 
-  Future<int> cli(List<String> args,
-          {String stdinText = '', Map<String, String> env = const {}}) =>
-      runCli(args,
-          config: {
-            'url': FakeCalDav.collection.toString(),
-            'user': 'u',
-            'password': 'p'
-          },
-          env: env,
-          out: out,
-          err: err,
-          readStdin: () async => stdinText,
-          httpClient: fake.client);
+  Future<int> cli(
+    List<String> args, {
+    String stdinText = '',
+    Map<String, String> env = const {},
+  }) => runCli(
+    args,
+    config: {
+      'url': FakeCalDav.collection.toString(),
+      'user': 'u',
+      'password': 'p',
+    },
+    env: env,
+    out: out,
+    err: err,
+    readStdin: () async => stdinText,
+    httpClient: fake.client,
+  );
 
   Future<Map<String, dynamic>> jcli(List<String> args) async {
     out.clear();
@@ -38,8 +42,16 @@ void main() {
 
   group('argument parsing', () {
     test('flags, value options, = form and repeats', () {
-      final p = Parsed.parse(
-          ['list', '--json', '--tag', 'a', '--tag=b', '--limit', '5', 'x']);
+      final p = Parsed.parse([
+        'list',
+        '--json',
+        '--tag',
+        'a',
+        '--tag=b',
+        '--limit',
+        '5',
+        'x',
+      ]);
       expect(p.positional, ['list', 'x']);
       expect(p.flag('json'), isTrue);
       expect(p.all('tag'), ['a', 'b']);
@@ -57,37 +69,42 @@ void main() {
   });
 
   group('--collection', () {
-    test('default unchanged, second collection reachable, unknown refused',
-        () async {
-      final other = FakeCalDav();
-      Future<int> run(List<String> a) => runCli(a,
+    test(
+      'default unchanged, second collection reachable, unknown refused',
+      () async {
+        final other = FakeCalDav();
+        Future<int> run(List<String> a) => runCli(
+          a,
           config: {
             'url': FakeCalDav.collection.toString(),
             'user': 'u',
-            'password': 'p'
+            'password': 'p',
           },
           env: const {},
           out: out,
           err: err,
           readStdin: () async => '',
-          httpClient: multiHome(fake, other));
-      expect(await run(['create', 'A', '--kind', 'note']), 0, reason: '$err');
-      expect(
+          httpClient: multiHome(fake, other),
+        );
+        expect(await run(['create', 'A', '--kind', 'note']), 0, reason: '$err');
+        expect(
           await run(['create', 'B', '--kind', 'note', '--collection', 'Other']),
           0,
-          reason: '$err');
-      expect(fake.ics, hasLength(1));
-      expect(other.ics, hasLength(1));
-      out.clear();
-      expect(await run(['list', '--collection', '/dav/d/', '--json']), 0);
-      expect(out.toString(), contains('"B"'));
-      expect(out.toString(), isNot(contains('"A"')));
-      for (final bad in ['Nope', '../x/', 'https://evil.test/dav/d/']) {
-        err.clear();
-        expect(await run(['list', '--collection', bad]), 1, reason: bad);
-        expect(err.toString(), contains('no collection'));
-      }
-    });
+          reason: '$err',
+        );
+        expect(fake.ics, hasLength(1));
+        expect(other.ics, hasLength(1));
+        out.clear();
+        expect(await run(['list', '--collection', '/dav/d/', '--json']), 0);
+        expect(out.toString(), contains('"B"'));
+        expect(out.toString(), isNot(contains('"A"')));
+        for (final bad in ['Nope', '../x/', 'https://evil.test/dav/d/']) {
+          err.clear();
+          expect(await run(['list', '--collection', bad]), 1, reason: bad);
+          expect(err.toString(), contains('no collection'));
+        }
+      },
+    );
   });
 
   group('access flags', () {
@@ -112,9 +129,12 @@ void main() {
 
     test('DAVDART_READ_ONLY=1 acts as --read-only', () async {
       expect(
-          await cli(['create', 'T', '--kind', 'note'],
-              env: {'DAVDART_READ_ONLY': '1'}),
-          3);
+        await cli(
+          ['create', 'T', '--kind', 'note'],
+          env: {'DAVDART_READ_ONLY': '1'},
+        ),
+        3,
+      );
       expect(fake.ics, isEmpty);
     });
 
@@ -129,8 +149,11 @@ void main() {
         err.clear();
         expect(await cli([...c, '--allow-admin', '--read-only']), 3);
       }
-      expect(fake.log.where((l) => !l.startsWith('GET')), isEmpty,
-          reason: 'refused before any request');
+      expect(
+        fake.log.where((l) => !l.startsWith('GET')),
+        isEmpty,
+        reason: 'refused before any request',
+      );
     });
 
     test('refusals are JSON with --json', () async {
@@ -155,7 +178,7 @@ void main() {
         '--due',
         '2026-12-01',
         '--priority',
-        '2'
+        '2',
       ]);
       final tid = (t['item'] as Map)['uid'] as String;
       expect((t['item'] as Map)['due'], '20261201');
@@ -187,9 +210,11 @@ void main() {
       err.clear();
       expect(await cli(['status', id, 'wip']), 1);
       expect(
-          err.toString(),
-          contains(
-              'allowed: backlog, todo, doing, blocked, review, done, canceled'));
+        err.toString(),
+        contains(
+          'allowed: backlog, todo, doing, blocked, review, done, canceled',
+        ),
+      );
       err.clear();
       expect(await cli(['new', 'W', '--status', 'wip']), 1);
       expect(err.toString(), contains('unknown status "wip"'));
@@ -208,8 +233,14 @@ void main() {
       expect(out.toString(), contains('priority: 9'));
       p = await jcli(['priority', id, 'none']);
       expect((p['item'] as Map).containsKey('priority'), isFalse);
-      final c =
-          await jcli(['create', 'M', '--kind', 'note', '--priority', '5']);
+      final c = await jcli([
+        'create',
+        'M',
+        '--kind',
+        'note',
+        '--priority',
+        '5',
+      ]);
       expect((c['item'] as Map)['priority'], 5);
     });
 
@@ -220,16 +251,24 @@ void main() {
     });
 
     test('create reads the body from stdin with --stdin', () async {
-      await cli(['create', 'T', '--kind', 'note', '--stdin'],
-          stdinText: 'hello body');
+      await cli([
+        'create',
+        'T',
+        '--kind',
+        'note',
+        '--stdin',
+      ], stdinText: 'hello body');
       out.clear();
       await cli(['get', 'T']);
       expect(out.toString(), contains('hello body'));
     });
 
     test('collections delete of an unknown collection fails', () async {
-      expect(await cli(['collections', 'delete', 'x', '--allow-admin']), 1,
-          reason: 'collection lookup fails first');
+      expect(
+        await cli(['collections', 'delete', 'x', '--allow-admin']),
+        1,
+        reason: 'collection lookup fails first',
+      );
     });
   });
 
@@ -262,9 +301,16 @@ void main() {
 
     test('new with plan header and task', () async {
       expect(
-          await cli(['new', 'Plan', '--id', 'D-1', '--owner', 'tm'],
-              stdinText: 'text'),
-          0);
+        await cli([
+          'new',
+          'Plan',
+          '--id',
+          'D-1',
+          '--owner',
+          'tm',
+        ], stdinText: 'text'),
+        0,
+      );
       out.clear();
       await cli(['board']);
       expect(out.toString(), contains('== backlog (1)'));
@@ -274,20 +320,33 @@ void main() {
       expect(out.toString(), startsWith('created task '));
     });
 
-    test('board: Other column for unknown words, board order inside',
-        () async {
+    test('board: Other column for unknown words, board order inside', () async {
       for (final n in ['a', 'b', 'c']) {
         await jcli(['create', n, '--kind', 'note', '--status', 'todo']);
       }
       await jcli(['rank', 'c', 'top']);
       expect(
-          await cli(['create', 'W', '--kind', 'note', '--body',
-              'status: waiting\n\nx']),
-          0);
+        await cli([
+          'create',
+          'W',
+          '--kind',
+          'note',
+          '--body',
+          'status: waiting\n\nx',
+        ]),
+        0,
+      );
       expect(
-          await cli(['create', 'V', '--kind', 'note', '--body',
-              'status: someday\n\nx']),
-          0);
+        await cli([
+          'create',
+          'V',
+          '--kind',
+          'note',
+          '--body',
+          'status: someday\n\nx',
+        ]),
+        0,
+      );
       out.clear();
       expect(await cli(['board']), 0);
       final text = out.toString();
@@ -297,17 +356,26 @@ void main() {
       expect(text, isNot(contains('== someday')));
       expect(text.indexOf('== todo'), lessThan(text.indexOf('== other')));
       final col = text.substring(
-          text.indexOf('== todo'), text.indexOf('== other'));
+        text.indexOf('== todo'),
+        text.indexOf('== other'),
+      );
       expect(col.indexOf('\n  c\n'), lessThan(col.indexOf('\n  b\n')));
     });
   });
 
   group('rank', () {
     Future<List<String>> order(String status) async => [
-          for (final i in (await jcli(
-              ['list', '--kind', 'task', '--status', status]))['items'] as List)
-            (i as Map)['title'] as String
-        ];
+      for (final i
+          in (await jcli([
+                'list',
+                '--kind',
+                'task',
+                '--status',
+                status,
+              ]))['items']
+              as List)
+        (i as Map)['title'] as String,
+    ];
     test('top, bottom, before, after, none, errors, read-only', () async {
       for (final n in ['a', 'b', 'c']) {
         await jcli(['create', n, '--kind', 'task', '--status', 'todo']);

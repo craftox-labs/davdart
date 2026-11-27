@@ -83,39 +83,17 @@ class HomePage extends StatelessWidget {
     );
 
     // --- Projects, most recently changed first ---
-    final changed = <String, DateTime>{};
-    void touch(String uid, DateTime? at) {
-      if (at == null) return;
-      final p = ix.projectOf(uid);
-      if (p == null) return;
-      final cur = changed[p.uid];
-      if (cur == null || at.isAfter(cur)) changed[p.uid] = at;
-    }
-
-    for (final n in state.notes) {
-      touch(n.uid, n.lastModified ?? n.dtstamp);
-    }
-    for (final k in state.tasks) {
-      touch(k.uid, k.lastModified ?? k.dtstamp);
-    }
-    for (final e in state.events) {
-      touch(e.uid, e.lastModified ?? e.dtstamp);
-    }
-    final projects = [...ix.projects()]
-      ..sort((a, b) {
-        final x = changed[a.uid], y = changed[b.uid];
-        if (x == null && y == null) return 0;
-        if (x == null) return 1;
-        if (y == null) return -1;
-        return y.compareTo(x);
-      });
+    // The index already holds the last-changed map and the order; it is
+    // rebuilt only when the Space changes, so a rebuild reads it, not the
+    // whole Space.
+    final projects = ix.projectsByLastChanged();
 
     Future<void> openProject(String uid) =>
         state.guarded(() => state.openProjectTab(uid));
 
     Widget projectRow(Note p) {
       final s = ix.statsOf(p.uid);
-      final at = changed[p.uid];
+      final at = ix.lastChangedOf(p.uid);
       final name = p.summary.isEmpty ? 'Untitled' : p.summary;
       final last = at == null
           ? 'No changes yet'

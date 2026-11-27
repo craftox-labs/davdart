@@ -52,14 +52,17 @@ String ev(String body, {String uid = 'x'}) =>
     'DTSTAMP:20261101T080000Z\r\n$body'
     'END:VEVENT\r\nEND:VCALENDAR\r\n';
 
-Event e(String start, String rule, {String extra = ''}) =>
-    parseEvent(ev('DTSTART:$start\r\n${rule.isEmpty ? '' : 'RRULE:$rule\r\n'}'
-        '$extra'));
+Event e(String start, String rule, {String extra = ''}) => parseEvent(
+  ev(
+    'DTSTART:$start\r\n${rule.isEmpty ? '' : 'RRULE:$rule\r\n'}'
+    '$extra',
+  ),
+);
 
 List<String> days(Event ev, DateTime from, DateTime to) => [
-      for (final o in occurrencesBetween(ev, from, to))
-        '${o.start.month}-${o.start.day}'
-    ];
+  for (final o in occurrencesBetween(ev, from, to))
+    '${o.start.month}-${o.start.day}',
+];
 
 void main() {
   group('model', () {
@@ -79,8 +82,10 @@ void main() {
       expect(v.parentUid, 'parent-9');
       expect(v.extraLines, contains('BEGIN:VALARM'));
       expect(v.extraLines, contains('TRANSP:OPAQUE'));
-      expect(v.siblingLines,
-          contains('RECURRENCE-ID;TZID=Europe/Berlin:20261130T093000'));
+      expect(
+        v.siblingLines,
+        contains('RECURRENCE-ID;TZID=Europe/Berlin:20261130T093000'),
+      );
       expect(v.calendarLines, contains('BEGIN:VTIMEZONE'));
       expect(v.calendarLines, contains('X-WR-CALNAME:Work'));
       expect(v.isRecurring, isTrue);
@@ -106,21 +111,33 @@ void main() {
 
     test('all-day, UTC, duration and copyWith', () {
       final a = parseEvent(
-          ev('DTSTART;VALUE=DATE:20261224\r\nDTEND;VALUE=DATE:20261226\r\n'));
+        ev('DTSTART;VALUE=DATE:20261224\r\nDTEND;VALUE=DATE:20261226\r\n'),
+      );
       expect(a.allDay, isTrue);
       expect(a.length, const Duration(days: 2));
-      final b =
-          parseEvent(ev('DTSTART:20261224T100000Z\r\nDURATION:P1DT2H\r\n'));
+      final b = parseEvent(
+        ev('DTSTART:20261224T100000Z\r\nDURATION:P1DT2H\r\n'),
+      );
       expect(b.dtstart!.isUtc, isTrue);
       final l = DateTime.utc(2026, 12, 24, 10).toLocal();
       expect(
-          b.endWall,
-          DateTime.utc(l.year, l.month, l.day, l.hour)
-              .add(const Duration(hours: 26)));
-      expect(parseEvent(ev('DTSTART;VALUE=DATE:20261224\r\n')).length,
-          const Duration(days: 1));
-      final c =
-          b.copyWith(summary: 'S', clearDuration: true, rrule: 'FREQ=DAILY');
+        b.endWall,
+        DateTime.utc(
+          l.year,
+          l.month,
+          l.day,
+          l.hour,
+        ).add(const Duration(hours: 26)),
+      );
+      expect(
+        parseEvent(ev('DTSTART;VALUE=DATE:20261224\r\n')).length,
+        const Duration(days: 1),
+      );
+      final c = b.copyWith(
+        summary: 'S',
+        clearDuration: true,
+        rrule: 'FREQ=DAILY',
+      );
       expect(c.summary, 'S');
       expect(c.duration, isNull);
       expect(c.rrule, 'FREQ=DAILY');
@@ -129,10 +146,14 @@ void main() {
     });
 
     test('parseEvent needs a VEVENT and a UID; types do not mix', () {
-      expect(() => parseEvent(serializeNote(Note(uid: 'n'))),
-          throwsA(isA<ICalException>()));
-      expect(() => parseEvent(ev('X:1\r\n', uid: '')),
-          throwsA(isA<ICalException>()));
+      expect(
+        () => parseEvent(serializeNote(Note(uid: 'n'))),
+        throwsA(isA<ICalException>()),
+      );
+      expect(
+        () => parseEvent(ev('X:1\r\n', uid: '')),
+        throwsA(isA<ICalException>()),
+      );
       expect(() => parseNote(google), throwsA(isA<ICalException>()));
       expect(() => parseTask(google), throwsA(isA<ICalException>()));
       expect(parseEvents(google), hasLength(2));
@@ -159,9 +180,11 @@ void main() {
 
     test('multi-day all-day event overlaps from the middle', () {
       final v = parseEvent(
-          ev('DTSTART;VALUE=DATE:20261124\r\nDTEND;VALUE=DATE:20261127\r\n'));
-      expect(days(v, DateTime.utc(2026, 11, 26), DateTime.utc(2026, 11, 27)),
-          ['11-24']);
+        ev('DTSTART;VALUE=DATE:20261124\r\nDTEND;VALUE=DATE:20261127\r\n'),
+      );
+      expect(days(v, DateTime.utc(2026, 11, 26), DateTime.utc(2026, 11, 27)), [
+        '11-24',
+      ]);
       expect(days(v, DateTime.utc(2026, 11, 27), to), isEmpty);
     });
 
@@ -171,94 +194,141 @@ void main() {
     });
 
     test('daily until (date) is inclusive; until (UTC time) compares time', () {
-      expect(days(e('20261120T090000Z', 'FREQ=DAILY;UNTIL=20261122'), from, to),
-          ['11-20', '11-21', '11-22']);
       expect(
-          days(e('20261120T090000Z', 'FREQ=DAILY;UNTIL=20261122T085959Z'), from,
-              to),
-          ['11-20', '11-21']);
+        days(e('20261120T090000Z', 'FREQ=DAILY;UNTIL=20261122'), from, to),
+        ['11-20', '11-21', '11-22'],
+      );
+      expect(
+        days(
+          e('20261120T090000Z', 'FREQ=DAILY;UNTIL=20261122T085959Z'),
+          from,
+          to,
+        ),
+        ['11-20', '11-21'],
+      );
     });
 
     test('weekly byday, interval and wkst', () {
       expect(
-          days(e('20261123T090000', 'FREQ=WEEKLY;BYDAY=MO,WE;COUNT=5'), from,
-              to),
-          ['11-23', '11-25', '11-30', '12-2', '12-7']);
+        days(e('20261123T090000', 'FREQ=WEEKLY;BYDAY=MO,WE;COUNT=5'), from, to),
+        ['11-23', '11-25', '11-30', '12-2', '12-7'],
+      );
       // Every other week, starting on a Wednesday: first week has only WE.
       expect(
-          days(
-              e('20261125T090000',
-                  'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=4'),
-              from,
-              to),
-          ['11-25', '12-7', '12-9', '12-21']);
+        days(
+          e('20261125T090000', 'FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE;COUNT=4'),
+          from,
+          to,
+        ),
+        ['11-25', '12-7', '12-9', '12-21'],
+      );
       // WKST=SU moves Sunday to the start of the week.
       expect(
-          days(
-              e('20261122T090000',
-                  'FREQ=WEEKLY;INTERVAL=2;BYDAY=SU,MO;WKST=SU;COUNT=4'),
-              from,
-              to),
-          ['11-22', '11-23', '12-6', '12-7']);
+        days(
+          e(
+            '20261122T090000',
+            'FREQ=WEEKLY;INTERVAL=2;BYDAY=SU,MO;WKST=SU;COUNT=4',
+          ),
+          from,
+          to,
+        ),
+        ['11-22', '11-23', '12-6', '12-7'],
+      );
     });
 
     test('weekly default is the start weekday', () {
-      expect(days(e('20261120T090000', 'FREQ=WEEKLY;COUNT=3'), from, to),
-          ['11-20', '11-27', '12-4']);
+      expect(days(e('20261120T090000', 'FREQ=WEEKLY;COUNT=3'), from, to), [
+        '11-20',
+        '11-27',
+        '12-4',
+      ]);
     });
 
-    test('monthly: day 31 skips short months; bymonthday list and negative',
-        () {
-      final y = DateTime.utc(2027, 6, 1);
-      expect(days(e('20270131T090000', 'FREQ=MONTHLY'), DateTime.utc(2027), y),
-          ['1-31', '3-31', '5-31']);
-      expect(
-          days(e('20261101T090000', 'FREQ=MONTHLY;BYMONTHDAY=1,15,-1;COUNT=6'),
-              from, DateTime.utc(2028)),
-          ['11-1', '11-15', '11-30', '12-1', '12-15', '12-31']);
-    });
+    test(
+      'monthly: day 31 skips short months; bymonthday list and negative',
+      () {
+        final y = DateTime.utc(2027, 6, 1);
+        expect(
+          days(e('20270131T090000', 'FREQ=MONTHLY'), DateTime.utc(2027), y),
+          ['1-31', '3-31', '5-31'],
+        );
+        expect(
+          days(
+            e('20261101T090000', 'FREQ=MONTHLY;BYMONTHDAY=1,15,-1;COUNT=6'),
+            from,
+            DateTime.utc(2028),
+          ),
+          ['11-1', '11-15', '11-30', '12-1', '12-15', '12-31'],
+        );
+      },
+    );
 
     test('monthly byday with ordinals (DTSTART counts as the first)', () {
       expect(
-          days(e('20261101T090000', 'FREQ=MONTHLY;BYDAY=2TU;COUNT=3'), from,
-              DateTime.utc(2028)),
-          ['11-1', '11-10', '12-8']);
+        days(
+          e('20261101T090000', 'FREQ=MONTHLY;BYDAY=2TU;COUNT=3'),
+          from,
+          DateTime.utc(2028),
+        ),
+        ['11-1', '11-10', '12-8'],
+      );
       expect(
-          days(e('20261101T090000', 'FREQ=MONTHLY;BYDAY=-1FR;COUNT=3'), from,
-              DateTime.utc(2028)),
-          ['11-1', '11-27', '12-25']);
+        days(
+          e('20261101T090000', 'FREQ=MONTHLY;BYDAY=-1FR;COUNT=3'),
+          from,
+          DateTime.utc(2028),
+        ),
+        ['11-1', '11-27', '12-25'],
+      );
       expect(
-          days(e('20261101T090000', 'FREQ=MONTHLY;BYDAY=SA;COUNT=3'), from,
-              DateTime.utc(2028)),
-          ['11-1', '11-7', '11-14']);
+        days(
+          e('20261101T090000', 'FREQ=MONTHLY;BYDAY=SA;COUNT=3'),
+          from,
+          DateTime.utc(2028),
+        ),
+        ['11-1', '11-7', '11-14'],
+      );
     });
 
     test('monthly interval across a year end', () {
       expect(
-          days(e('20261115T090000', 'FREQ=MONTHLY;INTERVAL=2;COUNT=3'), from,
-              DateTime.utc(2028)),
-          ['11-15', '1-15', '3-15']);
+        days(
+          e('20261115T090000', 'FREQ=MONTHLY;INTERVAL=2;COUNT=3'),
+          from,
+          DateTime.utc(2028),
+        ),
+        ['11-15', '1-15', '3-15'],
+      );
     });
 
     test('yearly: leap day, bymonth and bymonthday', () {
       final r = [
-        for (final o in occurrencesBetween(e('20240229T090000Z', 'FREQ=YEARLY'),
-            DateTime.utc(2024), DateTime.utc(2033)))
-          o.start.year
+        for (final o in occurrencesBetween(
+          e('20240229T090000Z', 'FREQ=YEARLY'),
+          DateTime.utc(2024),
+          DateTime.utc(2033),
+        ))
+          o.start.year,
       ];
       expect(r, [2024, 2028, 2032]);
       final y = occurrencesBetween(
-          e('20261105T090000Z',
-              'FREQ=YEARLY;BYMONTH=3,11;BYMONTHDAY=5;COUNT=3'),
-          from,
-          DateTime.utc(2030));
-      expect([for (final o in y) '${o.start.year}-${o.start.month}'],
-          ['2026-11', '2027-3', '2027-11']);
+        e('20261105T090000Z', 'FREQ=YEARLY;BYMONTH=3,11;BYMONTHDAY=5;COUNT=3'),
+        from,
+        DateTime.utc(2030),
+      );
+      expect(
+        [for (final o in y) '${o.start.year}-${o.start.month}'],
+        ['2026-11', '2027-3', '2027-11'],
+      );
     });
 
     test('all-day recurrence matches by date, keeps the length', () {
-      final v = parseEvent(ev('DTSTART;VALUE=DATE:20261124\r\n'
-          'DTEND;VALUE=DATE:20261126\r\nRRULE:FREQ=WEEKLY;COUNT=2\r\n'));
+      final v = parseEvent(
+        ev(
+          'DTSTART;VALUE=DATE:20261124\r\n'
+          'DTEND;VALUE=DATE:20261126\r\nRRULE:FREQ=WEEKLY;COUNT=2\r\n',
+        ),
+      );
       final o = occurrencesBetween(v, from, to);
       expect(o.map((x) => x.start.day), [24, 1]);
       expect(o.first.end, DateTime.utc(2026, 11, 26));
@@ -267,21 +337,31 @@ void main() {
     });
 
     test('count includes excluded dates', () {
-      final v = e('20261120T090000', 'FREQ=DAILY;COUNT=4',
-          extra: 'EXDATE:20261121T090000\r\n');
+      final v = e(
+        '20261120T090000',
+        'FREQ=DAILY;COUNT=4',
+        extra: 'EXDATE:20261121T090000\r\n',
+      );
       expect(days(v, from, to), ['11-20', '11-22', '11-23']);
     });
 
     test('exdate: several values, date-only for an all-day event', () {
-      final v = e('20261120T090000', 'FREQ=DAILY;COUNT=5',
-          extra: 'EXDATE:20261121T090000,20261122T090000\r\n'
-              'EXDATE;VALUE=DATE:20261123\r\n');
+      final v = e(
+        '20261120T090000',
+        'FREQ=DAILY;COUNT=5',
+        extra:
+            'EXDATE:20261121T090000,20261122T090000\r\n'
+            'EXDATE;VALUE=DATE:20261123\r\n',
+      );
       expect(days(v, from, to), ['11-20', '11-24']);
     });
 
     test('rdate adds instances', () {
-      final v = e('20261120T090000', 'FREQ=DAILY;COUNT=2',
-          extra: 'RDATE:20261201T090000\r\n');
+      final v = e(
+        '20261120T090000',
+        'FREQ=DAILY;COUNT=2',
+        extra: 'RDATE:20261201T090000\r\n',
+      );
       expect(days(v, from, to), ['11-20', '11-21', '12-1']);
       final only = e('20261120T090000', '', extra: 'RDATE:20261201T090000\r\n');
       expect(days(only, from, to), ['11-20', '12-1']);
@@ -289,12 +369,19 @@ void main() {
 
     test('window clips; far-future window needs no count', () {
       final v = e('20261120T090000Z', 'FREQ=DAILY');
-      expect(days(v, DateTime.utc(2026, 12, 1), DateTime.utc(2026, 12, 4)),
-          ['12-1', '12-2', '12-3']);
+      expect(days(v, DateTime.utc(2026, 12, 1), DateTime.utc(2026, 12, 4)), [
+        '12-1',
+        '12-2',
+        '12-3',
+      ]);
       expect(
-          occurrencesBetween(v, DateTime.utc(2030), DateTime.utc(2030, 1, 3))
-              .length,
-          2);
+        occurrencesBetween(
+          v,
+          DateTime.utc(2030),
+          DateTime.utc(2030, 1, 3),
+        ).length,
+        2,
+      );
     });
 
     test('overrides: edited, moved in, moved out and cancelled', () {
@@ -302,15 +389,14 @@ void main() {
       addTearDown(() => LocalZone.use(null));
       final v = parseEvent(google);
       final o = occurrencesBetween(
-          v, DateTime.utc(2026, 11, 23), DateTime.utc(2026, 12, 8));
-      expect([
-        for (final x in o) '${x.start.month}-${x.start.day} ${x.start.hour}'
-      ], [
-        '11-23 9',
-        '11-30 14',
-        '12-2 9',
-        '12-7 9'
-      ]);
+        v,
+        DateTime.utc(2026, 11, 23),
+        DateTime.utc(2026, 12, 8),
+      );
+      expect(
+        [for (final x in o) '${x.start.month}-${x.start.day} ${x.start.hour}'],
+        ['11-23 9', '11-30 14', '12-2 9', '12-7 9'],
+      );
       final moved = o.firstWhere((x) => x.isOverride);
       expect(moved.summary, 'Standup (moved)');
       expect(moved.end, DateTime.utc(2026, 11, 30, 14, 30));
@@ -373,8 +459,11 @@ void main() {
     });
 
     test('rdate periods are unsupported', () {
-      final v = e('20261120T090000', 'FREQ=DAILY;COUNT=2',
-          extra: 'RDATE;VALUE=PERIOD:20261201T090000Z/PT1H\r\n');
+      final v = e(
+        '20261120T090000',
+        'FREQ=DAILY;COUNT=2',
+        extra: 'RDATE;VALUE=PERIOD:20261201T090000Z/PT1H\r\n',
+      );
       expect(v.recurrenceUnsupported, isTrue);
     });
 
@@ -391,13 +480,20 @@ void main() {
 
     test('start, end and expansion use local wall time', () {
       final u = DateTime.utc(2026, 11, 20, 9);
-      final v = parseEvent(ev('DTSTART:20261120T090000Z\r\n'
+      final v = parseEvent(
+        ev(
+          'DTSTART:20261120T090000Z\r\n'
           'DTEND:20261120T100000Z\r\nRRULE:FREQ=DAILY;COUNT=2\r\n'
-          'EXDATE:20261121T090000Z\r\n'));
+          'EXDATE:20261121T090000Z\r\n',
+        ),
+      );
       expect(v.startWall, local(u));
       expect(v.endWall, local(u).add(const Duration(hours: 1)));
       final o = occurrencesBetween(
-          v, DateTime.utc(2026, 11, 19), DateTime.utc(2026, 11, 23));
+        v,
+        DateTime.utc(2026, 11, 19),
+        DateTime.utc(2026, 11, 23),
+      );
       expect([for (final x in o) x.start], [local(u)]);
       expect(o.single.recurrenceId!.value, '20261120T090000Z');
     });
@@ -412,8 +508,10 @@ void main() {
       expect(ICalDate.fromLocalWall(t.wall!, t).value, t.value);
       const d = ICalDate('20261120', ';VALUE=DATE');
       expect(d.shifted(const Duration(days: 2)).value, '20261122');
-      expect(z.shifted(const Duration(hours: 3)).localWall,
-          z.localWall!.add(const Duration(hours: 3)));
+      expect(
+        z.shifted(const Duration(hours: 3)).localWall,
+        z.localWall!.add(const Duration(hours: 3)),
+      );
     });
   });
 
@@ -423,29 +521,43 @@ void main() {
     test('weekly: DTSTART is the first instance and counts', () {
       // 2026-11-20 is a Friday, BYDAY=MO.
       expect(
-          days(e('20261120T090000', 'FREQ=WEEKLY;BYDAY=MO;COUNT=3'), from, to),
-          ['11-20', '11-23', '11-30']);
+        days(e('20261120T090000', 'FREQ=WEEKLY;BYDAY=MO;COUNT=3'), from, to),
+        ['11-20', '11-23', '11-30'],
+      );
       expect(
-          days(e('20261120T090000', 'FREQ=WEEKLY;BYDAY=MO'), from,
-              DateTime.utc(2026, 12, 1)),
-          ['11-20', '11-23', '11-30']);
+        days(
+          e('20261120T090000', 'FREQ=WEEKLY;BYDAY=MO'),
+          from,
+          DateTime.utc(2026, 12, 1),
+        ),
+        ['11-20', '11-23', '11-30'],
+      );
     });
 
     test('monthly: DTSTART is the first instance and counts', () {
       expect(
-          days(e('20261120T090000', 'FREQ=MONTHLY;BYMONTHDAY=5;COUNT=3'), from,
-              DateTime.utc(2027, 6, 1)),
-          ['11-20', '12-5', '1-5']);
+        days(
+          e('20261120T090000', 'FREQ=MONTHLY;BYMONTHDAY=5;COUNT=3'),
+          from,
+          DateTime.utc(2027, 6, 1),
+        ),
+        ['11-20', '12-5', '1-5'],
+      );
     });
 
     test('a matching DTSTART is not doubled; until still applies', () {
       expect(
-          days(e('20261123T090000', 'FREQ=WEEKLY;BYDAY=MO;COUNT=2'), from, to),
-          ['11-23', '11-30']);
+        days(e('20261123T090000', 'FREQ=WEEKLY;BYDAY=MO;COUNT=2'), from, to),
+        ['11-23', '11-30'],
+      );
       expect(
-          days(e('20261120T090000', 'FREQ=WEEKLY;BYDAY=MO;UNTIL=20261119'),
-              from, to),
-          isEmpty);
+        days(
+          e('20261120T090000', 'FREQ=WEEKLY;BYDAY=MO;UNTIL=20261119'),
+          from,
+          to,
+        ),
+        isEmpty,
+      );
     });
   });
 }

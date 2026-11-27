@@ -5,8 +5,12 @@ import 'task.dart';
 
 /// One card of the unified Home Board: a note or a task with a status.
 class BoardItem {
-  BoardItem.note(Note n) : note = n, task = null;
-  BoardItem.task(Task t) : task = t, note = null;
+  BoardItem.note(Note n)
+      : note = n,
+        task = null;
+  BoardItem.task(Task t)
+      : task = t,
+        note = null;
 
   final Note? note;
   final Task? task;
@@ -23,11 +27,11 @@ class BoardItem {
 
   /// 0 high, 1 medium, 2 low, 3 unset.
   int get priorityRank => switch (priorityWord) {
-    'high' => 0,
-    'medium' => 1,
-    'low' => 2,
-    _ => 3,
-  };
+        'high' => 0,
+        'medium' => 1,
+        'low' => 2,
+        _ => 3,
+      };
 
   /// The due wall-clock (tasks only; notes have none).
   DateTime? get due => task?.due?.localWall;

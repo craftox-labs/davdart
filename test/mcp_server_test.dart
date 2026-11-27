@@ -15,23 +15,31 @@ const _token = 'tok-secret-123';
 class _Env {
   _Env(this.fake) {
     final http = withHome(fake);
-    items = ItemService(CalDavClient(
+    items = ItemService(
+      CalDavClient(
         collection: FakeCalDav.collection,
         username: 'u',
         password: 'p',
-        client: http));
+        client: http,
+      ),
+    );
     collections = CollectionService(
-        home: Uri.parse('https://fake.test/dav/'),
-        username: 'u',
-        password: 'p',
-        httpClient: http);
+      home: Uri.parse('https://fake.test/dav/'),
+      username: 'u',
+      password: 'p',
+      httpClient: http,
+    );
   }
   final FakeCalDav fake;
   late final ItemService items;
   late final CollectionService collections;
 
   McpServer server(Set<ToolGroup> g, {String? backup}) => buildMcpServer(
-      items: items, collections: collections, groups: g, backupDir: backup);
+    items: items,
+    collections: collections,
+    groups: g,
+    backupDir: backup,
+  );
 }
 
 /// Connects a client to [server] over in-memory pipes.
@@ -51,8 +59,11 @@ Future<McpClient> connect(McpServer server) async {
 Future<List<String>> toolNames(McpClient c) async =>
     ((await c.listTools()).tools.map((t) => t.name).toList()..sort());
 
-Future<(bool, dynamic)> call(McpClient c, String name,
-    [Map<String, dynamic> args = const {}]) async {
+Future<(bool, dynamic)> call(
+  McpClient c,
+  String name, [
+  Map<String, dynamic> args = const {},
+]) async {
   final r = await c.callTool(CallToolRequest(name: name, arguments: args));
   final text = (r.content.single as TextContent).text;
   return (r.isError, r.isError ? text : jsonDecode(text));
@@ -85,29 +96,41 @@ void main() {
         'move',
         'overview',
         'rank',
-        'update'
+        'update',
       ]);
       await expectLater(call(c, 'delete', {'id': 'x'}), throwsA(anything));
     });
     test('history tool only with a history log', () async {
-      final f =
-          File('${Directory.systemTemp.createTempSync('h').path}/h.jsonl');
-      final c = await connect(buildMcpServer(
+      final f = File(
+        '${Directory.systemTemp.createTempSync('h').path}/h.jsonl',
+      );
+      final c = await connect(
+        buildMcpServer(
           items: env.items,
           groups: {ToolGroup.read},
-          history: HistoryLog(f.path)));
-      expect(await toolNames(c),
-          ['collections', 'get', 'history', 'list', 'overview']);
+          history: HistoryLog(f.path),
+        ),
+      );
+      expect(await toolNames(c), [
+        'collections',
+        'get',
+        'history',
+        'list',
+        'overview',
+      ]);
       expect(f.existsSync(), isTrue);
     });
     test('admin group needs a backup dir', () {
       expect(() => env.server({ToolGroup.admin}), throwsArgumentError);
-      expect(() => env.server({ToolGroup.admin}, backup: '/tmp/x'),
-          returnsNormally);
+      expect(
+        () => env.server({ToolGroup.admin}, backup: '/tmp/x'),
+        returnsNormally,
+      );
     });
     test('all groups give nine tools', () async {
-      final c = await connect(env.server(ToolGroup.values.toSet(),
-          backup: Directory.systemTemp.path));
+      final c = await connect(
+        env.server(ToolGroup.values.toSet(), backup: Directory.systemTemp.path),
+      );
       expect(await toolNames(c), [
         'collections',
         'create',
@@ -117,13 +140,16 @@ void main() {
         'move',
         'overview',
         'rank',
-        'update'
+        'update',
       ]);
     });
     test('group parsing', () {
       expect(ToolGroup.parse('read, write'), {ToolGroup.read, ToolGroup.write});
-      expect(ToolGroup.parse('read,write,delete'),
-          {ToolGroup.read, ToolGroup.write, ToolGroup.delete});
+      expect(ToolGroup.parse('read,write,delete'), {
+        ToolGroup.read,
+        ToolGroup.write,
+        ToolGroup.delete,
+      });
       expect(() => ToolGroup.parse('root'), throwsFormatException);
     });
   });
@@ -134,22 +160,27 @@ void main() {
     setUp(() {
       other = FakeCalDav();
       final h = multiHome(env.fake, other);
-      final items = ItemService(CalDavClient(
+      final items = ItemService(
+        CalDavClient(
           collection: FakeCalDav.collection,
           username: 'u',
           password: 'p',
-          client: h));
+          client: h,
+        ),
+      );
       final cs = CollectionService(
-          home: Uri.parse('https://fake.test/dav/'),
-          username: 'u',
-          password: 'p',
-          httpClient: h);
+        home: Uri.parse('https://fake.test/dav/'),
+        username: 'u',
+        password: 'p',
+        httpClient: h,
+      );
       make = (g) => buildMcpServer(items: items, collections: cs, groups: g);
     });
 
     test('omitted: the configured collection, unchanged', () async {
       final c = await connect(
-          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));
+        make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}),
+      );
       final (e, _) = await call(c, 'create', {'kind': 'note', 'title': 'A'});
       expect(e, isFalse);
       expect(env.fake.ics, hasLength(1));
@@ -160,9 +191,13 @@ void main() {
 
     test('a second collection by name and by href', () async {
       final c = await connect(
-          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));
-      var (e, r) = await call(
-          c, 'create', {'collection': 'Other', 'kind': 'note', 'title': 'B'});
+        make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}),
+      );
+      var (e, r) = await call(c, 'create', {
+        'collection': 'Other',
+        'kind': 'note',
+        'title': 'B',
+      });
       expect(e, isFalse, reason: '$r');
       expect(other.ics, hasLength(1));
       expect(env.fake.ics, isEmpty);
@@ -178,7 +213,7 @@ void main() {
       (e, r) = await call(c, 'update', {
         'collection': 'Other',
         'id': 'B',
-        'tags_add': ['x']
+        'tags_add': ['x'],
       });
       expect(e, isFalse, reason: '$r');
       (e, r) = await call(c, 'move', {'collection': 'Other', 'id': 'B'});
@@ -190,14 +225,17 @@ void main() {
 
     test('update refuses kind-projects in tags_add and tags_remove', () async {
       final c = await connect(env.server({ToolGroup.write}));
-      var (e, r) = await call(
-          c, 'create', {'title': 'F', 'kind': 'note', 'folder': true});
+      var (e, r) = await call(c, 'create', {
+        'title': 'F',
+        'kind': 'note',
+        'folder': true,
+      });
       expect(e, isFalse, reason: '$r');
       final id = (r['item'] as Map)['uid'] as String;
       for (final k in ['tags_add', 'tags_remove']) {
         (e, r) = await call(c, 'update', {
           'id': id,
-          k: ['kind-projects']
+          k: ['kind-projects'],
         });
         expect(e, isTrue);
         expect('$r', contains('create --folder'));
@@ -206,7 +244,8 @@ void main() {
 
     test('the configured collection by name reaches the same data', () async {
       final c = await connect(
-          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));
+        make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}),
+      );
       await call(c, 'create', {'kind': 'note', 'title': 'A'});
       final (_, l) = await call(c, 'list', {'collection': 'Work'});
       expect(l['items'], hasLength(1));
@@ -214,7 +253,8 @@ void main() {
 
     test('unknown or escaping collections are refused', () async {
       final c = await connect(
-          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));
+        make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}),
+      );
       for (final bad in [
         'Nope',
         'other',
@@ -229,36 +269,46 @@ void main() {
         expect(e, isTrue, reason: bad);
         expect(m, contains('no collection'), reason: bad);
       }
-      final (e, _) = await call(
-          c, 'create', {'collection': 'Nope', 'kind': 'note', 'title': 'x'});
+      final (e, _) = await call(c, 'create', {
+        'collection': 'Nope',
+        'kind': 'note',
+        'title': 'x',
+      });
       expect(e, isTrue);
       expect(env.fake.ics, isEmpty);
       expect(other.ics, isEmpty);
     });
 
-    test('a collection that does not hold the kind gives a clear error',
-        () async {
-      final c = await connect(
-          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}));
-      final (e, m) = await call(c, 'create', {
-        'collection': 'Todos',
-        'kind': 'event',
-        'title': 'x',
-        'start': '2026-01-01'
-      });
-      expect(e, isTrue);
-      expect(m, contains('does not hold events'));
-      expect(m, contains('tasks'));
-      expect(other.ics, isEmpty);
-    });
+    test(
+      'a collection that does not hold the kind gives a clear error',
+      () async {
+        final c = await connect(
+          make({ToolGroup.read, ToolGroup.write, ToolGroup.delete}),
+        );
+        final (e, m) = await call(c, 'create', {
+          'collection': 'Todos',
+          'kind': 'event',
+          'title': 'x',
+          'start': '2026-01-01',
+        });
+        expect(e, isTrue);
+        expect(m, contains('does not hold events'));
+        expect(m, contains('tasks'));
+        expect(other.ics, isEmpty);
+      },
+    );
 
     test('read-only and tool groups are unaffected', () async {
       final c = await connect(make({ToolGroup.read}));
       expect(await toolNames(c), ['collections', 'get', 'list', 'overview']);
       await expectLater(
-          call(c, 'create',
-              {'collection': 'Other', 'kind': 'note', 'title': 'x'}),
-          throwsA(anything));
+        call(c, 'create', {
+          'collection': 'Other',
+          'kind': 'note',
+          'title': 'x',
+        }),
+        throwsA(anything),
+      );
       expect(other.ics, isEmpty);
       final tools = (await c.listTools()).tools;
       for (final t in tools.where((t) => t.name != 'collections')) {
@@ -274,19 +324,27 @@ void main() {
 
     test('write tools are not served', () async {
       await expectLater(
-          call(c, 'create', {'kind': 'note', 'title': 'x'}), throwsA(anything));
+        call(c, 'create', {'kind': 'note', 'title': 'x'}),
+        throwsA(anything),
+      );
       expect(env.fake.ics, isEmpty);
     });
-    test('collections admin actions are refused with a clear message',
-        () async {
-      for (final a in ['create', 'rename', 'delete']) {
-        final (err, msg) = await call(c, 'collections',
-            {'action': a, 'name': 'n', 'href': 'c/', 'new_name': 'n'});
-        expect(err, isTrue);
-        expect(msg, contains('not enabled'));
-      }
-      expect(env.fake.log.where((l) => l.startsWith('DELETE')), isEmpty);
-    });
+    test(
+      'collections admin actions are refused with a clear message',
+      () async {
+        for (final a in ['create', 'rename', 'delete']) {
+          final (err, msg) = await call(c, 'collections', {
+            'action': a,
+            'name': 'n',
+            'href': 'c/',
+            'new_name': 'n',
+          });
+          expect(err, isTrue);
+          expect(msg, contains('not enabled'));
+        }
+        expect(env.fake.log.where((l) => l.startsWith('DELETE')), isEmpty);
+      },
+    );
     test('collections list works', () async {
       final (err, out) = await call(c, 'collections', {'action': 'list'});
       expect(err, isFalse);
@@ -296,21 +354,24 @@ void main() {
 
   group('tools end to end', () {
     late McpClient c;
-    setUp(() async => c = await connect(env.server({
-          ToolGroup.read,
-          ToolGroup.write,
-          ToolGroup.delete,
-        })));
+    setUp(
+      () async => c = await connect(
+        env.server({ToolGroup.read, ToolGroup.write, ToolGroup.delete}),
+      ),
+    );
 
     test('create, list, get, update, move, delete', () async {
-      var (err, f) = await call(
-          c, 'create', {'kind': 'note', 'title': 'Folder', 'folder': true});
+      var (err, f) = await call(c, 'create', {
+        'kind': 'note',
+        'title': 'Folder',
+        'folder': true,
+      });
       expect(err, isFalse, reason: '$f');
       (err, _) = await call(c, 'create', {
         'kind': 'task',
         'title': 'Do it',
         'tags': ['a'],
-        'parent': 'Folder'
+        'parent': 'Folder',
       });
       expect(err, isFalse);
       var (_, page) = await call(c, 'list', {'kind': 'task'});
@@ -355,13 +416,20 @@ void main() {
       }
       var (err, m) = await call(c, 'rank', {'id': 'C', 'position': 'top'});
       expect(err, isFalse, reason: '$m');
-      expect([for (final x in m['order'] as List) (x as Map)['title']],
-          ['C', 'A', 'B']);
+      expect(
+        [for (final x in m['order'] as List) (x as Map)['title']],
+        ['C', 'A', 'B'],
+      );
       (err, m) = await call(c, 'rank', {'id': 'C', 'after': 'B'});
-      expect([for (final x in m['order'] as List) (x as Map)['title']],
-          ['A', 'B', 'C']);
-      (err, m) =
-          await call(c, 'rank', {'id': 'A', 'before': 'C', 'dry_run': true});
+      expect(
+        [for (final x in m['order'] as List) (x as Map)['title']],
+        ['A', 'B', 'C'],
+      );
+      (err, m) = await call(c, 'rank', {
+        'id': 'A',
+        'before': 'C',
+        'dry_run': true,
+      });
       expect(m['dryRun'], isTrue);
       (err, m) = await call(c, 'rank', {'id': 'C', 'position': 'none'});
       expect(err, isFalse, reason: '$m');
@@ -372,8 +440,11 @@ void main() {
     });
 
     test('status is a fixed set; note priority through update', () async {
-      var (err, m) = await call(
-          c, 'create', {'kind': 'note', 'title': 'N', 'status': 'in_progress'});
+      var (err, m) = await call(c, 'create', {
+        'kind': 'note',
+        'title': 'N',
+        'status': 'in_progress',
+      });
       expect(err, isFalse, reason: '$m');
       var (_, g) = await call(c, 'get', {'id': 'N'});
       expect(g['status'], 'doing');
@@ -384,9 +455,11 @@ void main() {
       (err, m) = await call(c, 'update', {'id': 'N', 'status': 'wip'});
       expect(err, isTrue);
       expect(
-          m,
-          contains(
-              'allowed: backlog, todo, doing, blocked, review, done, canceled'));
+        m,
+        contains(
+          'allowed: backlog, todo, doing, blocked, review, done, canceled',
+        ),
+      );
       (err, m) = await call(c, 'update', {'id': 'N', 'status': 'wontfix'});
       expect(err, isFalse);
       (_, g) = await call(c, 'get', {'id': 'N'});
@@ -400,8 +473,11 @@ void main() {
       expect(err, isFalse);
       (_, g) = await call(c, 'get', {'id': 'N'});
       expect(g.containsKey('priority'), isFalse);
-      (err, m) = await call(
-          c, 'create', {'kind': 'event', 'title': 'E', 'start': '2026-12-01'});
+      (err, m) = await call(c, 'create', {
+        'kind': 'event',
+        'title': 'E',
+        'start': '2026-12-01',
+      });
       (err, m) = await call(c, 'update', {'id': 'E', 'priority': 1});
       expect(err, isTrue);
       expect(m, contains('tasks and notes only'));
@@ -441,7 +517,8 @@ void main() {
       backup = Directory.systemTemp.createTempSync('davdart-mcp-');
       addTearDown(() => backup.deleteSync(recursive: true));
       c = await connect(
-          env.server({ToolGroup.read, ToolGroup.admin}, backup: backup.path));
+        env.server({ToolGroup.read, ToolGroup.admin}, backup: backup.path),
+      );
     });
 
     test('delete needs the exact name', () async {
@@ -457,10 +534,11 @@ void main() {
 
     test('delete refuses a non-empty collection, dry run previews', () async {
       env.fake.external(
-          'n1.ics',
-          'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VJOURNAL\r\nUID:n1\r\n'
-              'DTSTAMP:20260101T000000Z\r\nSUMMARY:N\r\nEND:VJOURNAL\r\n'
-              'END:VCALENDAR\r\n');
+        'n1.ics',
+        'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VJOURNAL\r\nUID:n1\r\n'
+            'DTSTAMP:20260101T000000Z\r\nSUMMARY:N\r\nEND:VJOURNAL\r\n'
+            'END:VCALENDAR\r\n',
+      );
       final args = {
         'action': 'delete',
         'href': 'https://fake.test/dav/c/',
@@ -469,8 +547,11 @@ void main() {
       var (err, m) = await call(c, 'collections', args);
       expect(err, isTrue);
       expect(m, contains('allow_non_empty'));
-      var (_, d) = await call(c, 'collections',
-          {...args, 'allow_non_empty': true, 'dry_run': true});
+      var (_, d) = await call(c, 'collections', {
+        ...args,
+        'allow_non_empty': true,
+        'dry_run': true,
+      });
       expect(d['dryRun'], isTrue);
       expect(d['items'], 1);
       expect(backup.listSync(), isEmpty, reason: 'dry run writes nothing');
@@ -482,88 +563,115 @@ void main() {
     late File file;
     late McpClient c;
     Future<McpClient> start({String? defaultWriter, bool del = true}) async {
-      c = await connect(buildMcpServer(
+      c = await connect(
+        buildMcpServer(
           items: env.items,
           collections: env.collections,
           groups: {ToolGroup.read, ToolGroup.write, if (del) ToolGroup.delete},
           history: HistoryLog(file.path),
-          defaultWriter: defaultWriter));
+          defaultWriter: defaultWriter,
+        ),
+      );
       return c;
     }
 
     List<Map<String, dynamic>> lines() => [
-          for (final l in file.readAsLinesSync())
-            if (l.isNotEmpty) jsonDecode(l) as Map<String, dynamic>
-        ];
+      for (final l in file.readAsLinesSync())
+        if (l.isNotEmpty) jsonDecode(l) as Map<String, dynamic>,
+    ];
 
     setUp(() {
       dir = Directory.systemTemp.createTempSync('hist');
       file = File('${dir.path}/h.jsonl');
     });
 
-    test('writer is stored as X-WRITER, shown by get, kept on update',
-        () async {
-      await start();
-      var (e, r) = await call(c, 'create',
-          {'kind': 'note', 'title': 'A', 'writer': 'bot-a', 'body': 'x'});
-      expect(e, isFalse, reason: '$r');
-      expect(r['item']['writer'], 'bot-a');
-      expect(env.fake.ics.values.single, contains('X-WRITER:bot-a'));
-      // an update without a writer keeps the stamp
-      (e, r) = await call(c, 'update', {'id': 'A', 'body': 'y'});
-      expect(e, isFalse, reason: '$r');
-      expect(env.fake.ics.values.single, contains('X-WRITER:bot-a'));
-      expect((await call(c, 'get', {'id': 'A'})).$2['writer'], 'bot-a');
-      // another writer replaces it, one line only
-      await call(c, 'update', {
-        'id': 'A',
-        'tags_add': ['t'],
-        'writer': 'bot-b'
-      });
-      final ics = env.fake.ics.values.single;
-      expect(RegExp('X-WRITER').allMatches(ics), hasLength(1));
-      expect(ics, contains('X-WRITER:bot-b'));
-      // move and the other kinds take it too
-      await call(
-          c, 'create', {'kind': 'task', 'title': 'T', 'writer': 'bot-t'});
-      await call(c, 'move', {'id': 'T', 'parent': 'A', 'writer': 'bot-m'});
-      expect((await call(c, 'get', {'id': 'T'})).$2['writer'], 'bot-m');
-    });
+    test(
+      'writer is stored as X-WRITER, shown by get, kept on update',
+      () async {
+        await start();
+        var (e, r) = await call(c, 'create', {
+          'kind': 'note',
+          'title': 'A',
+          'writer': 'bot-a',
+          'body': 'x',
+        });
+        expect(e, isFalse, reason: '$r');
+        expect(r['item']['writer'], 'bot-a');
+        expect(env.fake.ics.values.single, contains('X-WRITER:bot-a'));
+        // an update without a writer keeps the stamp
+        (e, r) = await call(c, 'update', {'id': 'A', 'body': 'y'});
+        expect(e, isFalse, reason: '$r');
+        expect(env.fake.ics.values.single, contains('X-WRITER:bot-a'));
+        expect((await call(c, 'get', {'id': 'A'})).$2['writer'], 'bot-a');
+        // another writer replaces it, one line only
+        await call(c, 'update', {
+          'id': 'A',
+          'tags_add': ['t'],
+          'writer': 'bot-b',
+        });
+        final ics = env.fake.ics.values.single;
+        expect(RegExp('X-WRITER').allMatches(ics), hasLength(1));
+        expect(ics, contains('X-WRITER:bot-b'));
+        // move and the other kinds take it too
+        await call(c, 'create', {
+          'kind': 'task',
+          'title': 'T',
+          'writer': 'bot-t',
+        });
+        await call(c, 'move', {'id': 'T', 'parent': 'A', 'writer': 'bot-m'});
+        expect((await call(c, 'get', {'id': 'T'})).$2['writer'], 'bot-m');
+      },
+    );
 
     test('writer is sanitised and the default writer applies', () async {
       await start(defaultWriter: 'default-bot');
       await call(c, 'create', {'kind': 'note', 'title': 'A'});
       expect(env.fake.ics.values.single, contains('X-WRITER:default-bot'));
-      await call(c, 'update',
-          {'id': 'A', 'body': 'z', 'writer': 'evil\r\nATTENDEE:x;y,z'});
+      await call(c, 'update', {
+        'id': 'A',
+        'body': 'z',
+        'writer': 'evil\r\nATTENDEE:x;y,z',
+      });
       final ics = env.fake.ics.values.single;
       expect(ics, isNot(contains('\nATTENDEE')));
       expect(ics, contains('X-WRITER:evil__ATTENDEE:x_y_z'));
     });
 
-    test('history records writes with BEFORE snapshots, not dry runs',
-        () async {
-      await start();
-      await call(c, 'create',
-          {'kind': 'note', 'title': 'A', 'body': 'one', 'writer': 'w1'});
-      await call(c, 'update',
-          {'id': 'A', 'body': 'two', 'writer': 'w2', 'dry_run': true});
-      expect(lines(), hasLength(1));
-      await call(c, 'update', {'id': 'A', 'body': 'two', 'writer': 'w2'});
-      await call(c, 'delete', {'id': 'A', 'writer': 'w3'});
-      final l = lines();
-      expect(l.map((e) => e['tool']), ['create', 'update', 'delete']);
-      expect(l[0]['before'], isNull);
-      expect(l[1]['writer'], 'w2');
-      expect(l[1]['before'].single, contains('DESCRIPTION:one'));
-      expect(l[2]['before'].single, contains('DESCRIPTION:two'));
-      expect(l[2]['before'].single, contains('X-WRITER:w2'));
-      expect(l[2]['uid'], l[0]['uid']);
-      expect(l[0]['collection'], '/dav/c/');
-      expect(
-          l.every((e) => e['time'] is String && e['kind'] == 'note'), isTrue);
-      expect(env.fake.ics, isEmpty);
-    });
+    test(
+      'history records writes with BEFORE snapshots, not dry runs',
+      () async {
+        await start();
+        await call(c, 'create', {
+          'kind': 'note',
+          'title': 'A',
+          'body': 'one',
+          'writer': 'w1',
+        });
+        await call(c, 'update', {
+          'id': 'A',
+          'body': 'two',
+          'writer': 'w2',
+          'dry_run': true,
+        });
+        expect(lines(), hasLength(1));
+        await call(c, 'update', {'id': 'A', 'body': 'two', 'writer': 'w2'});
+        await call(c, 'delete', {'id': 'A', 'writer': 'w3'});
+        final l = lines();
+        expect(l.map((e) => e['tool']), ['create', 'update', 'delete']);
+        expect(l[0]['before'], isNull);
+        expect(l[1]['writer'], 'w2');
+        expect(l[1]['before'].single, contains('DESCRIPTION:one'));
+        expect(l[2]['before'].single, contains('DESCRIPTION:two'));
+        expect(l[2]['before'].single, contains('X-WRITER:w2'));
+        expect(l[2]['uid'], l[0]['uid']);
+        expect(l[0]['collection'], '/dav/c/');
+        expect(
+          l.every((e) => e['time'] is String && e['kind'] == 'note'),
+          isTrue,
+        );
+        expect(env.fake.ics, isEmpty);
+      },
+    );
 
     test('delete logs the children it re-parents', () async {
       await start();
@@ -594,18 +702,24 @@ void main() {
       expect(r['count'], 1);
       (e, r) = await call(c, 'history', {'id': 'B'});
       expect(r['entries'].single['title'], 'B');
-      (e, r) = await call(c, 'history',
-          {'id': 'A', 'include_bodies': true, 'collection': 'Work'});
+      (e, r) = await call(c, 'history', {
+        'id': 'A',
+        'include_bodies': true,
+        'collection': 'Work',
+      });
       expect(r['entries'].first['before'].single, contains('SUMMARY:A'));
       (e, r) = await call(c, 'history', {'collection': 'Nope'});
       expect(e, isTrue);
     });
 
     test('never logs secrets; line size is capped', () async {
-      c = await connect(buildMcpServer(
+      c = await connect(
+        buildMcpServer(
           items: env.items,
           groups: {ToolGroup.read, ToolGroup.write},
-          history: HistoryLog(file.path, maxLine: 20000, maxBefore: 50000)));
+          history: HistoryLog(file.path, maxLine: 20000, maxBefore: 50000),
+        ),
+      );
       await call(c, 'create', {'kind': 'note', 'title': 'A'});
       await call(c, 'update', {'id': 'A', 'body': 'b' * 90000});
       await call(c, 'update', {'id': 'A', 'body': 'c' * 90000});
@@ -616,8 +730,9 @@ void main() {
       expect(raw, isNot(contains('p-secret')));
       expect(lines().last['before'].single.length, lessThan(5100));
       final log = HistoryLog(file.path);
-      expect(log.cleanArgs({'token': 't', 'Password': 'p', 'title': 'x'}),
-          {'title': 'x'});
+      expect(log.cleanArgs({'token': 't', 'Password': 'p', 'title': 'x'}), {
+        'title': 'x',
+      });
     });
 
     test('an unwritable history refuses update and delete', () async {
@@ -634,16 +749,21 @@ void main() {
       expect(env.fake.ics.values.single, isNot(contains('DESCRIPTION:z')));
     });
 
-    test('--read-only semantics: read group alone has no write tools',
-        () async {
-      c = await connect(buildMcpServer(
-          items: env.items,
-          groups: {ToolGroup.read},
-          history: HistoryLog(file.path)));
-      for (final t in ['create', 'update', 'move', 'delete']) {
-        await expectLater(call(c, t, {'id': 'x'}), throwsA(anything));
-      }
-    });
+    test(
+      '--read-only semantics: read group alone has no write tools',
+      () async {
+        c = await connect(
+          buildMcpServer(
+            items: env.items,
+            groups: {ToolGroup.read},
+            history: HistoryLog(file.path),
+          ),
+        );
+        for (final t in ['create', 'update', 'move', 'delete']) {
+          await expectLater(call(c, t, {'id': 'x'}), throwsA(anything));
+        }
+      },
+    );
   });
 
   group('streamable HTTP', () {
@@ -652,8 +772,11 @@ void main() {
     late Uri url;
 
     setUp(() async {
-      http = buildHttpServer(() => env.server({ToolGroup.read}),
-          token: _token, port: 0);
+      http = buildHttpServer(
+        () => env.server({ToolGroup.read}),
+        token: _token,
+        port: 0,
+      );
       await http.start();
       url = Uri.parse('http://127.0.0.1:${http.boundPort}/mcp');
       client = HttpClient();
@@ -664,9 +787,10 @@ void main() {
     });
 
     Future<(int, Map<String, dynamic>?, HttpHeaders)> post(
-        Map<String, Object?> body,
-        {String? bearer,
-        String? session}) async {
+      Map<String, Object?> body, {
+      String? bearer,
+      String? session,
+    }) async {
       final req = await client.postUrl(url);
       req.headers
         ..set('content-type', 'application/json')
@@ -716,49 +840,70 @@ void main() {
       final sid = h.value('mcp-session-id');
       expect(sid, isNotNull);
 
-      await post({'jsonrpc': '2.0', 'method': 'notifications/initialized'},
-          bearer: _token, session: sid);
+      await post(
+        {'jsonrpc': '2.0', 'method': 'notifications/initialized'},
+        bearer: _token,
+        session: sid,
+      );
 
       final (_, list, _) = await post(
-          {'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list'},
-          bearer: _token, session: sid);
+        {'jsonrpc': '2.0', 'id': 2, 'method': 'tools/list'},
+        bearer: _token,
+        session: sid,
+      );
       final names = [
-        for (final t in list!['result']['tools'] as List) t['name']
+        for (final t in list!['result']['tools'] as List) t['name'],
       ]..sort();
       expect(names, ['collections', 'get', 'list', 'overview']);
 
-      final (_, res, _) = await post({
-        'jsonrpc': '2.0',
-        'id': 3,
-        'method': 'tools/call',
-        'params': {'name': 'overview', 'arguments': {}},
-      }, bearer: _token, session: sid);
+      final (_, res, _) = await post(
+        {
+          'jsonrpc': '2.0',
+          'id': 3,
+          'method': 'tools/call',
+          'params': {'name': 'overview', 'arguments': {}},
+        },
+        bearer: _token,
+        session: sid,
+      );
       final text = res!['result']['content'][0]['text'] as String;
       expect(jsonDecode(text)['total'], 0);
 
       final (c2, _, _) = await post(
-          {'jsonrpc': '2.0', 'id': 4, 'method': 'tools/list'},
-          bearer: 'wrong', session: sid);
+        {'jsonrpc': '2.0', 'id': 4, 'method': 'tools/list'},
+        bearer: 'wrong',
+        session: sid,
+      );
       expect(c2, anyOf(401, 403), reason: 'token is checked on every request');
     });
 
     test('an empty token is refused at construction', () {
       expect(
-          () => buildHttpServer(() => env.server({ToolGroup.read}), token: ''),
-          throwsArgumentError);
+        () => buildHttpServer(() => env.server({ToolGroup.read}), token: ''),
+        throwsArgumentError,
+      );
     });
   });
 
   group('config', () {
     test('missing keys are named, values never printed', () {
       expect(
-          () => servicesFromConfig({'url': 'https://x/dav/u/c', 'user': 'u'}),
-          throwsA(isA<StateError>().having((e) => e.message, 'message',
-              allOf(contains('password'), isNot(contains('https://x'))))));
+        () => servicesFromConfig({'url': 'https://x/dav/u/c', 'user': 'u'}),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains('password'), isNot(contains('https://x'))),
+          ),
+        ),
+      );
     });
     test('home defaults to the parent of the collection', () {
-      final s = servicesFromConfig(
-          {'url': 'https://x/dav/u/c/', 'user': 'u', 'password': 'p'});
+      final s = servicesFromConfig({
+        'url': 'https://x/dav/u/c/',
+        'user': 'u',
+        'password': 'p',
+      });
       expect(s.collections.home.path, '/dav/u/');
     });
   });

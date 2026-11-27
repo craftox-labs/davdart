@@ -50,9 +50,10 @@ class SpaceBook {
     CalDavClient? client;
     if (c.hasServer && password != null) {
       client = CalDavClient(
-          collection: Uri.parse(c.url!),
-          username: c.user ?? '',
-          password: password);
+        collection: Uri.parse(c.url!),
+        username: c.user ?? '',
+        password: password,
+      );
     }
     return Space(c, store, client: client)..onConfigChanged = _save;
   }

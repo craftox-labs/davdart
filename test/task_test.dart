@@ -116,11 +116,15 @@ void main() {
   });
 
   test('DATE-TIME UTC due and an unparsable DUE stays verbatim', () {
-    final t = parseTask('BEGIN:VCALENDAR\nBEGIN:VTODO\nUID:x\n'
-        'DUE:20261125T090000Z\nEND:VTODO\nEND:VCALENDAR\n');
+    final t = parseTask(
+      'BEGIN:VCALENDAR\nBEGIN:VTODO\nUID:x\n'
+      'DUE:20261125T090000Z\nEND:VTODO\nEND:VCALENDAR\n',
+    );
     expect(t.due!.isUtc, isTrue);
-    final bad = parseTask('BEGIN:VCALENDAR\nBEGIN:VTODO\nUID:x\n'
-        'DUE:garbage\nDURATION:PT1H\nEND:VTODO\nEND:VCALENDAR\n');
+    final bad = parseTask(
+      'BEGIN:VCALENDAR\nBEGIN:VTODO\nUID:x\n'
+      'DUE:garbage\nDURATION:PT1H\nEND:VTODO\nEND:VCALENDAR\n',
+    );
     expect(bad.due, isNull);
     expect(serializeTask(bad), contains('DUE:garbage'));
     expect(serializeTask(bad), contains('DURATION:PT1H'));
@@ -133,9 +137,9 @@ void main() {
     expect(parseNotes(nextcloud), isEmpty);
     expect(parseTasks(note), isEmpty);
     expect(
-        () =>
-            parseTask('BEGIN:VCALENDAR\nBEGIN:VTODO\nEND:VTODO\nEND:VCALENDAR'),
-        throwsA(isA<ICalException>()));
+      () => parseTask('BEGIN:VCALENDAR\nBEGIN:VTODO\nEND:VTODO\nEND:VCALENDAR'),
+      throwsA(isA<ICalException>()),
+    );
   });
 
   test('complete, reopen and board status', () {
@@ -177,23 +181,41 @@ void staleStatusTagTests() {
   test('a stale open status tag does not override a closed STATUS', () {
     for (final tag in ['status-todo', 'status-doing', 'status-blocked']) {
       expect(
-          Task(uid: 'u', summary: 's', status: 'COMPLETED', categories: [tag])
-              .boardStatus,
-          'done');
+        Task(
+          uid: 'u',
+          summary: 's',
+          status: 'COMPLETED',
+          categories: [tag],
+        ).boardStatus,
+        'done',
+      );
       expect(
-          Task(uid: 'u', summary: 's', status: 'CANCELLED', categories: [tag])
-              .boardStatus,
-          'canceled');
+        Task(
+          uid: 'u',
+          summary: 's',
+          status: 'CANCELLED',
+          categories: [tag],
+        ).boardStatus,
+        'canceled',
+      );
     }
     expect(
-        Task(uid: 'u', summary: 's', status: 'COMPLETED', categories: [
-          'status-done'
-        ]).boardStatus,
-        'done');
+      Task(
+        uid: 'u',
+        summary: 's',
+        status: 'COMPLETED',
+        categories: ['status-done'],
+      ).boardStatus,
+      'done',
+    );
     expect(
-        Task(uid: 'u', summary: 's', status: 'IN-PROCESS', categories: [
-          'status-blocked'
-        ]).boardStatus,
-        'blocked');
+      Task(
+        uid: 'u',
+        summary: 's',
+        status: 'IN-PROCESS',
+        categories: ['status-blocked'],
+      ).boardStatus,
+      'blocked',
+    );
   });
 }

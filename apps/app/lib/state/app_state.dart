@@ -1599,6 +1599,27 @@ class AppState extends ChangeNotifier {
     prefs?.write(_scopeKey, jsonEncode(_scopes));
   }
 
+  /// Sets the scope to what [page] last showed; a page's first visit keeps
+  /// the scope the user already has. Home is personal: it brings back its own
+  /// loose folder scope, never a project scope (a project page owns that).
+  void _scopeToPage(DocTab? page) {
+    if (!_pageScope.containsKey(page)) return;
+    final want = _pageScope[page];
+    if (page == null && want != null && projectIndex.projectOf(want) != null) {
+      _scopeTo(null);
+      return;
+    }
+    _scopeTo(want);
+  }
+
+  /// Sets the scope to [uid] and saves it, doing nothing when it already is
+  /// the scope. A page's own scope goes through here.
+  void _scopeTo(String? uid) {
+    if (uid == scopeUid) return;
+    scopeUid = uid;
+    _persistScope();
+  }
+
   /// Makes the scope follow the active tab: the project page's project, or
   /// none for Home and the other pages.
   void _syncScopeToTab() {
@@ -1912,7 +1933,6 @@ class AppState extends ChangeNotifier {
 
   void _dropCaches() {
     _projectIndexCache = null;
-    _parentCache = null;
   }
 
   @override
@@ -2063,6 +2083,10 @@ class AppState extends ChangeNotifier {
             ? _viewByUid(at.id)
             : null;
         if (saved != null) applyView(saved);
+        // Home's own scope for this session: the loose folder scope coming
+        // back with it, never a restored project page's project.
+        _pageScope[null] = activeTab == null ? scopeUid : null;
+        if (at != null) _pageScope[at] = scopeUid;
       }
     } catch (e) {
       if (src != source) return;
@@ -2500,9 +2524,12 @@ class AppState extends ChangeNotifier {
   /// Deletes project [uid]. Its notes, tasks and events are kept: they move
   /// to the Personal container (a visible home, unlike the hidden Projects
   /// container the plain note delete would leave them in). Not a project:
-  /// the plain [deleteNote].
+  /// the plain [deleteNote]. Undo puts the folder back with its children
+  /// under it again.
   Future<void> deleteProject(String uid) async {
     if (!projectIndex.isProject(uid)) return deleteNote(uid);
+    final project = tree.find(uid)?.note.copyWith();
+    if (project == null) return;
     final home = await ensurePersonalContainer();
     // No Personal container (e.g. the Space changed under us): keep the
     // project and its children rather than orphan them.
@@ -2545,6 +2572,34 @@ class AppState extends ChangeNotifier {
       if (error != null) return;
     }
     await deleteNote(uid);
+    if (error != null) return;
+    // One Undo puts the folder and everything that was under it back. The
+    // children went to Personal, so they are saved again under the project
+    // rather than left there.
+    _postUndo('Deleted "${project.summary}"', () async {
+      await _edit((src) async {
+        await src.save(project);
+        for (final k in kidNotes) {
+          await src.save(k.copyWith(parentUid: uid));
+        }
+      });
+      if (error != null) return;
+      if (kidTasks.isNotEmpty) {
+        await _taskEdit((src) async {
+          for (final k in kidTasks) {
+            await src.saveTask(k.copyWith(parentUid: uid));
+          }
+        });
+        if (error != null) return;
+      }
+      if (kidEvents.isNotEmpty) {
+        await _eventEdit((src) async {
+          for (final k in kidEvents) {
+            await src.saveEvent(k.copyWith(parentUid: uid));
+          }
+        });
+      }
+    });
   }
 
   /// Adds a note (a child of [parentUid] if given) and selects it.
@@ -2616,41 +2671,12 @@ class AppState extends ChangeNotifier {
   }
 
   /// True when [t] sits under [uid] (a folder, note or task) at any depth.
-  bool taskIsUnder(Task t, String uid) => _isUnder(t.parentUid, uid);
+  bool taskIsUnder(Task t, String uid) =>
+      projectIndex.isUnder(t.parentUid, uid);
 
   /// True when [e] sits under [uid] (a folder, note or task) at any depth.
-  bool eventIsUnder(Event e, String uid) => _isUnder(e.parentUid, uid);
-
-  /// Walks the parent chain from [start] with the cached uid-to-parent map
-  /// (one map per notification, not a search per step) and a seen-set, so a
-  /// parent loop ends instead of spinning.
-  bool _isUnder(String? start, String uid) {
-    final parents = _parentCache ??= _buildParents();
-    final seen = <String>{};
-    var cur = start;
-    while (cur != null && seen.add(cur)) {
-      if (cur == uid) return true;
-      cur = parents[cur];
-    }
-    return false;
-  }
-
-  Map<String, String?> _buildParents() {
-    // Notes win over tasks over events, as in [findItem].
-    final m = <String, String?>{};
-    for (final e in events) {
-      m[e.uid] = e.parentUid;
-    }
-    for (final t in tasks) {
-      m[t.uid] = t.parentUid;
-    }
-    for (final n in notes) {
-      m[n.uid] = n.parentUid;
-    }
-    return m;
-  }
-
-  Map<String, String?>? _parentCache;
+  bool eventIsUnder(Event e, String uid) =>
+      projectIndex.isUnder(e.parentUid, uid);
 
   /// Whether task [t] is in the open scope (always, with no scope).
   bool taskInScope(Task t) => scopeUid == null || taskIsUnder(t, scopeUid!);
@@ -3914,6 +3940,7 @@ class AppState extends ChangeNotifier {
     _tabs.tabs.clear();
     _activeViewTab = null;
     peekCollapsed = false;
+    _pageScope.clear();
   }
 
   /// A tab stays while its kind's list cannot vouch for it: a task or event
@@ -3945,8 +3972,11 @@ class AppState extends ChangeNotifier {
     if (_tabs.retain(_tabExists)) _saveTabs();
     if (wasActive != null && !_tabs.contains(wasActive)) {
       _activeViewTab = null;
-      // The project page went away: its scope goes with it.
+      _pageScope.remove(wasActive);
+      // The project page went away: its scope goes with it, and Home starts
+      // from what is left.
       _syncScopeToTab();
+      _pageScope[null] = scopeUid;
     }
   }
 
@@ -4060,8 +4090,23 @@ class AppState extends ChangeNotifier {
     return null;
   }
 
+  /// The scope each page last showed: Home under the null key, a tab under
+  /// itself. Leaving a page books its scope, showing it restores it, so a
+  /// loose folder scope set on Home survives a trip through a note tab and
+  /// closing an unrelated tab changes nothing.
+  final Map<DocTab?, String?> _pageScope = {};
+
+  /// Shows [t] (null: home) in the main pane, leaving the active page's scope
+  /// behind for its next visit.
+  void _show(DocTab? t) => _showFrom(activeTab, t);
+
+  void _showFrom(DocTab? from, DocTab? t) {
+    if (from != t) _pageScope[from] = scopeUid;
+    _showPage(t);
+  }
+
   /// Shows [t] (null: home) in the main pane without asking about edits.
-  void _show(DocTab? t) {
+  void _showPage(DocTab? t) {
     // Narrow: leaving an item saves its pending edit.
     final leaving = activeTab;
     if (narrow && leaving != null && leaving != t && isEditing(leaving.id)) {
@@ -4077,38 +4122,36 @@ class AppState extends ChangeNotifier {
     }
     if (t == null) {
       _activeViewTab = null;
-      // Home is personal: the project scope belongs to a project page.
-      if (scopeUid != null) {
-        scopeUid = null;
-        _persistScope();
-      }
+      // Home keeps the scope Home showed before (a project page owns its
+      // project, so this is the loose folder scope or none).
+      _scopeToPage(null);
       _saveTabs();
       notifyListeners();
     } else if (t.kind == TabKind.note) {
       if (tree.find(t.id) == null) return;
       _activeViewTab = t;
+      _scopeToPage(t);
       if (peekUid == t.id) _setPeek(null);
       _saveTabs();
       notifyListeners();
     } else if (t.kind == TabKind.task) {
       if (_taskById(t.id) == null) return;
       _activeViewTab = t;
+      _scopeToPage(t);
       if (peekUid == t.id) _setPeek(null);
       _saveTabs();
       notifyListeners();
     } else if (t.kind == TabKind.event) {
       if (_eventById(t.id) == null) return;
       _activeViewTab = t;
+      _scopeToPage(t);
       if (peekUid == t.id) _setPeek(null);
       _saveTabs();
       notifyListeners();
     } else if (t.kind == TabKind.project) {
       if (!projectIndex.isProject(t.id)) return;
       _activeViewTab = t;
-      if (scopeUid != t.id) {
-        scopeUid = t.id;
-        _persistScope();
-      }
+      _scopeTo(t.id);
       _rememberProject(t.id);
       if (peekUid == t.id) _setPeek(null);
       _saveTabs();
@@ -4141,10 +4184,11 @@ class AppState extends ChangeNotifier {
         _eventDrafts.remove(t.id);
       }
       _saveTabs();
-      if (wasActive) _show(next);
-      // Only a closed project page gives up its scope; a loose folder scope
-      // (the Notes panel's own) survives closing any other tab.
-      if (t.kind == TabKind.project && wasActive) _syncScopeToTab();
+      // The next page brings back its own scope, booked from the page that
+      // was closed: only that page's scope goes with it, so closing any
+      // other tab leaves the loose folder scope alone.
+      if (wasActive) _showFrom(t, next);
+      _pageScope.remove(t);
       notifyListeners();
     }
 

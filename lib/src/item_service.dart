@@ -27,7 +27,8 @@ enum ItemKind {
   static ItemKind parse(String s) => ItemKind.values.firstWhere(
         (k) => k.name == s.toLowerCase().trim(),
         orElse: () => throw ItemServiceException(
-            'unknown kind "$s" (expected note, task or event)'),
+          'unknown kind "$s" (expected note, task or event)',
+        ),
       );
 }
 
@@ -202,8 +203,11 @@ class RankedItem {
   final String uid;
   final String title;
   final double? rank;
-  Map<String, Object?> toJson() =>
-      {'uid': uid, 'title': title, if (rank != null) 'rank': rank};
+  Map<String, Object?> toJson() => {
+        'uid': uid,
+        'title': title,
+        if (rank != null) 'rank': rank,
+      };
 }
 
 /// Outcome of [ItemService.rankItem]: what was written (the moved item and
@@ -315,7 +319,8 @@ class _Ref {
 
   /// Creation time for sorting: a missing CREATED is a fixed epoch (DTSTAMP
   /// defaults to "now" on parse, which would shuffle the order each sync).
-  DateTime get sortCreated => switch (raw) {
+  DateTime get sortCreated =>
+      switch (raw) {
         Note n => n.created,
         Task t => t.created,
         Event e => e.created,
@@ -381,7 +386,8 @@ class _Ref {
             lastModified: n.lastModified,
             extraLines: List.of(n.extraLines),
             calendarLines: List.of(n.calendarLines),
-            propertyParams: Map.of(n.propertyParams)),
+            propertyParams: Map.of(n.propertyParams),
+          ),
         Task t => Task(
             uid: uid,
             summary: t.summary,
@@ -399,7 +405,8 @@ class _Ref {
             lastModified: t.lastModified,
             extraLines: List.of(t.extraLines),
             calendarLines: List.of(t.calendarLines),
-            propertyParams: Map.of(t.propertyParams)),
+            propertyParams: Map.of(t.propertyParams),
+          ),
         Event e => Event(
             uid: uid,
             summary: e.summary,
@@ -418,7 +425,8 @@ class _Ref {
             lastModified: e.lastModified,
             extraLines: List.of(e.extraLines),
             calendarLines: List.of(e.calendarLines),
-            propertyParams: Map.of(e.propertyParams)),
+            propertyParams: Map.of(e.propertyParams),
+          ),
         _ => raw,
       });
 
@@ -440,7 +448,7 @@ class _Ref {
             !RegExp(r'^(UID|DTSTAMP|CREATED|LAST-MODIFIED|PRODID|X-WRITER)[:;]')
                 .hasMatch(l) &&
             !l.startsWith('RELATED-TO;RELTYPE=PARENT:'))
-          l
+          l,
     ];
   }
 
@@ -499,25 +507,26 @@ class _Ref {
     final h = d.href;
     if (base == null || h == null || h.startsWith('/')) return d;
     return ItemData(
-        kind: d.kind,
-        uid: d.uid,
-        title: d.title,
-        href: base.resolve(h).path,
-        etag: d.etag,
-        body: d.body,
-        tags: d.tags,
-        status: d.status,
-        parentUid: d.parentUid,
-        isFolder: d.isFolder,
-        due: d.due,
-        start: d.start,
-        end: d.end,
-        location: d.location,
-        priority: d.priority,
-        created: d.created,
-        modified: d.modified,
-        writer: d.writer,
-        rank: d.rank);
+      kind: d.kind,
+      uid: d.uid,
+      title: d.title,
+      href: base.resolve(h).path,
+      etag: d.etag,
+      body: d.body,
+      tags: d.tags,
+      status: d.status,
+      parentUid: d.parentUid,
+      isFolder: d.isFolder,
+      due: d.due,
+      start: d.start,
+      end: d.end,
+      location: d.location,
+      priority: d.priority,
+      created: d.created,
+      modified: d.modified,
+      writer: d.writer,
+      rank: d.rank,
+    );
   }
 
   ItemData _toData() => _withWriter(_toData0());
@@ -526,79 +535,83 @@ class _Ref {
     final w = writer;
     if (w == null) return d;
     return ItemData(
-        kind: d.kind,
-        uid: d.uid,
-        title: d.title,
-        href: d.href,
-        etag: d.etag,
-        body: d.body,
-        tags: d.tags,
-        status: d.status,
-        parentUid: d.parentUid,
-        isFolder: d.isFolder,
-        due: d.due,
-        start: d.start,
-        end: d.end,
-        location: d.location,
-        priority: d.priority,
-        created: d.created,
-        modified: d.modified,
-        writer: w,
-        rank: d.rank);
+      kind: d.kind,
+      uid: d.uid,
+      title: d.title,
+      href: d.href,
+      etag: d.etag,
+      body: d.body,
+      tags: d.tags,
+      status: d.status,
+      parentUid: d.parentUid,
+      isFolder: d.isFolder,
+      due: d.due,
+      start: d.start,
+      end: d.end,
+      location: d.location,
+      priority: d.priority,
+      created: d.created,
+      modified: d.modified,
+      writer: w,
+      rank: d.rank,
+    );
   }
 
   ItemData _toData0() {
     switch (raw) {
       case Note n:
         return ItemData(
-            kind: ItemKind.note,
-            uid: n.uid,
-            title: n.summary,
-            href: n.href,
-            etag: n.etag,
-            body: n.description,
-            tags: List.of(n.categories),
-            status: status,
-            parentUid: n.parentUid,
-            isFolder: isFolderNote(n),
-            priority: PlanItem.fromNote(n).priority,
-            created: n.created,
-            modified: n.lastModified,
-            rank: n.rank);
+          kind: ItemKind.note,
+          uid: n.uid,
+          title: n.summary,
+          href: n.href,
+          etag: n.etag,
+          body: n.description,
+          tags: List.of(n.categories),
+          status: status,
+          parentUid: n.parentUid,
+          isFolder: isFolderNote(n),
+          priority: PlanItem.fromNote(n).priority,
+          created: n.created,
+          modified: n.lastModified,
+          rank: n.rank,
+        );
       case Task t:
         return ItemData(
-            kind: ItemKind.task,
-            uid: t.uid,
-            title: t.summary,
-            href: t.href,
-            etag: t.etag,
-            body: t.description,
-            tags: List.of(t.categories),
-            status: t.boardStatus,
-            parentUid: t.parentUid,
-            due: t.due?.value,
-            start: t.dtstart?.value,
-            priority: t.priority,
-            created: t.created,
-            modified: t.lastModified,
-            rank: t.rank);
+          kind: ItemKind.task,
+          uid: t.uid,
+          title: t.summary,
+          href: t.href,
+          etag: t.etag,
+          body: t.description,
+          tags: List.of(t.categories),
+          status: t.boardStatus,
+          parentUid: t.parentUid,
+          due: t.due?.value,
+          start: t.dtstart?.value,
+          priority: t.priority,
+          created: t.created,
+          modified: t.lastModified,
+          rank: t.rank,
+        );
       default:
         final e = raw as Event;
         return ItemData(
-            kind: ItemKind.event,
-            uid: e.uid,
-            title: e.summary,
-            href: e.href,
-            etag: e.etag,
-            body: e.description,
-            tags: List.of(e.categories),
-            status: status,
-            parentUid: e.parentUid,
-            start: e.dtstart?.value,
-            end: e.dtend?.value,
-            location: e.location,
-            created: e.created,
-            modified: e.lastModified);
+          kind: ItemKind.event,
+          uid: e.uid,
+          title: e.summary,
+          href: e.href,
+          etag: e.etag,
+          body: e.description,
+          tags: List.of(e.categories),
+          status: status,
+          parentUid: e.parentUid,
+          start: e.dtstart?.value,
+          end: e.dtend?.value,
+          location: e.location,
+          created: e.created,
+          modified: e.lastModified,
+        );
     }
   }
 
@@ -612,7 +625,8 @@ class _Ref {
         } on ConflictException {
           final remote = await c.getNote(n.href!);
           return _Ref(
-              await c.putNote(mergeNotes(base.raw as Note, n, remote).note));
+            await c.putNote(mergeNotes(base.raw as Note, n, remote).note),
+          );
         }
       case Task t:
         try {
@@ -620,7 +634,8 @@ class _Ref {
         } on ConflictException {
           final remote = await c.getTask(t.href!);
           return _Ref(
-              await c.putTask(mergeTasks(base.raw as Task, t, remote).task));
+            await c.putTask(mergeTasks(base.raw as Task, t, remote).task),
+          );
         }
       default:
         final e = raw as Event;
@@ -628,8 +643,9 @@ class _Ref {
           return _Ref(await c.putEvent(e));
         } on ConflictException {
           final remote = await c.getEvent(e.href!);
-          return _Ref(await c
-              .putEvent(mergeEvents(base.raw as Event, e, remote).event));
+          return _Ref(
+            await c.putEvent(mergeEvents(base.raw as Event, e, remote).event),
+          );
         }
     }
   }
@@ -645,16 +661,20 @@ class _Ref {
 /// forms into an [ICalDate]. A timed value without Z is floating.
 ICalDate parseWhen(String s) {
   final m = RegExp(
-          r'^(\d{4})-?(\d{2})-?(\d{2})(?:[T ](\d{2}):?(\d{2})(?::?(\d{2}))?(Z)?)?$')
-      .firstMatch(s.trim());
+    r'^(\d{4})-?(\d{2})-?(\d{2})(?:[T ](\d{2}):?(\d{2})(?::?(\d{2}))?(Z)?)?$',
+  ).firstMatch(s.trim());
   if (m == null) {
-    throw ItemServiceException('cannot read date "$s" (use YYYY-MM-DD or '
-        'YYYY-MM-DDTHH:MM[:SS][Z])');
+    throw ItemServiceException(
+      'cannot read date "$s" (use YYYY-MM-DD or '
+      'YYYY-MM-DDTHH:MM[:SS][Z])',
+    );
   }
   final y = m.group(1)!, mo = m.group(2)!, d = m.group(3)!;
   if (m.group(4) == null) return ICalDate('$y$mo$d', ';VALUE=DATE');
-  return ICalDate('$y$mo${d}T${m.group(4)}${m.group(5)}${m.group(6) ?? '00'}'
-      '${m.group(7) ?? ''}');
+  return ICalDate(
+    '$y$mo${d}T${m.group(4)}${m.group(5)}${m.group(6) ?? '00'}'
+    '${m.group(7) ?? ''}',
+  );
 }
 
 /// Item operations over one CalDAV collection, generic over note, task and
@@ -687,7 +707,7 @@ class ItemService {
   /// Saved-view notes (hidden by [_load]).
   Future<List<_Ref>> _loadViews() async => [
         for (final n in await client.listNotes())
-          if (isViewNote(n)) _Ref(n)
+          if (isViewNote(n)) _Ref(n),
       ];
 
   /// The first difference between two items' content, as "FIELD", or null.
@@ -706,28 +726,35 @@ class ItemService {
   NoteTree _tree(List<_Ref> refs) => NoteTree.build([
         for (final r in refs)
           Note(
-              uid: r.uid,
-              summary: r.title,
-              parentUid: r.parentUid,
-              created: r.created)
+            uid: r.uid,
+            summary: r.title,
+            parentUid: r.parentUid,
+            created: r.created,
+          ),
       ]);
 
   _Ref _find(List<_Ref> refs, String id, {ItemKind? kind}) {
     final low = id.toLowerCase();
     var hits = refs
-        .where((r) =>
-            (kind == null || r.kind == kind) && (r.uid == id || r.href == id))
+        .where(
+          (r) =>
+              (kind == null || r.kind == kind) && (r.uid == id || r.href == id),
+        )
         .toList();
     if (hits.isEmpty) {
       hits = refs
-          .where((r) =>
-              (kind == null || r.kind == kind) && r.title.toLowerCase() == low)
+          .where(
+            (r) =>
+                (kind == null || r.kind == kind) &&
+                r.title.toLowerCase() == low,
+          )
           .toList();
     }
     if (hits.isEmpty) throw ItemServiceException('no item matches "$id"');
     if (hits.length > 1) {
       throw ItemServiceException(
-          '${hits.length} items match "$id": ${hits.map((h) => '${h.title} (${h.uid})').join(' | ')}');
+        '${hits.length} items match "$id": ${hits.map((h) => '${h.title} (${h.uid})').join(' | ')}',
+      );
     }
     return hits.single;
   }
@@ -740,8 +767,13 @@ class ItemService {
     final byUid = {for (final r in refs) r.uid: r};
     OverviewNode node(NoteNode n, int depth) {
       final r = byUid[n.note.uid]!;
-      final o = OverviewNode(r.kind, r.uid, r.title, r.status,
-          r.raw is Note && isFolderNote(r.raw as Note));
+      final o = OverviewNode(
+        r.kind,
+        r.uid,
+        r.title,
+        r.status,
+        r.raw is Note && isFolderNote(r.raw as Note),
+      );
       if (depth >= maxDepth) {
         o.hiddenChildren = n.children.length;
       } else {
@@ -772,8 +804,13 @@ class ItemService {
         byTag[t] = (byTag[t] ?? 0) + 1;
       }
     }
-    return Overview([for (final n in start) node(n, 1)], refs.length, byKind,
-        byStatus, byTag);
+    return Overview(
+      [for (final n in start) node(n, 1)],
+      refs.length,
+      byKind,
+      byStatus,
+      byTag,
+    );
   }
 
   /// Filtered, paged list without bodies. [under] is a folder (or any item)
@@ -802,8 +839,7 @@ class ItemService {
     final hits = refs.where((r) {
       if (!includeFolders &&
           r.raw is Note &&
-          (isFolderNote(r.raw as Note) ||
-              isPersonalContainer(r.raw as Note))) {
+          (isFolderNote(r.raw as Note) || isPersonalContainer(r.raw as Note))) {
         return false;
       }
       if (tag != null && !r.tags.contains(tag)) return false;
@@ -827,8 +863,12 @@ class ItemService {
       });
     final lim = limit.clamp(1, 500);
     final off = offset < 0 ? 0 : offset;
-    return ItemPage([for (final r in hits.skip(off).take(lim)) r.toData()],
-        hits.length, off, lim);
+    return ItemPage(
+      [for (final r in hits.skip(off).take(lim)) r.toData()],
+      hits.length,
+      off,
+      lim,
+    );
   }
 
   /// One item by uid, href or exact title.
@@ -846,10 +886,11 @@ class ItemService {
     final items = <ItemData>[];
     for (var off = 0;;) {
       final page = await list(
-          kind: ItemKind.note,
-          includeFolders: false,
-          limit: limit,
-          offset: off);
+        kind: ItemKind.note,
+        includeFolders: false,
+        limit: limit,
+        offset: off,
+      );
       items.addAll(page.items);
       off += page.items.length;
       if (!page.hasMore || page.items.isEmpty) break;
@@ -882,12 +923,13 @@ class ItemService {
   /// the rank line in [ItemData.rank], which [compareBoardItems] needs.
   static Note _noteOf(ItemData i) {
     final n = Note(
-        uid: i.uid,
-        summary: i.title,
-        description: i.body,
-        categories: List.of(i.tags),
-        created: i.created,
-        lastModified: i.modified);
+      uid: i.uid,
+      summary: i.title,
+      description: i.body,
+      categories: List.of(i.tags),
+      created: i.created,
+      lastModified: i.modified,
+    );
     if (i.rank != null) n.rank = i.rank;
     return n;
   }
@@ -897,7 +939,7 @@ class ItemService {
 
   List<String> _cleanTags(Iterable<String> t) => {
         for (final x in t)
-          if (x.trim().isNotEmpty) x.trim().replaceAll(',', '-')
+          if (x.trim().isNotEmpty) x.trim().replaceAll(',', '-'),
       }.toList();
 
   /// Creates an item. [due] and [priority] apply to tasks; [start], [end] and
@@ -931,7 +973,8 @@ class ItemService {
     if (kind != ItemKind.event &&
         (start != null || end != null || location != null)) {
       throw ItemServiceException(
-          'start, end and location apply to events only');
+        'start, end and location apply to events only',
+      );
     }
     String? parentUid;
     if (parent != null) parentUid = _find(await _load(), parent).uid;
@@ -942,51 +985,58 @@ class ItemService {
     switch (kind) {
       case ItemKind.note:
         final n = Note(
-            uid: uid,
-            summary: title,
-            description: body,
-            categories: cats,
-            parentUid: parentUid,
-            created: now,
-            lastModified: now);
+          uid: uid,
+          summary: title,
+          description: body,
+          categories: cats,
+          parentUid: parentUid,
+          created: now,
+          lastModified: now,
+        );
         ref = _Ref(n);
         if (status != null) _setStatus(ref, status, now);
         if (priority != null) _setNotePriority(n, priority);
       case ItemKind.task:
         final t = Task(
-            uid: uid,
-            summary: title,
-            description: body,
-            categories: cats,
-            status: 'NEEDS-ACTION',
-            priority: priority,
-            due: due == null ? null : parseWhen(due),
-            parentUid: parentUid,
-            created: now,
-            lastModified: now);
+          uid: uid,
+          summary: title,
+          description: body,
+          categories: cats,
+          status: 'NEEDS-ACTION',
+          priority: priority,
+          due: due == null ? null : parseWhen(due),
+          parentUid: parentUid,
+          created: now,
+          lastModified: now,
+        );
         ref = _Ref(t);
         if (status != null) _setStatus(ref, status, now);
       case ItemKind.event:
         if (start == null) throw ItemServiceException('an event needs a start');
         final e = Event(
-            uid: uid,
-            summary: title,
-            description: body,
-            location: location ?? '',
-            categories: cats,
-            dtstart: parseWhen(start),
-            dtend: end == null ? null : parseWhen(end),
-            parentUid: parentUid,
-            created: now,
-            lastModified: now);
+          uid: uid,
+          summary: title,
+          description: body,
+          location: location ?? '',
+          categories: cats,
+          dtstart: parseWhen(start),
+          dtend: end == null ? null : parseWhen(end),
+          parentUid: parentUid,
+          created: now,
+          lastModified: now,
+        );
         ref = _Ref(e);
         if (status != null) _setStatus(ref, status, now);
     }
     ref.stampWriter(writer);
     final desc = ['create ${folder ? 'folder' : kind.name} "$title"'];
     if (dryRun) return ItemChange('create', true, desc, ref.toData());
-    return ItemChange('create', false, desc,
-        (await ref.put(client, ref)).toData(client.collection));
+    return ItemChange(
+      'create',
+      false,
+      desc,
+      (await ref.put(client, ref)).toData(client.collection),
+    );
   }
 
   Future<ItemChange> _edit(
@@ -1005,8 +1055,12 @@ class ItemService {
     if (changes.isEmpty || dryRun) {
       return ItemChange(action, dryRun, changes, edit.toData());
     }
-    return ItemChange(action, false, changes,
-        (await edit.put(client, base)).toData(client.collection));
+    return ItemChange(
+      action,
+      false,
+      changes,
+      (await edit.put(client, base)).toData(client.collection),
+    );
   }
 
   /// Changes title, body, location (events) or start and end (events).
@@ -1050,7 +1104,8 @@ class ItemService {
         if (location != null || start != null || end != null) {
           if (raw is! Event) {
             throw ItemServiceException(
-                'location, start and end apply to events only');
+              'location, start and end apply to events only',
+            );
           }
           if (location != null && location != raw.location) {
             ch.add('location: "${raw.location}" -> "$location"');
@@ -1071,13 +1126,18 @@ class ItemService {
 
   /// Moves an item under [parent] (uid or title), or to the top level when
   /// [parent] is null. Refuses a move that would make a loop.
-  Future<ItemChange> move(String id, String? parent,
-          {String? writer, bool dryRun = false}) =>
+  Future<ItemChange> move(
+    String id,
+    String? parent, {
+    String? writer,
+    bool dryRun = false,
+  }) =>
       _edit(id, 'move', null, dryRun, (e, all) {
         final target = parent == null ? null : _find(all, parent);
         if (!_tree(all).canMove(e.uid, target?.uid)) {
           throw ItemServiceException(
-              'cannot move "${e.title}" under "${target?.title}"');
+            'cannot move "${e.title}" under "${target?.title}"',
+          );
         }
         if (e.parentUid == target?.uid) return [];
         final from = e.parentUid;
@@ -1088,35 +1148,41 @@ class ItemService {
   /// Replaces ([set]), adds to ([add]) or removes from ([remove]) the tags.
   /// Status tags are managed by [setStatus]; this leaves them alone unless
   /// named explicitly.
-  Future<ItemChange> setTags(String id,
-          {List<String>? set,
-          List<String> add = const [],
-          List<String> remove = const [],
-          ItemKind? kind,
-          String? writer,
-          bool dryRun = false}) =>
+  Future<ItemChange> setTags(
+    String id, {
+    List<String>? set,
+    List<String> add = const [],
+    List<String> remove = const [],
+    ItemKind? kind,
+    String? writer,
+    bool dryRun = false,
+  }) =>
       _edit(id, 'tags', kind, dryRun, (e, _) {
         final before = List.of(e.tags);
         bool reserved(String x) => x.startsWith('kind-');
         for (final x in [..._cleanTags(add), ..._cleanTags(remove)]) {
           if (reserved(x)) {
-            throw ItemServiceException('"$x" cannot be added or removed with '
-                'tags: kind-* tags ($folderTag, $projectsTag, $personalTag, '
-                '$viewTag) decide what a note is. Use create --folder (or '
-                'the Projects and Personal actions in the app) instead');
+            throw ItemServiceException(
+              '"$x" cannot be added or removed with '
+              'tags: kind-* tags ($folderTag, $projectsTag, $personalTag, '
+              '$viewTag) decide what a note is. Use create --folder (or '
+              'the Projects and Personal actions in the app) instead',
+            );
           }
         }
         for (final x in _cleanTags(set ?? const [])) {
           if (reserved(x) && !before.contains(x)) {
-            throw ItemServiceException('"$x" cannot be set with tags: '
-                'kind-* tags decide what a note is');
+            throw ItemServiceException(
+              '"$x" cannot be set with tags: '
+              'kind-* tags decide what a note is',
+            );
           }
         }
         var t = set == null
             ? List.of(before)
             : [
                 ..._cleanTags(set).where((x) => !reserved(x)),
-                ...before.where((x) => x.startsWith('status-') || reserved(x))
+                ...before.where((x) => x.startsWith('status-') || reserved(x)),
               ];
         for (final a in _cleanTags(add)) {
           if (!t.contains(a)) t.add(a);
@@ -1136,8 +1202,10 @@ class ItemService {
     if (w != null && w.isNotEmpty) {
       w = canonicalStatus(w);
       if (w == null) {
-        throw ItemServiceException('unknown status "${word!.trim()}"; '
-            'allowed: ${allowedStatuses.join(', ')}');
+        throw ItemServiceException(
+          'unknown status "${word!.trim()}"; '
+          'allowed: ${allowedStatuses.join(', ')}',
+        );
       }
     }
     switch (e.raw) {
@@ -1169,8 +1237,13 @@ class ItemService {
   /// in step (via [Task.setBoardStatus]); notes and events use `status-*`
   /// tags (and the body header of a plan note). A null [status] clears it
   /// (not for tasks).
-  Future<ItemChange> setStatus(String id, String? status,
-          {ItemKind? kind, String? writer, bool dryRun = false}) =>
+  Future<ItemChange> setStatus(
+    String id,
+    String? status, {
+    ItemKind? kind,
+    String? writer,
+    bool dryRun = false,
+  }) =>
       _edit(id, 'status', kind, dryRun, (e, _) {
         final before = e.status;
         _setStatus(e, status, _now());
@@ -1181,8 +1254,12 @@ class ItemService {
       }, writer);
 
   /// Sets the due date of a task ([due] null clears it).
-  Future<ItemChange> setDue(String id, String? due,
-          {String? writer, bool dryRun = false}) =>
+  Future<ItemChange> setDue(
+    String id,
+    String? due, {
+    String? writer,
+    bool dryRun = false,
+  }) =>
       _edit(id, 'due', ItemKind.task, dryRun, (e, _) {
         final t = e.raw as Task;
         final nd = due == null ? null : parseWhen(due);
@@ -1202,8 +1279,13 @@ class ItemService {
   /// Sets the priority of a task or note (1 highest .. 9 lowest; null clears
   /// it). A note keeps it as a `priority: high|medium|low` body line (1-4 high,
   /// 5 medium, 6-9 low; 1, 5 and 9 are what it reads back as).
-  Future<ItemChange> setPriority(String id, int? priority,
-      {ItemKind? kind, String? writer, bool dryRun = false}) {
+  Future<ItemChange> setPriority(
+    String id,
+    int? priority, {
+    ItemKind? kind,
+    String? writer,
+    bool dryRun = false,
+  }) {
     if (priority != null && (priority < 0 || priority > 9)) {
       throw ItemServiceException('priority is 0..9');
     }
@@ -1222,7 +1304,8 @@ class ItemService {
           return ['priority: ${before ?? '-'} -> ${after ?? '-'}'];
         default:
           throw ItemServiceException(
-              'priority applies to tasks and notes only; "${e.title}" is an event');
+            'priority applies to tasks and notes only; "${e.title}" is an event',
+          );
       }
     }, writer);
   }
@@ -1243,28 +1326,36 @@ class ItemService {
     String? writer,
     bool dryRun = false,
   }) async {
-    final n = [top, bottom, before != null, after != null, clear]
-        .where((x) => x)
-        .length;
+    final n = [
+      top,
+      bottom,
+      before != null,
+      after != null,
+      clear,
+    ].where((x) => x).length;
     if (n != 1) {
       throw ItemServiceException(
-          'rank needs exactly one of top, bottom, before, after, clear');
+        'rank needs exactly one of top, bottom, before, after, clear',
+      );
     }
     final all = await _load();
     final base = _find(all, id);
     final bi = base.boardItem;
     if (bi == null) {
       throw ItemServiceException(
-          'rank applies to notes and tasks only; "${base.title}" is an event');
+        'rank applies to notes and tasks only; "${base.title}" is an event',
+      );
     }
     if (base.raw is Note && isFolderNote(base.raw as Note)) {
       throw ItemServiceException(
-          'rank applies to notes and tasks, not folders; "${base.title}" is a folder');
+        'rank applies to notes and tasks, not folders; "${base.title}" is a folder',
+      );
     }
     final st = base.status;
     if (st == null) {
       throw ItemServiceException(
-          'cannot rank "${base.title}": it has no status (rank orders a status column)');
+        'cannot rank "${base.title}": it has no status (rank orders a status column)',
+      );
     }
     String col(String s) => canonicalStatus(s) ?? s;
     final column = <_Ref>[
@@ -1283,11 +1374,13 @@ class ItemService {
       final r = _find(all, q);
       if (r.uid == base.uid) {
         throw ItemServiceException(
-            'cannot place "${base.title}" relative to itself');
+          'cannot place "${base.title}" relative to itself',
+        );
       }
       if (!others.any((o) => o.uid == r.uid)) {
         throw ItemServiceException(
-            '"${r.title}" is not in the ${col(st)} column with "${base.title}"');
+          '"${r.title}" is not in the ${col(st)} column with "${base.title}"',
+        );
       }
       return r;
     }
@@ -1316,31 +1409,34 @@ class ItemService {
       if (orig.rank == e.value) continue;
       final c = orig.clone()..rank = e.value;
       edits[orig] = c;
-      changes
-          .add('${orig.title}: rank ${orig.rank ?? '-'} -> ${e.value ?? '-'}');
+      changes.add(
+        '${orig.title}: rank ${orig.rank ?? '-'} -> ${e.value ?? '-'}',
+      );
     }
     for (final c in edits.values) {
       c.stampWriter(writer);
     }
-    final after0 = [
-      for (final r in column) edits[r] ?? r,
-    ]..sort((a, b) => compareBoardItems(a.boardItem!, b.boardItem!));
+    final after0 = [for (final r in column) edits[r] ?? r]
+      ..sort((a, b) => compareBoardItems(a.boardItem!, b.boardItem!));
     if (!dryRun) {
       for (final en in edits.entries) {
         await en.value.put(client, en.key);
       }
     }
-    return RankChange(dryRun, col(st), changes,
-        [for (final r in after0) RankedItem(r.uid, r.title, r.rank)]);
+    return RankChange(dryRun, col(st), changes, [
+      for (final r in after0) RankedItem(r.uid, r.title, r.rank),
+    ]);
   }
 
   /// Deletes an item. With [adoptChildren] (default) its children move up to
   /// its own parent first, so none are left dangling.
-  Future<ItemChange> delete(String id,
-      {ItemKind? kind,
-      bool adoptChildren = true,
-      String? writer,
-      bool dryRun = false}) async {
+  Future<ItemChange> delete(
+    String id, {
+    ItemKind? kind,
+    bool adoptChildren = true,
+    String? writer,
+    bool dryRun = false,
+  }) async {
     final all = await _load();
     final ref = _find(all, id, kind: kind);
     final kids = adoptChildren
@@ -1407,8 +1503,10 @@ class ItemService {
     final inSet = {for (final r in set) r.uid};
     for (final r in set) {
       if (r.hasSiblings) {
-        throw ItemServiceException('"${r.title}" is a repeating item with '
-            'changed occurrences; it cannot be moved');
+        throw ItemServiceException(
+          '"${r.title}" is a repeating item with '
+          'changed occurrences; it cannot be moved',
+        );
       }
     }
     // Unreadable resources in the source.
@@ -1423,23 +1521,27 @@ class ItemService {
     };
     final unreadable = [
       for (final r in raw)
-        if (!readable.contains(client.pathOf(r.href))) r.href
+        if (!readable.contains(client.pathOf(r.href))) r.href,
     ];
     if (unreadable.isNotEmpty && !allowUnreadable) {
-      throw ItemServiceException('the source holds ${unreadable.length} '
-          'unreadable resource(s) (${unreadable.take(5).join(', ')}); nothing '
-          'was moved. Allow unreadable to move anyway (they stay untouched)');
+      throw ItemServiceException(
+        'the source holds ${unreadable.length} '
+        'unreadable resource(s) (${unreadable.take(5).join(', ')}); nothing '
+        'was moved. Allow unreadable to move anyway (they stay untouched)',
+      );
     }
     final tAll = await target._load();
     final under0 = under == null ? null : target._find(tAll, under);
     if (under0 != null &&
         !(under0.raw is Note && isFolderNote(under0.raw as Note))) {
-      throw ItemServiceException('--under "${under0.title}" is not a folder '
-          'in the target collection; nothing was moved');
+      throw ItemServiceException(
+        '--under "${under0.title}" is not a folder '
+        'in the target collection; nothing was moved',
+      );
     }
     final views = [
       for (final v in await _loadViews())
-        if (inSet.contains(v.parentUid)) v
+        if (inSet.contains(v.parentUid)) v,
     ];
     final fresh = {for (final r in set) r.uid: target._newUid()};
     final kids =
@@ -1447,13 +1549,14 @@ class ItemService {
     final entries = [
       for (final r in set)
         MoveEntry(
-            r.kind,
-            r.uid,
-            fresh[r.uid]!,
-            r.title,
-            r.uid == root.uid
-                ? under0?.uid
-                : (inSet.contains(r.parentUid) ? fresh[r.parentUid] : null)),
+          r.kind,
+          r.uid,
+          fresh[r.uid]!,
+          r.title,
+          r.uid == root.uid
+              ? under0?.uid
+              : (inSet.contains(r.parentUid) ? fresh[r.parentUid] : null),
+        ),
     ];
     final stamp = _now()
         .toUtc()
@@ -1493,8 +1596,9 @@ class ItemService {
       final body = h == null ? null : rawByPath[client.pathOf(h)]?.data;
       if (h == null || body == null || body.trim().isEmpty) {
         throw ItemServiceException(
-            'cannot back up "${r.title}": no raw copy or it is empty; '
-            'nothing was moved');
+          'cannot back up "${r.title}": no raw copy or it is empty; '
+          'nothing was moved',
+        );
       }
       final label = client.pathOf(h).split('/').where((x) => x.isNotEmpty).last;
       final safe = label
@@ -1506,13 +1610,15 @@ class ItemService {
     if (files.length != set.length ||
         files.values.any((t) => t.trim().isEmpty)) {
       throw ItemServiceException(
-          'backup set is incomplete (${files.length} of ${set.length}, or an '
-          'empty file); nothing was moved');
+        'backup set is incomplete (${files.length} of ${set.length}, or an '
+        'empty file); nothing was moved',
+      );
     }
     final written = (backupWriter ?? writeBackupFiles)(dir!, files);
     if (written != null && written != files.length) {
       throw ItemServiceException(
-          'backup wrote $written of ${files.length} files; nothing was moved');
+        'backup wrote $written of ${files.length} files; nothing was moved',
+      );
     }
 
     // Copy everything first.
@@ -1528,8 +1634,10 @@ class ItemService {
         made.add(x.newUid);
       }
     } catch (e) {
-      throw ItemServiceException('copy failed ($e); the originals were kept; '
-          '${madeText()}');
+      throw ItemServiceException(
+        'copy failed ($e); the originals were kept; '
+        '${madeText()}',
+      );
     }
     // Read the target back and check every copy.
     final back = {for (final r in await target._load()) r.uid: r};
@@ -1553,21 +1661,27 @@ class ItemService {
         if (f != null) bad = 'field $f differs';
       }
       if (bad != null) {
-        throw ItemServiceException('verification failed for "${x.title}" '
-            '(${x.newUid}): $bad; the originals were kept; ${madeText()}');
+        throw ItemServiceException(
+          'verification failed for "${x.title}" '
+          '(${x.newUid}): $bad; the originals were kept; ${madeText()}',
+        );
       }
     }
     if (made.length != set.length) {
-      throw ItemServiceException('verification failed: ${made.length} copies '
-          'for ${set.length} items; the originals were kept; ${madeText()}');
+      throw ItemServiceException(
+        'verification failed: ${made.length} copies '
+        'for ${set.length} items; the originals were kept; ${madeText()}',
+      );
     }
     // The originals must be unchanged since they were read.
     final now = {for (final r in await _load()) r.uid: r};
     for (final r in set) {
       final n = now[r.uid];
       if (n == null || n.etag != r.etag) {
-        throw ItemServiceException('"${r.title}" changed while moving; the '
-            'originals were kept; ${madeText()}');
+        throw ItemServiceException(
+          '"${r.title}" changed while moving; the '
+          'originals were kept; ${madeText()}',
+        );
       }
     }
     // Re-parent what stays behind, then delete originals, children first.
@@ -1589,8 +1703,10 @@ class ItemService {
         await edit.put(client, k);
       }
     } catch (e) {
-      throw ItemServiceException('re-parenting failed ($e); no original was '
-          'deleted; ${pending()}');
+      throw ItemServiceException(
+        're-parenting failed ($e); no original was '
+        'deleted; ${pending()}',
+      );
     }
     try {
       for (final r in set.reversed) {
@@ -1598,8 +1714,10 @@ class ItemService {
         deleted++;
       }
     } catch (e) {
-      throw ItemServiceException('delete failed after $deleted of '
-          '${set.length} originals ($e); ${pending()}');
+      throw ItemServiceException(
+        'delete failed after $deleted of '
+        '${set.length} originals ($e); ${pending()}',
+      );
     }
     return MoveResult(false, plan, entries, dir, true, views.length);
   }
@@ -1609,7 +1727,12 @@ class ItemService {
 /// new parent uid (null: top level).
 class MoveEntry {
   const MoveEntry(
-      this.kind, this.oldUid, this.newUid, this.title, this.newParent);
+    this.kind,
+    this.oldUid,
+    this.newUid,
+    this.title,
+    this.newParent,
+  );
   final ItemKind kind;
   final String oldUid, newUid, title;
   final String? newParent;
@@ -1626,8 +1749,13 @@ class MoveEntry {
 /// written; [deleted] says the originals are gone.
 class MoveResult {
   const MoveResult(
-      this.dryRun, this.plan, this.entries, this.backupPath, this.deleted,
-      [this.viewNotesLeft = 0]);
+    this.dryRun,
+    this.plan,
+    this.entries,
+    this.backupPath,
+    this.deleted, [
+    this.viewNotesLeft = 0,
+  ]);
   final bool dryRun;
   final List<String> plan;
   final List<MoveEntry> entries;

@@ -79,8 +79,9 @@ class MemoryNoteStore implements NoteStore {
   }
 
   @override
-  Future<List<StoredNote>> all() async =>
-      [for (final s in _notes.values) _cloneStored(s)];
+  Future<List<StoredNote>> all() async => [
+        for (final s in _notes.values) _cloneStored(s),
+      ];
 
   @override
   Future<void> put(String uid, StoredNote s) async {
@@ -113,8 +114,11 @@ class MemoryNoteStore implements NoteStore {
   Future<List<Revision>> revisions(String uid) async =>
       _revisions.where((r) => r.uid == uid).toList();
 
-  static Map<String, Object?> _encode(Note n) =>
-      {'ics': serializeNote(n), 'href': n.href, 'etag': n.etag};
+  static Map<String, Object?> _encode(Note n) => {
+        'ics': serializeNote(n),
+        'href': n.href,
+        'etag': n.etag,
+      };
 
   static Note _decode(Map<String, dynamic> m) => parseNote(m['ics'] as String)
     ..href = m['href'] as String?
@@ -132,7 +136,7 @@ class MemoryNoteStore implements NoteStore {
               'base': e.value.base == null ? null : _encode(e.value.base!),
               'dirty': e.value.dirty,
               'deleted': e.value.deleted,
-            }
+            },
         },
         'revisions': [
           for (final r in _revisions)
@@ -142,7 +146,7 @@ class MemoryNoteStore implements NoteStore {
               'reason': r.reason,
               'summary': r.summary,
               'body': r.body,
-            }
+            },
         ],
       };
 
@@ -164,13 +168,15 @@ class MemoryNoteStore implements NoteStore {
     }
     for (final r in j['revisions'] as List<dynamic>) {
       final m = r as Map<String, dynamic>;
-      _revisions.add(Revision(
-        uid: m['uid'] as String,
-        at: DateTime.parse(m['at'] as String),
-        reason: m['reason'] as String,
-        summary: m['summary'] as String,
-        body: m['body'] as String,
-      ));
+      _revisions.add(
+        Revision(
+          uid: m['uid'] as String,
+          at: DateTime.parse(m['at'] as String),
+          reason: m['reason'] as String,
+          summary: m['summary'] as String,
+          body: m['body'] as String,
+        ),
+      );
     }
   }
 }

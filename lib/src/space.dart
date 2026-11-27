@@ -16,8 +16,12 @@ class SpaceConfig {
 
   bool get hasServer => url != null;
 
-  Map<String, Object?> toJson() =>
-      {'id': id, 'name': name, 'url': url, 'user': user};
+  Map<String, Object?> toJson() => {
+        'id': id,
+        'name': name,
+        'url': url,
+        'user': user,
+      };
 
   factory SpaceConfig.fromJson(Map<String, dynamic> j) => SpaceConfig(
         id: j['id'] as String,
@@ -30,9 +34,12 @@ class SpaceConfig {
 /// One body of notes: a project, an inbox. Always usable offline; a server is
 /// optional and can be attached or detached at any time.
 class Space {
-  Space(this.config, this.store,
-      {CalDavClient? client, DateTime Function()? now})
-      : _client = client,
+  Space(
+    this.config,
+    this.store, {
+    CalDavClient? client,
+    DateTime Function()? now,
+  })  : _client = client,
         _now = now;
 
   final SpaceConfig config;
@@ -54,15 +61,16 @@ class Space {
   // One engine (and its http.Client) for the life of the Space, not one per
   // call: a client is never closed here, so each call used to leak sockets.
   late final SyncEngine _local = SyncEngine(
-        // Local edits never touch the network; a throwaway client is not
-        // needed because save/delete/notes only use the store.
-        CalDavClient(
-            collection: Uri.parse('http://localhost/'),
-            username: '',
-            password: ''),
-        store,
-        now: _now,
-      );
+    // Local edits never touch the network; a throwaway client is not
+    // needed because save/delete/notes only use the store.
+    CalDavClient(
+      collection: Uri.parse('http://localhost/'),
+      username: '',
+      password: '',
+    ),
+    store,
+    now: _now,
+  );
 
   Future<List<Note>> notes() => (_engine ?? _local).notes();
   Future<Note> save(Note n) => (_engine ?? _local).save(n);

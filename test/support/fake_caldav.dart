@@ -38,18 +38,22 @@ class FakeCalDav {
     deletedAt[name] = ++version;
   }
 
-  String _resp(String name) => '<d:response><d:href>/dav/c/$name</d:href>'
+  String _resp(String name) =>
+      '<d:response><d:href>/dav/c/$name</d:href>'
       '<d:propstat><d:prop><d:getetag>${etags[name]}</d:getetag>'
       '<c:calendar-data>${_esc.convert(ics[name]!)}</c:calendar-data>'
       '</d:prop><d:status>HTTP/1.1 200 OK</d:status></d:propstat>'
       '</d:response>';
 
   http.Response _multi(String inner, [String? token]) => http.Response.bytes(
-      utf8.encode('<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
-          'xmlns:c="urn:ietf:params:xml:ns:caldav">$inner'
-          '${token == null ? '' : '<d:sync-token>$token</d:sync-token>'}'
-          '</d:multistatus>'),
-      207);
+    utf8.encode(
+      '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
+      'xmlns:c="urn:ietf:params:xml:ns:caldav">$inner'
+      '${token == null ? '' : '<d:sync-token>$token</d:sync-token>'}'
+      '</d:multistatus>',
+    ),
+    207,
+  );
 
   Future<http.Response> _handle(http.BaseRequest req) async {
     final body = req is http.Request ? req.body : '';
@@ -69,8 +73,11 @@ class FakeCalDav {
           return http.Response('', 412);
         }
         external(name, body);
-        return http.Response('', exists ? 204 : 201,
-            headers: {'etag': etags[name]!});
+        return http.Response(
+          '',
+          exists ? 204 : 201,
+          headers: {'etag': etags[name]!},
+        );
       case 'DELETE':
         if (!ics.containsKey(name)) return http.Response('', 404);
         final ifMatch = req.headers['If-Match'];
@@ -81,14 +88,18 @@ class FakeCalDav {
         return http.Response('', 204);
       case 'REPORT':
         if (body.contains('sync-collection')) {
-          final t = RegExp(r'<d:sync-token>(.*?)</d:sync-token>', dotAll: true)
-                  .firstMatch(body)
-                  ?.group(1) ??
+          final t =
+              RegExp(
+                r'<d:sync-token>(.*?)</d:sync-token>',
+                dotAll: true,
+              ).firstMatch(body)?.group(1) ??
               '';
           final m = RegExp(r'^v(\d+)$').firstMatch(t);
           if (t.isNotEmpty && (rejectTokens || m == null)) {
             return http.Response(
-                '<d:error xmlns:d="DAV:"><d:valid-sync-token/></d:error>', 403);
+              '<d:error xmlns:d="DAV:"><d:valid-sync-token/></d:error>',
+              403,
+            );
           }
           final since = m == null ? 0 : int.parse(m.group(1)!);
           final b = StringBuffer();
@@ -99,8 +110,10 @@ class FakeCalDav {
           }
           for (final e in deletedAt.entries) {
             if (e.value > since && !ics.containsKey(e.key)) {
-              b.write('<d:response><d:href>/dav/c/${e.key}</d:href>'
-                  '<d:status>HTTP/1.1 404 Not Found</d:status></d:response>');
+              b.write(
+                '<d:response><d:href>/dav/c/${e.key}</d:href>'
+                '<d:status>HTTP/1.1 404 Not Found</d:status></d:response>',
+              );
             }
           }
           return _multi(b.toString(), 'v$version');
@@ -108,10 +121,12 @@ class FakeCalDav {
         final comp = RegExp(r'<c:comp-filter name="(VJOURNAL|VTODO|VEVENT)"')
             .firstMatch(body)
             ?.group(1);
-        return _multi([
-          for (final n in ics.keys)
-            if (comp == null || ics[n]!.contains('BEGIN:$comp')) _resp(n)
-        ].join());
+        return _multi(
+          [
+            for (final n in ics.keys)
+              if (comp == null || ics[n]!.contains('BEGIN:$comp')) _resp(n),
+          ].join(),
+        );
     }
     return http.Response('', 405);
   }

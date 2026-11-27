@@ -23,8 +23,10 @@ void main() {
       expect(back.extraLines, contains('X-APPLE-SORT-ORDER:12'));
     });
     test('reads a foreign rank line, clears it, ignores junk', () {
-      final n = parseNote('BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\nUID:a\r\n'
-          'X-DAVDART-RANK:3\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n');
+      final n = parseNote(
+        'BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\nUID:a\r\n'
+        'X-DAVDART-RANK:3\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n',
+      );
       expect(n.rank, 3);
       n.rank = null;
       expect(n.extraLines, isEmpty);
@@ -62,8 +64,8 @@ void main() {
 
   group('planRanks', () {
     List<(String, double?)> col(List<double?> r) => [
-          for (var i = 0; i < r.length; i++) ('c$i', r[i]),
-        ];
+      for (var i = 0; i < r.length; i++) ('c$i', r[i]),
+    ];
     test('empty column', () => expect(planRanks([], 0, 'm'), {'m': 0.0}));
     test('top', () => expect(planRanks(col([1, 2]), 0, 'm'), {'m': 0.0}));
     test('bottom', () => expect(planRanks(col([1, 2]), 2, 'm'), {'m': 3.0}));

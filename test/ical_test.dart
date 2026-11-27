@@ -1,7 +1,8 @@
 import 'package:davdart/davdart.dart';
 import 'package:test/test.dart';
 
-const sample = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\n'
+const sample =
+    'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//x//EN\r\n'
     'BEGIN:VJOURNAL\r\nUID:abc-1\r\nDTSTAMP:20261119T010203Z\r\n'
     'CREATED:20261118T000000Z\r\nSUMMARY:Shopping\\, errands\r\n'
     'DESCRIPTION:line one\\nline two\\; end\r\n'
@@ -36,20 +37,25 @@ void main() {
   });
 
   test('unfolds folded lines and folds long ones at 75 octets', () {
-    final folded =
-        sample.replaceFirst('SUMMARY:Shopping', 'SUMMARY:Shop\r\n ping');
+    final folded = sample.replaceFirst(
+      'SUMMARY:Shopping',
+      'SUMMARY:Shop\r\n ping',
+    );
     expect(parseNote(folded).summary, 'Shopping, errands');
     final long = Note(uid: 'u', summary: 'é' * 100);
     final text = serializeNote(long);
     for (final l in text.split('\r\n')) {
-      expect(l.codeUnits.fold<int>(0, (s, c) => s + (c < 0x80 ? 1 : 2)),
-          lessThanOrEqualTo(75));
+      expect(
+        l.codeUnits.fold<int>(0, (s, c) => s + (c < 0x80 ? 1 : 2)),
+        lessThanOrEqualTo(75),
+      );
     }
     expect(parseNote(text).summary, 'é' * 100);
   });
 
   test('ignores VEVENT/VTODO and keeps nested components', () {
-    const mixed = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:e\r\nEND:VEVENT\r\n'
+    const mixed =
+        'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:e\r\nEND:VEVENT\r\n'
         'BEGIN:VJOURNAL\r\nUID:j\r\nBEGIN:VALARM\r\nACTION:DISPLAY\r\n'
         'END:VALARM\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n';
     final notes = parseNotes(mixed);
@@ -60,9 +66,12 @@ void main() {
 
   test('rejects a VJOURNAL without UID', () {
     expect(
-        () => parseNotes('BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\n'
-            'SUMMARY:x\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n'),
-        throwsA(isA<ICalException>()));
+      () => parseNotes(
+        'BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\n'
+        'SUMMARY:x\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n',
+      ),
+      throwsA(isA<ICalException>()),
+    );
   });
 
   test('accepts LF-only input', () {
@@ -73,7 +82,8 @@ void main() {
 void roundTripTests() {
   group('lossless round trip', () {
     test('recurrence overrides and calendar-level lines survive', () {
-      const src = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nX-WR-CALNAME:Memo\r\n'
+      const src =
+          'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nX-WR-CALNAME:Memo\r\n'
           'BEGIN:VJOURNAL\r\nUID:m\r\nSUMMARY:master\r\nEND:VJOURNAL\r\n'
           'BEGIN:VJOURNAL\r\nUID:m\r\nRECURRENCE-ID:20261120T000000Z\r\n'
           'SUMMARY:override\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n';
@@ -86,7 +96,8 @@ void roundTripTests() {
     });
 
     test('TZID, floating and date-only values are not shifted', () {
-      const src = 'BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\nUID:t\r\n'
+      const src =
+          'BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\nUID:t\r\n'
           'CREATED;TZID=Asia/Bangkok:20261119T100000\r\n'
           'LAST-MODIFIED:20261119T100000\r\nEND:VJOURNAL\r\nEND:VCALENDAR\r\n';
       final n = parseNote(src);
@@ -97,7 +108,8 @@ void roundTripTests() {
     });
 
     test('parameters and repeated DESCRIPTIONs are kept', () {
-      const src = 'BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\nUID:p\r\n'
+      const src =
+          'BEGIN:VCALENDAR\r\nBEGIN:VJOURNAL\r\nUID:p\r\n'
           'SUMMARY;LANGUAGE=de:Hallo\r\nDESCRIPTION:one\r\n'
           'DESCRIPTION:two\r\nCATEGORIES;X-FOO=1:a\r\n'
           'END:VJOURNAL\r\nEND:VCALENDAR\r\n';

@@ -40,8 +40,7 @@ void main() {
     expect(
       SavedViewSpec.fromNote(
         Note(uid: 'e', summary: 'Empty', categories: [viewTag]),
-      )!
-          .mode,
+      )!.mode,
       'board',
     );
     expect(SavedViewSpec.fromNote(Note(uid: 'x', summary: 'n')), isNull);
@@ -73,7 +72,11 @@ void main() {
 
 void personalStructuralTests() {
   test('a hand-made Personal container is structural and out of lists', () {
-    final p = Note(uid: 'p', summary: 'Personal', categories: ['kind-personal']);
+    final p = Note(
+      uid: 'p',
+      summary: 'Personal',
+      categories: ['kind-personal'],
+    );
     expect(isStructuralNote(p), isTrue);
     expect(isStructuralNote(Note(uid: 'n', summary: 'Plain')), isFalse);
   });

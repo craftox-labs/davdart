@@ -76,8 +76,14 @@ class CollectionCapabilities {
 
 /// Outcome of a collection write. With [dryRun] nothing was changed.
 class CollectionChange {
-  const CollectionChange(this.action, this.dryRun, this.changes,
-      {this.href, this.backupPath, this.itemCount});
+  const CollectionChange(
+    this.action,
+    this.dryRun,
+    this.changes, {
+    this.href,
+    this.backupPath,
+    this.itemCount,
+  });
   final String action;
   final bool dryRun;
   final List<String> changes;
@@ -118,13 +124,18 @@ class CollectionService {
   final DateTime Function() _now;
 
   CalDavClient _client(Uri collection) => CalDavClient(
-      collection: collection,
-      username: username,
-      password: password,
-      client: httpClient);
+        collection: collection,
+        username: username,
+        password: password,
+        client: httpClient,
+      );
 
-  Future<List<CollectionInfo>> list() => CalDavClient.discover(home,
-      username: username, password: password, client: httpClient);
+  Future<List<CollectionInfo>> list() => CalDavClient.discover(
+        home,
+        username: username,
+        password: password,
+        client: httpClient,
+      );
 
   Future<CollectionInfo> _info(Uri href) async {
     final h =
@@ -138,33 +149,46 @@ class CollectionService {
   }
 
   /// Creates a collection named [name]; returns its URL in the result.
-  Future<CollectionChange> create(String name,
-      {List<String> components = const ['VJOURNAL', 'VTODO', 'VEVENT'],
-      bool dryRun = false}) async {
+  Future<CollectionChange> create(
+    String name, {
+    List<String> components = const ['VJOURNAL', 'VTODO', 'VEVENT'],
+    bool dryRun = false,
+  }) async {
     if (name.trim().isEmpty) {
       throw CollectionSafetyException('collection name is empty');
     }
     final desc = ['create collection "$name" (${components.join(', ')})'];
     if (dryRun) return CollectionChange('create', true, desc);
-    final url = await CalDavClient.createCollection(home, name,
-        username: username,
-        password: password,
-        client: httpClient,
-        components: components);
+    final url = await CalDavClient.createCollection(
+      home,
+      name,
+      username: username,
+      password: password,
+      client: httpClient,
+      components: components,
+    );
     return CollectionChange('create', false, desc, href: url);
   }
 
   /// Renames (display name) the collection at [href].
-  Future<CollectionChange> rename(Uri href, String name,
-      {bool dryRun = false}) async {
+  Future<CollectionChange> rename(
+    Uri href,
+    String name, {
+    bool dryRun = false,
+  }) async {
     if (name.trim().isEmpty) {
       throw CollectionSafetyException('collection name is empty');
     }
     final info = await _info(href);
     final desc = ['rename "${info.name}" -> "$name"'];
     if (!dryRun) {
-      await CalDavClient.renameCollection(info.href, name,
-          username: username, password: password, client: httpClient);
+      await CalDavClient.renameCollection(
+        info.href,
+        name,
+        username: username,
+        password: password,
+        client: httpClient,
+      );
     }
     return CollectionChange('rename', dryRun, desc, href: info.href);
   }
@@ -191,16 +215,18 @@ class CollectionService {
     final info = await _info(href);
     if (confirmName != info.name) {
       throw CollectionSafetyException(
-          'confirmation "$confirmName" does not match the collection name '
-          '"${info.name}"');
+        'confirmation "$confirmName" does not match the collection name '
+        '"${info.name}"',
+      );
     }
     final errors = <String?>[];
     final c = CalDavClient(
-        collection: info.href,
-        username: username,
-        password: password,
-        client: httpClient,
-        onResourceError: (h, _) => errors.add(h));
+      collection: info.href,
+      username: username,
+      password: password,
+      client: httpClient,
+      onResourceError: (h, _) => errors.add(h),
+    );
     try {
       final raw = await c.listRaw();
       final notes = await c.listNotes();
@@ -223,15 +249,17 @@ class CollectionService {
       final count = items.length + unreadable.length;
       if (unreadable.isNotEmpty && !allowUnreadable) {
         throw CollectionSafetyException(
-            '"${info.name}" holds ${unreadable.length} unreadable '
-            'resource(s) that cannot be parsed as notes, tasks or events '
-            '(${unreadable.map((r) => r.href).take(5).join(', ')}'
-            '${unreadable.length > 5 ? ', ...' : ''}); nothing was deleted. '
-            'Set allowUnreadable to back up their raw bodies and delete anyway');
+          '"${info.name}" holds ${unreadable.length} unreadable '
+          'resource(s) that cannot be parsed as notes, tasks or events '
+          '(${unreadable.map((r) => r.href).take(5).join(', ')}'
+          '${unreadable.length > 5 ? ', ...' : ''}); nothing was deleted. '
+          'Set allowUnreadable to back up their raw bodies and delete anyway',
+        );
       }
       if (count > 0 && !allowNonEmpty) {
         throw CollectionSafetyException(
-            '"${info.name}" holds $count items; set allowNonEmpty to delete it');
+          '"${info.name}" holds $count items; set allowNonEmpty to delete it',
+        );
       }
       final stamp = _now()
           .toUtc()
@@ -248,10 +276,14 @@ class CollectionService {
         'delete collection "${info.name}"',
       ];
       if (dryRun) {
-        return CollectionChange('delete', true, desc,
-            href: info.href,
-            backupPath: count > 0 ? dir : null,
-            itemCount: count);
+        return CollectionChange(
+          'delete',
+          true,
+          desc,
+          href: info.href,
+          backupPath: count > 0 ? dir : null,
+          itemCount: count,
+        );
       }
       if (count > 0) {
         final rawByPath = {for (final r in raw) c.pathOf(r.href): r};
@@ -282,14 +314,16 @@ class CollectionService {
         }
         if (files.length != count) {
           throw CollectionSafetyException(
-              'backup would hold ${files.length} files for $count items; '
-              'nothing was deleted');
+            'backup would hold ${files.length} files for $count items; '
+            'nothing was deleted',
+          );
         }
         final written = (backupWriter ?? writeBackupFiles)(dir, files);
         if (written != null && written != files.length) {
           throw CollectionSafetyException(
-              'backup wrote $written of ${files.length} files; nothing was '
-              'deleted');
+            'backup wrote $written of ${files.length} files; nothing was '
+            'deleted',
+          );
         }
       }
       // Anything created or changed since the listing was not backed up.
@@ -299,15 +333,24 @@ class CollectionService {
               .join('\n');
       if (sig(again) != sig(raw)) {
         throw CollectionSafetyException(
-            '"${info.name}" changed while it was being backed up; nothing '
-            'was deleted. Run the delete again');
+          '"${info.name}" changed while it was being backed up; nothing '
+          'was deleted. Run the delete again',
+        );
       }
-      await CalDavClient.deleteCollection(info.href,
-          username: username, password: password, client: httpClient);
-      return CollectionChange('delete', false, desc,
-          href: info.href,
-          backupPath: count > 0 ? dir : null,
-          itemCount: count);
+      await CalDavClient.deleteCollection(
+        info.href,
+        username: username,
+        password: password,
+        client: httpClient,
+      );
+      return CollectionChange(
+        'delete',
+        false,
+        desc,
+        href: info.href,
+        backupPath: count > 0 ? dir : null,
+        itemCount: count,
+      );
     } finally {
       // The client wraps the caller's http client (or its own): leave a
       // caller-supplied one open.
@@ -355,12 +398,15 @@ class CollectionService {
         why['mkcalendar'] = why['proppatch'] = 'OPTIONS failed: $e';
       }
       try {
-        final r = await c.sendRaw('PROPFIND', url,
-            headers: {
-              'Depth': '0',
-              'Content-Type': 'application/xml; charset=utf-8',
-            },
-            body: _probeBody);
+        final r = await c.sendRaw(
+          'PROPFIND',
+          url,
+          headers: {
+            'Depth': '0',
+            'Content-Type': 'application/xml; charset=utf-8',
+          },
+          body: _probeBody,
+        );
         if (r.statusCode != 207) {
           for (final k in ['syncCollection', 'ctag', 'components']) {
             why[k] = 'PROPFIND ${r.statusCode}';
@@ -370,16 +416,21 @@ class CollectionService {
           // Properties the server answered with 200.
           Iterable<XmlElement> okProps(String name) => doc.descendantElements
               .where((p) => p.localName == 'propstat')
-              .where((p) => p.childElements.any((s) =>
-                  s.localName == 'status' && s.innerText.contains(' 200')))
+              .where(
+                (p) => p.childElements.any(
+                  (s) =>
+                      s.localName == 'status' && s.innerText.contains(' 200'),
+                ),
+              )
               .expand((p) => p.descendantElements)
               .where((e) => e.localName == name);
           final reports = okProps('supported-report-set').toList();
           if (reports.isEmpty) {
             why['syncCollection'] = 'supported-report-set not returned';
           } else {
-            sync = reports.first.descendantElements
-                .any((e) => e.localName == 'sync-collection');
+            sync = reports.first.descendantElements.any(
+              (e) => e.localName == 'sync-collection',
+            );
           }
           final cs = okProps('getctag').toList();
           final st = okProps('sync-token').toList();
@@ -391,7 +442,7 @@ class CollectionService {
           } else {
             comps = [
               for (final e in set.first.descendantElements)
-                if (e.localName == 'comp') e.getAttribute('name') ?? ''
+                if (e.localName == 'comp') e.getAttribute('name') ?? '',
             ]..removeWhere((s) => s.isEmpty);
             vj = comps.contains('VJOURNAL');
             vt = comps.contains('VTODO');
@@ -407,15 +458,16 @@ class CollectionService {
       if (httpClient == null) c.close();
     }
     return CollectionCapabilities(
-        syncCollection: sync,
-        ctag: ctag,
-        mkcalendar: mk,
-        proppatch: pp,
-        components: comps,
-        vjournal: vj,
-        vtodo: vt,
-        vevent: ve,
-        davClasses: dav,
-        undetermined: why);
+      syncCollection: sync,
+      ctag: ctag,
+      mkcalendar: mk,
+      proppatch: pp,
+      components: comps,
+      vjournal: vj,
+      vtodo: vt,
+      vevent: ve,
+      davClasses: dav,
+      undetermined: why,
+    );
   }
 }

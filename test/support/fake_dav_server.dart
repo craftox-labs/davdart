@@ -12,14 +12,15 @@ http.Client withHome(FakeCalDav fake, {String name = 'Work'}) =>
     MockClient((r) async {
       if (r.method == 'PROPFIND' && r.url.path == '/dav/') {
         return http.Response(
-            '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
-            'xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response>'
-            '<d:href>/dav/c/</d:href><d:propstat><d:prop>'
-            '<d:displayname>$name</d:displayname><d:resourcetype>'
-            '<d:collection/><c:calendar/></d:resourcetype></d:prop>'
-            '<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>'
-            '</d:multistatus>',
-            207);
+          '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
+          'xmlns:c="urn:ietf:params:xml:ns:caldav"><d:response>'
+          '<d:href>/dav/c/</d:href><d:propstat><d:prop>'
+          '<d:displayname>$name</d:displayname><d:resourcetype>'
+          '<d:collection/><c:calendar/></d:resourcetype></d:prop>'
+          '<d:status>HTTP/1.1 200 OK</d:status></d:propstat></d:response>'
+          '</d:multistatus>',
+          207,
+        );
       }
       return fake.respond(r);
     });
@@ -37,18 +38,22 @@ http.Client multiHome(FakeCalDav work, FakeCalDav other) {
   return MockClient((r) async {
     if (r.method == 'PROPFIND' && r.url.path == '/dav/') {
       return http.Response(
-          '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
-          'xmlns:c="urn:ietf:params:xml:ns:caldav">'
-          '${entry('/dav/c/', 'Work')}${entry('/dav/d/', 'Other')}'
-          '${entry('/dav/t/', 'Todos', ['VTODO'])}</d:multistatus>',
-          207);
+        '<?xml version="1.0"?><d:multistatus xmlns:d="DAV:" '
+        'xmlns:c="urn:ietf:params:xml:ns:caldav">'
+        '${entry('/dav/c/', 'Work')}${entry('/dav/d/', 'Other')}'
+        '${entry('/dav/t/', 'Todos', ['VTODO'])}</d:multistatus>',
+        207,
+      );
     }
     if (r.url.path.startsWith('/dav/d/') || r.url.path.startsWith('/dav/t/')) {
       // The fake always writes /dav/c/ hrefs; show this collection's own.
       final res = await other.respond(r);
       final dir = r.url.path.substring(0, 7);
-      return http.Response(res.body.replaceAll('/dav/c/', dir), res.statusCode,
-          headers: res.headers);
+      return http.Response(
+        res.body.replaceAll('/dav/c/', dir),
+        res.statusCode,
+        headers: res.headers,
+      );
     }
     return work.respond(r);
   });

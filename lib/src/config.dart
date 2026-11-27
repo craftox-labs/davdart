@@ -7,7 +7,8 @@ Map<String, String> loadConfig() {
   final env = Platform.environment;
   final cfg = <String, String>{};
   final file = File(
-      env['DAVDART_CONFIG'] ?? '${env['HOME']}/.config/davdart/credentials');
+    env['DAVDART_CONFIG'] ?? '${env['HOME']}/.config/davdart/credentials',
+  );
   if (file.existsSync()) {
     for (final line in file.readAsLinesSync()) {
       final i = line.indexOf('=');

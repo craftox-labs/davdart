@@ -232,15 +232,17 @@ Note _journalFromLines(List<String> lines) {
       case 'RELATED-TO':
         // The first PARENT relation is the note's parent; any other relation
         // (CHILD, SIBLING, further parents) stays as a raw line.
-        final type = RegExp(r'RELTYPE="?([A-Za-z-]+)"?', caseSensitive: false)
-            .firstMatch(p.params)
-            ?.group(1)
-            ?.toUpperCase();
+        final type = RegExp(
+          r'RELTYPE="?([A-Za-z-]+)"?',
+          caseSensitive: false,
+        ).firstMatch(p.params)?.group(1)?.toUpperCase();
         if (parent == null &&
             p.value.trim().isNotEmpty &&
             p.params
                 .replaceAll(
-                    RegExp(r'RELTYPE="?[A-Za-z-]+"?', caseSensitive: false), '')
+                  RegExp(r'RELTYPE="?[A-Za-z-]+"?', caseSensitive: false),
+                  '',
+                )
                 .replaceAll(';', '')
                 .isEmpty &&
             (type == null || type == 'PARENT')) {
@@ -304,18 +306,21 @@ Note parseNote(String text) {
   final cal = _splitCalendar(text);
   final journals = [
     for (final b in cal.blocks)
-      if (b.type == 'VJOURNAL') b
+      if (b.type == 'VJOURNAL') b,
   ];
   if (journals.isEmpty) throw ICalException('no VJOURNAL found');
   bool isOverride(_Block b) =>
       b.lines.any((l) => l.toUpperCase().startsWith('RECURRENCE-ID'));
-  final master =
-      journals.firstWhere((b) => !isOverride(b), orElse: () => journals.first);
+  final master = journals.firstWhere(
+    (b) => !isOverride(b),
+    orElse: () => journals.first,
+  );
   final note = _journalFromLines(master.lines);
   for (final b in cal.blocks) {
     if (identical(b, master)) continue;
-    (b.type == 'VJOURNAL' ? note.siblingLines : note.calendarLines)
-        .addAll(b.lines);
+    (b.type == 'VJOURNAL' ? note.siblingLines : note.calendarLines).addAll(
+      b.lines,
+    );
   }
   note.calendarLines.addAll(cal.looseLines);
   return note;
@@ -514,18 +519,21 @@ Task parseTask(String text) {
   final cal = _splitCalendar(text);
   final todos = [
     for (final b in cal.blocks)
-      if (b.type == 'VTODO') b
+      if (b.type == 'VTODO') b,
   ];
   if (todos.isEmpty) throw ICalException('no VTODO found');
   bool isOverride(_Block b) =>
       b.lines.any((l) => l.toUpperCase().startsWith('RECURRENCE-ID'));
-  final master =
-      todos.firstWhere((b) => !isOverride(b), orElse: () => todos.first);
+  final master = todos.firstWhere(
+    (b) => !isOverride(b),
+    orElse: () => todos.first,
+  );
   final task = _todoFromLines(master.lines);
   for (final b in cal.blocks) {
     if (identical(b, master)) continue;
-    (b.type == 'VTODO' ? task.siblingLines : task.calendarLines)
-        .addAll(b.lines);
+    (b.type == 'VTODO' ? task.siblingLines : task.calendarLines).addAll(
+      b.lines,
+    );
   }
   task.calendarLines.addAll(cal.looseLines);
   return task;
@@ -732,18 +740,21 @@ Event parseEvent(String text) {
   final cal = _splitCalendar(text);
   final events = [
     for (final b in cal.blocks)
-      if (b.type == 'VEVENT') b
+      if (b.type == 'VEVENT') b,
   ];
   if (events.isEmpty) throw ICalException('no VEVENT found');
   bool isOverride(_Block b) =>
       b.lines.any((l) => l.toUpperCase().startsWith('RECURRENCE-ID'));
-  final master =
-      events.firstWhere((b) => !isOverride(b), orElse: () => events.first);
+  final master = events.firstWhere(
+    (b) => !isOverride(b),
+    orElse: () => events.first,
+  );
   final event = _eventFromLines(master.lines);
   for (final b in cal.blocks) {
     if (identical(b, master)) continue;
-    (b.type == 'VEVENT' ? event.siblingLines : event.calendarLines)
-        .addAll(b.lines);
+    (b.type == 'VEVENT' ? event.siblingLines : event.calendarLines).addAll(
+      b.lines,
+    );
   }
   event.calendarLines.addAll(cal.looseLines);
   return event;

@@ -30,8 +30,12 @@ class SyncTokenInvalid extends CalDavException {
 
 /// Result of [CalDavClient.sync].
 class SyncResult {
-  SyncResult(this.changed, this.deletedHrefs, this.syncToken,
-      [this.unparsableHrefs = const []]);
+  SyncResult(
+    this.changed,
+    this.deletedHrefs,
+    this.syncToken, [
+    this.unparsableHrefs = const [],
+  ]);
   final List<Note> changed;
   final List<String> deletedHrefs;
 
@@ -43,8 +47,12 @@ class SyncResult {
 
 /// Result of [CalDavClient.syncTasks].
 class TaskSyncResult {
-  TaskSyncResult(this.changed, this.deletedHrefs, this.syncToken,
-      [this.unparsableHrefs = const []]);
+  TaskSyncResult(
+    this.changed,
+    this.deletedHrefs,
+    this.syncToken, [
+    this.unparsableHrefs = const [],
+  ]);
   final List<Task> changed;
   final List<String> deletedHrefs;
 
@@ -55,8 +63,12 @@ class TaskSyncResult {
 
 /// Result of [CalDavClient.syncEvents].
 class EventSyncResult {
-  EventSyncResult(this.changed, this.deletedHrefs, this.syncToken,
-      [this.unparsableHrefs = const []]);
+  EventSyncResult(
+    this.changed,
+    this.deletedHrefs,
+    this.syncToken, [
+    this.unparsableHrefs = const [],
+  ]);
   final List<Event> changed;
   final List<String> deletedHrefs;
 
@@ -67,10 +79,13 @@ class EventSyncResult {
 
 /// A calendar collection found under a user's home.
 class CollectionInfo {
-  const CollectionInfo(this.href, this.name,
-      {this.holdsNotes = true,
-      this.holdsTasks = true,
-      this.holdsEvents = true});
+  const CollectionInfo(
+    this.href,
+    this.name, {
+    this.holdsNotes = true,
+    this.holdsTasks = true,
+    this.holdsEvents = true,
+  });
 
   /// Absolute URL of the collection.
   final Uri href;
@@ -142,20 +157,24 @@ class CalDavClient {
   }) async {
     final h = _withSlash(home);
     final c = CalDavClient(
-        collection: h, username: username, password: password, client: client);
-    final r = await c._send('PROPFIND', h,
-        headers: {
-          'Depth': '1',
-          'Content-Type': 'application/xml; charset=utf-8',
-        },
-        body: _discoverBody);
+      collection: h,
+      username: username,
+      password: password,
+      client: client,
+    );
+    final r = await c._send(
+      'PROPFIND',
+      h,
+      headers: {'Depth': '1', 'Content-Type': 'application/xml; charset=utf-8'},
+      body: _discoverBody,
+    );
     if (r.statusCode != 207) {
       throw CalDavException(r.statusCode, 'PROPFIND failed');
     }
     final out = <CollectionInfo>[];
-    for (final resp in XmlDocument.parse(utf8.decode(r.bodyBytes))
-        .descendantElements
-        .where((e) => e.name.local == 'response')) {
+    for (final resp in XmlDocument.parse(
+      utf8.decode(r.bodyBytes),
+    ).descendantElements.where((e) => e.name.local == 'response')) {
       XmlElement? find(String name) => resp.descendantElements
           .where((e) => e.name.local == name)
           .firstOrNull;
@@ -169,13 +188,15 @@ class CalDavClient {
           .toList();
       final dn = find('displayname')?.innerText.trim() ?? '';
       final segs = url.pathSegments.where((s) => s.isNotEmpty);
-      out.add(CollectionInfo(
-        _withSlash(url),
-        dn.isEmpty ? (segs.isEmpty ? url.path : segs.last) : dn,
-        holdsNotes: comps.isEmpty || comps.contains('VJOURNAL'),
-        holdsTasks: comps.isEmpty || comps.contains('VTODO'),
-        holdsEvents: comps.isEmpty || comps.contains('VEVENT'),
-      ));
+      out.add(
+        CollectionInfo(
+          _withSlash(url),
+          dn.isEmpty ? (segs.isEmpty ? url.path : segs.last) : dn,
+          holdsNotes: comps.isEmpty || comps.contains('VJOURNAL'),
+          holdsTasks: comps.isEmpty || comps.contains('VTODO'),
+          holdsEvents: comps.isEmpty || comps.contains('VEVENT'),
+        ),
+      );
     }
     return out;
   }
@@ -194,31 +215,51 @@ class CalDavClient {
   }) async {
     final h = _withSlash(home);
     final c = CalDavClient(
-        collection: h, username: username, password: password, client: client);
+      collection: h,
+      username: username,
+      password: password,
+      client: client,
+    );
     final rnd = Random.secure();
     final cid = id ??
         List.generate(
-                16, (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0'))
-            .join();
+          16,
+          (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0'),
+        ).join();
     final url = h.resolve('$cid/');
     final b = XmlBuilder();
-    b.element('c:mkcalendar', nest: () {
-      b.namespace('DAV:', 'd');
-      b.namespace('urn:ietf:params:xml:ns:caldav', 'c');
-      b.element('d:set', nest: () {
-        b.element('d:prop', nest: () {
-          b.element('d:displayname', nest: name);
-          b.element('c:supported-calendar-component-set', nest: () {
-            for (final c in components) {
-              b.element('c:comp', attributes: {'name': c});
-            }
-          });
-        });
-      });
-    });
-    final r = await c._send('MKCALENDAR', url,
-        headers: {'Content-Type': 'application/xml; charset=utf-8'},
-        body: b.buildDocument().toXmlString());
+    b.element(
+      'c:mkcalendar',
+      nest: () {
+        b.namespace('DAV:', 'd');
+        b.namespace('urn:ietf:params:xml:ns:caldav', 'c');
+        b.element(
+          'd:set',
+          nest: () {
+            b.element(
+              'd:prop',
+              nest: () {
+                b.element('d:displayname', nest: name);
+                b.element(
+                  'c:supported-calendar-component-set',
+                  nest: () {
+                    for (final c in components) {
+                      b.element('c:comp', attributes: {'name': c});
+                    }
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+    final r = await c._send(
+      'MKCALENDAR',
+      url,
+      headers: {'Content-Type': 'application/xml; charset=utf-8'},
+      body: b.buildDocument().toXmlString(),
+    );
     if (r.statusCode != 201) {
       throw CalDavException(r.statusCode, 'MKCALENDAR failed');
     }
@@ -235,19 +276,35 @@ class CalDavClient {
   }) async {
     final u = _withSlash(url);
     final c = CalDavClient(
-        collection: u, username: username, password: password, client: client);
+      collection: u,
+      username: username,
+      password: password,
+      client: client,
+    );
     final b = XmlBuilder();
-    b.element('d:propertyupdate', nest: () {
-      b.namespace('DAV:', 'd');
-      b.element('d:set', nest: () {
-        b.element('d:prop', nest: () {
-          b.element('d:displayname', nest: name);
-        });
-      });
-    });
-    final r = await c._send('PROPPATCH', u,
-        headers: {'Content-Type': 'application/xml; charset=utf-8'},
-        body: b.buildDocument().toXmlString());
+    b.element(
+      'd:propertyupdate',
+      nest: () {
+        b.namespace('DAV:', 'd');
+        b.element(
+          'd:set',
+          nest: () {
+            b.element(
+              'd:prop',
+              nest: () {
+                b.element('d:displayname', nest: name);
+              },
+            );
+          },
+        );
+      },
+    );
+    final r = await c._send(
+      'PROPPATCH',
+      u,
+      headers: {'Content-Type': 'application/xml; charset=utf-8'},
+      body: b.buildDocument().toXmlString(),
+    );
     if (r.statusCode != 207 && r.statusCode != 200 && r.statusCode != 204) {
       throw CalDavException(r.statusCode, 'PROPPATCH failed');
     }
@@ -273,7 +330,11 @@ class CalDavClient {
   }) async {
     final u = _withSlash(url);
     final c = CalDavClient(
-        collection: u, username: username, password: password, client: client);
+      collection: u,
+      username: username,
+      password: password,
+      client: client,
+    );
     final r = await c._send('DELETE', u);
     if (r.statusCode != 200 && r.statusCode != 204) {
       throw CalDavException(r.statusCode, 'DELETE collection failed');
@@ -282,8 +343,12 @@ class CalDavClient {
 
   /// Sends a raw request with this client's credentials, for capability
   /// probes. Not for item writes.
-  Future<http.Response> sendRaw(String method, Uri url,
-          {Map<String, String> headers = const {}, String? body}) =>
+  Future<http.Response> sendRaw(
+    String method,
+    Uri url, {
+    Map<String, String> headers = const {},
+    String? body,
+  }) =>
       _send(method, url, headers: headers, body: body);
 
   Uri _resolve(String href) => collection.resolve(href);
@@ -314,19 +379,20 @@ class CalDavClient {
   /// with the raw calendar-data when the server returned any. Used to check
   /// that typed listings did not silently drop anything.
   Future<List<RawResource>> listRaw() async {
-    final r = await _send('REPORT', collection,
-        headers: {
-          'Depth': '1',
-          'Content-Type': 'application/xml; charset=utf-8',
-        },
-        body: _reportBody(null));
+    final r = await _send(
+      'REPORT',
+      collection,
+      headers: {'Depth': '1', 'Content-Type': 'application/xml; charset=utf-8'},
+      body: _reportBody(null),
+    );
     if (r.statusCode != 207) {
       throw CalDavException(r.statusCode, 'REPORT failed');
     }
     final doc = XmlDocument.parse(utf8.decode(r.bodyBytes));
     final out = <RawResource>[];
-    for (final resp
-        in doc.descendantElements.where((e) => e.localName == 'response')) {
+    for (final resp in doc.descendantElements.where(
+      (e) => e.localName == 'response',
+    )) {
       String? text(String name) => resp.descendantElements
           .where((e) => e.localName == name)
           .map((e) => e.innerText)
@@ -335,8 +401,13 @@ class CalDavClient {
       if (href == null) continue;
       if (_resolve(href).path == collection.path) continue;
       final data = text('calendar-data');
-      out.add(RawResource(href, text('getetag'),
-          data == null || data.trim().isEmpty ? null : data));
+      out.add(
+        RawResource(
+          href,
+          text('getetag'),
+          data == null || data.trim().isEmpty ? null : data,
+        ),
+      );
     }
     return out;
   }
@@ -355,12 +426,12 @@ class CalDavClient {
 
   /// Lists every note in the collection, with href and etag set.
   Future<List<Note>> listNotes() async {
-    final r = await _send('REPORT', collection,
-        headers: {
-          'Depth': '1',
-          'Content-Type': 'application/xml; charset=utf-8',
-        },
-        body: _reportBody('VJOURNAL'));
+    final r = await _send(
+      'REPORT',
+      collection,
+      headers: {'Depth': '1', 'Content-Type': 'application/xml; charset=utf-8'},
+      body: _reportBody('VJOURNAL'),
+    );
     if (r.statusCode != 207) {
       throw CalDavException(r.statusCode, 'REPORT failed');
     }
@@ -371,13 +442,15 @@ class CalDavClient {
   /// is an initial sync. Throws [SyncTokenInvalid] if the server rejects the
   /// token; fall back to `sync()` without a token then.
   Future<SyncResult> sync({String? syncToken}) async {
-    final r = await _syncGeneric<Note>(syncToken,
-        parse: parseNote,
-        missing: 'no VJOURNAL found',
-        get: getNote,
-        setMeta: (n, href, etag) => n
-          ..href = href
-          ..etag = etag);
+    final r = await _syncGeneric<Note>(
+      syncToken,
+      parse: parseNote,
+      missing: 'no VJOURNAL found',
+      get: getNote,
+      setMeta: (n, href, etag) => n
+        ..href = href
+        ..etag = etag,
+    );
     return SyncResult(r.$1, r.$2, r.$3, r.$4);
   }
 
@@ -385,25 +458,29 @@ class CalDavClient {
   /// answers sync-collection for every component, so notes, tasks and events
   /// arrive together; each caller keeps its own type and skips the rest.
   Future<TaskSyncResult> syncTasks({String? syncToken}) async {
-    final r = await _syncGeneric<Task>(syncToken,
-        parse: parseTask,
-        missing: 'no VTODO found',
-        get: getTask,
-        setMeta: (t, href, etag) => t
-          ..href = href
-          ..etag = etag);
+    final r = await _syncGeneric<Task>(
+      syncToken,
+      parse: parseTask,
+      missing: 'no VTODO found',
+      get: getTask,
+      setMeta: (t, href, etag) => t
+        ..href = href
+        ..etag = etag,
+    );
     return TaskSyncResult(r.$1, r.$2, r.$3, r.$4);
   }
 
   /// Like [sync], for the VEVENT resources of the collection.
   Future<EventSyncResult> syncEvents({String? syncToken}) async {
-    final r = await _syncGeneric<Event>(syncToken,
-        parse: parseEvent,
-        missing: 'no VEVENT found',
-        get: getEvent,
-        setMeta: (e, href, etag) => e
-          ..href = href
-          ..etag = etag);
+    final r = await _syncGeneric<Event>(
+      syncToken,
+      parse: parseEvent,
+      missing: 'no VEVENT found',
+      get: getEvent,
+      setMeta: (e, href, etag) => e
+        ..href = href
+        ..etag = etag,
+    );
     return EventSyncResult(r.$1, r.$2, r.$3, r.$4);
   }
 
@@ -422,12 +499,12 @@ class CalDavClient {
   <d:sync-level>1</d:sync-level>
   <d:prop><d:getetag/><c:calendar-data/></d:prop>
 </d:sync-collection>''';
-    final r = await _send('REPORT', collection,
-        headers: {
-          'Depth': '0',
-          'Content-Type': 'application/xml; charset=utf-8',
-        },
-        body: body);
+    final r = await _send(
+      'REPORT',
+      collection,
+      headers: {'Depth': '0', 'Content-Type': 'application/xml; charset=utf-8'},
+      body: body,
+    );
     final text = utf8.decode(r.bodyBytes, allowMalformed: true);
     if ({403, 409, 412}.contains(r.statusCode) &&
         text.contains('valid-sync-token')) {
@@ -447,8 +524,9 @@ class CalDavClient {
         newToken = e.innerText.trim();
       }
     }
-    for (final resp
-        in doc.descendantElements.where((e) => e.localName == 'response')) {
+    for (final resp in doc.descendantElements.where(
+      (e) => e.localName == 'response',
+    )) {
       String? first(String name) => resp.descendantElements
           .where((e) => e.localName == name)
           .map((e) => e.innerText)
@@ -522,15 +600,15 @@ class CalDavClient {
         ..dtstamp = now;
     }
     final href = note.href ?? '${Uri.encodeComponent(note.uid)}.ics';
-    final r = await _send('PUT', _resolve(href),
-        headers: {
-          'Content-Type': 'text/calendar; charset=utf-8',
-          if (note.etag != null)
-            'If-Match': note.etag!
-          else
-            'If-None-Match': '*',
-        },
-        body: serializeNote(note));
+    final r = await _send(
+      'PUT',
+      _resolve(href),
+      headers: {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        if (note.etag != null) 'If-Match': note.etag! else 'If-None-Match': '*',
+      },
+      body: serializeNote(note),
+    );
     if (r.statusCode == 412) {
       throw ConflictException('${note.uid} changed on the server');
     }
@@ -547,8 +625,11 @@ class CalDavClient {
   Future<void> deleteNote(Note note) async {
     final href = note.href;
     if (href == null) throw ArgumentError('note has no href');
-    final r = await _send('DELETE', _resolve(href),
-        headers: {if (note.etag != null) 'If-Match': note.etag!});
+    final r = await _send(
+      'DELETE',
+      _resolve(href),
+      headers: {if (note.etag != null) 'If-Match': note.etag!},
+    );
     if (r.statusCode == 412) {
       throw ConflictException('${note.uid} changed on the server');
     }
@@ -561,17 +642,19 @@ class CalDavClient {
 
   /// Lists every task in the collection, with href and etag set.
   Future<List<Task>> listTasks() async {
-    final r = await _send('REPORT', collection,
-        headers: {
-          'Depth': '1',
-          'Content-Type': 'application/xml; charset=utf-8',
-        },
-        body: _reportBody('VTODO'));
+    final r = await _send(
+      'REPORT',
+      collection,
+      headers: {'Depth': '1', 'Content-Type': 'application/xml; charset=utf-8'},
+      body: _reportBody('VTODO'),
+    );
     if (r.statusCode != 207) {
       throw CalDavException(r.statusCode, 'REPORT failed');
     }
-    return parseTaskMultistatus(utf8.decode(r.bodyBytes),
-        onError: onResourceError);
+    return parseTaskMultistatus(
+      utf8.decode(r.bodyBytes),
+      onError: onResourceError,
+    );
   }
 
   /// Fetches one task by href (absolute or relative to the collection).
@@ -594,15 +677,15 @@ class CalDavClient {
         ..dtstamp = now;
     }
     final href = task.href ?? '${Uri.encodeComponent(task.uid)}.ics';
-    final r = await _send('PUT', _resolve(href),
-        headers: {
-          'Content-Type': 'text/calendar; charset=utf-8',
-          if (task.etag != null)
-            'If-Match': task.etag!
-          else
-            'If-None-Match': '*',
-        },
-        body: serializeTask(task));
+    final r = await _send(
+      'PUT',
+      _resolve(href),
+      headers: {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        if (task.etag != null) 'If-Match': task.etag! else 'If-None-Match': '*',
+      },
+      body: serializeTask(task),
+    );
     if (r.statusCode == 412) {
       throw ConflictException('${task.uid} changed on the server');
     }
@@ -619,8 +702,11 @@ class CalDavClient {
   Future<void> deleteTask(Task task) async {
     final href = task.href;
     if (href == null) throw ArgumentError('task has no href');
-    final r = await _send('DELETE', _resolve(href),
-        headers: {if (task.etag != null) 'If-Match': task.etag!});
+    final r = await _send(
+      'DELETE',
+      _resolve(href),
+      headers: {if (task.etag != null) 'If-Match': task.etag!},
+    );
     if (r.statusCode == 412) {
       throw ConflictException('${task.uid} changed on the server');
     }
@@ -633,17 +719,19 @@ class CalDavClient {
 
   /// Lists every event in the collection, with href and etag set.
   Future<List<Event>> listEvents() async {
-    final r = await _send('REPORT', collection,
-        headers: {
-          'Depth': '1',
-          'Content-Type': 'application/xml; charset=utf-8',
-        },
-        body: _reportBody('VEVENT'));
+    final r = await _send(
+      'REPORT',
+      collection,
+      headers: {'Depth': '1', 'Content-Type': 'application/xml; charset=utf-8'},
+      body: _reportBody('VEVENT'),
+    );
     if (r.statusCode != 207) {
       throw CalDavException(r.statusCode, 'REPORT failed');
     }
-    return parseEventMultistatus(utf8.decode(r.bodyBytes),
-        onError: onResourceError);
+    return parseEventMultistatus(
+      utf8.decode(r.bodyBytes),
+      onError: onResourceError,
+    );
   }
 
   /// Fetches one event by href (absolute or relative to the collection).
@@ -666,15 +754,18 @@ class CalDavClient {
         ..dtstamp = now;
     }
     final href = event.href ?? '${Uri.encodeComponent(event.uid)}.ics';
-    final r = await _send('PUT', _resolve(href),
-        headers: {
-          'Content-Type': 'text/calendar; charset=utf-8',
-          if (event.etag != null)
-            'If-Match': event.etag!
-          else
-            'If-None-Match': '*',
-        },
-        body: serializeEvent(event));
+    final r = await _send(
+      'PUT',
+      _resolve(href),
+      headers: {
+        'Content-Type': 'text/calendar; charset=utf-8',
+        if (event.etag != null)
+          'If-Match': event.etag!
+        else
+          'If-None-Match': '*',
+      },
+      body: serializeEvent(event),
+    );
     if (r.statusCode == 412) {
       throw ConflictException('${event.uid} changed on the server');
     }
@@ -691,8 +782,11 @@ class CalDavClient {
   Future<void> deleteEvent(Event event) async {
     final href = event.href;
     if (href == null) throw ArgumentError('event has no href');
-    final r = await _send('DELETE', _resolve(href),
-        headers: {if (event.etag != null) 'If-Match': event.etag!});
+    final r = await _send(
+      'DELETE',
+      _resolve(href),
+      headers: {if (event.etag != null) 'If-Match': event.etag!},
+    );
     if (r.statusCode == 412) {
       throw ConflictException('${event.uid} changed on the server');
     }
@@ -707,12 +801,15 @@ class CalDavClient {
 /// Parses a WebDAV 207 multistatus body into notes with href and etag.
 ///
 /// A resource that fails to parse is reported to [onError] and skipped.
-List<Note> parseMultistatus(String body,
-    {void Function(String? href, Object error)? onError}) {
+List<Note> parseMultistatus(
+  String body, {
+  void Function(String? href, Object error)? onError,
+}) {
   final doc = XmlDocument.parse(body);
   final notes = <Note>[];
-  for (final resp
-      in doc.descendantElements.where((e) => e.localName == 'response')) {
+  for (final resp in doc.descendantElements.where(
+    (e) => e.localName == 'response',
+  )) {
     String? text(String name) => resp.descendantElements
         .where((e) => e.localName == name)
         .map((e) => e.innerText)
@@ -735,12 +832,15 @@ List<Note> parseMultistatus(String body,
 
 /// Parses a WebDAV 207 multistatus body into tasks with href and etag.
 /// Resources without a VTODO are skipped; unparsable ones go to [onError].
-List<Task> parseTaskMultistatus(String body,
-    {void Function(String? href, Object error)? onError}) {
+List<Task> parseTaskMultistatus(
+  String body, {
+  void Function(String? href, Object error)? onError,
+}) {
   final doc = XmlDocument.parse(body);
   final tasks = <Task>[];
-  for (final resp
-      in doc.descendantElements.where((e) => e.localName == 'response')) {
+  for (final resp in doc.descendantElements.where(
+    (e) => e.localName == 'response',
+  )) {
     String? text(String name) => resp.descendantElements
         .where((e) => e.localName == name)
         .map((e) => e.innerText)
@@ -749,9 +849,11 @@ List<Task> parseTaskMultistatus(String body,
     if (data == null || data.trim().isEmpty) continue;
     final href = text('href');
     try {
-      tasks.add(parseTask(data)
-        ..href = href
-        ..etag = text('getetag'));
+      tasks.add(
+        parseTask(data)
+          ..href = href
+          ..etag = text('getetag'),
+      );
     } on ICalException catch (e) {
       if (e.message != 'no VTODO found') onError?.call(href, e);
     }
@@ -761,12 +863,15 @@ List<Task> parseTaskMultistatus(String body,
 
 /// Parses a WebDAV 207 multistatus body into events with href and etag.
 /// Resources without a VEVENT are skipped; unparsable ones go to [onError].
-List<Event> parseEventMultistatus(String body,
-    {void Function(String? href, Object error)? onError}) {
+List<Event> parseEventMultistatus(
+  String body, {
+  void Function(String? href, Object error)? onError,
+}) {
   final doc = XmlDocument.parse(body);
   final events = <Event>[];
-  for (final resp
-      in doc.descendantElements.where((e) => e.localName == 'response')) {
+  for (final resp in doc.descendantElements.where(
+    (e) => e.localName == 'response',
+  )) {
     String? text(String name) => resp.descendantElements
         .where((e) => e.localName == name)
         .map((e) => e.innerText)
@@ -775,9 +880,11 @@ List<Event> parseEventMultistatus(String body,
     if (data == null || data.trim().isEmpty) continue;
     final href = text('href');
     try {
-      events.add(parseEvent(data)
-        ..href = href
-        ..etag = text('getetag'));
+      events.add(
+        parseEvent(data)
+          ..href = href
+          ..etag = text('getetag'),
+      );
     } on ICalException catch (e) {
       if (e.message != 'no VEVENT found') onError?.call(href, e);
     }

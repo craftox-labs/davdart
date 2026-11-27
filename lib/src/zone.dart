@@ -68,13 +68,15 @@ class LocalZone {
 
   /// The instant (UTC) of wall fields [w] in zone [l].
   static DateTime instantIn(tz.Location l, DateTime w) => _plain(
-      tz.TZDateTime(l, w.year, w.month, w.day, w.hour, w.minute, w.second));
+        tz.TZDateTime(l, w.year, w.month, w.day, w.hour, w.minute, w.second),
+      );
 
   // A plain UTC DateTime: a TZDateTime would `toLocal()` into the package's
   // own local location instead of the platform zone.
-  static DateTime _plain(DateTime d) =>
-      DateTime.fromMicrosecondsSinceEpoch(d.microsecondsSinceEpoch,
-          isUtc: true);
+  static DateTime _plain(DateTime d) => DateTime.fromMicrosecondsSinceEpoch(
+        d.microsecondsSinceEpoch,
+        isUtc: true,
+      );
 
   /// The wall fields (UTC-flagged) of [instant] in zone [l].
   static DateTime wallIn(tz.Location l, DateTime instant) {

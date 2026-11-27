@@ -14,8 +14,10 @@ class ICalDate {
   factory ICalDate.utc(DateTime d) {
     final u = d.toUtc();
     String t(int n, [int w = 2]) => n.toString().padLeft(w, '0');
-    return ICalDate('${t(u.year, 4)}${t(u.month)}${t(u.day)}T'
-        '${t(u.hour)}${t(u.minute)}${t(u.second)}Z');
+    return ICalDate(
+      '${t(u.year, 4)}${t(u.month)}${t(u.day)}T'
+      '${t(u.hour)}${t(u.minute)}${t(u.second)}Z',
+    );
   }
 
   /// An all-day date.
@@ -34,9 +36,10 @@ class ICalDate {
   bool get isUtc => value.endsWith('Z');
 
   /// The TZID parameter, or null.
-  String? get tzid => RegExp(r'TZID="?([^;":]+)"?', caseSensitive: false)
-      .firstMatch(params)
-      ?.group(1);
+  String? get tzid => RegExp(
+        r'TZID="?([^;":]+)"?',
+        caseSensitive: false,
+      ).firstMatch(params)?.group(1);
 
   /// The wall-clock fields as written, as a UTC-flagged [DateTime]: no zone
   /// is applied. Null if the value does not parse.
@@ -115,9 +118,10 @@ class ICalDate {
       if (z != null) x = LocalZone.wallIn(z, LocalZone.instantOf(w));
     }
     return ICalDate(
-        '${t(x.year, 4)}${t(x.month)}${t(x.day)}T${t(x.hour)}${t(x.minute)}'
-        '${t(x.second)}${like.isUtc ? 'Z' : ''}',
-        like.params);
+      '${t(x.year, 4)}${t(x.month)}${t(x.day)}T${t(x.hour)}${t(x.minute)}'
+      '${t(x.second)}${like.isUtc ? 'Z' : ''}',
+      like.params,
+    );
   }
 
   /// This value moved by [d] on the local wall clock (an all-day date moves
