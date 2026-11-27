@@ -160,10 +160,7 @@ List<Event> _events() => [
   ),
 ];
 
-Future<AppState> _pump(
-  WidgetTester t,
-  double w,
-) async {
+Future<AppState> _pump(WidgetTester t, double w) async {
   return pumpTasksApp(
     t,
     notes: _notes(),
@@ -204,7 +201,6 @@ Future<void> _addDialog(WidgetTester t, String entry) async {
 }
 
 void main() {
-
   // The audit is only worth anything if an overflow in this harness reaches
   // takeException().
   testWidgets('the audit detects an overflow', (t) async {

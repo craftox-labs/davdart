@@ -30,7 +30,6 @@ List<String> _texts(WidgetTester t, String uid) => [
 ];
 
 void main() {
-
   testWidgets('a "slug: Title" summary shows only the title', (t) async {
     await pumpHomeApp(t, notes: [_plan('slug', 'slug: Title', itemId: 'slug')]);
     expect(_k('nav-card-slug'), findsOneWidget);

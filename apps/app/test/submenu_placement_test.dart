@@ -8,7 +8,6 @@ import 'tasks_helper.dart';
 Finder _k(String k) => find.byKey(Key(k));
 
 void main() {
-
   // The web (and any non-desktop platform) used to stack submenus over
   // their row, so run the popup on android as well as linux.
   for (final p in [TargetPlatform.linux, TargetPlatform.android]) {

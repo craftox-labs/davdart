@@ -63,6 +63,23 @@ Segmented<int> _icons({bool full = false}) => Segmented<int>(
 );
 
 void main() {
+  testWidgets(
+    'desktop segments are equal width and one height in any switcher',
+    (t) async {
+      await _pump(t, Column(children: [_fourIcons(), _labels(), _icons()]));
+      double w(String k) => t.getSize(find.byKey(Key(k))).width;
+      double h(String k) => t.getSize(find.byKey(Key(k))).height;
+      final four = [w('f0'), w('f1'), w('f2'), w('f3')];
+      expect(four.every((x) => x == four.first), isTrue, reason: '$four');
+      expect(four.first, greaterThanOrEqualTo(Tokens.light.sizes.segmentMin));
+      expect(w('l0'), w('l1'));
+      expect(w('i0'), w('i1'));
+      for (final k in ['f0', 'f3', 'l0', 'i1']) {
+        expect(h(k), Tokens.light.sizes.segmentHeight);
+      }
+    },
+  );
+
   for (final width in [1000.0, 400.0]) {
     testWidgets('icon and label segments share a height at $width', (t) async {
       await _pump(t, Column(children: [_labels(), _icons()]), width: width);

@@ -230,20 +230,6 @@ class _Filters extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    Widget toggle(String label, TaskFilter v) => touchBox(
-      context,
-      FButton(
-        key: Key('tasks-filter-${v.name}'),
-        variant: state.taskFilter == v
-            ? FButtonVariant.secondary
-            : FButtonVariant.outline,
-        size: FButtonSizeVariant.xs,
-        mainAxisSize: MainAxisSize.min,
-        selected: state.taskFilter == v,
-        onPress: () => state.setTaskFilter(v),
-        child: Text(label),
-      ),
-    );
     // Folders (any depth) the scope filter can pick, indented like the tree.
     final folders = <(String, String, int)>[];
     void walk(List<NoteNode> nodes, int depth) {
@@ -258,37 +244,26 @@ class _Filters extends StatelessWidget {
     walk(state.tree.roots, 0);
     final folder = state.scopeUid;
     final narrow = narrowLayout(context);
-    final toggles = [
-      toggle('Open', TaskFilter.open),
-      toggle('All', TaskFilter.all),
-      toggle('Completed', TaskFilter.completed),
-    ];
-    // Phones: one full-width segmented control (equal segments, labels
-    // ellipsize); wide: separate buttons hugging their labels.
-    final row = narrow
-        ? Segmented<TaskFilter>(
-            fullWidth: true,
-            value: state.taskFilter,
-            onChanged: state.setTaskFilter,
-            segments: [
-              for (final (l, v) in [
-                ('Open', TaskFilter.open),
-                ('All', TaskFilter.all),
-                ('Completed', TaskFilter.completed),
-              ])
-                Segment(v, l, 'tasks-filter-${v.name}'),
-            ],
-          )
-        : null;
+    // One shared segmented control everywhere; phones span the full width.
+    final row = Segmented<TaskFilter>(
+      fullWidth: narrow,
+      value: state.taskFilter,
+      onChanged: state.setTaskFilter,
+      segments: [
+        for (final (l, v) in [
+          ('Open', TaskFilter.open),
+          ('All', TaskFilter.all),
+          ('Completed', TaskFilter.completed),
+        ])
+          Segment(v, l, 'tasks-filter-${v.name}'),
+      ],
+    );
     return Wrap(
       spacing: t.space.md,
       runSpacing: t.space.md,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
-        if (row != null)
-          SizedBox(width: double.infinity, child: row)
-        else
-          ...toggles,
+        narrow ? SizedBox(width: double.infinity, child: row) : row,
         if (folders.isNotEmpty)
           SizedBox(
             // Phones: the folder selector spans the content width.

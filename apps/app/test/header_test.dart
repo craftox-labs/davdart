@@ -97,6 +97,8 @@ void main() {
       final sync = t.getRect(find.byIcon(FLucideIcons.refreshCw));
       // Home's heading is its Space; the tab strip still says Home.
       expect(t.widget<Text>(_k('page-title')).data, 'This Space');
+      expect(t.widget<Text>(_k('page-title')).style?.color, Tokens.light.fg);
+      expect(title.width, greaterThan(0));
       expect(row.height, _z.paneHeader);
       expect(title.centerLeft.dx, closeTo(row.left + Tokens.light.space.md, 1));
       expect(title.center.dy, closeTo(row.center.dy, 1));

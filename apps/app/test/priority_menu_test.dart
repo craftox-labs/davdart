@@ -33,15 +33,9 @@ String? _word(AppState s, String uid) =>
     PlanItem.fromNote(s.tree.find(uid)!.note).priorityWord;
 
 void main() {
-
   group('task context menu', () {
-    testWidgets('each priority is set, cleared and marked current', (
-      t,
-    ) async {
-      final s = await pumpHomeApp(
-        t,
-        tasks: [mkTask('t', summary: 'Fix it')],
-      );
+    testWidgets('each priority is set, cleared and marked current', (t) async {
+      final s = await pumpHomeApp(t, tasks: [mkTask('t', summary: 'Fix it')]);
       Future<void> openSubmenu() async {
         await t.tap(
           find.descendant(of: _k('nav-card-t'), matching: find.text('Fix it')),

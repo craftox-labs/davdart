@@ -47,7 +47,7 @@ class PageHeaderRow extends StatelessWidget {
             child: OverflowTip(
               title,
               textKey: textKey,
-              style: t.type.titleStyle,
+              style: t.type.titleStyle.copyWith(color: t.paneTitleColor),
             ),
           ),
           ?switcher,

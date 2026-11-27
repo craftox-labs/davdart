@@ -47,7 +47,6 @@ Future<AppState> _pump(WidgetTester t) async =>
     pumpHomeApp(t, notes: await _Seed().load());
 
 void main() {
-
   test('review sits between doing and done in the fixed order', () {
     expect(boardOrder, [
       'backlog',
