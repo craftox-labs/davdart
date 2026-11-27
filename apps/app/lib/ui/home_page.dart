@@ -83,9 +83,9 @@ class HomePage extends StatelessWidget {
     );
 
     // --- Projects, most recently changed first ---
-    // The index already holds the last-changed map and the order; it is
-    // rebuilt only when the Space changes, so a rebuild reads it, not the
-    // whole Space.
+    // The index holds the last-changed map and the order; every
+    // notification drops it, so it is rebuilt at most once per change and
+    // shared by everything in the same frame.
     final projects = ix.projectsByLastChanged();
 
     Future<void> openProject(String uid) =>
