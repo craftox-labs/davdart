@@ -460,7 +460,7 @@ void main() {
       await t.pump();
       await g.up();
       await t.pumpAndSettle();
-      expect(find.text('Move project?'), findsOneWidget);
+      expect(find.text('Move folder?'), findsOneWidget);
       expect(find.textContaining('"Other"'), findsOneWidget);
       expect(s.tree.find('f'), isNotNull);
       await t.tap(find.text('Cancel'));

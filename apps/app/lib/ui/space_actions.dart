@@ -46,9 +46,16 @@ Future<void> moveNoteToSpace(
     return;
   }
   if (node.children.isNotEmpty || AppState.isFolder(node.note)) {
+    // The confirm names what moves: a project, a folder or a note that
+    // carries others.
+    final kind = state.projectIndex.isProject(node.note.uid)
+        ? 'project'
+        : AppState.isFolder(node.note)
+        ? 'folder'
+        : 'note';
     final ok = await showAppDialog<bool>(
       context,
-      title: 'Move project?',
+      title: 'Move $kind?',
       content: Text(
         '"${node.note.summary}" and everything in it will move to '
         '"${sp.name}".',
