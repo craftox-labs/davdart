@@ -25,7 +25,12 @@ void main() {
   });
 
   Future<McpClient> spawn(List<String> flags) async {
-    final client = McpClient(const Implementation(name: 't', version: '1'));
+    // `dart run` can take longer than the default 5s discovery probe to start
+    // the server under load; a timeout makes the client fall back to
+    // `initialize`, which the already-stateless server rejects.
+    final client = McpClient(const Implementation(name: 't', version: '1'),
+        options: const McpClientOptions(
+            legacyDiscoveryTimeout: Duration(seconds: 60)));
     await client.connect(StdioClientTransport(StdioServerParameters(
       command: Platform.resolvedExecutable,
       args: ['run', 'bin/davdart_mcp.dart', '--stdio', ...flags],
