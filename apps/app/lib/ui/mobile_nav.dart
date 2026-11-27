@@ -278,7 +278,7 @@ class MobileBar extends StatelessWidget {
                         color: t.muted,
                         width: t.borders.hairline,
                       ),
-                      borderRadius: BorderRadius.circular(t.space.xs),
+                      borderRadius: BorderRadius.circular(t.radii.badge),
                     ),
                     child: Text('$count', style: t.type.labelStyle),
                   ),

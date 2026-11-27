@@ -51,7 +51,7 @@ class Segmented<T> extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: t.type.captionStyle.copyWith(
               color: on ? t.fg : t.muted,
-              fontWeight: on ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: on ? t.type.semibold : t.type.regular,
             ),
           );
           Widget content() {

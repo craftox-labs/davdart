@@ -54,7 +54,7 @@ class HomeColumnsToggle extends StatelessWidget {
                   padding: EdgeInsets.symmetric(horizontal: t.space.xs),
                   decoration: BoxDecoration(
                     color: t.accent,
-                    borderRadius: BorderRadius.circular(t.space.md),
+                    borderRadius: BorderRadius.circular(t.radii.pill),
                   ),
                   child: Text(
                     '${hidden.length}',

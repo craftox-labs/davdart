@@ -535,7 +535,7 @@ class _NavRowState extends State<NavRow> {
         position: DecorationPosition.foreground,
         decoration: _on
             ? BoxDecoration(
-                color: t.accent.withValues(alpha: 0.1),
+                color: t.accentTint,
                 border: Border.all(color: t.accent, width: t.borders.hairline),
                 borderRadius: BorderRadius.circular(
                   widget.radius ?? t.radii.small,

@@ -33,7 +33,7 @@ class BoardView extends StatelessWidget {
     final t = tokensOf(context);
     if (state.error != null && state.notes.isEmpty) {
       return Center(
-        child: Text(state.error!, style: TextStyle(color: t.muted)),
+        child: Text(state.error!, style: t.type.bodyStyle.copyWith(color: t.muted)),
       );
     }
     final cols = state.columns(includeNoStatus: includeNoStatus);
@@ -47,7 +47,7 @@ class BoardView extends StatelessWidget {
                 ? 'No work items yet. Give a note a status (backlog, todo, doing...) and it shows up here.'
                 : 'No notes',
             textAlign: TextAlign.center,
-            style: TextStyle(color: t.muted),
+            style: t.type.bodyStyle.copyWith(color: t.muted),
           ),
         ),
       );

@@ -300,7 +300,7 @@ class _Progress extends StatelessWidget {
                 vertical: t.space.xxs,
               ),
               decoration: BoxDecoration(
-                color: t.statusBlocked.withValues(alpha: 0.15),
+                color: t.dangerTint,
                 borderRadius: BorderRadius.circular(t.radii.card),
               ),
               child: Text(

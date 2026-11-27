@@ -89,7 +89,7 @@ class HomeBoard extends StatelessWidget {
     final t = tokensOf(context);
     if (state.error != null && state.notes.isEmpty) {
       return Center(
-        child: Text(state.error!, style: TextStyle(color: t.muted)),
+        child: Text(state.error!, style: t.type.bodyStyle.copyWith(color: t.muted)),
       );
     }
     final cols = state.homeColumns();
@@ -102,7 +102,7 @@ class HomeBoard extends StatelessWidget {
                 ? 'No work items yet. Give a note or task a status (backlog, todo, doing...) and it shows up here.'
                 : 'No notes',
             textAlign: TextAlign.center,
-            style: TextStyle(color: t.muted),
+            style: t.type.bodyStyle.copyWith(color: t.muted),
           ),
         ),
       );
@@ -390,7 +390,7 @@ class _Card extends StatelessWidget {
     return Padding(
       padding: EdgeInsets.only(bottom: t.space.md),
       child: Opacity(
-        opacity: item.canceled || column == 'canceled' ? 0.5 : 1,
+        opacity: item.canceled || column == 'canceled' ? t.dimmed : 1,
         // The grip sits beside the menu, not inside it: a press on the grip
         // never reaches the card's long press or tap, so holding it for any
         // length of time still lets the card be dragged.

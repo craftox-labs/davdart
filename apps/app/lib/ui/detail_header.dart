@@ -45,91 +45,86 @@ class DetailHeader extends StatelessWidget {
       child: ListenableBuilder(
         // The dirty dot follows the open edit, which notifies on its own.
         listenable: Listenable.merge([state, ?draft, ?taskDraft, ?eventDraft]),
-        builder: (context, _) => Padding(
-          padding: EdgeInsets.only(left: 0, right: 0),
-          child: LayoutBuilder(
-            builder: (context, c) {
-              final w = math.min(c.maxWidth, t.sizes.tabMax);
-              final icon = task != null
-                  ? FLucideIcons.listChecks
-                  : event != null
-                  ? FLucideIcons.calendar
-                  : note != null && AppState.isFolder(note)
-                  ? FLucideIcons.folder
-                  : FLucideIcons.fileText;
-              Widget menu(Widget child) => uid == null
-                  ? child
-                  : task != null
-                  ? TaskContextMenu(
-                      state: state,
-                      uid: uid,
-                      surface: NoteSurface.peekTab,
-                      child: child,
-                    )
-                  : event != null
-                  ? EventContextMenu(
-                      state: state,
-                      uid: uid,
-                      surface: NoteSurface.peekTab,
-                      child: child,
-                    )
-                  : NoteContextMenu(
-                      state: state,
-                      uid: uid,
-                      surface: NoteSurface.peekTab,
-                      child: child,
-                    );
-              return Align(
-                alignment: mirror ? Alignment.topRight : Alignment.topLeft,
-                child: menu(
-                  Draggable<NoteDrag>(
-                    key: const Key('detail-drag'),
-                    data: uid == null
-                        ? null
-                        : NoteDrag(uid, NoteDragSource.peek),
-                    maxSimultaneousDrags: uid == null ? 0 : 1,
-                    feedback: DefaultTextStyle(
-                      style: t.type.captionStyle.copyWith(color: t.fg),
-                      child: Container(
-                        width: w,
-                        height: t.sizes.tabStrip,
-                        alignment: Alignment.centerLeft,
-                        padding: EdgeInsets.symmetric(horizontal: t.space.md),
-                        decoration: BoxDecoration(
-                          color: t.panel,
-                          border: Border.all(color: t.divider),
-                          borderRadius: BorderRadius.circular(t.radii.small),
-                        ),
-                        child: Text(
-                          title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+        builder: (context, _) => LayoutBuilder(
+          builder: (context, c) {
+            final w = math.min(c.maxWidth, t.sizes.tabMax);
+            final icon = task != null
+                ? FLucideIcons.listChecks
+                : event != null
+                ? FLucideIcons.calendar
+                : note != null && AppState.isFolder(note)
+                ? FLucideIcons.folder
+                : FLucideIcons.fileText;
+            Widget menu(Widget child) => uid == null
+                ? child
+                : task != null
+                ? TaskContextMenu(
+                    state: state,
+                    uid: uid,
+                    surface: NoteSurface.peekTab,
+                    child: child,
+                  )
+                : event != null
+                ? EventContextMenu(
+                    state: state,
+                    uid: uid,
+                    surface: NoteSurface.peekTab,
+                    child: child,
+                  )
+                : NoteContextMenu(
+                    state: state,
+                    uid: uid,
+                    surface: NoteSurface.peekTab,
+                    child: child,
+                  );
+            return Align(
+              alignment: mirror ? Alignment.topRight : Alignment.topLeft,
+              child: menu(
+                Draggable<NoteDrag>(
+                  key: const Key('detail-drag'),
+                  data: uid == null ? null : NoteDrag(uid, NoteDragSource.peek),
+                  maxSimultaneousDrags: uid == null ? 0 : 1,
+                  feedback: DefaultTextStyle(
+                    style: t.type.captionStyle.copyWith(color: t.fg),
+                    child: Container(
+                      width: w,
+                      height: t.sizes.tabStrip,
+                      alignment: Alignment.centerLeft,
+                      padding: EdgeInsets.symmetric(horizontal: t.space.md),
+                      decoration: BoxDecoration(
+                        color: t.panel,
+                        border: Border.all(color: t.divider),
+                        borderRadius: BorderRadius.circular(t.radii.small),
+                      ),
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    child: TabItem(
-                      key: const Key('detail-tab'),
-                      // The pane's divider side lines up with the divider.
-                      flushStart: !mirror,
-                      flushEnd: mirror,
-                      width: w,
-                      icon: icon,
-                      title: title,
-                      active: true,
-                      dirty:
-                          state.dirty ||
-                          (uid != null &&
-                              (state.dirtyTaskFor(uid) ||
-                                  state.dirtyEventFor(uid))),
-                      // A double click promotes the peek to the main area.
-                      onPress: () => state.clickOpenNote(uid ?? ''),
-                      onClose: () => state.guarded(() => state.select(null)),
-                    ),
+                  ),
+                  child: TabItem(
+                    key: const Key('detail-tab'),
+                    // The pane's divider side lines up with the divider.
+                    flushStart: !mirror,
+                    flushEnd: mirror,
+                    width: w,
+                    icon: icon,
+                    title: title,
+                    active: true,
+                    dirty:
+                        state.dirty ||
+                        (uid != null &&
+                            (state.dirtyTaskFor(uid) ||
+                                state.dirtyEventFor(uid))),
+                    // A double click promotes the peek to the main area.
+                    onPress: () => state.clickOpenNote(uid ?? ''),
+                    onClose: () => state.guarded(() => state.select(null)),
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
     );

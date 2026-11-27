@@ -20,7 +20,7 @@ class NoteListView extends StatelessWidget {
     final t = tokensOf(context);
     if (state.error != null && state.notes.isEmpty) {
       return Center(
-        child: Text(state.error!, style: TextStyle(color: t.muted)),
+        child: Text(state.error!, style: t.type.bodyStyle.copyWith(color: t.muted)),
       );
     }
     final rows = <(Note, int)>[];
@@ -41,7 +41,7 @@ class NoteListView extends StatelessWidget {
     }
     if (rows.isEmpty && !state.loading) {
       return Center(
-        child: Text('No notes', style: TextStyle(color: t.muted)),
+        child: Text('No notes', style: t.type.bodyStyle.copyWith(color: t.muted)),
       );
     }
     final list = ListView.separated(

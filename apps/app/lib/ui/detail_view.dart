@@ -157,7 +157,12 @@ class DetailView extends StatelessWidget {
                           SizedBox(height: t.space.md),
                           Row(
                             children: [
-                              Text('Status', style: TextStyle(color: t.muted)),
+                              Text(
+                                'Status',
+                                style: t.type.bodyStyle.copyWith(
+                                  color: t.muted,
+                                ),
+                              ),
                               SizedBox(width: t.space.lg),
                               SizedBox(
                                 width: t.sizes.statusField,

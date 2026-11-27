@@ -146,6 +146,8 @@ class RadiusTokens {
     this.card = 8,
     this.panel = 12,
     this.tab = 4,
+    this.badge = 4,
+    this.pill = 999,
   });
 
   /// Chips, tree rows.
@@ -162,6 +164,12 @@ class RadiusTokens {
 
   /// The active rail tab and the concave corners joining it to the panel.
   final double tab;
+
+  /// The outlined square of a count badge in the top bar.
+  final double badge;
+
+  /// A fully rounded (pill) badge or chip.
+  final double pill;
 }
 
 /// Motion: how the side panes slide open and shut.
@@ -474,6 +482,16 @@ class Tokens {
 
   /// Colour of pane header titles (the same as the main text).
   Color get paneTitleColor => fg;
+
+  /// Low-alpha fills derived from [accent] and [statusBlocked]: the focus
+  /// ring around a keyboard target, a text selection, and the tint behind a
+  /// danger badge. The alphas live only here.
+  Color get accentTint => accent.withValues(alpha: .1);
+  Color get selectionFill => accent.withValues(alpha: .3);
+  Color get dangerTint => statusBlocked.withValues(alpha: .15);
+
+  /// Opacity of dimmed content: a canceled card, a ghost left by a drag.
+  double get dimmed => .5;
 
   final TypeTokens type;
   final SpaceTokens space;
