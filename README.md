@@ -15,9 +15,11 @@ Status: v0, in development. APIs, note formats and the UI will still change.
 ## What works today
 
 - A UI-free Dart core: notes, tasks, events, plan items, folders, saved views, a CalDAV client and sync engines for each type.
-- A Flutter web app (built on forui 0.28.0): icon rail with Notes, Tasks, Events, Projects, Views, Search, Spaces, Account and Settings; a tab strip; a full-page item view with in-place editing; board and list views; a Home page with a Day focus (month calendar with event and task dots, and cards for the selected day's events and tasks, undated tasks listed last) and a Board focus, remembered per Space; an optional mirrored layout; a token-driven theme.
+- A Flutter web app (built on forui 0.28.0): an icon rail driven by a section registry (Home, Notes, Tasks, Calendar, and Projects once a Space has projects, plus Search, Spaces, Account and Settings); a tab strip; a page header row under it (the Space name on Home, the project name on a project); a full-page item view with in-place editing; board and list views; a Home dashboard (counts, projects, personal tasks, personal calendar, recently modified; an Inbox placeholder); a project page with Overview, Board, Notes and Calendar views; Notes as a List or Tree; a token-driven theme with shared components (switchers, cards, count badges, empty states) and an optional mirrored layout.
+- Projects: a Projects container folder whose child folders are projects, with a Personal side for everything outside a project. Move dialogs, project actions and the Home Projects card work on that structure.
 - A small board server that serves the app and proxies CalDAV to the upstream server.
 - A CLI for listing, creating, moving and exporting notes, with a board view that matches the app's.
+- An MCP server (`bin/davdart_mcp.dart`) over the same core services as the CLI, so agents can read and organise a Space (status, priority, rank, folders) without the app.
 
 ## Spaces
 
@@ -30,7 +32,7 @@ Spaces are discovered at sign-in or with Account > Refresh spaces; collections a
 ## Layout
 
 - Desktop (880 px and wider): icon rail, a left panel listing notes, tasks or events for the rail section, and tabs in the main area. Items open in a peek pane or a main tab, depending on the open setting. Right-click menus and drag to move work in the tree, boards and Spaces.
-- Narrow and mobile: a top bar with the Space tab, a side menu with the Space chip and a Notes/Tasks/Events/Views filter, a bottom bar, and a grid of open items. Items always open full screen. Swipe right completes a task, with undo; long press opens actions. Open items have an edit/preview toggle and a top-sliding actions sheet, and edits autosave.
+- Narrow and mobile: a top bar that shows the page title (the Space name while the menu is open), a side menu that mirrors the desktop rail and panel, a bottom bar, and a grid of open items. Items always open full screen. Swipe right completes a task, with undo; long press opens actions. Open items have an edit/preview toggle and a top-sliding actions sheet, and edits autosave.
 - Between 440 and 880 px the board turns into status accordions below 600 px, and Home's calendar collapses to a one-line day stepper.
 
 ## Keyboard
@@ -45,7 +47,7 @@ All-day events and date-only due dates are floating dates. Timed values in UTC o
 
 ## Planned
 
-Real colours, tables, calendar day cells that show item titles on wide screens, and desktop and phone builds. The planning collection is the source of truth for the roadmap; this list is only a summary.
+Real colours, a table view, a calendar grid, an Inbox for unsorted items, templates, attachments, project status and members, and desktop and phone builds. The planning collection is the source of truth for the roadmap; this list is only a summary.
 
 ## Architecture
 
