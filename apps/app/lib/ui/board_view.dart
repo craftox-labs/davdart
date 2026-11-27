@@ -9,6 +9,8 @@ import 'board_layout.dart';
 import 'chips.dart' show priorityColorOf;
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
+import 'empty_state.dart';
+import 'card_box.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
@@ -30,26 +32,17 @@ class BoardView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = tokensOf(context);
     if (state.error != null && state.notes.isEmpty) {
-      return Center(
-        child: Text(state.error!, style: TextStyle(color: t.muted)),
-      );
+      return EmptyState(state.error!, centered: true, error: true);
     }
     final cols = state.columns(includeNoStatus: includeNoStatus);
     if (cols.isEmpty && !state.loading) {
       final hasNotes = state.filtered.isNotEmpty;
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.all(t.space.lg),
-          child: Text(
-            hasNotes
-                ? 'No work items yet. Give a note a status (backlog, todo, doing...) and it shows up here.'
-                : 'No notes',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: t.muted),
-          ),
-        ),
+      return EmptyState(
+        hasNotes
+            ? 'No work items yet. Give a note a status (backlog, todo, doing...) and it shows up here.'
+            : 'No notes',
+        centered: true,
       );
     }
     return BoardLayout<Note>(
@@ -138,59 +131,45 @@ class _Card extends StatelessWidget {
           uid: note.uid,
           source: NoteDragSource.board,
           label: note.summary,
-          child: FTappable(
-            onPress: () => state.clickNote(note.uid),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: t.card,
-                borderRadius: BorderRadius.circular(t.radii.card),
-                border: Border.all(color: selected ? t.accent : t.cardBorder),
-              ),
-              child: Padding(
-                padding: EdgeInsets.all(t.space.lg),
-                child: compact
-                    ? Text(note.summary, style: t.type.semiboldStyle)
-                    : Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            p.itemId ?? note.summary,
-                            style: t.type.semiboldStyle,
-                          ),
-                          if (p.itemId != null) ...[
-                            SizedBox(height: t.space.xxs),
-                            OverflowTip(
-                              note.summary,
-                              maxLines: 2,
-                              style: t.type.bodyStyle.copyWith(color: t.muted),
-                            ),
-                          ],
-                          if (p.priorityWord != null) ...[
-                            SizedBox(height: t.space.sm),
-                            Text(
-                              _label(p.priorityWord!),
-                              key: Key('card-priority-${note.uid}'),
-                              style: t.type.captionStyle.copyWith(
-                                color: priorityColorOf(
-                                  t,
-                                  p.priorityWord ?? 'none',
-                                ),
-                              ),
-                            ),
-                          ],
-                          if (p.owner != null) ...[
-                            SizedBox(height: t.space.sm),
-                            Text(
-                              p.owner!,
-                              style: t.type.captionStyle.copyWith(
-                                color: t.muted,
-                              ),
-                            ),
-                          ],
-                        ],
+          child: CardBox(
+            selected: selected,
+            onTap: () => state.clickNote(note.uid),
+            child: compact
+                ? Text(note.summary, style: t.type.semiboldStyle)
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        p.itemId ?? note.summary,
+                        style: t.type.semiboldStyle,
                       ),
-              ),
-            ),
+                      if (p.itemId != null) ...[
+                        SizedBox(height: t.space.xxs),
+                        OverflowTip(
+                          note.summary,
+                          maxLines: 2,
+                          style: t.type.bodyStyle.copyWith(color: t.muted),
+                        ),
+                      ],
+                      if (p.priorityWord != null) ...[
+                        SizedBox(height: t.space.sm),
+                        Text(
+                          _label(p.priorityWord!),
+                          key: Key('card-priority-${note.uid}'),
+                          style: t.type.captionStyle.copyWith(
+                            color: priorityColorOf(t, p.priorityWord ?? 'none'),
+                          ),
+                        ),
+                      ],
+                      if (p.owner != null) ...[
+                        SizedBox(height: t.space.sm),
+                        Text(
+                          p.owner!,
+                          style: t.type.captionStyle.copyWith(color: t.muted),
+                        ),
+                      ],
+                    ],
+                  ),
           ),
         ),
       ),

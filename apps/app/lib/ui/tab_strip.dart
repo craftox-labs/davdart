@@ -14,6 +14,7 @@ import 'note_menu.dart';
 import 'save_view_dialog.dart';
 import 'shell_frame.dart';
 import 'task_menu.dart';
+import 'surface.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
@@ -74,7 +75,7 @@ class TabStrip extends StatelessWidget {
           key: const Key('tab-strip'),
           // One hairline past the tab boxes: the active tab paints over the
           // panel border below it.
-          height: t.sizes.tabStrip + t.borders.hairline,
+          height: t.sizes.tabStripLine,
           child: Padding(
             padding: EdgeInsets.only(left: startPad, right: endPad),
             child: LayoutBuilder(
@@ -182,7 +183,7 @@ class TabStrip extends StatelessWidget {
                               personal: createsPersonal(state),
                             ),
                             builder: (context, states, _) => _Box(
-                              size: t.sizes.tabClose + t.space.sm,
+                              size: t.sizes.tabCloseHit,
                               hovered: states.contains(
                                 FTappableVariant.hovered,
                               ),
@@ -476,16 +477,13 @@ class _Box extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return Container(
+    return SizedBox(
       width: size,
       height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: hovered ? t.hover : null,
-        borderRadius: BorderRadius.circular(t.radii.small),
+      child: Surface(
+        hovered: hovered,
+        child: Center(child: child),
       ),
-      child: child,
     );
   }
 }

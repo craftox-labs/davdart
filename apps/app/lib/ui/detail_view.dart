@@ -11,6 +11,7 @@ import 'chips.dart';
 import 'edit_note_dialog.dart' show confirmDeleteNote;
 import 'markdown_lite.dart';
 import 'parts.dart';
+import 'card_box.dart';
 import 'theme.dart';
 import 'move_space_dialog.dart';
 import 'mobile_item.dart';
@@ -157,7 +158,12 @@ class DetailView extends StatelessWidget {
                           SizedBox(height: t.space.md),
                           Row(
                             children: [
-                              Text('Status', style: TextStyle(color: t.muted)),
+                              Text(
+                                'Status',
+                                style: t.type.bodyStyle.copyWith(
+                                  color: t.muted,
+                                ),
+                              ),
                               SizedBox(width: t.space.lg),
                               SizedBox(
                                 width: t.sizes.statusField,
@@ -201,14 +207,9 @@ class DetailView extends StatelessWidget {
                         ],
                         SizedBox(height: t.space.lg),
                         if (p.fields.isNotEmpty)
-                          Container(
+                          CardBox(
                             width: double.infinity,
                             padding: EdgeInsets.all(t.space.lg),
-                            decoration: BoxDecoration(
-                              color: t.card,
-                              border: Border.all(color: t.cardBorder),
-                              borderRadius: BorderRadius.circular(t.radii.card),
-                            ),
                             child: Column(
                               children: [
                                 for (final e in p.fields.entries)
@@ -281,21 +282,12 @@ class DetailView extends StatelessWidget {
                                   child: Column(
                                     children: [
                                       for (final r in revs.reversed)
-                                        Container(
+                                        CardBox(
                                           width: double.infinity,
                                           margin: EdgeInsets.only(
                                             bottom: t.space.md,
                                           ),
                                           padding: EdgeInsets.all(t.space.lg),
-                                          decoration: BoxDecoration(
-                                            color: t.card,
-                                            border: Border.all(
-                                              color: t.cardBorder,
-                                            ),
-                                            borderRadius: BorderRadius.circular(
-                                              t.radii.card,
-                                            ),
-                                          ),
                                           child: Column(
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,

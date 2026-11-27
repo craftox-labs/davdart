@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import 'surface.dart';
 import 'theme.dart';
 
 /// One choice of a [Segmented] control: [value], its [label] and widget key.
@@ -51,7 +52,7 @@ class Segmented<T> extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
             style: t.type.captionStyle.copyWith(
               color: on ? t.fg : t.muted,
-              fontWeight: on ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: on ? t.type.semibold : t.type.regular,
             ),
           );
           Widget content() {
@@ -88,11 +89,9 @@ class Segmented<T> extends StatelessWidget {
                 minWidth: t.sizes.segmentMin,
                 maxWidth: maxSeg,
               ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: on ? t.selected : null,
-                  borderRadius: BorderRadius.circular(t.radii.card),
-                ),
+              child: Surface(
+                selected: on,
+                radius: t.radii.card,
                 child: Padding(
                   // Every segment, icon or label only, gets the same room at its
                   // sides; segmentMin keeps short labels their current width.

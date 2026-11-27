@@ -12,6 +12,7 @@ import 'parts.dart';
 import 'chips.dart' show priorityColorOf;
 import 'task_detail.dart' show priorityBucket;
 import 'task_menu.dart';
+import 'surface.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
@@ -234,8 +235,9 @@ class TaskRow extends StatelessWidget {
             state.clickTask(task.uid);
             onOpen?.call();
           },
-          child: Container(
-            color: selected ? t.selected : null,
+          child: Surface(
+            selected: selected,
+            square: true,
             constraints: BoxConstraints(
               minHeight: narrowLayout(context) ? t.sizes.touchTarget : 0,
             ),
@@ -251,10 +253,7 @@ class TaskRow extends StatelessWidget {
                   child: OverflowTip(
                     task.summary,
                     style: task.isClosed
-                        ? TextStyle(
-                            color: t.muted,
-                            decoration: TextDecoration.lineThrough,
-                          )
+                        ? t.type.strikethrough.copyWith(color: t.muted)
                         : null,
                   ),
                 ),

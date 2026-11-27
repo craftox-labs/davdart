@@ -222,7 +222,7 @@ class _PlainTitleFieldState extends State<_PlainTitleField> {
             style: style,
             cursorColor: t.accent,
             backgroundCursorColor: t.muted,
-            selectionColor: t.accent.withValues(alpha: 0.3),
+            selectionColor: t.selectionFill,
             maxLines: 1,
             textInputAction: TextInputAction.done,
           ),

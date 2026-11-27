@@ -6,6 +6,7 @@ import 'package:forui/forui.dart';
 import '../data/note_source.dart';
 import '../state/app_state.dart';
 import 'parts.dart';
+import 'empty_state.dart';
 import 'theme.dart';
 
 /// Connects the local Space to a CalDAV collection through the board
@@ -93,7 +94,10 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
               Text(finding!, style: tokensOf(ctx).type.captionStyle),
             if (found != null)
               found!.isEmpty
-                  ? const Text('No note collections for this user.')
+                  ? const EmptyState(
+                      'No note collections for this user.',
+                      padding: EdgeInsets.zero,
+                    )
                   : TrackPopover(
                       builder: (_, pc) => FSelect<String>.rich(
                         popoverControl: pc,

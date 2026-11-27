@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
+import 'count_badge.dart';
 import 'parts.dart';
 import 'theme.dart';
 
@@ -49,17 +50,10 @@ class HomeColumnsToggle extends StatelessWidget {
               right: 0,
               top: 0,
               child: IgnorePointer(
-                child: Container(
+                child: CountBadge(
+                  hidden.length,
                   key: const Key('home-cols-badge'),
-                  padding: EdgeInsets.symmetric(horizontal: t.space.xs),
-                  decoration: BoxDecoration(
-                    color: t.accent,
-                    borderRadius: BorderRadius.circular(t.space.md),
-                  ),
-                  child: Text(
-                    '${hidden.length}',
-                    style: t.type.captionStyle.copyWith(color: t.onAccent),
-                  ),
+                  tone: BadgeTone.accent,
                 ),
               ),
             ),

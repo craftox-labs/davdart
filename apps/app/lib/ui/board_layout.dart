@@ -6,6 +6,7 @@ import 'chips.dart';
 import 'collapsible_section.dart';
 import 'content_grid.dart';
 import 'key_nav_ui.dart';
+import 'section_label.dart';
 import 'theme.dart';
 
 /// The status whose accordion section starts open: doing, else the first
@@ -159,13 +160,7 @@ class _BoardLayoutState<T> extends State<BoardLayout<T>> {
               children: [
                 StatusDot(dotOf(name)),
                 SizedBox(width: t.space.md),
-                Text(
-                  name.toUpperCase(),
-                  style: t.type.labelStyle.copyWith(
-                    fontSize: t.type.caption,
-                    color: t.muted,
-                  ),
-                ),
+                SectionLabel(name),
                 SizedBox(width: t.space.sm),
                 Text(
                   '${totals[name]}',

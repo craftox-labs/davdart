@@ -315,7 +315,7 @@ class _Filters extends StatelessWidget {
                   for (final e in folders)
                     FSelectItem<String>(
                       title: Text(e.$2, overflow: TextOverflow.ellipsis),
-                      prefix: SizedBox(width: e.$3 * t.space.lg),
+                      prefix: SizedBox(width: e.$3 * t.sizes.folderIndent),
                       value: e.$1,
                     ),
                 ],

@@ -13,6 +13,7 @@ import '../theme/tokens.dart';
 import 'logo.dart';
 import 'section_registry.dart';
 import 'sidebar.dart';
+import 'surface.dart';
 import 'theme.dart';
 
 /// The window-filling frame in the frame colour. On a wide screen it
@@ -357,18 +358,15 @@ class RailButton extends StatelessWidget {
               ),
             );
           }
-          return Container(
+          return SizedBox(
             width: side,
             height: side,
-            decoration: BoxDecoration(
-              color: active
-                  ? t.activeItem
-                  : hovered
-                  ? t.hover
-                  : null,
-              borderRadius: BorderRadius.circular(t.radii.control),
+            child: Surface(
+              color: active ? t.activeItem : null,
+              hovered: hovered,
+              radius: t.radii.control,
+              child: Center(child: glyph),
             ),
-            child: glyph,
           );
         },
       ),

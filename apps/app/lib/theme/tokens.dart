@@ -1,14 +1,14 @@
 import 'dart:ui' show Color, FontWeight;
 
 import 'package:flutter/animation.dart' show Curve, Curves;
-import 'package:flutter/painting.dart' show TextStyle;
+import 'package:flutter/painting.dart' show TextDecoration, TextStyle;
 
 // HOW TO RETHEME
 // One source: this file. Nothing in lib/ui holds a colour, font size, weight,
 // spacing, radius or size of its own. Widgets read them from [Tokens] through
 // one accessor, `tokensOf(context)` (lib/ui/theme.dart), and the forui theme
 // is built only from these tokens (`buildTheme` in lib/ui/theme.dart). A test
-// (test/token_audit_test.dart) fails if a literal slips back into lib/ui.
+// (test/design_rules_test.dart) fails if a literal slips back into lib/ui.
 //
 // COLOUR: edit the values of [Tokens.light] and [Tokens.dark]. The look is
 //   two-tone: `frame` fills the window, the rail and the margin; `panel` is
@@ -48,6 +48,7 @@ class TypeTokens {
     this.heading = 17,
     this.display = 22,
     this.paneTitle = 13,
+    this.sectionLabel = 12,
     this.regular = FontWeight.w400,
     this.medium = FontWeight.w500,
     this.semibold = FontWeight.w600,
@@ -73,6 +74,10 @@ class TypeTokens {
   final double paneTitle;
   final FontWeight paneTitleWeight;
 
+  /// Size of the small uppercase section label (one step over [micro], so it
+  /// matches the caption line it sits above).
+  final double sectionLabel;
+
   /// Letter spacing of small uppercase section labels.
   final double labelSpacing;
 
@@ -93,6 +98,14 @@ class TypeTokens {
   /// caller via [Tokens.paneTitleColor]).
   TextStyle get paneTitleStyle => _s(paneTitle, paneTitleWeight);
 
+  /// Small uppercase section label (the shared SectionLabel component).
+  TextStyle get sectionLabelStyle => TextStyle(
+    fontSize: sectionLabel,
+    fontWeight: semibold,
+    letterSpacing: labelSpacing,
+    height: lineHeight,
+  );
+
   /// Small uppercase section label.
   TextStyle get labelStyle => TextStyle(
     fontSize: micro,
@@ -108,6 +121,13 @@ class TypeTokens {
   /// Caption-size and body-size text with emphasis.
   TextStyle get captionStrong => _s(caption, semibold);
   TextStyle get bodyStrong => _s(body, semibold);
+
+  /// Struck-through text of a closed item (colour from the caller).
+  TextStyle get strikethrough => TextStyle(
+    fontSize: body,
+    height: lineHeight,
+    decoration: TextDecoration.lineThrough,
+  );
 
   /// Weight only (keeps the surrounding size), for bold inline runs.
   TextStyle get boldStyle => TextStyle(fontWeight: bold);
@@ -134,8 +154,22 @@ class SpaceTokens {
     this.xxl = 20,
     this.xxxl = 24,
     this.huge = 40,
+    this.rowInset = 10,
+    this.groupInset = 14,
+    this.rowInsetSm = 5,
+    this.paneInset = 18,
   });
   final double xxs, xs, sm, md, lg, xl, xxl, xxxl, huge;
+
+  /// Vertical inset of a list row, and of a tight one (lg - xxs, sm - the
+  /// hairline).
+  final double rowInset, rowInsetSm;
+
+  /// Top inset of a section's first row (lg + xxs).
+  final double groupInset;
+
+  /// Start inset of a pane header (xl + xxs).
+  final double paneInset;
 }
 
 /// Corner radii.
@@ -146,6 +180,8 @@ class RadiusTokens {
     this.card = 8,
     this.panel = 12,
     this.tab = 4,
+    this.badge = 4,
+    this.pill = 999,
   });
 
   /// Chips, tree rows.
@@ -162,6 +198,12 @@ class RadiusTokens {
 
   /// The active rail tab and the concave corners joining it to the panel.
   final double tab;
+
+  /// The outlined square of a count badge in the top bar.
+  final double badge;
+
+  /// A fully rounded (pill) badge or chip.
+  final double pill;
 }
 
 /// Motion: how the side panes slide open and shut.
@@ -251,6 +293,7 @@ class SizeTokens {
     this.tabMax = 180,
     this.tabClose = 16,
     this.touchTarget = 44,
+    this.countBox = 36,
     this.spaceChipMax = 140,
     this.edgeSwipe = 32,
     this.fabClearance = 84,
@@ -262,6 +305,13 @@ class SizeTokens {
     this.calendarDot = 5,
     this.ring = 2,
     this.progressBar = 4,
+    this.statLabel = 80,
+    this.tileMin = 88,
+    this.folderIndent = 12,
+    this.barButton = 50,
+    this.tabStripLine = 35,
+    this.tabCloseHit = 22,
+    this.tipMax = 280,
   });
 
   /// Edge of the logo on the first-run screen (and other large uses).
@@ -325,6 +375,9 @@ class SizeTokens {
   /// Least hit target of an interactive control on the narrow (touch) layout.
   final double touchTarget;
 
+  /// Square of the outlined count badge in the narrow top bar.
+  final double countBox;
+
   /// Home calendar: grid width, wide day cell, dot, today ring; the Day|Board
   /// switch segment minimum width and height.
   final double calendarWidth,
@@ -336,6 +389,28 @@ class SizeTokens {
 
   /// Height of the thin progress bar on a project row.
   final double progressBar;
+
+  /// Width of a stat row's label column (twice [SpaceTokens.huge]).
+  final double statLabel;
+
+  /// Least width of a stat tile (twice [touchTarget]).
+  final double tileMin;
+
+  /// Prefix width of one folder level in a folder picker.
+  final double folderIndent;
+
+  /// Side of the narrow bar's add button (a touch target and a half).
+  final double barButton;
+
+  /// The tab strip's height plus a hairline: the active tab paints over the
+  /// panel border below it.
+  final double tabStripLine;
+
+  /// Side of the tab strip's plus button (a tab's close square plus a gap).
+  final double tabCloseHit;
+
+  /// Widest a tooltip grows before its text wraps.
+  final double tipMax;
 
   /// Narrow layout: widest the Space chip in the top bar gets, and the width
   /// of the left-edge zone whose swipe opens the side menu.
@@ -474,6 +549,16 @@ class Tokens {
 
   /// Colour of pane header titles (the same as the main text).
   Color get paneTitleColor => fg;
+
+  /// Low-alpha fills derived from [accent] and [statusBlocked]: the focus
+  /// ring around a keyboard target, a text selection, and the tint behind a
+  /// danger badge. The alphas live only here.
+  Color get accentTint => accent.withValues(alpha: .1);
+  Color get selectionFill => accent.withValues(alpha: .3);
+  Color get dangerTint => statusBlocked.withValues(alpha: .15);
+
+  /// Opacity of dimmed content: a canceled card, a ghost left by a drag.
+  double get dimmed => .5;
 
   final TypeTokens type;
   final SpaceTokens space;

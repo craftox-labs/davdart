@@ -82,7 +82,7 @@ class _MarkdownLiteState extends State<MarkdownLite> {
       if (para.isEmpty) return;
       out.add(
         Padding(
-          padding: EdgeInsets.only(bottom: t.space.lg - t.space.xxs),
+          padding: EdgeInsets.only(bottom: t.space.rowInset),
           child: Text.rich(_inline(para.join(' '), base, t)),
         ),
       );

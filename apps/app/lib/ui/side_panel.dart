@@ -31,7 +31,7 @@ class SidePanelFrame extends StatelessWidget {
       children: [
         PaneHeaderRow(
           key: const Key('side-header'),
-          startPad: t.space.xl + t.space.xxs,
+          startPad: t.space.paneInset,
           endPad: t.space.lg,
           children: [
             Expanded(child: title),

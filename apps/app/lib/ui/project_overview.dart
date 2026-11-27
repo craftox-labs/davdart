@@ -13,6 +13,10 @@ import 'placeholder_card.dart';
 import 'section_registry.dart' show projectViews;
 import 'sections.dart' show NotesSection;
 import 'segmented.dart';
+import 'empty_state.dart';
+import 'section_label.dart';
+import 'card_box.dart';
+import 'count_badge.dart';
 import 'theme.dart';
 
 /// A project's page in the main area: a switcher across its views (Overview,
@@ -293,20 +297,11 @@ class _Progress extends StatelessWidget {
         if (overdue > 0)
           Align(
             alignment: Alignment.centerLeft,
-            child: Container(
+            child: CountBadge(
+              overdue,
               key: const Key('proj-overdue-badge'),
-              padding: EdgeInsets.symmetric(
-                horizontal: t.space.sm,
-                vertical: t.space.xxs,
-              ),
-              decoration: BoxDecoration(
-                color: t.statusBlocked.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(t.radii.card),
-              ),
-              child: Text(
-                '$overdue overdue',
-                style: t.type.captionStyle.copyWith(color: t.statusBlocked),
-              ),
+              tone: BadgeTone.danger,
+              text: '$overdue overdue',
             ),
           ),
         SizedBox(height: t.space.sm),
@@ -384,7 +379,7 @@ class _Details extends StatelessWidget {
           child: Row(
             children: [
               SizedBox(
-                width: t.space.huge * 2,
+                width: t.sizes.statLabel,
                 child: Text(label, style: muted),
               ),
               Expanded(
@@ -423,23 +418,12 @@ class _Card extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    return Container(
+    return CardBox(
       padding: EdgeInsets.all(t.space.md),
-      decoration: BoxDecoration(
-        color: t.card,
-        borderRadius: BorderRadius.circular(t.radii.card),
-        border: Border.all(color: t.cardBorder),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: t.space.xs,
-        children: [
-          Text(
-            title.toUpperCase(),
-            style: t.type.labelStyle.copyWith(color: t.muted),
-          ),
-          ...children,
-        ],
+        children: [SectionLabel(title), ...children],
       ),
     );
   }
@@ -505,17 +489,13 @@ class _Tile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    return Container(
+    return CardBox(
       key: Key('$keyPrefix-$id'),
-      constraints: BoxConstraints(minWidth: t.sizes.touchTarget * 2),
+      variant: CardVariant.tile,
+      constraints: BoxConstraints(minWidth: t.sizes.tileMin),
       padding: EdgeInsets.symmetric(
         horizontal: t.space.md,
         vertical: t.space.sm,
-      ),
-      decoration: BoxDecoration(
-        color: t.panel,
-        border: Border.all(color: t.panelBorder, width: t.borders.hairline),
-        borderRadius: BorderRadius.circular(t.radii.card),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -564,14 +544,7 @@ class _Block extends StatelessWidget {
           ),
         ),
         if (children.isEmpty)
-          Padding(
-            padding: EdgeInsets.symmetric(vertical: t.space.xs),
-            child: Text(
-              empty,
-              key: emptyKey == null ? null : Key(emptyKey!),
-              style: t.type.captionStyle.copyWith(color: t.muted),
-            ),
-          )
+          EmptyState(empty, key: emptyKey == null ? null : Key(emptyKey!))
         else
           ...children,
       ],
