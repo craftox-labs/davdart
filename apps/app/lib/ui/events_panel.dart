@@ -335,10 +335,7 @@ class EventRow extends StatelessWidget {
                       OverflowTip(
                         o.summary.isEmpty ? '(no title)' : o.summary,
                         style: cancelled
-                            ? TextStyle(
-                                color: t.muted,
-                                decoration: TextDecoration.lineThrough,
-                              )
+                            ? t.type.strikethrough.copyWith(color: t.muted)
                             : null,
                       ),
                       if (o.location.isNotEmpty)

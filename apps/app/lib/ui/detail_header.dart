@@ -139,7 +139,7 @@ class DetailHeader extends StatelessWidget {
     return SizedBox(
       key: const Key('detail-header'),
       width: width,
-      height: t.sizes.tabStrip + t.borders.hairline,
+      height: t.sizes.tabStripLine,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: mirror ? [promote, tab] : [tab, promote],

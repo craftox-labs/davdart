@@ -379,7 +379,7 @@ class _Details extends StatelessWidget {
           child: Row(
             children: [
               SizedBox(
-                width: t.space.huge * 2,
+                width: t.sizes.statLabel,
                 child: Text(label, style: muted),
               ),
               Expanded(
@@ -492,7 +492,7 @@ class _Tile extends StatelessWidget {
     return CardBox(
       key: Key('$keyPrefix-$id'),
       variant: CardVariant.tile,
-      constraints: BoxConstraints(minWidth: t.sizes.touchTarget * 2),
+      constraints: BoxConstraints(minWidth: t.sizes.tileMin),
       padding: EdgeInsets.symmetric(
         horizontal: t.space.md,
         vertical: t.space.sm,

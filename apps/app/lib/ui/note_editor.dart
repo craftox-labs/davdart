@@ -131,7 +131,7 @@ class NoteEditor extends StatelessWidget {
                       e.$3 ? '${e.$2}  (folder)' : e.$2,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    prefix: SizedBox(width: e.$4 * t.space.lg),
+                    prefix: SizedBox(width: e.$4 * t.sizes.folderIndent),
                     value: e.$1 ?? '',
                   ),
               ],

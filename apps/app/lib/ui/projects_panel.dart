@@ -16,6 +16,7 @@ import 'parts.dart';
 import 'placeholder_card.dart';
 import 'side_panel.dart';
 import 'surface.dart';
+import 'empty_state.dart';
 import 'theme.dart';
 
 /// Names a new project (a folder under the Space's Projects container).
@@ -372,10 +373,7 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
                       ),
                     ),
                     if (scope == null)
-                      Text(
-                        'No project',
-                        style: t.type.captionStyle.copyWith(color: t.muted),
-                      ),
+                      const EmptyState('No project', padding: EdgeInsets.zero),
                   ],
                 ),
               ),
@@ -390,9 +388,12 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     spacing: t.space.sm,
                     children: [
-                      Text(
+                      EmptyState(
                         'No projects yet',
-                        style: t.type.captionStyle.copyWith(color: t.muted),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: t.space.md,
+                          vertical: t.space.xs,
+                        ),
                       ),
                       if (state.editable)
                         ActionButton(

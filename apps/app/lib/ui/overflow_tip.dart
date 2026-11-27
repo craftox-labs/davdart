@@ -3,6 +3,8 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import 'theme.dart';
+
 /// A [Text] that shows a tooltip with its full text only while it is cut off
 /// (ellipsis or clipped lines). Hover on desktop, long press on touch (forui's
 /// tooltip handles both). When the text fits there is no tooltip at all, so
@@ -88,7 +90,7 @@ class _OverflowTipState extends State<OverflowTip> {
     if (!_cut) return label;
     return FTooltip(
       tipBuilder: (_, _) => ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 280),
+        constraints: BoxConstraints(maxWidth: tokensOf(context).sizes.tipMax),
         child: Text(w.tip ?? w.text),
       ),
       child: label,

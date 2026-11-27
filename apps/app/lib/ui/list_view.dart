@@ -59,9 +59,9 @@ class NoteListView extends StatelessWidget {
             square: true,
             padding: EdgeInsets.fromLTRB(
               t.space.lg + depth * t.sizes.listIndent,
-              t.space.lg - t.space.xxs,
+              t.space.rowInset,
               t.space.lg,
-              t.space.lg - t.space.xxs,
+              t.space.rowInset,
             ),
             child: Row(
               children: [
@@ -85,7 +85,7 @@ class NoteListView extends StatelessWidget {
                       : null,
                 ),
                 StatusDot(p.status),
-                SizedBox(width: t.space.lg - t.space.xxs),
+                SizedBox(width: t.space.rowInset),
                 Expanded(child: OverflowTip(n.summary)),
                 if (p.owner != null)
                   Text(

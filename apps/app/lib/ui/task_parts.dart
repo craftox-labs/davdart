@@ -253,10 +253,7 @@ class TaskRow extends StatelessWidget {
                   child: OverflowTip(
                     task.summary,
                     style: task.isClosed
-                        ? TextStyle(
-                            color: t.muted,
-                            decoration: TextDecoration.lineThrough,
-                          )
+                        ? t.type.strikethrough.copyWith(color: t.muted)
                         : null,
                   ),
                 ),

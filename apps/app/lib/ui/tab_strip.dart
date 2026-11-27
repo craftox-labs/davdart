@@ -75,7 +75,7 @@ class TabStrip extends StatelessWidget {
           key: const Key('tab-strip'),
           // One hairline past the tab boxes: the active tab paints over the
           // panel border below it.
-          height: t.sizes.tabStrip + t.borders.hairline,
+          height: t.sizes.tabStripLine,
           child: Padding(
             padding: EdgeInsets.only(left: startPad, right: endPad),
             child: LayoutBuilder(
@@ -183,7 +183,7 @@ class TabStrip extends StatelessWidget {
                               personal: createsPersonal(state),
                             ),
                             builder: (context, states, _) => _Box(
-                              size: t.sizes.tabClose + t.space.sm,
+                              size: t.sizes.tabCloseHit,
                               hovered: states.contains(
                                 FTappableVariant.hovered,
                               ),

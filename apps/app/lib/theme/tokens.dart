@@ -1,14 +1,14 @@
 import 'dart:ui' show Color, FontWeight;
 
 import 'package:flutter/animation.dart' show Curve, Curves;
-import 'package:flutter/painting.dart' show TextStyle;
+import 'package:flutter/painting.dart' show TextDecoration, TextStyle;
 
 // HOW TO RETHEME
 // One source: this file. Nothing in lib/ui holds a colour, font size, weight,
 // spacing, radius or size of its own. Widgets read them from [Tokens] through
 // one accessor, `tokensOf(context)` (lib/ui/theme.dart), and the forui theme
 // is built only from these tokens (`buildTheme` in lib/ui/theme.dart). A test
-// (test/token_audit_test.dart) fails if a literal slips back into lib/ui.
+// (test/design_rules_test.dart) fails if a literal slips back into lib/ui.
 //
 // COLOUR: edit the values of [Tokens.light] and [Tokens.dark]. The look is
 //   two-tone: `frame` fills the window, the rail and the margin; `panel` is
@@ -122,6 +122,13 @@ class TypeTokens {
   TextStyle get captionStrong => _s(caption, semibold);
   TextStyle get bodyStrong => _s(body, semibold);
 
+  /// Struck-through text of a closed item (colour from the caller).
+  TextStyle get strikethrough => TextStyle(
+    fontSize: body,
+    height: lineHeight,
+    decoration: TextDecoration.lineThrough,
+  );
+
   /// Weight only (keeps the surrounding size), for bold inline runs.
   TextStyle get boldStyle => TextStyle(fontWeight: bold);
   TextStyle get semiboldStyle => TextStyle(fontWeight: semibold);
@@ -147,8 +154,22 @@ class SpaceTokens {
     this.xxl = 20,
     this.xxxl = 24,
     this.huge = 40,
+    this.rowInset = 10,
+    this.groupInset = 14,
+    this.rowInsetSm = 5,
+    this.paneInset = 18,
   });
   final double xxs, xs, sm, md, lg, xl, xxl, xxxl, huge;
+
+  /// Vertical inset of a list row, and of a tight one (lg - xxs, sm - the
+  /// hairline).
+  final double rowInset, rowInsetSm;
+
+  /// Top inset of a section's first row (lg + xxs).
+  final double groupInset;
+
+  /// Start inset of a pane header (xl + xxs).
+  final double paneInset;
 }
 
 /// Corner radii.
@@ -284,6 +305,13 @@ class SizeTokens {
     this.calendarDot = 5,
     this.ring = 2,
     this.progressBar = 4,
+    this.statLabel = 80,
+    this.tileMin = 88,
+    this.folderIndent = 12,
+    this.barButton = 50,
+    this.tabStripLine = 35,
+    this.tabCloseHit = 22,
+    this.tipMax = 280,
   });
 
   /// Edge of the logo on the first-run screen (and other large uses).
@@ -361,6 +389,28 @@ class SizeTokens {
 
   /// Height of the thin progress bar on a project row.
   final double progressBar;
+
+  /// Width of a stat row's label column (twice [SpaceTokens.huge]).
+  final double statLabel;
+
+  /// Least width of a stat tile (twice [touchTarget]).
+  final double tileMin;
+
+  /// Prefix width of one folder level in a folder picker.
+  final double folderIndent;
+
+  /// Side of the narrow bar's add button (a touch target and a half).
+  final double barButton;
+
+  /// The tab strip's height plus a hairline: the active tab paints over the
+  /// panel border below it.
+  final double tabStripLine;
+
+  /// Side of the tab strip's plus button (a tab's close square plus a gap).
+  final double tabCloseHit;
+
+  /// Widest a tooltip grows before its text wraps.
+  final double tipMax;
 
   /// Narrow layout: widest the Space chip in the top bar gets, and the width
   /// of the left-edge zone whose swipe opens the side menu.

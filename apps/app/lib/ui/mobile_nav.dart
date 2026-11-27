@@ -299,7 +299,7 @@ class _AddFabState extends State<AddFab> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     if (addEntries(widget.state).isEmpty) return const SizedBox.shrink();
-    final size = t.sizes.touchTarget + t.space.sm;
+    final size = t.sizes.barButton;
     return FTappable(
       key: const Key('bar-add'),
       semanticsLabel: 'New',

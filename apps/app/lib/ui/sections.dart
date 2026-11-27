@@ -20,6 +20,7 @@ import 'save_view_dialog.dart';
 import 'side_panel.dart';
 import 'segmented.dart';
 import 'surface.dart';
+import 'empty_state.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 import 'panel_tags_drawer.dart';
@@ -111,7 +112,7 @@ Widget _label(BuildContext context, String text) {
   return Padding(
     padding: EdgeInsets.fromLTRB(
       t.space.md,
-      t.space.lg + t.space.xxs,
+      t.space.groupInset,
       t.space.md,
       t.space.xs,
     ),
@@ -357,7 +358,7 @@ class NotesSection extends _Section {
             selected: on,
             padding: EdgeInsets.symmetric(
               horizontal: t.space.md,
-              vertical: t.space.sm - t.borders.hairline,
+              vertical: t.space.rowInsetSm,
             ),
             child: child,
           ),
@@ -487,7 +488,7 @@ class NotesSection extends _Section {
                 key: Key('notes-group-${n.uid}'),
                 padding: EdgeInsets.fromLTRB(
                   t.space.md,
-                  t.space.lg + t.space.xxs,
+                  t.space.groupInset,
                   t.space.md,
                   t.space.xs,
                 ),
@@ -537,13 +538,10 @@ class NotesSection extends _Section {
       }
       if (scopeNotes.isEmpty) {
         body.add(
-          Padding(
+          EmptyState(
+            'No notes here yet',
             key: const Key('notes-empty'),
             padding: EdgeInsets.all(t.space.md),
-            child: Text(
-              'No notes here yet',
-              style: t.type.captionStyle.copyWith(color: t.muted),
-            ),
           ),
         );
       }
@@ -945,12 +943,7 @@ class _SearchSectionState extends State<SearchSection> {
     return _Panel(
       heading: _title('Search'),
       pinned: Padding(
-        padding: EdgeInsets.fromLTRB(
-          t.space.lg + t.space.xs,
-          0,
-          t.space.lg + t.space.xs,
-          t.space.md,
-        ),
+        padding: EdgeInsets.fromLTRB(t.space.xl, 0, t.space.xl, t.space.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           spacing: t.space.sm,
