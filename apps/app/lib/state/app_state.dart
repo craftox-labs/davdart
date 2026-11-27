@@ -638,6 +638,8 @@ class AppState extends ChangeNotifier {
   Future<void> _openCurrent() async {
     final c = catalog!;
     final id = c.current;
+    // An Undo belongs to the Space it was posted in.
+    pendingUndo = null;
     // A new Space starts with its done columns capped again.
     nav.boardOpen.remove('done#all');
     source = id == null ? const EmptyNoteSource() : c.sourceFor(id);
@@ -1605,6 +1607,12 @@ class AppState extends ChangeNotifier {
   void _scopeToPage(DocTab? page) {
     if (!_pageScope.containsKey(page)) return;
     final want = _pageScope[page];
+    // A scope whose folder or project is gone falls back to the page's own:
+    // the project of a project page, else none.
+    if (want != null && tree.find(want) == null) {
+      _scopeTo(page != null && page.kind == TabKind.project ? page.id : null);
+      return;
+    }
     if (page == null && want != null && projectIndex.projectOf(want) != null) {
       _scopeTo(null);
       return;
@@ -2576,25 +2584,42 @@ class AppState extends ChangeNotifier {
     // One Undo puts the folder and everything that was under it back. The
     // children went to Personal, so they are saved again under the project
     // rather than left there.
+    // Only children still sitting under Personal come back, and as they are
+    // now: a later edit, delete or move is left alone.
+    final noteIds = {for (final k in kidNotes) k.uid};
+    final taskIds = {for (final k in kidTasks) k.uid};
+    final eventIds = {for (final k in kidEvents) k.uid};
     _postUndo('Deleted "${project.summary}"', () async {
+      final backNotes = [
+        for (final n in notes)
+          if (noteIds.contains(n.uid) && n.parentUid == home) n,
+      ];
       await _edit((src) async {
-        await src.save(project);
-        for (final k in kidNotes) {
+        if (tree.find(uid) == null) await src.save(project);
+        for (final k in backNotes) {
           await src.save(k.copyWith(parentUid: uid));
         }
       });
       if (error != null) return;
-      if (kidTasks.isNotEmpty) {
+      final backTasks = [
+        for (final k in tasks)
+          if (taskIds.contains(k.uid) && k.parentUid == home) k,
+      ];
+      if (backTasks.isNotEmpty) {
         await _taskEdit((src) async {
-          for (final k in kidTasks) {
+          for (final k in backTasks) {
             await src.saveTask(k.copyWith(parentUid: uid));
           }
         });
         if (error != null) return;
       }
-      if (kidEvents.isNotEmpty) {
+      final backEvents = [
+        for (final k in events)
+          if (eventIds.contains(k.uid) && k.parentUid == home) k,
+      ];
+      if (backEvents.isNotEmpty) {
         await _eventEdit((src) async {
-          for (final k in kidEvents) {
+          for (final k in backEvents) {
             await src.saveEvent(k.copyWith(parentUid: uid));
           }
         });
@@ -3975,7 +4000,11 @@ class AppState extends ChangeNotifier {
       _pageScope.remove(wasActive);
       // The project page went away: its scope goes with it, and Home starts
       // from what is left.
-      _syncScopeToTab();
+      if (_pageScope.containsKey(null)) {
+        _scopeToPage(null);
+      } else {
+        _syncScopeToTab();
+      }
       _pageScope[null] = scopeUid;
     }
   }
@@ -4187,7 +4216,20 @@ class AppState extends ChangeNotifier {
       // The next page brings back its own scope, booked from the page that
       // was closed: only that page's scope goes with it, so closing any
       // other tab leaves the loose folder scope alone.
-      if (wasActive) _showFrom(t, next);
+      if (wasActive) {
+        final visited = _pageScope.containsKey(next);
+        _showFrom(t, next);
+        // A page never shown keeps no scope of its own to bring back: it
+        // reads the one its tab implies, so a closed project's scope goes.
+        if (!visited && scopeUid != null && tree.find(scopeUid!) != null) {
+          if (projectIndex.isProject(scopeUid!) ||
+              projectIndex.projectOf(scopeUid!) != null) {
+            _syncScopeToTab();
+          }
+        } else if (!visited) {
+          _syncScopeToTab();
+        }
+      }
       _pageScope.remove(t);
       notifyListeners();
     }
