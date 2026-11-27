@@ -259,6 +259,7 @@ class _CommandPaletteState extends State<CommandPalette> {
                             ? EmptyState(
                                 'No matches',
                                 key: const Key('palette-empty'),
+                                large: true,
                                 padding: EdgeInsets.all(t.space.xl),
                               )
                             : ListView(

@@ -14,8 +14,8 @@ import 'section_registry.dart' show projectViews;
 import 'sections.dart' show NotesSection;
 import 'segmented.dart';
 import 'empty_state.dart';
-import 'section_label.dart';
 import 'card_box.dart';
+import 'section_card.dart';
 import 'count_badge.dart';
 import 'theme.dart';
 
@@ -269,7 +269,7 @@ class _Progress extends StatelessWidget {
       ('done', 'Done', t.statusDone, by['done'] ?? 0),
     ];
     final muted = t.type.captionStyle.copyWith(color: t.muted);
-    return _Card(
+    return SectionCard(
       key: const Key('proj-progress'),
       title: 'Progress',
       children: [
@@ -394,7 +394,7 @@ class _Details extends StatelessWidget {
             ],
           ),
         );
-    return _Card(
+    return SectionCard(
       key: const Key('proj-details'),
       title: 'Details',
       children: [
@@ -405,26 +405,6 @@ class _Details extends StatelessWidget {
         row('due', 'Due', 'Placeholder'),
         row('members', 'Members', 'Placeholder'),
       ],
-    );
-  }
-}
-
-/// A bordered block with a small capitalised heading.
-class _Card extends StatelessWidget {
-  const _Card({super.key, required this.title, required this.children});
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return CardBox(
-      padding: EdgeInsets.all(t.space.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: t.space.xs,
-        children: [SectionLabel(title), ...children],
-      ),
     );
   }
 }

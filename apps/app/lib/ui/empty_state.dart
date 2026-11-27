@@ -13,12 +13,16 @@ class EmptyState extends StatelessWidget {
     super.key,
     this.centered = false,
     this.error = false,
+    this.large = false,
     this.padding,
   });
 
   final String text;
   final bool centered;
   final bool error;
+
+  /// Body size for an inline state (a centred one is always body size).
+  final bool large;
 
   /// Defaults to [SpaceTokens.lg] around a centred state and
   /// [SpaceTokens.xs] above and below an inline one.
@@ -30,9 +34,8 @@ class EmptyState extends StatelessWidget {
     final body = Text(
       text,
       textAlign: centered ? TextAlign.center : null,
-      style: (centered ? t.type.bodyStyle : t.type.captionStyle).copyWith(
-        color: error ? t.error : t.muted,
-      ),
+      style: ((centered || large) ? t.type.bodyStyle : t.type.captionStyle)
+          .copyWith(color: error ? t.error : t.muted),
     );
     final padded = Padding(
       padding:

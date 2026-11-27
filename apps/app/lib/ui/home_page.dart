@@ -13,8 +13,7 @@ import 'project_overview.dart';
 import 'placeholder_card.dart';
 import 'projects_panel.dart' show ProjectProgressBar, projectCounts;
 import 'empty_state.dart';
-import 'card_box.dart';
-import 'section_label.dart';
+import 'section_card.dart';
 import 'theme.dart';
 
 /// Home: the individual's page, scoped to the open Space and ignoring the
@@ -181,7 +180,7 @@ class HomePage extends StatelessWidget {
 
     final projectsCard = projects.isEmpty
         ? null
-        : _Card(
+        : SectionCard(
             key: const Key('home-projects'),
             title: 'Projects',
             children: [
@@ -272,7 +271,7 @@ class HomePage extends StatelessWidget {
       );
     }
 
-    final tasksCard = _Card(
+    final tasksCard = SectionCard(
       key: const Key('home-personal-tasks'),
       title: 'Personal tasks',
       action: _SeeAll(
@@ -314,7 +313,7 @@ class HomePage extends StatelessWidget {
     }
     calendarRows.sort((a, b) => a.at.compareTo(b.at));
 
-    final calendarCard = _Card(
+    final calendarCard = SectionCard(
       key: const Key('home-personal-calendar'),
       title: 'Personal calendar',
       action: _SeeAll(
@@ -356,7 +355,7 @@ class HomePage extends StatelessWidget {
           ),
     ]..sort((a, b) => b.at.compareTo(a.at));
 
-    final recentCard = _Card(
+    final recentCard = SectionCard(
       key: const Key('home-recent'),
       title: 'Recently modified',
       children: [
@@ -426,36 +425,6 @@ class HomePage extends StatelessWidget {
           tasksCard,
           calendarCard,
           recentCard,
-        ],
-      ),
-    );
-  }
-}
-
-/// A bordered block of Home with a small capitalised heading and an optional
-/// right-hand action.
-class _Card extends StatelessWidget {
-  const _Card({
-    super.key,
-    required this.title,
-    required this.children,
-    this.action,
-  });
-  final String title;
-  final List<Widget> children;
-  final Widget? action;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return CardBox(
-      padding: EdgeInsets.all(t.space.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: t.space.xs,
-        children: [
-          SectionLabel(title, action: action),
-          ...children,
         ],
       ),
     );
