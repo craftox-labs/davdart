@@ -160,7 +160,7 @@ class _BoardLayoutState<T> extends State<BoardLayout<T>> {
               children: [
                 StatusDot(dotOf(name)),
                 SizedBox(width: t.space.md),
-                SectionLabel(name, upper: false),
+                SectionLabel(name),
                 SizedBox(width: t.space.sm),
                 Text(
                   '${totals[name]}',

@@ -13,6 +13,7 @@ import 'catalog_helper.dart';
 
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app.dart';
+import 'package:davdart_app/ui/surface.dart';
 import 'package:davdart_app/ui/list_view.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -1221,15 +1222,21 @@ void main() {
       await t.tap(find.byKey(const Key('rail-notes')));
       await t.pumpAndSettle();
       expect(find.byKey(const Key('rail-tab')), findsNothing);
+      // The rail item is the shared Surface: its fill is the highlight.
       final box =
           t
-                  .widget<Container>(
-                    find.descendant(
-                      of: find.byKey(const Key('rail-notes')),
-                      matching: find.byType(Container),
-                    ),
+                  .widget<DecoratedBox>(
+                    find
+                        .descendant(
+                          of: find.descendant(
+                            of: find.byKey(const Key('rail-notes')),
+                            matching: find.byType(Surface),
+                          ),
+                          matching: find.byType(DecoratedBox),
+                        )
+                        .first,
                   )
-                  .decoration!
+                  .decoration
               as BoxDecoration;
       expect(box.color, Tokens.light.activeItem);
       expect(state.section, Section.notes);
