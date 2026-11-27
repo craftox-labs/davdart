@@ -2703,11 +2703,19 @@ class AppState extends ChangeNotifier {
   bool eventIsUnder(Event e, String uid) =>
       projectIndex.isUnder(e.parentUid, uid);
 
-  /// Whether task [t] is in the open scope (always, with no scope).
-  bool taskInScope(Task t) => scopeUid == null || taskIsUnder(t, scopeUid!);
+  /// Whether task [t] is in the open scope. With no scope (Personal) that is
+  /// the loose, individual tasks only: nothing inside a project, and only
+  /// those [isMine] says are the user's (project tasks join Personal later,
+  /// when they are specifically assigned to the user).
+  bool taskInScope(Task t) => scopeUid == null
+      ? (!inProjectsLayer(t.uid) && isMine(t))
+      : taskIsUnder(t, scopeUid!);
 
-  /// Whether event [e] is in the open scope (always, with no scope).
-  bool eventInScope(Event e) => scopeUid == null || eventIsUnder(e, scopeUid!);
+  /// Whether event [e] is in the open scope; Personal means loose events
+  /// only, as for [taskInScope].
+  bool eventInScope(Event e) => scopeUid == null
+      ? (!inProjectsLayer(e.uid) && isMine(e))
+      : eventIsUnder(e, scopeUid!);
 
   /// The events in the open scope, for Home Day and the Today cards.
   List<Event> get scopedEvents => [
@@ -2821,7 +2829,12 @@ class AppState extends ChangeNotifier {
 
   /// Open tasks (not completed, not cancelled) in the open scope: overdue
   /// first, then by due date, priority, title.
-  List<Task> openTasks([DateTime? now]) => openTasksIn(scopeUid, now);
+  List<Task> openTasks([DateTime? now]) => scopeUid == null
+      ? [
+          for (final t in openTasksIn(null, now))
+            if (taskInScope(t)) t,
+        ]
+      : openTasksIn(scopeUid, now);
 
   /// Open tasks in [scope] (a folder at any depth; null means the whole
   /// Space), ordered as [openTasks]. The one counting rule behind the
@@ -2847,7 +2860,13 @@ class AppState extends ChangeNotifier {
 
   /// Open tasks past due in the open scope (see [isTaskOverdue] for how zoned
   /// times are treated), most overdue first.
-  List<Task> overdueTasks([DateTime? now]) => overdueIn(scopeUid, now);
+  List<Task> overdueTasks([DateTime? now]) {
+    final n = now ?? DateTime.now();
+    return [
+      for (final t in openTasks(n))
+        if (isTaskOverdue(t, n)) t,
+    ];
+  }
 
   /// Open tasks due on the user's current day, not yet past due.
   List<Task> dueTodayTasks([DateTime? now]) {
