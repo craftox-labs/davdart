@@ -120,8 +120,8 @@ class CalDavClient {
     required this.password,
     http.Client? client,
     this.onResourceError,
-  }) : collection = _withSlash(collection),
-       _http = client ?? http.Client();
+  })  : collection = _withSlash(collection),
+        _http = client ?? http.Client();
 
   final Uri collection;
   final String username;
@@ -136,9 +136,9 @@ class CalDavClient {
       u.path.endsWith('/') ? u : u.replace(path: '${u.path}/');
 
   Map<String, String> get _auth => {
-    'Authorization':
-        'Basic ${base64.encode(utf8.encode('$username:$password'))}',
-  };
+        'Authorization':
+            'Basic ${base64.encode(utf8.encode('$username:$password'))}',
+      };
 
   static const _discoverBody = '''<?xml version="1.0" encoding="utf-8"?>
 <d:propfind xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
@@ -221,8 +221,7 @@ class CalDavClient {
       client: client,
     );
     final rnd = Random.secure();
-    final cid =
-        id ??
+    final cid = id ??
         List.generate(
           16,
           (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0'),
@@ -310,7 +309,8 @@ class CalDavClient {
       throw CalDavException(r.statusCode, 'PROPPATCH failed');
     }
     if (r.statusCode == 207) {
-      final bad = XmlDocument.parse(utf8.decode(r.bodyBytes)).descendantElements
+      final bad = XmlDocument.parse(utf8.decode(r.bodyBytes))
+          .descendantElements
           .where((e) => e.name.local == 'status')
           .where((e) => !e.innerText.contains(' 200'));
       if (bad.isNotEmpty) {
@@ -348,7 +348,8 @@ class CalDavClient {
     Uri url, {
     Map<String, String> headers = const {},
     String? body,
-  }) => _send(method, url, headers: headers, body: body);
+  }) =>
+      _send(method, url, headers: headers, body: body);
 
   Uri _resolve(String href) => collection.resolve(href);
 
@@ -490,10 +491,9 @@ class CalDavClient {
     required Future<T> Function(String href) get,
     required T Function(T, String href, String? etag) setMeta,
   }) async {
-    final token = const HtmlEscape(HtmlEscapeMode.element)
-        .convert(syncToken ?? '');
-    final body =
-        '''<?xml version="1.0" encoding="utf-8"?>
+    final token =
+        const HtmlEscape(HtmlEscapeMode.element).convert(syncToken ?? '');
+    final body = '''<?xml version="1.0" encoding="utf-8"?>
 <d:sync-collection xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
   <d:sync-token>$token</d:sync-token>
   <d:sync-level>1</d:sync-level>

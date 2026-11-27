@@ -42,11 +42,11 @@ abstract class TaskStore {
 Task _clone(Task n) => n.copyWith();
 
 StoredTask _cloneStored(StoredTask s) => StoredTask(
-  local: _clone(s.local),
-  base: s.base == null ? null : _clone(s.base!),
-  dirty: s.dirty,
-  deleted: s.deleted,
-);
+      local: _clone(s.local),
+      base: s.base == null ? null : _clone(s.base!),
+      dirty: s.dirty,
+      deleted: s.deleted,
+    );
 
 class MemoryTaskStore implements TaskStore {
   final Map<String, StoredTask> _tasks = {};
@@ -64,8 +64,8 @@ class MemoryTaskStore implements TaskStore {
 
   @override
   Future<List<StoredTask>> all() async => [
-    for (final s in _tasks.values) _cloneStored(s),
-  ];
+        for (final s in _tasks.values) _cloneStored(s),
+      ];
 
   @override
   Future<void> put(String uid, StoredTask s) async {
@@ -99,10 +99,10 @@ class MemoryTaskStore implements TaskStore {
       _revisions.where((r) => r.uid == uid).toList();
 
   static Map<String, Object?> _encode(Task n) => {
-    'ics': serializeTask(n),
-    'href': n.href,
-    'etag': n.etag,
-  };
+        'ics': serializeTask(n),
+        'href': n.href,
+        'etag': n.etag,
+      };
 
   static Task _decode(Map<String, dynamic> m) => parseTask(m['ics'] as String)
     ..href = m['href'] as String?
@@ -112,27 +112,27 @@ class MemoryTaskStore implements TaskStore {
   /// nothing a server sent is lost. Platform stores (a file, browser storage,
   /// a database) can persist this and hand it back to [loadJson].
   Map<String, Object?> toJson() => {
-    'syncToken': _token,
-    'tasks': {
-      for (final e in _tasks.entries)
-        e.key: {
-          'local': _encode(e.value.local),
-          'base': e.value.base == null ? null : _encode(e.value.base!),
-          'dirty': e.value.dirty,
-          'deleted': e.value.deleted,
+        'syncToken': _token,
+        'tasks': {
+          for (final e in _tasks.entries)
+            e.key: {
+              'local': _encode(e.value.local),
+              'base': e.value.base == null ? null : _encode(e.value.base!),
+              'dirty': e.value.dirty,
+              'deleted': e.value.deleted,
+            },
         },
-    },
-    'revisions': [
-      for (final r in _revisions)
-        {
-          'uid': r.uid,
-          'at': r.at.toIso8601String(),
-          'reason': r.reason,
-          'summary': r.summary,
-          'body': r.body,
-        },
-    ],
-  };
+        'revisions': [
+          for (final r in _revisions)
+            {
+              'uid': r.uid,
+              'at': r.at.toIso8601String(),
+              'reason': r.reason,
+              'summary': r.summary,
+              'body': r.body,
+            },
+        ],
+      };
 
   /// Replaces the contents with a map from [toJson].
   void loadJson(Map<String, dynamic> j) {

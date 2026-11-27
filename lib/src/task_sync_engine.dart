@@ -15,7 +15,7 @@ import 'task_store.dart';
 /// edit wins that value, and the earlier local text is kept as a [Revision].
 class TaskSyncEngine {
   TaskSyncEngine(this.client, this.store, {DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+      : _now = now ?? DateTime.now;
 
   final CalDavClient client;
   final TaskStore store;
@@ -54,9 +54,9 @@ class TaskSyncEngine {
 
   /// Tasks to show: everything not deleted locally.
   Future<List<Task>> tasks() async => [
-    for (final s in await store.all())
-      if (!s.deleted) s.local,
-  ];
+        for (final s in await store.all())
+          if (!s.deleted) s.local,
+      ];
 
   String _path(String href) => client.collection.resolve(href).path;
 

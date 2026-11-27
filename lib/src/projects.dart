@@ -48,9 +48,9 @@ class ProjectIndex {
     Iterable<Note> notes, [
     Iterable<Task> tasks = const [],
     Iterable<Event> events = const [],
-  ]) : _notes = notes.toList(),
-       _tasks = tasks.toList(),
-       _events = events.toList() {
+  ])  : _notes = notes.toList(),
+        _tasks = tasks.toList(),
+        _events = events.toList() {
     for (final n in _notes) {
       _parent[n.uid] = n.parentUid;
       _byUid[n.uid] = n;
@@ -116,6 +116,30 @@ class ProjectIndex {
   }
 
   Map<String, DateTime>? _lastChanged;
+
+  /// The projects, most recently changed first: the newest modification
+  /// stamp among a project's notes, tasks and events (the folder itself
+  /// included). Built once per index, so a page that orders projects on every
+  /// rebuild does not walk the Space again.
+  List<Note> projectsByLastChanged() {
+    _computeLastChanged();
+    return _byChange ??= _orderByChange();
+  }
+
+  List<Note>? _byChange;
+
+  List<Note> _orderByChange() {
+    final at = _lastChanged!;
+    final list = [..._projects];
+    list.sort((a, b) {
+      final x = at[a.uid], y = at[b.uid];
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      return y.compareTo(x);
+    });
+    return List.unmodifiable(list);
+  }
 
   void _computeLastChanged() {
     if (_lastChanged != null) return;

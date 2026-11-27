@@ -37,9 +37,9 @@ class ICalDate {
 
   /// The TZID parameter, or null.
   String? get tzid => RegExp(
-    r'TZID="?([^;":]+)"?',
-    caseSensitive: false,
-  ).firstMatch(params)?.group(1);
+        r'TZID="?([^;":]+)"?',
+        caseSensitive: false,
+      ).firstMatch(params)?.group(1);
 
   /// The wall-clock fields as written, as a UTC-flagged [DateTime]: no zone
   /// is applied. Null if the value does not parse.
@@ -170,15 +170,15 @@ class Task {
     Map<String, String>? propertyParams,
     this.href,
     this.etag,
-  }) : categories = categories ?? <String>[],
-       created = created?.toUtc(),
-       lastModified = lastModified?.toUtc(),
-       completed = completed?.toUtc(),
-       dtstamp = (dtstamp ?? DateTime.now()).toUtc(),
-       extraLines = extraLines ?? <String>[],
-       calendarLines = calendarLines ?? <String>[],
-       siblingLines = siblingLines ?? <String>[],
-       propertyParams = propertyParams ?? <String, String>{};
+  })  : categories = categories ?? <String>[],
+        created = created?.toUtc(),
+        lastModified = lastModified?.toUtc(),
+        completed = completed?.toUtc(),
+        dtstamp = (dtstamp ?? DateTime.now()).toUtc(),
+        extraLines = extraLines ?? <String>[],
+        calendarLines = calendarLines ?? <String>[],
+        siblingLines = siblingLines ?? <String>[],
+        propertyParams = propertyParams ?? <String, String>{};
 
   final String uid;
   String summary;
@@ -331,31 +331,31 @@ class Task {
     String? parentUid,
     bool clearParent = false,
     DateTime? lastModified,
-  }) => Task(
-    uid: uid,
-    summary: summary ?? this.summary,
-    description: description ?? this.description,
-    categories: categories ?? List.of(this.categories),
-    status: clearStatus ? null : (status ?? this.status),
-    percentComplete: clearPercent
-        ? null
-        : (percentComplete ?? this.percentComplete),
-    priority: clearPriority ? null : (priority ?? this.priority),
-    due: clearDue ? null : (due ?? this.due),
-    dtstart: clearStart ? null : (dtstart ?? this.dtstart),
-    completed: clearCompleted ? null : (completed ?? this.completed),
-    rrule: clearRrule ? null : (rrule ?? this.rrule),
-    parentUid: clearParent ? null : (parentUid ?? this.parentUid),
-    created: created,
-    lastModified: lastModified ?? this.lastModified,
-    dtstamp: dtstamp,
-    extraLines: List.of(extraLines),
-    calendarLines: List.of(calendarLines),
-    siblingLines: List.of(siblingLines),
-    propertyParams: Map.of(propertyParams),
-    href: href,
-    etag: etag,
-  );
+  }) =>
+      Task(
+        uid: uid,
+        summary: summary ?? this.summary,
+        description: description ?? this.description,
+        categories: categories ?? List.of(this.categories),
+        status: clearStatus ? null : (status ?? this.status),
+        percentComplete:
+            clearPercent ? null : (percentComplete ?? this.percentComplete),
+        priority: clearPriority ? null : (priority ?? this.priority),
+        due: clearDue ? null : (due ?? this.due),
+        dtstart: clearStart ? null : (dtstart ?? this.dtstart),
+        completed: clearCompleted ? null : (completed ?? this.completed),
+        rrule: clearRrule ? null : (rrule ?? this.rrule),
+        parentUid: clearParent ? null : (parentUid ?? this.parentUid),
+        created: created,
+        lastModified: lastModified ?? this.lastModified,
+        dtstamp: dtstamp,
+        extraLines: List.of(extraLines),
+        calendarLines: List.of(calendarLines),
+        siblingLines: List.of(siblingLines),
+        propertyParams: Map.of(propertyParams),
+        href: href,
+        etag: etag,
+      );
 
   @override
   String toString() => 'Task($uid, "$summary")';

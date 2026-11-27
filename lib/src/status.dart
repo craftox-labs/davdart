@@ -49,7 +49,7 @@ const notePriorities = {'high': 1, 'medium': 5, 'low': 9};
 String? priorityWordOf(int? p) => p == null || p <= 0
     ? null
     : p <= 4
-    ? 'high'
-    : p == 5
-    ? 'medium'
-    : 'low';
+        ? 'high'
+        : p == 5
+            ? 'medium'
+            : 'low';

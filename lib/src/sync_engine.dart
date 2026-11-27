@@ -17,8 +17,7 @@ class SyncReport {
   final errors = <String>[];
 
   @override
-  String toString() =>
-      'pulled $pulled, pushed $pushed, deleted $deleted, '
+  String toString() => 'pulled $pulled, pushed $pushed, deleted $deleted, '
       'merged $merged, restored $restored, conflicts ${conflicts.length}, errors ${errors.length}';
 }
 
@@ -31,7 +30,7 @@ class SyncReport {
 /// edit wins that value, and the earlier local text is kept as a [Revision].
 class SyncEngine {
   SyncEngine(this.client, this.store, {DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+      : _now = now ?? DateTime.now;
 
   final CalDavClient client;
   final NoteStore store;
@@ -70,9 +69,9 @@ class SyncEngine {
 
   /// Notes to show: everything not deleted locally.
   Future<List<Note>> notes() async => [
-    for (final s in await store.all())
-      if (!s.deleted) s.local,
-  ];
+        for (final s in await store.all())
+          if (!s.deleted) s.local,
+      ];
 
   String _path(String href) => client.collection.resolve(href).path;
 

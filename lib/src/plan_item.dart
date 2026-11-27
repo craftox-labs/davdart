@@ -66,8 +66,8 @@ class PlanItem {
       fields.remove('priority');
     } else {
       // Keep any extra text after the value (`high  # because x`).
-      final m = RegExp(r'^(\s*)[^\s(;,]+(.*)$')
-          .firstMatch(fields['priority'] ?? '');
+      final m =
+          RegExp(r'^(\s*)[^\s(;,]+(.*)$').firstMatch(fields['priority'] ?? '');
       fields['priority'] = m == null ? word : '${m.group(1)}$word${m.group(2)}';
     }
   }

@@ -17,18 +17,18 @@ class SpaceConfig {
   bool get hasServer => url != null;
 
   Map<String, Object?> toJson() => {
-    'id': id,
-    'name': name,
-    'url': url,
-    'user': user,
-  };
+        'id': id,
+        'name': name,
+        'url': url,
+        'user': user,
+      };
 
   factory SpaceConfig.fromJson(Map<String, dynamic> j) => SpaceConfig(
-    id: j['id'] as String,
-    name: j['name'] as String,
-    url: j['url'] as String?,
-    user: j['user'] as String?,
-  );
+        id: j['id'] as String,
+        name: j['name'] as String,
+        url: j['url'] as String?,
+        user: j['user'] as String?,
+      );
 }
 
 /// One body of notes: a project, an inbox. Always usable offline; a server is
@@ -39,8 +39,8 @@ class Space {
     this.store, {
     CalDavClient? client,
     DateTime Function()? now,
-  }) : _client = client,
-       _now = now;
+  })  : _client = client,
+        _now = now;
 
   final SpaceConfig config;
   final NoteStore store;

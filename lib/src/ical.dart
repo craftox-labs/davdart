@@ -34,10 +34,10 @@ String fold(String line) {
     final n = ch.codeUnits.length == 1 && rune < 0x80
         ? 1
         : rune < 0x800
-        ? 2
-        : rune < 0x10000
-        ? 3
-        : 4;
+            ? 2
+            : rune < 0x10000
+                ? 3
+                : 4;
     final limit = first ? 75 : 74; // continuation lines start with a space
     if (octets + n > limit) {
       buf.write('\r\n ');
@@ -293,9 +293,9 @@ Note _journalFromLines(List<String> lines) {
 /// components are ignored. Use [parseNote] for a CalDAV resource you intend to
 /// write back.
 List<Note> parseNotes(String text) => [
-  for (final b in _splitCalendar(text).blocks)
-    if (b.type == 'VJOURNAL') _journalFromLines(b.lines),
-];
+      for (final b in _splitCalendar(text).blocks)
+        if (b.type == 'VJOURNAL') _journalFromLines(b.lines),
+    ];
 
 /// Parses one CalDAV resource into a single Note, keeping what a write-back
 /// must not lose: other VJOURNALs of the same resource (recurrence overrides)
@@ -507,9 +507,9 @@ Task _todoFromLines(List<String> lines) {
 
 /// Parses every VTODO in an iCalendar document as its own Task.
 List<Task> parseTasks(String text) => [
-  for (final b in _splitCalendar(text).blocks)
-    if (b.type == 'VTODO') _todoFromLines(b.lines),
-];
+      for (final b in _splitCalendar(text).blocks)
+        if (b.type == 'VTODO') _todoFromLines(b.lines),
+    ];
 
 /// Parses one CalDAV resource into a single Task, keeping other VTODOs of the
 /// resource (recurrence overrides) in [Task.siblingLines] and VTIMEZONE and
@@ -728,9 +728,9 @@ Event _eventFromLines(List<String> lines) {
 
 /// Parses every VEVENT in an iCalendar document as its own Event.
 List<Event> parseEvents(String text) => [
-  for (final b in _splitCalendar(text).blocks)
-    if (b.type == 'VEVENT') _eventFromLines(b.lines),
-];
+      for (final b in _splitCalendar(text).blocks)
+        if (b.type == 'VEVENT') _eventFromLines(b.lines),
+    ];
 
 /// Parses one CalDAV resource into a single Event, keeping other VEVENTs of
 /// the resource (recurrence overrides) in [Event.siblingLines] and VTIMEZONE

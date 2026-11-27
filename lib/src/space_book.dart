@@ -34,8 +34,7 @@ class SpaceBook {
 
   /// Creates a local-only Space.
   Future<Space> createLocal(String name) async {
-    final id =
-        '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
+    final id = '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}'
         '${name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]+'), '-')}';
     final config = SpaceConfig(id: id, name: name);
     _configs.add(config);

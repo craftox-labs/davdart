@@ -98,8 +98,7 @@ TextMerge mergeText(
   final b = base.split('\n');
   final lh = _diff(b, local.split('\n'));
   final rh = _diff(b, remote.split('\n'));
-  final all = [...lh.map((h) => (h, true)), ...rh.map((h) => (h, false))]
-    ..sort(
+  final all = [...lh.map((h) => (h, true)), ...rh.map((h) => (h, false))]..sort(
       (x, y) => x.$1.start != y.$1.start
           ? x.$1.start - y.$1.start
           : x.$1.end - y.$1.end,
@@ -234,8 +233,8 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
     final pick = sameList(lx, bx)
         ? rx
         : sameList(rx, bx) || preferLocal
-        ? lx
-        : rx;
+            ? lx
+            : rx;
     merged.extraLines
       ..clear()
       ..addAll(pick);
@@ -246,8 +245,8 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
     final pick = _sameMap(local.propertyParams, base.propertyParams)
         ? remote.propertyParams
         : _sameMap(remote.propertyParams, base.propertyParams) || preferLocal
-        ? local.propertyParams
-        : remote.propertyParams;
+            ? local.propertyParams
+            : remote.propertyParams;
     final copy = Map.of(pick);
     merged.propertyParams
       ..clear()
@@ -300,9 +299,9 @@ NoteMerge mergeNotes(Note base, Note local, Note remote) {
   item.text = text.text;
   item.apply();
   merged.lastModified = [lm, rm].whereType<DateTime>().fold<DateTime?>(
-    null,
-    (a, d) => a == null || d.isAfter(a) ? d : a,
-  );
+        null,
+        (a, d) => a == null || d.isAfter(a) ? d : a,
+      );
   return NoteMerge(merged, conflicts);
 }
 
@@ -382,8 +381,8 @@ TaskMerge mergeTasks(Task base, Task local, Task remote) {
     final src = sameList(lx, bx)
         ? rx
         : sameList(rx, bx) || preferLocal
-        ? lx
-        : rx;
+            ? lx
+            : rx;
     merged.extraLines
       ..clear()
       ..addAll(src);
@@ -394,8 +393,8 @@ TaskMerge mergeTasks(Task base, Task local, Task remote) {
     final src = _sameMap(local.propertyParams, base.propertyParams)
         ? remote.propertyParams
         : _sameMap(remote.propertyParams, base.propertyParams) || preferLocal
-        ? local.propertyParams
-        : remote.propertyParams;
+            ? local.propertyParams
+            : remote.propertyParams;
     final copy = Map.of(src);
     merged.propertyParams
       ..clear()
@@ -423,9 +422,9 @@ TaskMerge mergeTasks(Task base, Task local, Task remote) {
   conflicts.addAll(text.conflicts);
   merged.description = text.text;
   merged.lastModified = [lm, rm].whereType<DateTime>().fold<DateTime?>(
-    null,
-    (a, d) => a == null || d.isAfter(a) ? d : a,
-  );
+        null,
+        (a, d) => a == null || d.isAfter(a) ? d : a,
+      );
   return TaskMerge(merged, conflicts);
 }
 
@@ -477,8 +476,8 @@ EventMerge mergeEvents(Event base, Event local, Event remote) {
       sameList(l, b)
           ? r
           : sameList(r, b) || preferLocal
-          ? l
-          : r,
+              ? l
+              : r,
     );
   }
 
@@ -529,8 +528,8 @@ EventMerge mergeEvents(Event base, Event local, Event remote) {
     final src = _sameMap(local.propertyParams, base.propertyParams)
         ? remote.propertyParams
         : _sameMap(remote.propertyParams, base.propertyParams) || preferLocal
-        ? local.propertyParams
-        : remote.propertyParams;
+            ? local.propertyParams
+            : remote.propertyParams;
     final copy = Map.of(src);
     merged.propertyParams
       ..clear()
@@ -558,8 +557,8 @@ EventMerge mergeEvents(Event base, Event local, Event remote) {
   conflicts.addAll(text.conflicts);
   merged.description = text.text;
   merged.lastModified = [lm, rm].whereType<DateTime>().fold<DateTime?>(
-    null,
-    (a, d) => a == null || d.isAfter(a) ? d : a,
-  );
+        null,
+        (a, d) => a == null || d.isAfter(a) ? d : a,
+      );
   return EventMerge(merged, conflicts);
 }

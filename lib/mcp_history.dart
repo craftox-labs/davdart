@@ -69,8 +69,7 @@ class HistoryLog {
   /// is a list of ICS texts, each clipped. Throws when the file cannot be
   /// written: the caller must then refuse the write.
   String append(Map<String, Object?> entry) {
-    final id =
-        '${_now().toUtc().microsecondsSinceEpoch.toRadixString(36)}'
+    final id = '${_now().toUtc().microsecondsSinceEpoch.toRadixString(36)}'
         '${_rand.nextInt(1 << 20).toRadixString(36)}';
     final e = <String, Object?>{
       'id': id,
@@ -96,9 +95,8 @@ class HistoryLog {
       if (line.length > maxLine && e['args'] is Map) {
         e['args'] = {
           for (final en in (e['args'] as Map).entries)
-            en.key: en.value is String
-                ? _clip(en.value as String, 200)
-                : en.value,
+            en.key:
+                en.value is String ? _clip(en.value as String, 200) : en.value,
         };
         line = jsonEncode(e);
       }

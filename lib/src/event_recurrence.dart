@@ -185,9 +185,9 @@ List<EventOccurrence> occurrencesBetween(
   }
 
   void emit(DateTime base) => emitLocal(
-    first.localWallOf(base),
-    DateTime.utc(base.year, base.month, base.day),
-  );
+        first.localWallOf(base),
+        DateTime.utc(base.year, base.month, base.day),
+      );
 
   final rule = plan.rule;
   if (rule != null) {
@@ -487,9 +487,8 @@ class _Rule {
         !{'DAILY', 'WEEKLY', 'MONTHLY', 'YEARLY'}.contains(freq)) {
       return null;
     }
-    final interval = m.containsKey('INTERVAL')
-        ? int.tryParse(m['INTERVAL']!)
-        : 1;
+    final interval =
+        m.containsKey('INTERVAL') ? int.tryParse(m['INTERVAL']!) : 1;
     if (interval == null || interval < 1) return null;
     int? count;
     if (m.containsKey('COUNT')) {
@@ -557,9 +556,8 @@ class _Rule {
       case 'WEEKLY':
         final first = start.subtract(_day * ((start.weekday - wkst + 7) % 7));
         final ws = first.add(_day * (7 * interval * i));
-        final wds = byday.isEmpty
-            ? [start.weekday]
-            : [for (final b in byday) b.$2];
+        final wds =
+            byday.isEmpty ? [start.weekday] : [for (final b in byday) b.$2];
         final offs = {for (final w in wds) (w - wkst + 7) % 7}.toList()..sort();
         return _Period(ws, [for (final o in offs) ws.add(_day * o)]);
       case 'MONTHLY':
@@ -592,9 +590,8 @@ class _Rule {
         ]);
       default: // YEARLY
         final y = start.year + i * interval;
-        final months = bymonth.isEmpty
-            ? [start.month]
-            : (List.of(bymonth)..sort());
+        final months =
+            bymonth.isEmpty ? [start.month] : (List.of(bymonth)..sort());
         final out = <DateTime>[];
         for (final mo in months) {
           final n = _daysIn(y, mo);
@@ -603,7 +600,8 @@ class _Rule {
             for (final d in src)
               if ((d > 0 ? d : n + d + 1) >= 1 && (d > 0 ? d : n + d + 1) <= n)
                 d > 0 ? d : n + d + 1,
-          }.toList()..sort();
+          }.toList()
+            ..sort();
           for (final d in ds) {
             out.add(DateTime.utc(y, mo, d));
           }

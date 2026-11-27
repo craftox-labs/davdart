@@ -61,17 +61,17 @@ class CollectionCapabilities {
   final Map<String, String> undetermined;
 
   Map<String, Object?> toJson() => {
-    'syncCollection': syncCollection,
-    'ctag': ctag,
-    'mkcalendar': mkcalendar,
-    'proppatch': proppatch,
-    'components': components,
-    'vjournal': vjournal,
-    'vtodo': vtodo,
-    'vevent': vevent,
-    'dav': davClasses,
-    'undetermined': undetermined,
-  };
+        'syncCollection': syncCollection,
+        'ctag': ctag,
+        'mkcalendar': mkcalendar,
+        'proppatch': proppatch,
+        'components': components,
+        'vjournal': vjournal,
+        'vtodo': vtodo,
+        'vevent': vevent,
+        'dav': davClasses,
+        'undetermined': undetermined,
+      };
 }
 
 /// Outcome of a collection write. With [dryRun] nothing was changed.
@@ -93,13 +93,13 @@ class CollectionChange {
   final String? backupPath;
   final int? itemCount;
   Map<String, Object?> toJson() => {
-    'action': action,
-    'dryRun': dryRun,
-    'changes': changes,
-    if (href != null) 'href': href.toString(),
-    if (backupPath != null) 'backup': backupPath,
-    if (itemCount != null) 'items': itemCount,
-  };
+        'action': action,
+        'dryRun': dryRun,
+        'changes': changes,
+        if (href != null) 'href': href.toString(),
+        if (backupPath != null) 'backup': backupPath,
+        if (itemCount != null) 'items': itemCount,
+      };
 }
 
 /// Collection management under one calendar home: list, create, rename,
@@ -112,10 +112,10 @@ class CollectionService {
     required this.password,
     this.httpClient,
     DateTime Function()? now,
-  }) : home = home.path.endsWith('/')
-           ? home
-           : home.replace(path: '${home.path}/'),
-       _now = now ?? DateTime.now;
+  })  : home = home.path.endsWith('/')
+            ? home
+            : home.replace(path: '${home.path}/'),
+        _now = now ?? DateTime.now;
 
   final Uri home;
   final String username;
@@ -124,23 +124,22 @@ class CollectionService {
   final DateTime Function() _now;
 
   CalDavClient _client(Uri collection) => CalDavClient(
-    collection: collection,
-    username: username,
-    password: password,
-    client: httpClient,
-  );
+        collection: collection,
+        username: username,
+        password: password,
+        client: httpClient,
+      );
 
   Future<List<CollectionInfo>> list() => CalDavClient.discover(
-    home,
-    username: username,
-    password: password,
-    client: httpClient,
-  );
+        home,
+        username: username,
+        password: password,
+        client: httpClient,
+      );
 
   Future<CollectionInfo> _info(Uri href) async {
-    final h = href.path.endsWith('/')
-        ? href
-        : href.replace(path: '${href.path}/');
+    final h =
+        href.path.endsWith('/') ? href : href.replace(path: '${href.path}/');
     final all = await list();
     final hit = all.where((c) => c.href.path == h.path).firstOrNull;
     if (hit == null) {
@@ -267,8 +266,7 @@ class CollectionService {
           .toIso8601String()
           .replaceAll(RegExp(r'[:.]'), '')
           .replaceAll('-', '');
-      final id =
-          info.href.pathSegments.where((s) => s.isNotEmpty).lastOrNull ??
+      final id = info.href.pathSegments.where((s) => s.isNotEmpty).lastOrNull ??
           'collection';
       final dir = '$backupDir/${Uri.encodeComponent(id)}-$stamp';
       final desc = [
@@ -310,11 +308,8 @@ class CollectionService {
         }
         for (final r in unreadable) {
           final bytes = await c.getRawBytes(r.href);
-          final label = c
-              .pathOf(r.href)
-              .split('/')
-              .where((x) => x.isNotEmpty)
-              .last;
+          final label =
+              c.pathOf(r.href).split('/').where((x) => x.isNotEmpty).last;
           files[name(i++, label)] = utf8.decode(bytes, allowMalformed: true);
         }
         if (files.length != count) {
@@ -374,9 +369,8 @@ class CollectionService {
   /// throws on a server answer: what could not be found out is null in the
   /// result, with the reason in `undetermined`.
   Future<CollectionCapabilities> probe(Uri href) async {
-    final url = href.path.endsWith('/')
-        ? href
-        : href.replace(path: '${href.path}/');
+    final url =
+        href.path.endsWith('/') ? href : href.replace(path: '${href.path}/');
     final c = _client(url);
     final why = <String, String>{};
     bool? mk, pp, sync, ctag, vj, vt, ve;

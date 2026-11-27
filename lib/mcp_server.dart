@@ -50,12 +50,10 @@ enum ToolGroup {
 
 const _kinds = ['note', 'task', 'event'];
 
-const _collNote =
-    ' Pass collection (href or exact name from the collections '
+const _collNote = ' Pass collection (href or exact name from the collections '
     'tool, action list; call it first) to work in another collection.';
 
-final _statusNote =
-    'one of ${allowedStatuses.join(', ')}; '
+final _statusNote = 'one of ${allowedStatuses.join(', ')}; '
     'review means shipped and waiting on tm to check; doing means partly shipped '
     'with work remaining; in_progress and in-progress mean doing, in_review, '
     'in-review, ready_for_review and to_review mean review, cancelled, duplicate and wontfix '
@@ -185,11 +183,15 @@ McpServer buildMcpServer({
         !(kind == ItemKind.note
             ? hit.holdsNotes
             : kind == ItemKind.task
-            ? hit.holdsTasks
-            : hit.holdsEvents)) {
+                ? hit.holdsTasks
+                : hit.holdsEvents)) {
       throw ItemServiceException(
         'collection "${hit.name}" does not hold '
-        '${kind.name}s (it accepts: ${[if (hit.holdsNotes) 'notes', if (hit.holdsTasks) 'tasks', if (hit.holdsEvents) 'events'].join(', ')})',
+        '${kind.name}s (it accepts: ${[
+          if (hit.holdsNotes) 'notes',
+          if (hit.holdsTasks) 'tasks',
+          if (hit.holdsEvents) 'events'
+        ].join(', ')})',
       );
     }
     final path = _slash(hit.href.path);
@@ -209,8 +211,7 @@ McpServer buildMcpServer({
 
   final kindS = JsonSchema.string(enumValues: _kinds, description: 'Item kind');
   final collS = JsonSchema.string(
-    description:
-        'Collection href or exact name from the collections list '
+    description: 'Collection href or exact name from the collections list '
         'action; default is the configured collection',
   );
   final idS = JsonSchema.string(
@@ -221,8 +222,7 @@ McpServer buildMcpServer({
   );
   final tagsS = JsonSchema.array(items: JsonSchema.string());
   final writerS = JsonSchema.string(
-    description:
-        'Optional name of who is making this change (a bot or '
+    description: 'Optional name of who is making this change (a bot or '
         'person label). Stored as the item\'s X-WRITER property and in the '
         'history log. Self-declared: not authentication, anyone with the '
         'token can claim any name; never rely on it for trust.',
@@ -250,21 +250,21 @@ McpServer buildMcpServer({
     if (dry || log == null) return run(writer);
     final coll = _slash(svc.client.collection.path);
     Map<String, Object?> base(ItemData? it) => {
-      'tool': tool,
-      'collection': coll,
-      if (it != null) ...{
-        'uid': it.uid,
-        'kind': it.kind.name,
-        'title': it.title,
-        if (it.href != null) 'href': it.href,
-      },
-      if (writer != null) 'writer': writer,
-      'args': log.cleanArgs(a.m),
-    };
+          'tool': tool,
+          'collection': coll,
+          if (it != null) ...{
+            'uid': it.uid,
+            'kind': it.kind.name,
+            'title': it.title,
+            if (it.href != null) 'href': it.href,
+          },
+          if (writer != null) 'writer': writer,
+          'args': log.cleanArgs(a.m),
+        };
     Future<String> ics(ItemData it) async => utf8.decode(
-      await svc.client.getRawBytes(it.href!),
-      allowMalformed: true,
-    );
+          await svc.client.getRawBytes(it.href!),
+          allowMalformed: true,
+        );
     String? entryId;
     if (id != null) {
       final item = await svc.get(id, kind: kind);
@@ -355,7 +355,8 @@ McpServer buildMcpServer({
       (a) async => (await (await svcFor(a)).overview(
         maxDepth: a.integer('depth') ?? 2,
         under: a.string('under'),
-      )).toJson(),
+      ))
+          .toJson(),
     );
     tool(
       'list',
@@ -388,7 +389,8 @@ McpServer buildMcpServer({
         includeFolders: a.boolean('folders') ?? false,
         limit: a.integer('limit') ?? 50,
         offset: a.integer('offset') ?? 0,
-      )).toJson(),
+      ))
+          .toJson(),
     );
     tool(
       'get',
@@ -399,7 +401,9 @@ McpServer buildMcpServer({
       (a) async => (await (await svcFor(
         a,
         a.kind('kind'),
-      )).get(a.req('id'), kind: a.kind('kind'))).toJson(),
+      ))
+              .get(a.req('id'), kind: a.kind('kind')))
+          .toJson(),
     );
     final log = history;
     if (log != null) {
@@ -490,7 +494,8 @@ McpServer buildMcpServer({
             end: a.string('end'),
             location: a.string('location'),
             dryRun: a.boolean('dry_run') ?? false,
-          )).toJson(),
+          ))
+              .toJson(),
         );
       },
     );
@@ -582,7 +587,8 @@ McpServer buildMcpServer({
             after: a.string('after'),
             writer: w,
             dryRun: a.boolean('dry_run') ?? false,
-          )).toJson(),
+          ))
+              .toJson(),
           id: a.req('id'),
         );
       },
@@ -612,7 +618,8 @@ McpServer buildMcpServer({
             p == null || p.toLowerCase() == 'top' ? null : p,
             writer: w,
             dryRun: a.boolean('dry_run') ?? false,
-          )).toJson(),
+          ))
+              .toJson(),
           id: a.req('id'),
         );
       },
@@ -647,7 +654,8 @@ McpServer buildMcpServer({
             adoptChildren: adopt,
             writer: w,
             dryRun: a.boolean('dry_run') ?? false,
-          )).toJson(),
+          ))
+              .toJson(),
           id: a.req('id'),
           kind: a.kind('kind'),
           adopt: adopt,
@@ -701,8 +709,8 @@ McpServer buildMcpServer({
                     action == 'rename' ||
                     action == 'delete'
                 ? 'collections "$action" is not enabled here (enabled: '
-                      '${actions.join(', ')}); start the server with the admin '
-                      'group to allow it'
+                    '${actions.join(', ')}); start the server with the admin '
+                    'group to allow it'
                 : 'unknown action "$action" (expected ${actions.join(', ')})',
           );
         }
@@ -728,7 +736,8 @@ McpServer buildMcpServer({
               svc.home.resolve(a.req('href')),
               a.req('new_name'),
               dryRun: dry,
-            )).toJson();
+            ))
+                .toJson();
           default:
             return (await svc.delete(
               svc.home.resolve(a.req('href')),
@@ -737,7 +746,8 @@ McpServer buildMcpServer({
               allowNonEmpty: a.boolean('allow_non_empty') ?? false,
               allowUnreadable: a.boolean('allow_unreadable') ?? false,
               dryRun: dry,
-            )).toJson();
+            ))
+                .toJson();
         }
       },
     );

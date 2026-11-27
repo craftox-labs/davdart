@@ -33,11 +33,11 @@ abstract class EventStore {
 Event _clone(Event n) => n.copyWith();
 
 StoredEvent _cloneStored(StoredEvent s) => StoredEvent(
-  local: _clone(s.local),
-  base: s.base == null ? null : _clone(s.base!),
-  dirty: s.dirty,
-  deleted: s.deleted,
-);
+      local: _clone(s.local),
+      base: s.base == null ? null : _clone(s.base!),
+      dirty: s.dirty,
+      deleted: s.deleted,
+    );
 
 class MemoryEventStore implements EventStore {
   final Map<String, StoredEvent> _events = {};
@@ -55,8 +55,8 @@ class MemoryEventStore implements EventStore {
 
   @override
   Future<List<StoredEvent>> all() async => [
-    for (final s in _events.values) _cloneStored(s),
-  ];
+        for (final s in _events.values) _cloneStored(s),
+      ];
 
   @override
   Future<void> put(String uid, StoredEvent s) async {
@@ -90,10 +90,10 @@ class MemoryEventStore implements EventStore {
       _revisions.where((r) => r.uid == uid).toList();
 
   static Map<String, Object?> _encode(Event n) => {
-    'ics': serializeEvent(n),
-    'href': n.href,
-    'etag': n.etag,
-  };
+        'ics': serializeEvent(n),
+        'href': n.href,
+        'etag': n.etag,
+      };
 
   static Event _decode(Map<String, dynamic> m) => parseEvent(m['ics'] as String)
     ..href = m['href'] as String?
@@ -101,27 +101,27 @@ class MemoryEventStore implements EventStore {
 
   /// The whole store as a JSON-ready map; events are kept as iCalendar text.
   Map<String, Object?> toJson() => {
-    'syncToken': _token,
-    'events': {
-      for (final e in _events.entries)
-        e.key: {
-          'local': _encode(e.value.local),
-          'base': e.value.base == null ? null : _encode(e.value.base!),
-          'dirty': e.value.dirty,
-          'deleted': e.value.deleted,
+        'syncToken': _token,
+        'events': {
+          for (final e in _events.entries)
+            e.key: {
+              'local': _encode(e.value.local),
+              'base': e.value.base == null ? null : _encode(e.value.base!),
+              'dirty': e.value.dirty,
+              'deleted': e.value.deleted,
+            },
         },
-    },
-    'revisions': [
-      for (final r in _revisions)
-        {
-          'uid': r.uid,
-          'at': r.at.toIso8601String(),
-          'reason': r.reason,
-          'summary': r.summary,
-          'body': r.body,
-        },
-    ],
-  };
+        'revisions': [
+          for (final r in _revisions)
+            {
+              'uid': r.uid,
+              'at': r.at.toIso8601String(),
+              'reason': r.reason,
+              'summary': r.summary,
+              'body': r.body,
+            },
+        ],
+      };
 
   /// Replaces the contents with a map from [toJson].
   void loadJson(Map<String, dynamic> j) {

@@ -15,7 +15,7 @@ import 'event_store.dart';
 /// edit wins that value, and the earlier local text is kept as a [Revision].
 class EventSyncEngine {
   EventSyncEngine(this.client, this.store, {DateTime Function()? now})
-    : _now = now ?? DateTime.now;
+      : _now = now ?? DateTime.now;
 
   final CalDavClient client;
   final EventStore store;
@@ -54,9 +54,9 @@ class EventSyncEngine {
 
   /// Events to show: everything not deleted locally.
   Future<List<Event>> events() async => [
-    for (final s in await store.all())
-      if (!s.deleted) s.local,
-  ];
+        for (final s in await store.all())
+          if (!s.deleted) s.local,
+      ];
 
   String _path(String href) => client.collection.resolve(href).path;
 
