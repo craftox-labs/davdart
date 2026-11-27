@@ -2499,9 +2499,12 @@ class AppState extends ChangeNotifier {
   /// Deletes project [uid]. Its notes, tasks and events are kept: they move
   /// to the Personal container (a visible home, unlike the hidden Projects
   /// container the plain note delete would leave them in). Not a project:
-  /// the plain [deleteNote].
+  /// the plain [deleteNote]. Undo puts the folder back with its children
+  /// under it again.
   Future<void> deleteProject(String uid) async {
     if (!projectIndex.isProject(uid)) return deleteNote(uid);
+    final project = tree.find(uid)?.note.copyWith();
+    if (project == null) return;
     final home = await ensurePersonalContainer();
     // No Personal container (e.g. the Space changed under us): keep the
     // project and its children rather than orphan them.
@@ -2544,6 +2547,34 @@ class AppState extends ChangeNotifier {
       if (error != null) return;
     }
     await deleteNote(uid);
+    if (error != null) return;
+    // One Undo puts the folder and everything that was under it back. The
+    // children went to Personal, so they are saved again under the project
+    // rather than left there.
+    _postUndo('Deleted "${project.summary}"', () async {
+      await _edit((src) async {
+        await src.save(project);
+        for (final k in kidNotes) {
+          await src.save(k.copyWith(parentUid: uid));
+        }
+      });
+      if (error != null) return;
+      if (kidTasks.isNotEmpty) {
+        await _taskEdit((src) async {
+          for (final k in kidTasks) {
+            await src.saveTask(k.copyWith(parentUid: uid));
+          }
+        });
+        if (error != null) return;
+      }
+      if (kidEvents.isNotEmpty) {
+        await _eventEdit((src) async {
+          for (final k in kidEvents) {
+            await src.saveEvent(k.copyWith(parentUid: uid));
+          }
+        });
+      }
+    });
   }
 
   /// Adds a note (a child of [parentUid] if given) and selects it.
