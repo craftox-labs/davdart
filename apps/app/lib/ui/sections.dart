@@ -1100,7 +1100,7 @@ class SettingsSection extends _Section {
         if (!state.connected && state.currentOnServer)
           _item(FLucideIcons.cloudSync, 'Retry connecting', state.load)
         else if (!state.connected)
-          _item(FLucideIcons.cloud, 'Connect a collection by path', () {
+          _item(FLucideIcons.cloud, 'Connect a Space by path', () {
             onPick();
             showConnectDialog(context, state);
           })
