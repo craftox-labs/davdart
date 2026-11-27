@@ -7,6 +7,8 @@ import '../state/note_drag.dart';
 import 'drag_drop.dart';
 import 'chips.dart';
 import 'note_menu.dart';
+import 'empty_state.dart';
+import 'surface.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
@@ -19,9 +21,7 @@ class NoteListView extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     if (state.error != null && state.notes.isEmpty) {
-      return Center(
-        child: Text(state.error!, style: t.type.bodyStyle.copyWith(color: t.muted)),
-      );
+      return EmptyState(state.error!, centered: true, error: true);
     }
     final rows = <(Note, int)>[];
     final filtering = state.query.trim().isNotEmpty || state.tag != null;
@@ -40,9 +40,7 @@ class NoteListView extends StatelessWidget {
       walk(state.spaceTreeRoots, 0);
     }
     if (rows.isEmpty && !state.loading) {
-      return Center(
-        child: Text('No notes', style: t.type.bodyStyle.copyWith(color: t.muted)),
-      );
+      return const EmptyState('No notes', centered: true);
     }
     final list = ListView.separated(
       padding: EdgeInsets.only(bottom: fabInset(context)),
@@ -56,8 +54,9 @@ class NoteListView extends StatelessWidget {
         final folder = AppState.isFolder(n);
         final body = FTappable(
           onPress: () => state.clickNote(n.uid),
-          child: Container(
-            color: state.peekUid == n.uid ? t.selected : null,
+          child: Surface(
+            selected: state.peekUid == n.uid,
+            square: true,
             padding: EdgeInsets.fromLTRB(
               t.space.lg + depth * t.sizes.listIndent,
               t.space.lg - t.space.xxs,

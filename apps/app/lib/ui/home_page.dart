@@ -12,6 +12,9 @@ import 'overflow_tip.dart';
 import 'project_overview.dart';
 import 'placeholder_card.dart';
 import 'projects_panel.dart' show ProjectProgressBar, projectCounts;
+import 'empty_state.dart';
+import 'card_box.dart';
+import 'section_label.dart';
 import 'theme.dart';
 
 /// Home: the individual's page, scoped to the open Space and ignoring the
@@ -279,7 +282,7 @@ class HomePage extends StatelessWidget {
       ),
       children: [
         if (looseTasks.isEmpty)
-          _Empty('Nothing loose to do', key: const Key('home-tasks-empty'))
+          EmptyState('Nothing loose to do', key: const Key('home-tasks-empty'))
         else
           ...looseTasks.take(preview).map(taskRow),
       ],
@@ -321,7 +324,7 @@ class HomePage extends StatelessWidget {
       ),
       children: [
         if (calendarRows.isEmpty)
-          _Empty('Nothing coming up', key: const Key('home-calendar-empty'))
+          EmptyState('Nothing coming up', key: const Key('home-calendar-empty'))
         else
           for (final c in calendarRows.take(preview))
             row(
@@ -358,7 +361,7 @@ class HomePage extends StatelessWidget {
       title: 'Recently modified',
       children: [
         if (recent.isEmpty)
-          _Empty('Nothing changed yet', key: const Key('home-recent-empty'))
+          EmptyState('Nothing changed yet', key: const Key('home-recent-empty'))
         else
           for (final i in recent.take(preview))
             row(
@@ -445,28 +448,13 @@ class _Card extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    return Container(
+    return CardBox(
       padding: EdgeInsets.all(t.space.md),
-      decoration: BoxDecoration(
-        color: t.card,
-        borderRadius: BorderRadius.circular(t.radii.card),
-        border: Border.all(color: t.cardBorder),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         spacing: t.space.xs,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title.toUpperCase(),
-                  style: t.type.labelStyle.copyWith(color: t.muted),
-                ),
-              ),
-              ?action,
-            ],
-          ),
+          SectionLabel(title, action: action),
           ...children,
         ],
       ),
@@ -497,20 +485,6 @@ class _SeeAll extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _Empty extends StatelessWidget {
-  const _Empty(this.text, {super.key});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return Padding(
-      padding: EdgeInsets.symmetric(vertical: t.space.xs),
-      child: Text(text, style: t.type.captionStyle.copyWith(color: t.muted)),
     );
   }
 }

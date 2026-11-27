@@ -17,6 +17,8 @@ import 'note_menu.dart';
 import 'overflow_tip.dart';
 import 'task_menu.dart';
 import 'task_parts.dart';
+import 'empty_state.dart';
+import 'card_box.dart';
 import 'theme.dart';
 
 /// The glyph of a card's kind: a document for a note, a checklist (the rail icon) for a
@@ -86,25 +88,16 @@ class HomeBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = tokensOf(context);
     if (state.error != null && state.notes.isEmpty) {
-      return Center(
-        child: Text(state.error!, style: t.type.bodyStyle.copyWith(color: t.muted)),
-      );
+      return EmptyState(state.error!, centered: true, error: true);
     }
     final cols = state.homeColumns();
     if (cols.isEmpty && !state.loading) {
-      return Center(
-        child: Padding(
-          padding: EdgeInsets.all(t.space.lg),
-          child: Text(
-            state.filtered.isNotEmpty || state.tasks.isNotEmpty
-                ? 'No work items yet. Give a note or task a status (backlog, todo, doing...) and it shows up here.'
-                : 'No notes',
-            textAlign: TextAlign.center,
-            style: t.type.bodyStyle.copyWith(color: t.muted),
-          ),
-        ),
+      return EmptyState(
+        state.filtered.isNotEmpty || state.tasks.isNotEmpty
+            ? 'No work items yet. Give a note or task a status (backlog, todo, doing...) and it shows up here.'
+            : 'No notes',
+        centered: true,
       );
     }
     return BoardLayout<BoardItem>(
@@ -340,27 +333,19 @@ class _Card extends StatelessWidget {
         footer,
       ],
     );
-    final card = FTappable(
-      key: task == null ? null : Key('task-card-${task.uid}'),
-      onPress: () => state.clickNote(item.uid),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: t.card,
-          borderRadius: BorderRadius.circular(t.radii.card),
-          border: Border.all(color: selected ? t.accent : t.cardBorder),
-        ),
-        child: Padding(
-          padding: compact
-              ? EdgeInsets.fromLTRB(
-                  t.space.lg,
-                  t.space.lg,
-                  t.space.huge,
-                  t.space.lg,
-                )
-              : EdgeInsets.all(t.space.lg),
-          child: body,
-        ),
-      ),
+    final card = CardBox(
+      selected: selected,
+      tapKey: task == null ? null : Key('task-card-${task.uid}'),
+      onTap: () => state.clickNote(item.uid),
+      padding: compact
+          ? EdgeInsets.fromLTRB(
+              t.space.lg,
+              t.space.lg,
+              t.space.huge,
+              t.space.lg,
+            )
+          : null,
+      child: body,
     );
     final draggable = NoteDraggable(
       uid: item.uid,

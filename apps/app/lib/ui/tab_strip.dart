@@ -14,6 +14,7 @@ import 'note_menu.dart';
 import 'save_view_dialog.dart';
 import 'shell_frame.dart';
 import 'task_menu.dart';
+import 'surface.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
@@ -476,16 +477,13 @@ class _Box extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return Container(
+    return SizedBox(
       width: size,
       height: size,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: hovered ? t.hover : null,
-        borderRadius: BorderRadius.circular(t.radii.small),
+      child: Surface(
+        hovered: hovered,
+        child: Center(child: child),
       ),
-      child: child,
     );
   }
 }

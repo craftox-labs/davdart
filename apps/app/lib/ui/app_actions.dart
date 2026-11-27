@@ -22,6 +22,7 @@ import 'new_space_dialog.dart';
 import 'projects_panel.dart';
 import 'parts.dart';
 import 'task_menu.dart';
+import 'section_label.dart';
 import 'theme.dart';
 
 /// The uid of the note, task or event the user is on: the one open full page,
@@ -919,15 +920,7 @@ class _HelpGroup extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            title.toUpperCase(),
-            style: t.type.labelStyle.copyWith(color: t.muted),
-          ),
-          SizedBox(height: t.space.xs),
-          SizedBox(
-            height: t.borders.hairline,
-            child: ColoredBox(color: t.divider),
-          ),
+          SectionLabel(title, rule: true),
           SizedBox(height: t.space.xs),
           for (final (keys, what) in items)
             ConstrainedBox(

@@ -18,6 +18,8 @@ import 'shell_frame.dart';
 import 'sidebar.dart';
 import 'task_menu.dart';
 import 'tab_strip.dart' show tabStripIcon;
+import 'card_box.dart';
+import 'count_badge.dart';
 import 'theme.dart';
 import '../theme/tokens.dart';
 
@@ -266,21 +268,12 @@ class MobileBar extends StatelessWidget {
               child: SizedBox(
                 width: t.sizes.touchTarget,
                 height: t.sizes.touchTarget,
+                // A quiet outlined box: the count reads as a bigger icon.
                 child: Center(
-                  // A quiet outlined box: the count reads as a bigger icon.
-                  child: Container(
+                  child: CountBadge(
+                    count,
                     key: const Key('bar-count-box'),
-                    width: t.sizes.touchTarget - t.space.md,
-                    height: t.sizes.touchTarget - t.space.md,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      border: Border.all(
-                        color: t.muted,
-                        width: t.borders.hairline,
-                      ),
-                      borderRadius: BorderRadius.circular(t.radii.badge),
-                    ),
-                    child: Text('$count', style: t.type.labelStyle),
+                    tone: BadgeTone.outline,
                   ),
                 ),
               ),
@@ -498,16 +491,11 @@ class _OpenItemsGridState extends State<OpenItemsGrid>
       key: const Key('grid-card-home'),
       semanticsLabel: 'Home',
       onPress: () => widget.onOpen(null),
-      child: Container(
+      child: CardBox(
+        variant: CardVariant.tile,
         padding: EdgeInsets.all(t.space.md),
-        decoration: BoxDecoration(
-          color: t.panel,
-          borderRadius: BorderRadius.circular(t.radii.card),
-          border: Border.all(
-            color: active ? t.accent : t.panelBorder,
-            width: active ? t.borders.hairline * 2 : t.borders.hairline,
-          ),
-        ),
+        selected: active,
+        selectedBorderWidth: t.borders.focus,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -534,16 +522,11 @@ class _OpenItemsGridState extends State<OpenItemsGrid>
       key: Key('grid-card-${tab.code}'),
       semanticsLabel: title,
       onPress: () => widget.onOpen(tab),
-      child: Container(
+      child: CardBox(
+        variant: CardVariant.tile,
         padding: EdgeInsets.all(t.space.md),
-        decoration: BoxDecoration(
-          color: t.panel,
-          borderRadius: BorderRadius.circular(t.radii.card),
-          border: Border.all(
-            color: active ? t.accent : t.panelBorder,
-            width: active ? t.borders.hairline * 2 : t.borders.hairline,
-          ),
-        ),
+        selected: active,
+        selectedBorderWidth: t.borders.focus,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

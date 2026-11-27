@@ -19,6 +19,7 @@ import 'parts.dart';
 import 'save_view_dialog.dart';
 import 'side_panel.dart';
 import 'segmented.dart';
+import 'surface.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 import 'panel_tags_drawer.dart';
@@ -175,17 +176,16 @@ class SpacesSection extends _Section {
         child: FTappable(
           key: key,
           onPress: onPress,
-          child: Container(
+          child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: t.sizes.touchTarget),
-            padding: EdgeInsets.symmetric(
-              horizontal: t.space.md,
-              vertical: t.space.sm,
+            child: Surface(
+              selected: sp.id == state.currentSpaceId,
+              padding: EdgeInsets.symmetric(
+                horizontal: t.space.md,
+                vertical: t.space.sm,
+              ),
+              child: child,
             ),
-            decoration: BoxDecoration(
-              color: sp.id == state.currentSpaceId ? t.selected : null,
-              borderRadius: BorderRadius.circular(t.radii.small),
-            ),
-            child: child,
           ),
         ),
       ),
@@ -353,14 +353,11 @@ class NotesSection extends _Section {
             }
             onPick();
           },
-          child: Container(
+          child: Surface(
+            selected: on,
             padding: EdgeInsets.symmetric(
               horizontal: t.space.md,
               vertical: t.space.sm - t.borders.hairline,
-            ),
-            decoration: BoxDecoration(
-              color: on ? t.selected : null,
-              borderRadius: BorderRadius.circular(t.radii.small),
             ),
             child: child,
           ),

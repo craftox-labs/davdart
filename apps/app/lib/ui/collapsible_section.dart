@@ -2,8 +2,9 @@ import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../data/key_value_storage.dart';
+import 'count_badge.dart';
+import 'section_label.dart';
 import 'theme.dart';
-import 'overflow_tip.dart';
 
 /// A section with a small heading row (chevron, muted label, optional count)
 /// that toggles its body. The collapsed state is kept in [prefs] under
@@ -87,7 +88,6 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final title = widget.upper ? widget.title.toUpperCase() : widget.title;
     final fill = widget.fill && !_isCollapsed;
     return Column(
       mainAxisSize: fill ? MainAxisSize.max : MainAxisSize.min,
@@ -127,22 +127,14 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
                             SizedBox(width: t.space.sm),
                           ],
                           Flexible(
-                            child: OverflowTip(
-                              title,
-                              style: t.type.labelStyle.copyWith(
-                                fontSize: t.type.caption,
-                                color: t.muted,
-                              ),
+                            child: SectionLabel(
+                              widget.title,
+                              upper: widget.upper,
                             ),
                           ),
                           if (widget.count != null) ...[
                             SizedBox(width: t.space.sm),
-                            Text(
-                              '${widget.count}',
-                              style: t.type.captionStyle.copyWith(
-                                color: t.muted,
-                              ),
-                            ),
+                            CountBadge(widget.count!),
                           ],
                         ],
                       ),

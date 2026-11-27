@@ -48,6 +48,7 @@ class TypeTokens {
     this.heading = 17,
     this.display = 22,
     this.paneTitle = 13,
+    this.sectionLabel = 12,
     this.regular = FontWeight.w400,
     this.medium = FontWeight.w500,
     this.semibold = FontWeight.w600,
@@ -73,6 +74,10 @@ class TypeTokens {
   final double paneTitle;
   final FontWeight paneTitleWeight;
 
+  /// Size of the small uppercase section label (one step over [micro], so it
+  /// matches the caption line it sits above).
+  final double sectionLabel;
+
   /// Letter spacing of small uppercase section labels.
   final double labelSpacing;
 
@@ -92,6 +97,14 @@ class TypeTokens {
   /// The one title style of all pane header rows (colour comes from the
   /// caller via [Tokens.paneTitleColor]).
   TextStyle get paneTitleStyle => _s(paneTitle, paneTitleWeight);
+
+  /// Small uppercase section label (the shared SectionLabel component).
+  TextStyle get sectionLabelStyle => TextStyle(
+    fontSize: sectionLabel,
+    fontWeight: semibold,
+    letterSpacing: labelSpacing,
+    height: lineHeight,
+  );
 
   /// Small uppercase section label.
   TextStyle get labelStyle => TextStyle(
@@ -259,6 +272,7 @@ class SizeTokens {
     this.tabMax = 180,
     this.tabClose = 16,
     this.touchTarget = 44,
+    this.countBox = 36,
     this.spaceChipMax = 140,
     this.edgeSwipe = 32,
     this.fabClearance = 84,
@@ -332,6 +346,9 @@ class SizeTokens {
 
   /// Least hit target of an interactive control on the narrow (touch) layout.
   final double touchTarget;
+
+  /// Square of the outlined count badge in the narrow top bar.
+  final double countBox;
 
   /// Home calendar: grid width, wide day cell, dot, today ring; the Day|Board
   /// switch segment minimum width and height.

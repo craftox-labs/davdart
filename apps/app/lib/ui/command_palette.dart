@@ -9,6 +9,9 @@ import '../state/palette_model.dart';
 import '../state/palette_recents.dart';
 import 'app_actions.dart';
 import 'parts.dart';
+import 'empty_state.dart';
+import 'section_label.dart';
+import 'surface.dart';
 import 'theme.dart';
 
 bool get _apple =>
@@ -189,10 +192,7 @@ class _CommandPaletteState extends State<CommandPalette> {
               t.space.lg,
               t.space.xs,
             ),
-            child: Text(
-              e.group.toUpperCase(),
-              style: t.type.captionStyle.copyWith(color: t.muted),
-            ),
+            child: SectionLabel(e.group),
           ),
         );
       }
@@ -256,15 +256,10 @@ class _CommandPaletteState extends State<CommandPalette> {
                               0.6,
                         ),
                         child: _entries.isEmpty
-                            ? Padding(
+                            ? EmptyState(
+                                'No matches',
+                                key: const Key('palette-empty'),
                                 padding: EdgeInsets.all(t.space.xl),
-                                child: Text(
-                                  'No matches',
-                                  key: const Key('palette-empty'),
-                                  style: t.type.bodyStyle.copyWith(
-                                    color: t.muted,
-                                  ),
-                                ),
                               )
                             : ListView(
                                 key: const Key('palette-list'),
@@ -307,35 +302,35 @@ class _Row extends StatelessWidget {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onTap: onTap,
-        child: Container(
-          key: Key('palette-row-${entry.id ?? entry.uid}'),
-          margin: EdgeInsets.symmetric(horizontal: t.space.sm),
-          padding: EdgeInsets.symmetric(
-            horizontal: t.space.md,
-            vertical: t.space.md,
-          ),
-          decoration: BoxDecoration(
-            color: selected ? t.selected : null,
-            borderRadius: BorderRadius.circular(t.radii.control),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: Text(
-                  entry.title.isEmpty ? 'Untitled' : entry.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: t.type.bodyStyle.copyWith(color: t.fg),
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: t.space.sm),
+          child: Surface(
+            key: Key('palette-row-${entry.id ?? entry.uid}'),
+            selected: selected,
+            radius: t.radii.control,
+            padding: EdgeInsets.symmetric(
+              horizontal: t.space.md,
+              vertical: t.space.md,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    entry.title.isEmpty ? 'Untitled' : entry.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: t.type.bodyStyle.copyWith(color: t.fg),
+                  ),
                 ),
-              ),
-              if (entry.hint != null) ...[
-                SizedBox(width: t.space.md),
-                Text(
-                  entry.hint!,
-                  style: t.type.captionStyle.copyWith(color: t.muted),
-                ),
+                if (entry.hint != null) ...[
+                  SizedBox(width: t.space.md),
+                  Text(
+                    entry.hint!,
+                    style: t.type.captionStyle.copyWith(color: t.muted),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

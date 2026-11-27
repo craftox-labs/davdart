@@ -14,6 +14,8 @@ import 'event_menu.dart';
 import 'panel_tags_drawer.dart';
 import 'parts.dart';
 import 'side_panel.dart';
+import 'empty_state.dart';
+import 'surface.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
@@ -174,9 +176,17 @@ class EventsPanel extends StatelessWidget {
                             : state.filteredPersonalEvents)
                         .isEmpty &&
                     tasks.values.every((l) => l.isEmpty))
-                  _Note('No events yet', key: const Key('events-empty'))
+                  EmptyState(
+                    'No events yet',
+                    key: const Key('events-empty'),
+                    padding: EdgeInsets.all(t.space.md),
+                  )
                 else if (!shown)
-                  _Note('Nothing in sight', key: const Key('events-none')),
+                  EmptyState(
+                    'Nothing in sight',
+                    key: const Key('events-none'),
+                    padding: EdgeInsets.all(t.space.md),
+                  ),
                 for (final s in sections)
                   if (s.$3.isNotEmpty || tasks[s.$1]!.isNotEmpty)
                     Padding(
@@ -288,8 +298,9 @@ class EventRow extends StatelessWidget {
             state.clickEvent(uid);
             onOpen?.call();
           },
-          child: Container(
-            color: selected ? t.selected : null,
+          child: Surface(
+            selected: selected,
+            square: true,
             padding: EdgeInsets.symmetric(
               horizontal: t.space.xs,
               vertical: t.space.sm,
@@ -388,8 +399,9 @@ class TaskDueRow extends StatelessWidget {
         state.clickTask(task.uid);
         onOpen?.call();
       },
-      child: Container(
-        color: selected ? t.selected : null,
+      child: Surface(
+        selected: selected,
+        square: true,
         padding: EdgeInsets.symmetric(
           horizontal: t.space.xs,
           vertical: t.space.sm,
@@ -447,20 +459,6 @@ class TaskDueRow extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _Note extends StatelessWidget {
-  const _Note(this.text, {super.key});
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return Padding(
-      padding: EdgeInsets.all(t.space.md),
-      child: Text(text, style: t.type.captionStyle.copyWith(color: t.muted)),
     );
   }
 }

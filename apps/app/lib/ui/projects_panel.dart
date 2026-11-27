@@ -15,6 +15,7 @@ import 'overflow_tip.dart';
 import 'parts.dart';
 import 'placeholder_card.dart';
 import 'side_panel.dart';
+import 'surface.dart';
 import 'theme.dart';
 
 /// Names a new project (a folder under the Space's Projects container).
@@ -163,17 +164,16 @@ class _ProjectsPanelState extends State<ProjectsPanel> {
           child: FTappable(
             key: key,
             onPress: onPress,
-            child: Container(
+            child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: t.sizes.touchTarget),
-              padding: EdgeInsets.symmetric(
-                horizontal: t.space.md,
-                vertical: t.space.sm,
+              child: Surface(
+                selected: on,
+                padding: EdgeInsets.symmetric(
+                  horizontal: t.space.md,
+                  vertical: t.space.sm,
+                ),
+                child: child,
               ),
-              decoration: BoxDecoration(
-                color: on ? t.selected : null,
-                borderRadius: BorderRadius.circular(t.radii.small),
-              ),
-              child: child,
             ),
           ),
         );

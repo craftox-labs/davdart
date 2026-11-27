@@ -16,6 +16,7 @@ import 'task_menu.dart';
 import 'task_parts.dart';
 import 'mobile_item.dart';
 import 'note_editor.dart';
+import 'card_box.dart';
 import 'theme.dart';
 import 'vim_field.dart';
 
@@ -430,14 +431,9 @@ class TaskDetail extends StatelessWidget {
                       ),
                       if (draft == null) ...[
                         SizedBox(height: t.space.lg),
-                        Container(
+                        CardBox(
                           width: double.infinity,
                           padding: EdgeInsets.all(t.space.lg),
-                          decoration: BoxDecoration(
-                            color: t.card,
-                            border: Border.all(color: t.cardBorder),
-                            borderRadius: BorderRadius.circular(t.radii.card),
-                          ),
                           child: Column(
                             children: [
                               meta(
