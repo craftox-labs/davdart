@@ -200,7 +200,7 @@ Future<void> showMoveEventDialog(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'The event goes to the space you pick. A moved event gets a '
+            'The event goes to the Space you pick. A moved event gets a '
             'new id.',
             style: tokensOf(ctx).type.captionStyle,
           ),

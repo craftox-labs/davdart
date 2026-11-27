@@ -84,7 +84,7 @@ void main() {
     addTearDown(() => tmp.deleteSync(recursive: true));
     await _open(t, s);
     expect(
-      find.textContaining('removes the space from the server for everyone'),
+      find.textContaining('removes the Space from the server for everyone'),
       findsOneWidget,
     );
     expect(find.textContaining('1 item'), findsOneWidget);
@@ -125,7 +125,7 @@ void main() {
     await t.tap(find.byKey(const Key('space-server-delete')));
     await t.pumpAndSettle();
     expect(
-      find.textContaining('removes the space from the server for everyone'),
+      find.textContaining('removes the Space from the server for everyone'),
       findsOneWidget,
     );
     expect(seen.any((e) => e.startsWith('DELETE')), isFalse);

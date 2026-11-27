@@ -280,7 +280,7 @@ class SpacesSection extends _Section {
               onPick();
               showRenameSpaceDialog(context, state);
             }),
-            _item(FLucideIcons.trash2, 'Delete this space…', () {
+            _item(FLucideIcons.trash2, 'Delete this Space…', () {
               onPick();
               showDeleteSpaceDialog(context, state);
             }),
@@ -1066,7 +1066,7 @@ class AccountSection extends _Section {
           'Signed in as ${state.accountUser}',
           key: const Key('account-label'),
         ),
-        _item(FLucideIcons.refreshCw, 'Refresh spaces', state.refreshSpaces),
+        _item(FLucideIcons.refreshCw, 'Refresh Spaces', state.refreshSpaces),
         _item(FLucideIcons.logOut, 'Sign out', state.signOut),
       ],
       if (state.connected) ...[
@@ -1100,7 +1100,7 @@ class SettingsSection extends _Section {
         if (!state.connected && state.currentOnServer)
           _item(FLucideIcons.cloudSync, 'Retry connecting', state.load)
         else if (!state.connected)
-          _item(FLucideIcons.cloud, 'Connect a collection by path', () {
+          _item(FLucideIcons.cloud, 'Connect a Space by path', () {
             onPick();
             showConnectDialog(context, state);
           })

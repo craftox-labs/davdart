@@ -18,7 +18,7 @@ Future<void> showNewSpaceDialog(BuildContext context, AppState state) {
 
   return showAppDialog(
     context,
-    title: 'New space',
+    title: 'New Space',
     content: StatefulBuilder(
       builder: (ctx, setLocal) => Column(
         mainAxisSize: MainAxisSize.min,
@@ -73,7 +73,7 @@ Future<void> showRenameSpaceDialog(
 
   return showAppDialog(
     context,
-    title: 'Rename space',
+    title: 'Rename Space',
     content: StatefulBuilder(
       builder: (ctx, setState) {
         setError = setState;
@@ -96,12 +96,12 @@ Future<void> showRenameSpaceDialog(
 /// Confirms deleting the open Space from this device. Says plainly that
 /// server notes are never deleted, and warns about changes not synced yet.
 Future<void> showDeleteSpaceDialog(BuildContext context, AppState state) async {
-  final name = state.currentSpaceName ?? 'this space';
+  final name = state.currentSpaceName ?? 'this Space';
   final unsynced = await state.unsyncedInCurrent();
   if (!context.mounted) return;
   final base = state.currentOnServer
-      ? 'This removes only this device\'s copy of the space. Notes on the '
-            'server are never deleted, and Refresh spaces brings the space '
+      ? 'This removes only this device\'s copy of the Space. Notes on the '
+            'server are never deleted, and Refresh Spaces brings the Space '
             'back.'
       : 'This removes only this device\'s copy: its notes and saved views '
             'are deleted from this device. Notes on a server, if it was '
@@ -189,7 +189,7 @@ Future<void> showDeleteFromServerDialog(
           spacing: tokensOf(ctx).space.lg,
           children: [
             Text(
-              'This removes the space from the server for everyone who uses '
+              'This removes the Space from the server for everyone who uses '
               'it, with ${info.items} item${info.items == 1 ? '' : 's'}. '
               'It cannot be undone.',
               key: const Key('server-delete-text'),

@@ -334,7 +334,7 @@ Future<void> showMoveTaskDialog(
         children: [
           Text(
             'The task and the tasks under it go to the top level of the '
-            'space you pick. Moved tasks get new ids.',
+            'Space you pick. Moved tasks get new ids.',
             style: tokensOf(ctx).type.captionStyle,
           ),
           SizedBox(height: tokensOf(ctx).space.md),

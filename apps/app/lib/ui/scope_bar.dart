@@ -257,7 +257,9 @@ List<NoteMenuItem> scopeActionItems(
         key: const Key('scope-move'),
       ),
     NoteMenuItem(
-      'Edit project',
+      state.projectIndex.isProject(folder.uid)
+          ? 'Edit project'
+          : 'Edit ${editKindOf(folder)}',
       FLucideIcons.pencil,
       () => state.projectIndex.isProject(folder.uid)
           ? showEditProjectDialog(context, state, folder)

@@ -39,8 +39,8 @@ Future<void> showAccountDialog(BuildContext context, AppState state) {
             onSubmit: (_) => submit(ctx),
           ),
           Text(
-            'Your collections become Spaces and sync here. The login is '
-            'kept in this browser.',
+            'The Spaces of your account sync here. The login is kept in '
+            'this browser.',
             style: tokensOf(ctx).type.captionStyle,
           ),
         ],

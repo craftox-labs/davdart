@@ -34,7 +34,7 @@ class FirstRunView extends StatelessWidget {
                 signedIn
                     ? 'Signed in as ${state.accountUser}. This account has no '
                           'Spaces here yet: create one, or refresh to load '
-                          'its collections.'
+                          'its Spaces.'
                     : 'A Space holds your notes. Keep one on this device, or '
                           'sign in to load the Spaces of your account.',
                 style: t.type.bodyStyle.copyWith(color: t.muted),
@@ -63,7 +63,7 @@ class FirstRunView extends StatelessWidget {
                       variant: FButtonVariant.outline,
                       mainAxisSize: MainAxisSize.min,
                       onPress: state.refreshSpaces,
-                      child: const Text('Refresh spaces'),
+                      child: const Text('Refresh Spaces'),
                     ),
                 ],
               ),

@@ -9,6 +9,18 @@ import 'parts.dart';
 import 'scope_bar.dart';
 import 'theme.dart';
 
+/// What [showEditNoteDialog] edits, as its title names it: a container is
+/// called by its own name (Personal, Projects), a plain folder a folder.
+String editKindOf(Note note) => isPersonalContainer(note)
+    ? personalTitle
+    : isProjectsContainer(note)
+    ? projectsTitle
+    : AppState.isFolder(note)
+    ? 'folder'
+    : 'note';
+
+/// Editing a container is not editing a folder: [editKindOf] names it.
+
 /// Edits a note's title and body text. Header lines are kept as they are.
 Future<void> showEditNoteDialog(
   BuildContext context,
@@ -63,7 +75,7 @@ Future<void> showEditNoteDialog(
   final labels = {for (final e in targets) e.$1 ?? '': e};
   return showAppDialog(
     context,
-    title: isFolder ? 'Edit folder' : 'Edit note',
+    title: 'Edit ${editKindOf(note)}',
     width: tokensOf(context).sizes.dialogXl,
     content: StatefulBuilder(
       builder: (ctx, setLocal) => Column(

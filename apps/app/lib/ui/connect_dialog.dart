@@ -51,7 +51,7 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
             });
           } catch (e) {
             if (!ctx.mounted) return;
-            setLocal(() => finding = 'Could not list collections: $e');
+            setLocal(() => finding = 'Could not list Spaces: $e');
           }
         }
 
@@ -88,21 +88,21 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
               size: FButtonSizeVariant.sm,
               mainAxisSize: MainAxisSize.min,
               onPress: finding == '' ? null : find,
-              child: Text(finding == '' ? 'Looking…' : 'Find collections'),
+              child: Text(finding == '' ? 'Looking…' : 'Find Spaces'),
             ),
             if (finding != null && finding != '')
               Text(finding!, style: tokensOf(ctx).type.captionStyle),
             if (found != null)
               found!.isEmpty
                   ? const EmptyState(
-                      'No note collections for this user.',
+                      'No Spaces for this user.',
                       padding: EdgeInsets.zero,
                     )
                   : TrackPopover(
                       builder: (_, pc) => FSelect<String>.rich(
                         popoverControl: pc,
                         key: const Key('connect-pick'),
-                        label: const Text('Collection'),
+                        label: const Text('Space'),
                         format: (v) =>
                             [
                               for (final c in found!)
@@ -131,8 +131,8 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
             field(
               key: const Key('connect-path'),
               controller: path,
-              label: 'Collection path',
-              hint: 'or type it: user/collection/',
+              label: 'Space path',
+              hint: 'or type its path',
             ),
             FCheckbox(
               key: const Key('connect-replace'),
@@ -141,7 +141,7 @@ Future<void> showConnectDialog(BuildContext context, AppState state) {
               label: const Text('Start from the server (drop local notes)'),
             ),
             Text(
-              'Otherwise notes here are sent to this collection and merged with what '
+              'Otherwise notes here are sent to this Space and merged with what '
               'it holds. The login is kept in this browser.',
               style: tokensOf(ctx).type.captionStyle,
             ),
