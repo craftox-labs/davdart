@@ -235,7 +235,7 @@ void main() {
           await t.tap(find.byKey(const Key('rail-spaces')));
           await t.pumpAndSettle();
           expect(find.text('New Space…'), findsOneWidget);
-          expect(find.text('Delete this space…'), findsNothing);
+          expect(find.text('Delete this Space…'), findsNothing);
           expect(t.takeException(), isNull);
         }
         // Create the first Space from the screen.
@@ -261,7 +261,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('rail-spaces')));
       await t.pumpAndSettle();
-      await t.tap(find.text('Delete this space…'));
+      await t.tap(find.text('Delete this Space…'));
       await t.pumpAndSettle();
       expect(find.textContaining('never deleted'), findsOneWidget);
       await t.tap(find.byKey(const Key('space-delete')));

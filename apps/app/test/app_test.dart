@@ -1032,7 +1032,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('rail-spaces')));
       await t.pumpAndSettle();
-      expect(find.text('Delete this space…'), findsOneWidget);
+      expect(find.text('Delete this Space…'), findsOneWidget);
       await t.tap(find.text('New Space…'));
       await t.pumpAndSettle();
       await t.enterText(find.byKey(const Key('space-name')), 'Inbox');
@@ -1045,7 +1045,7 @@ void main() {
       await t.tap(find.byKey(const Key('space-rename')));
       await t.pumpAndSettle();
       expect(state.currentSpaceName, 'Later');
-      await t.tap(find.text('Delete this space…'));
+      await t.tap(find.text('Delete this Space…'));
       await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('space-delete')));
       await t.pumpAndSettle();

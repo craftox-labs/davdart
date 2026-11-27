@@ -63,7 +63,7 @@ class FirstRunView extends StatelessWidget {
                       variant: FButtonVariant.outline,
                       mainAxisSize: MainAxisSize.min,
                       onPress: state.refreshSpaces,
-                      child: const Text('Refresh spaces'),
+                      child: const Text('Refresh Spaces'),
                     ),
                 ],
               ),

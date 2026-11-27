@@ -28,15 +28,15 @@ Future<void> showMoveSpaceDialog(
         children: [
           Text(
             count == 0
-                ? 'The note goes to the top level of the space you pick.'
+                ? 'The note goes to the top level of the Space you pick.'
                 : 'The note and the $count under it go to the top level of '
-                      'the space you pick.',
+                      'the Space you pick.',
             style: tokensOf(ctx).type.captionStyle,
           ),
           SizedBox(height: tokensOf(ctx).space.xs),
           Text(
             'Moved notes get new ids and leave their earlier versions '
-            'behind. A server space syncs them when you open it.',
+            'behind. A server Space syncs them when you open it.',
             style: tokensOf(ctx).type.captionStyle,
           ),
           SizedBox(height: tokensOf(ctx).space.md),
