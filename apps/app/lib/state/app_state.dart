@@ -1600,10 +1600,16 @@ class AppState extends ChangeNotifier {
   }
 
   /// Sets the scope to what [page] last showed; a page's first visit keeps
-  /// the scope the user already has.
+  /// the scope the user already has. Home is personal: it brings back its own
+  /// loose folder scope, never a project scope (a project page owns that).
   void _scopeToPage(DocTab? page) {
     if (!_pageScope.containsKey(page)) return;
-    _scopeTo(_pageScope[page]);
+    final want = _pageScope[page];
+    if (page == null && want != null && projectIndex.projectOf(want) != null) {
+      _scopeTo(null);
+      return;
+    }
+    _scopeTo(want);
   }
 
   /// Sets the scope to [uid] and saves it, doing nothing when it already is
