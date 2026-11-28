@@ -252,6 +252,7 @@ class SpaceCatalog {
     }
     final found = await _discover(user, password);
     account = Account(user, password);
+    gone.clear();
     storage.write(
       _accountKey,
       jsonEncode({'user': user, 'password': password}),
@@ -265,6 +266,8 @@ class SpaceCatalog {
     if (a == null) return 0;
     final found = await _discover(a.user, a.password);
     final added = _addFound(found);
+    // An empty listing is not trusted as "everything was deleted".
+    if (found.isEmpty) return added;
     final here = {for (final f in found) _norm(f.path)};
     gone
       ..clear()
@@ -539,6 +542,7 @@ class SpaceCatalog {
   /// Signs out. Account Spaces stay on this device as local copies.
   void signOut() {
     account = null;
+    gone.clear();
     storage.write(_accountKey, '');
     for (var i = 0; i < spaces.length; i++) {
       final s = spaces[i];
@@ -561,6 +565,7 @@ class SpaceCatalog {
   bool remove(String id) {
     final at = spaces.indexWhere((s) => s.id == id);
     if (at < 0) return false;
+    gone.remove(id);
     _deleted.add(id);
     if (id == planningId) {
       for (final k in [...legacyKeys, ...legacyTaskKeys, ...legacyEventKeys]) {

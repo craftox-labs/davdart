@@ -755,6 +755,10 @@ void main() {
         spaceSyncLabel(s, s.spaces.firstWhere((e) => e.name == 'Work')),
         'Synced with the server',
       );
+      // Signing out makes them plain local copies: no longer flagged.
+      await s.signOut();
+      expect(c.gone, isEmpty);
+      await s.signIn('tm', 'pw');
       // A re-added Space persists again (its writes were not left blocked).
       await s.switchSpace(s.spaces.firstWhere((e) => e.name == 'Work').id);
       await Future<void>.delayed(const Duration(milliseconds: 100));
