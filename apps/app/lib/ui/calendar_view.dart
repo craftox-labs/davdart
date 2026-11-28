@@ -1258,7 +1258,7 @@ class _CalendarViewState extends State<CalendarView> {
                             key: const Key('calendar-now-line'),
                             left: days.indexOf(today) * colW,
                             width: colW,
-                            top: yOf(nowMinute) - t.sizes.ring / 2,
+                            top: yOf(nowMinute),
                             height: t.sizes.ring,
                             child: ColoredBox(color: t.accent),
                           ),
@@ -1268,18 +1268,24 @@ class _CalendarViewState extends State<CalendarView> {
                     if (!wide) {
                       // A touch: a press on an empty slot opens the dialog at
                       // its time; a drag stays the scroll.
-                      return GestureDetector(
-                        behavior: HitTestBehavior.translucent,
-                        onTapUp: (e) {
-                          final p = e.localPosition;
-                          if (onBlock(p)) return;
-                          final day = dayAtX(p.dx);
-                          final start =
-                              (p.dy / pitch * 4).floor().clamp(0, 95) * 15;
-                          _select(day);
-                          _newEvent(day, startMinute: start);
-                        },
-                        child: stack,
+                      var press = Offset.zero;
+                      return Listener(
+                        onPointerDown: (e) => press = e.localPosition,
+                        child: FTappable(
+                          key: const Key('calendar-time-slots'),
+                          behavior: HitTestBehavior.translucent,
+                          semanticsLabel: 'New event',
+                          onPress: () {
+                            if (onBlock(press)) return;
+                            final day = dayAtX(press.dx);
+                            final start =
+                                (press.dy / pitch * 4).floor().clamp(0, 95) *
+                                15;
+                            _select(day);
+                            _newEvent(day, startMinute: start);
+                          },
+                          child: stack,
+                        ),
                       );
                     }
                     return Listener(
