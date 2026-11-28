@@ -272,6 +272,87 @@ void main() {
     expect(_k('events-today-toggle'), findsOneWidget);
   });
 
+  testWidgets('a picked day shuts the agenda, transiently', (t) async {
+    final storage = MemoryStorage();
+    final s = await pumpTasksApp(
+      t,
+      prefs: storage,
+      events: [
+        mkEvent('ev-today', summary: 'Today ev', days: 0),
+        mkEvent('ev-later', summary: 'Later ev', days: 5),
+      ],
+    );
+    s.setHomeView(HomeView.calendar);
+    s.setSection(Section.events);
+    await t.pumpAndSettle();
+    final panel = _k('events-panel');
+    Finder inPanel(String text) =>
+        find.descendant(of: panel, matching: find.text(text));
+    expect(inPanel('Later ev'), findsOneWidget);
+    // Pick another day: the other sections shut, the picked day leads.
+    await t.tap(_k(_dayKey(_otherDay())));
+    await t.pumpAndSettle();
+    expect(_k('calendar-day-pin'), findsOneWidget);
+    expect(inPanel('Later ev'), findsNothing);
+    expect(inPanel('Today ev'), findsNothing);
+    // Transient: the saved collapse prefs are untouched.
+    expect(storage.read('davdart.events.upcoming.collapsed.v1'), isNull);
+    expect(storage.read('davdart.events.today.collapsed.v1'), isNull);
+    // A hand expand holds while the day is picked...
+    await t.tap(_k('events-upcoming-toggle'));
+    await t.pumpAndSettle();
+    expect(inPanel('Later ev'), findsOneWidget);
+    expect(storage.read('davdart.events.upcoming.collapsed.v1'), isNull);
+    // ...and the next pick shuts it again.
+    await t.tap(_k(_dayKey(wallDay(wallNow(DateTime.now())))));
+    await t.pumpAndSettle();
+    expect(inPanel('Later ev'), findsNothing);
+  });
+
+  testWidgets('picking today opens Today, shuts the rest, pins nothing', (
+    t,
+  ) async {
+    final s = await _app(t);
+    s.setHomeView(HomeView.calendar);
+    s.setSection(Section.events);
+    await t.pumpAndSettle();
+    final panel = _k('events-panel');
+    Finder inPanel(String text) =>
+        find.descendant(of: panel, matching: find.text(text));
+    await t.tap(_k(_dayKey(_otherDay())));
+    await t.pumpAndSettle();
+    expect(_k('calendar-day-pin'), findsOneWidget);
+    expect(inPanel('Loose ev'), findsNothing);
+    await t.tap(_k('calendar-today'));
+    await t.pumpAndSettle();
+    // Today is the agenda's own section: no pinned day, its rows shown, and
+    // the day's add buttons on its header.
+    expect(_k('calendar-day-pin'), findsNothing);
+    expect(inPanel('Loose ev'), findsWidgets);
+    expect(_k('calendar-day-add-event'), findsOneWidget);
+    expect(_k('calendar-day-add-task'), findsOneWidget);
+  });
+
+  testWidgets('with no day picked the panel follows its saved prefs', (
+    t,
+  ) async {
+    final storage = MemoryStorage();
+    storage.write('davdart.events.upcoming.collapsed.v1', 'true');
+    final s = await pumpTasksApp(
+      t,
+      prefs: storage,
+      events: [mkEvent('ev-later', summary: 'Later ev', days: 5)],
+    );
+    s.setSection(Section.events);
+    await t.pumpAndSettle();
+    expect(s.homeDay, isNull);
+    expect(_k('calendar-day-pin'), findsNothing);
+    expect(
+      find.descendant(of: _k('events-panel'), matching: find.text('Later ev')),
+      findsNothing,
+    );
+  });
+
   testWidgets('narrow keeps the day list under the grid and no panel day', (
     t,
   ) async {
