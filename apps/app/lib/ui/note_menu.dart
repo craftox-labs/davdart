@@ -460,7 +460,7 @@ class NoteContextMenu extends StatelessWidget {
           'Edit',
           FLucideIcons.pencil,
           () async {
-            if (await state.openNote(uid)) state.startEdit(uid);
+            if (await state.openNote(uid)) state.startEdit(uid, false);
           },
           key: const Key('menu-edit'),
           afterOpen: true,

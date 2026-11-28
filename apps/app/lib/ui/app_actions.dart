@@ -547,7 +547,7 @@ List<AppAction> buildActions(AppState state) {
         }
         switch (s.findItem(uid)) {
           case Note():
-            s.startEdit(uid);
+            s.startEdit(uid, false);
           case Task():
             s.startTaskEdit(uid);
           case Event():

@@ -116,4 +116,59 @@ void main() {
       expect(d.dirty, isTrue);
     });
   });
+
+  // A note's title is a live field on the wide layout too, so its draft
+  // rebases there as well (regression: it only did on narrow).
+  group('a note draft on the wide layout', () {
+    Future<(AppState, FakeCalDav)> openWide(String summary) async {
+      final server = FakeCalDav()
+        ..external('a.ics', serializeNote(Note(uid: 'a', summary: summary)));
+      final s = await _open(server);
+      s.narrow = false;
+      return (s, server);
+    }
+
+    test(
+      'takes the synced title, so the first typed char does not undo it',
+      () async {
+        final (s, server) = await openWide('Alpha');
+        s.startEdit('a', true); // the tap on the title
+        final d = s.draftFor('a')!;
+        expect(d.titleController.text, 'Alpha');
+        server.external(
+          'a.ics',
+          serializeNote(Note(uid: 'a', summary: 'Remote edit')),
+        );
+        await s.sync();
+        expect(d.titleController.text, 'Remote edit');
+        expect(d.dirty, isFalse);
+        // The title field commits the first typed character's save from the
+        // merged text, not over it.
+        d.titleController.text = 'Remote edit!';
+        expect(await s.commitNoteText('a'), isTrue);
+        expect(s.tree.find('a')!.note.summary, 'Remote edit!');
+      },
+    );
+
+    test('the title commit leaves a typed body dirty for Discard', () async {
+      final (s, _) = await openWide('Alpha');
+      s.startEdit('a', false);
+      final d = s.draftFor('a')!;
+      d.titleController.text = 'Alpha two';
+      d.bodyController.text = 'body in progress';
+      expect(await s.commitNoteText('a'), isTrue);
+      final n = s.tree.find('a')!.note;
+      expect(n.summary, 'Alpha two');
+      expect(PlanItem.fromNote(n).text, isNot(contains('in progress')));
+      expect(d.titleDirty, isFalse);
+      expect(d.bodyDirty, isTrue);
+      // :q! / Discard still has the body to throw away.
+      s.discardEdit('a');
+      expect(s.draftFor('a'), isNull);
+      expect(
+        PlanItem.fromNote(s.tree.find('a')!.note).text,
+        isNot(contains('in progress')),
+      );
+    });
+  });
 }

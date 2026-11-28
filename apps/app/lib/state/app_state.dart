@@ -4771,8 +4771,9 @@ class AppState extends ChangeNotifier {
   Future<DraftChoice> Function()? leaveGuard;
 
   /// Starts editing note [uid] (the peek note by default). With [focusTitle]
-  /// (the default) the title's inline field opens and takes the focus, as the
-  /// pencil's title field did.
+  /// (a tap on the title, or the pencil) the title's inline field opens and
+  /// takes the focus; the menu and palette paths pass false, so the note opens
+  /// in edit mode with nothing focused.
   void startEdit([String? uid, bool focusTitle = true]) {
     uid ??= peekUid;
     if (uid == null) return;
@@ -4805,9 +4806,11 @@ class AppState extends ChangeNotifier {
   /// again.
   void clearNoteTextIntent() => noteTextIntent = null;
 
-  /// Saves the open text buffer of note [uid] and says why when it cannot.
+  /// Saves the title field of note [uid] and says why when it cannot. Only the
+  /// title is written: a body typed on the wide layout (explicit Save) stays
+  /// dirty, so :q! and Discard still discard it.
   Future<bool> commitNoteText(String uid) async {
-    final ok = await flushEdit(uid);
+    final ok = await flushEdit(uid, titleOnly: true);
     if (!ok) reportNotSaved(_notSavedReason(uid));
     return ok;
   }
@@ -4816,7 +4819,11 @@ class AppState extends ChangeNotifier {
   /// that changed, so a property picked in place (or an undo, or a sync) is
   /// never put back by this save. False if nothing was saved (empty title,
   /// failure).
-  Future<bool> saveDraft([String? uid, bool stay = false]) async {
+  Future<bool> saveDraft([
+    String? uid,
+    bool stay = false,
+    bool titleOnly = false,
+  ]) async {
     final key = uid ?? peekUid;
     final d = key == null ? null : _drafts[key];
     if (d == null || d.titleEmpty) return false;
@@ -4829,7 +4836,9 @@ class AppState extends ChangeNotifier {
     }
     // What this save sends; text typed while it runs is newer than this.
     final title = d.titleDirty ? d.titleController.text : null;
-    final body = d.bodyDirty ? d.bodyController.text : null;
+    // The title's inline field commits on both layouts; the body is a
+    // separate edit (explicit Save on wide), so its draft is left behind.
+    final body = !titleOnly && d.bodyDirty ? d.bodyController.text : null;
     if (title == null && body == null) {
       if (!stay) _drafts.remove(key);
       notifyListeners();
@@ -4914,11 +4923,13 @@ class AppState extends ChangeNotifier {
   /// Saves the edit of [uid] now if anything is pending, staying in edit
   /// mode. Runs after a save already in flight. False when nothing was saved
   /// (empty title, failure).
-  Future<bool> flushEdit(String uid) {
+  Future<bool> flushEdit(String uid, {bool titleOnly = false}) {
     _autosaveTimers.remove(uid)?.cancel();
     final running = _flushing[uid];
-    if (running != null) return running.then((_) => flushEdit(uid));
-    final f = saveEdit(uid).whenComplete(() {
+    if (running != null) {
+      return running.then((_) => flushEdit(uid, titleOnly: titleOnly));
+    }
+    final f = saveEdit(uid, titleOnly: titleOnly).whenComplete(() {
       _flushing.remove(uid);
       notifyListeners();
     });
@@ -4957,9 +4968,10 @@ class AppState extends ChangeNotifier {
       _autosaveTimers.containsKey(uid) || _flushing.containsKey(uid);
 
   /// After a sync: an edit with nothing typed takes the merged text, so the
-  /// next autosave does not send back a stale copy over a remote change.
+  /// next save does not send back a stale copy over a remote change. The note
+  /// title is a live field on both layouts (only its body is explicit-Save on
+  /// wide), so this runs always, like [_rebaseTaskDrafts].
   void _rebaseDrafts() {
-    if (!narrow) return;
     for (final d in _drafts.values) {
       final n = tree.find(d.uid)?.note;
       if (n == null || d.dirty) continue;
@@ -5023,6 +5035,9 @@ class AppState extends ChangeNotifier {
     _drafts.remove(uid);
     _taskDrafts.remove(uid);
     _eventDrafts.remove(uid);
+    // A tap on the title whose field never built must not make the next build
+    // open and focus it.
+    if (noteTextIntent == uid) noteTextIntent = null;
     // Leaving the edit of a note deleted elsewhere clears that notice.
     if (error == _goneNote) error = null;
     notifyListeners();
@@ -5046,7 +5061,7 @@ class AppState extends ChangeNotifier {
 
   /// Saves the edit of [uid] and stays in edit mode (`:w` in the Vim
   /// editor). A clean edit does nothing. False when nothing was saved.
-  Future<bool> saveEdit(String uid) async {
+  Future<bool> saveEdit(String uid, {bool titleOnly = false}) async {
     if (!isEditing(uid)) return true;
     if (_taskDrafts.containsKey(uid)) {
       return dirtyTaskFor(uid) ? saveTaskDraft(uid, stay: true) : true;
@@ -5054,7 +5069,7 @@ class AppState extends ChangeNotifier {
     if (_eventDrafts.containsKey(uid)) {
       return dirtyEventFor(uid) ? saveEventDraft(uid, stay: true) : true;
     }
-    return dirtyFor(uid) ? saveDraft(uid, true) : true;
+    return dirtyFor(uid) ? saveDraft(uid, true, titleOnly) : true;
   }
 
   /// Leaves edit mode for [uid] and drops the unsaved changes without asking
