@@ -26,11 +26,16 @@ class Segmented<T> extends StatelessWidget {
     required this.value,
     required this.onChanged,
     this.fullWidth = false,
+    this.iconsOnly = false,
   });
   final List<Segment<T>> segments;
   final T value;
   final ValueChanged<T> onChanged;
   final bool fullWidth;
+
+  /// Icons alone with the label in the tooltip, whatever the layout: a pill
+  /// in a tight header row says the same in less width.
+  final bool iconsOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +43,7 @@ class Segmented<T> extends StatelessWidget {
     Widget seg(Segment<T> s) {
       final on = value == s.value;
       final icon = s.icon;
-      final narrow = narrowLayout(context);
+      final narrow = narrowLayout(context) || iconsOnly;
       Widget text() => Text(
         s.label,
         maxLines: 1,

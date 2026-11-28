@@ -270,6 +270,7 @@ class SizeTokens {
     this.statusField = 160,
     this.metaLabel = 104,
     this.propertyRow = 32,
+    this.headerPill = 760,
     this.eventTime = 56,
     this.chevronBox = 20,
     this.listChevronBox = 24,
@@ -363,6 +364,10 @@ class SizeTokens {
   /// Height of one property row (a label and a value) on the wide layout;
   /// the narrow layout uses [touchTarget].
   final double propertyRow;
+
+  /// Least width of a page header row that still fits a full view-switcher
+  /// pill beside its actions; below it the pill shows icons alone.
+  final double headerPill;
 
   final double chevronBox, listChevronBox, listMarker;
   final double treeIndent, listIndent;

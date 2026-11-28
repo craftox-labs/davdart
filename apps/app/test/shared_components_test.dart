@@ -100,12 +100,16 @@ void main() {
     testWidgets('is pane-header tall, with title, switcher and actions', (
       t,
     ) async {
+      var compact = false;
       await _pumpWidget(
         t,
         PageHeaderRow(
           title: 'Page',
           textKey: const Key('t'),
-          switcher: const SizedBox(key: Key('sw'), width: 40, height: 20),
+          switcher: (c) {
+            compact = c;
+            return const SizedBox(key: Key('sw'), width: 40, height: 20);
+          },
           actions: const [
             SizedBox(key: Key('a1'), width: 30, height: 20),
             SizedBox(key: Key('a2'), width: 30, height: 20),
@@ -124,6 +128,26 @@ void main() {
       expect(a1.right, lessThanOrEqualTo(a2.left));
       // Actions sit at the right edge, inside the horizontal padding.
       expect(a2.right, 800 - tokens.space.md);
+      // 800 fits the full pill, so the switcher is built with labels.
+      expect(compact, isFalse);
+    });
+
+    testWidgets('a narrow row builds the switcher compact', (t) async {
+      var compact = false;
+      await _pumpWidget(
+        t,
+        PageHeaderRow(
+          title: 'Page',
+          switcher: (c) {
+            compact = c;
+            return const SizedBox(key: Key('sw'), width: 40, height: 20);
+          },
+          actions: const [SizedBox(key: Key('a1'), width: 30, height: 20)],
+        ),
+        width: 600,
+      );
+      expect(compact, isTrue);
+      expect(t.takeException(), isNull);
     });
 
     testWidgets('a long title does not push the actions out', (t) async {
@@ -208,11 +232,19 @@ void main() {
       expect(_k('page-title'), findsOneWidget);
     });
 
-    testWidgets('desktop header actions go in the actions slot', (t) async {
+    testWidgets('desktop header carries the page switcher and its actions', (
+      t,
+    ) async {
       await pumpHomeApp(t);
       final row = t.widget<PageHeaderRow>(find.byType(PageHeaderRow));
       expect(row.actions, isNotEmpty);
-      expect(row.switcher, isNull);
+      // The project page's tab pill shares this row, right-aligned.
+      expect(row.switcher, isNotNull);
+      expect(_k('proj-tabs'), findsOneWidget);
+      expect(
+        find.descendant(of: _k('top-bar'), matching: _k('proj-tabs')),
+        findsOneWidget,
+      );
     });
   });
 }

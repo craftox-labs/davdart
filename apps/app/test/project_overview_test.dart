@@ -122,6 +122,27 @@ void main() {
       await _end(t);
     });
 
+    testWidgets('the tab pill sits in the page header, right of the title', (
+      t,
+    ) async {
+      await _app(t);
+      final header = t.getRect(_k('page-header'));
+      final pill = t.getRect(_k('proj-tabs'));
+      final title = t.getRect(_k('page-title'));
+      // Same row as the title, inside it, to the right of the title.
+      expect(pill.top, greaterThanOrEqualTo(header.top));
+      expect(pill.bottom, lessThanOrEqualTo(header.bottom));
+      expect(pill.left, greaterThan(title.right));
+      // And right-aligned: nothing of the page's own below the header.
+      expect(pill.right, lessThanOrEqualTo(header.right));
+      // No separate switcher row under the header any more.
+      expect(
+        find.descendant(of: _k('proj-page'), matching: _k('proj-tabs')),
+        findsNothing,
+      );
+      await _end(t);
+    });
+
     testWidgets('About and the details save as the project note', (t) async {
       final s = await _app(t);
       // About is the note's own text, edited in place.

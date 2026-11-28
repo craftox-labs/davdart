@@ -4,11 +4,10 @@ import 'overflow_tip.dart';
 import 'theme.dart';
 
 /// The desktop page header row under the tab strip: the page's title on the
-/// left, an optional page-level switcher beside it and the page's actions on
-/// the right. Home names its Space here; a project page its project.
-///
-/// The switcher slot is unused for now (the project's view switcher stays
-/// below this row until its move is decided).
+/// left, then the page's own [switcher] pill right-aligned beside the page's
+/// actions, so every page gives the pill the same place and the content below
+/// starts straight away. The title gives up width first when the row is
+/// tight (it truncates; the pill and the actions do not shrink).
 class PageHeaderRow extends StatelessWidget {
   const PageHeaderRow({
     super.key,
@@ -23,8 +22,11 @@ class PageHeaderRow extends StatelessWidget {
   /// Key for the title text (tests).
   final Key? textKey;
 
-  /// A page-level switcher shown beside the title, when a page has one.
-  final Widget? switcher;
+  /// A page-level switcher (Home's views, a project's tabs), right-aligned
+  /// beside the actions when a page has one. It is built with [compact] set
+  /// when the row is too narrow for a full pill (the labels go into the
+  /// tooltips), so the title never has to give up its place to fit it.
+  final Widget Function(bool compact)? switcher;
 
   /// Page actions, right-aligned: reload, menus, view toggles.
   final List<Widget> actions;
@@ -41,18 +43,29 @@ class PageHeaderRow extends StatelessWidget {
           bottom: BorderSide(color: t.divider, width: t.borders.hairline),
         ),
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: OverflowTip(
-              title,
-              textKey: textKey,
-              style: t.type.titleStyle.copyWith(color: t.paneTitleColor),
-            ),
-          ),
-          ?switcher,
-          ...actions,
-        ],
+      child: LayoutBuilder(
+        builder: (context, c) {
+          // A full pill needs roughly this much beside the actions; below it
+          // the pill goes icon-only.
+          final compact = c.maxWidth < t.sizes.headerPill;
+          return Row(
+            children: [
+              Expanded(
+                child: OverflowTip(
+                  title,
+                  textKey: textKey,
+                  style: t.type.titleStyle.copyWith(color: t.paneTitleColor),
+                ),
+              ),
+              if (switcher != null) ...[
+                SizedBox(width: t.space.md),
+                switcher!(compact),
+                SizedBox(width: t.space.md),
+              ],
+              ...actions,
+            ],
+          );
+        },
       ),
     );
   }

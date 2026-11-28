@@ -128,6 +128,11 @@ void main() {
     final s = await _app(t);
     expect(s.homeView, HomeView.overview);
     expect(_k('home-tabs'), findsOneWidget);
+    // The pill shares the page header row with the title on a wide layout.
+    final header = t.getRect(_k('page-header'));
+    final pill = t.getRect(_k('home-tabs'));
+    expect(pill.top, greaterThanOrEqualTo(header.top));
+    expect(pill.bottom, lessThanOrEqualTo(header.bottom));
     expect(_k('home-page'), findsOneWidget);
     await t.tap(_k('home-tab-calendar'));
     await t.pumpAndSettle();

@@ -100,32 +100,62 @@ class ProjectOverviewPage extends StatelessWidget {
       ),
     };
 
+    // Wide: the tab pill sits in the page header row (beside the page
+    // actions), so the page starts straight with its content; the phone keeps
+    // the pill under the title.
+    final narrow = narrowLayout(context);
     return Column(
       key: const Key('proj-page'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(t.space.xl, t.space.lg, t.space.xl, 0),
-          child: Segmented<ProjectTab>(
-            key: const Key('proj-tabs'),
-            value: tab,
-            fullWidth: narrowLayout(context),
-            onChanged: (v) {
-              if (projectUid != null) state.setProjectTab(projectUid, v);
-            },
-            segments: [
-              for (final v in projectViews)
-                Segment<ProjectTab>(
-                  tabOf(v.id),
-                  v.label,
-                  'proj-tab-${v.id}',
-                  icon: v.icon,
-                ),
-            ],
+        if (narrow) ...[
+          Padding(
+            padding: EdgeInsets.fromLTRB(t.space.xl, t.space.lg, t.space.xl, 0),
+            child: ProjectTabSwitcher(state: state, projectUid: projectUid),
           ),
-        ),
-        SizedBox(height: t.space.sm),
+          SizedBox(height: t.space.sm),
+        ],
         Expanded(child: tabBody()),
+      ],
+    );
+  }
+}
+
+/// A project page's Overview | Board | Notes | Calendar switcher: a pill in
+/// the page header row on the wide layout (beside the page actions) and under
+/// the title on the phone.
+class ProjectTabSwitcher extends StatelessWidget {
+  const ProjectTabSwitcher({
+    super.key,
+    required this.state,
+    required this.projectUid,
+    this.iconsOnly = false,
+  });
+  final AppState state;
+
+  /// The project whose page this is (null: no project in scope).
+  final String? projectUid;
+  final bool iconsOnly;
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = projectUid;
+    return Segmented<ProjectTab>(
+      key: const Key('proj-tabs'),
+      value: uid == null ? ProjectTab.overview : state.projectTab(uid),
+      fullWidth: narrowLayout(context),
+      iconsOnly: iconsOnly,
+      onChanged: (v) {
+        if (uid != null) state.setProjectTab(uid, v);
+      },
+      segments: [
+        for (final v in projectViews)
+          Segment<ProjectTab>(
+            ProjectOverviewPage.tabOf(v.id),
+            v.label,
+            'proj-tab-${v.id}',
+            icon: v.icon,
+          ),
       ],
     );
   }

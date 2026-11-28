@@ -18,6 +18,43 @@ import 'section_card.dart';
 import 'segmented.dart';
 import 'theme.dart';
 
+/// Home's Overview | Calendar switcher: a pill in the page header row on the
+/// wide layout (beside the page actions) and under the title on the phone.
+class HomeViewSwitcher extends StatelessWidget {
+  const HomeViewSwitcher({
+    super.key,
+    required this.state,
+    this.fullWidth = false,
+    this.iconsOnly = false,
+  });
+  final AppState state;
+  final bool fullWidth;
+  final bool iconsOnly;
+
+  @override
+  Widget build(BuildContext context) => Segmented<HomeView>(
+    key: const Key('home-tabs'),
+    value: state.homeView,
+    fullWidth: fullWidth,
+    iconsOnly: iconsOnly,
+    onChanged: state.setHomeView,
+    segments: const [
+      Segment(
+        HomeView.overview,
+        'Overview',
+        'home-tab-overview',
+        icon: FLucideIcons.layoutDashboard,
+      ),
+      Segment(
+        HomeView.calendar,
+        'Calendar',
+        'home-tab-calendar',
+        icon: FLucideIcons.calendar,
+      ),
+    ],
+  );
+}
+
 /// Home: the individual's page, scoped to the open Space and ignoring the
 /// project scope. It summarises what concerns the user (the Space's numbers,
 /// its projects, their own loose tasks, calendar and recent items); project
@@ -386,33 +423,20 @@ class HomePage extends StatelessWidget {
       state.homeView == HomeView.calendar ? const [] : navRows,
     );
 
+    // Wide: the view switcher sits in the page header row (beside the page
+    // actions), so this page starts straight with its content; the phone
+    // keeps the pill under the title.
+    final narrow = narrowLayout(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: EdgeInsets.fromLTRB(t.space.xl, t.space.lg, t.space.xl, 0),
-          child: Segmented<HomeView>(
-            key: const Key('home-tabs'),
-            value: state.homeView,
-            fullWidth: narrowLayout(context),
-            onChanged: state.setHomeView,
-            segments: const [
-              Segment(
-                HomeView.overview,
-                'Overview',
-                'home-tab-overview',
-                icon: FLucideIcons.layoutDashboard,
-              ),
-              Segment(
-                HomeView.calendar,
-                'Calendar',
-                'home-tab-calendar',
-                icon: FLucideIcons.calendar,
-              ),
-            ],
+        if (narrow) ...[
+          Padding(
+            padding: EdgeInsets.fromLTRB(t.space.xl, t.space.lg, t.space.xl, 0),
+            child: HomeViewSwitcher(state: state, fullWidth: true),
           ),
-        ),
-        SizedBox(height: t.space.sm),
+          SizedBox(height: t.space.sm),
+        ],
         Expanded(
           child: state.homeView == HomeView.calendar
               // Keyed by Space: a Space switch starts on today again, as a

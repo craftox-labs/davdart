@@ -946,6 +946,7 @@ class TopBar extends StatelessWidget {
       onPress: state.load,
     );
     if (!showMenu) {
+      final projectUid = state.mainProjectUid;
       return PageHeaderRow(
         key: const Key('top-bar'),
         // Desktop: Home's heading is the Space's name, not the word Home.
@@ -953,6 +954,17 @@ class TopBar extends StatelessWidget {
             ? (state.currentSpaceName ?? 'This Space')
             : state.mainPageTitle,
         textKey: const Key('page-title'),
+        // The page's own view switcher, right-aligned beside the actions:
+        // Home's Overview | Calendar, or the open project's tabs.
+        switcher: state.activeTab == null
+            ? (compact) => HomeViewSwitcher(state: state, iconsOnly: compact)
+            : projectUid != null
+            ? (compact) => ProjectTabSwitcher(
+                state: state,
+                projectUid: projectUid,
+                iconsOnly: compact,
+              )
+            : null,
         actions: [
           viewControl,
           // Menu first: Columns and refresh keep their place whether or not
