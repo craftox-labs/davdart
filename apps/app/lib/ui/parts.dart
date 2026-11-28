@@ -2,6 +2,7 @@ import 'package:flutter/services.dart' show TextInputAction;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import '../state/app_state.dart';
 import '../theme/tokens.dart';
 import 'overflow_tip.dart';
 import 'theme.dart';
@@ -310,6 +311,60 @@ class ItemHeader extends StatelessWidget {
       ],
     );
   }
+}
+
+/// The way back up from an item that sits inside another: one muted line
+/// above the item's title row, `↑ parent name`, which opens the parent where
+/// this item is shown. Muted, one line, ellipsized; the label's own row, so
+/// the title row and its alignment do not change.
+class ParentCrumb extends StatelessWidget {
+  const ParentCrumb({super.key, required this.label, required this.onOpen});
+  final String label;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return PaneHeaderRow(
+      key: const Key('parent-crumb'),
+      startPad: t.space.xxl,
+      endPad: t.space.xxl,
+      maxContentWidth: narrowLayout(context) ? null : t.sizes.pageMax,
+      children: [
+        FTappable(
+          onPress: onOpen,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                FLucideIcons.arrowUpToLine,
+                size: t.icons.sm,
+                color: t.muted,
+              ),
+              SizedBox(width: t.space.xs),
+              Flexible(
+                child: OverflowTip(
+                  label,
+                  textKey: const Key('parent-crumb-label'),
+                  style: t.type.captionStyle.copyWith(color: t.muted),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The crumb for [uid], or nothing when it sits at the top level.
+Widget parentCrumb(AppState state, String uid) {
+  final parent = state.parentItemOf(uid);
+  if (parent == null) return const SizedBox.shrink();
+  return ParentCrumb(
+    label: parent.summary,
+    onOpen: () => state.openParentOf(uid),
+  );
 }
 
 /// The shared pane title text style (size and weight from the type tokens,

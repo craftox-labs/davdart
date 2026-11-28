@@ -56,6 +56,22 @@ Future<_App> _pump(
   return _App(s, store);
 }
 
+/// A projects container, a project in it, and a plain note in the project.
+final _projectNotes = [
+  Note(
+    uid: 'container',
+    summary: 'Projects',
+    categories: [folderTag, projectsTag],
+  ),
+  Note(
+    uid: 'proj',
+    summary: 'Alpha',
+    parentUid: 'container',
+    categories: [folderTag],
+  ),
+  Note(uid: 'notes', summary: 'Notes', parentUid: 'proj'),
+];
+
 void main() {
   group('a task page', () {
     testWidgets('no pencil and no Save or Cancel: the rows are the fields', (
@@ -174,17 +190,76 @@ void main() {
       expect(app.state.taskTagsOf(task), ['home']);
     });
 
-    testWidgets('the inside row moves the task at once', (t) async {
+    testWidgets('a sub-task shows a crumb to its parent, which opens it', (
+      t,
+    ) async {
+      final app = await _pump(
+        t,
+        task: mkTask('k', summary: 'Pay rent', parent: 'plans'),
+        notes: [Note(uid: 'plans', summary: 'Plans')],
+      );
+      expect(_k('parent-crumb'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: _k('parent-crumb'),
+          matching: find.byKey(const Key('parent-crumb-label')),
+        ),
+        findsOneWidget,
+      );
+      expect(t.widget<Text>(_k('parent-crumb-label')).data, 'Plans');
+      // The crumb sits above the title row.
+      expect(
+        t.getRect(_k('parent-crumb')).bottom,
+        lessThanOrEqualTo(t.getRect(_k('peek-toolbar')).top),
+      );
+      await t.tap(_k('parent-crumb-label'));
+      await t.pumpAndSettle();
+      // The peek's parent takes the peek.
+      expect(app.state.peekUid, 'plans');
+      expect(_k('parent-crumb'), findsNothing);
+    });
+
+    testWidgets('a top-level task has no crumb', (t) async {
+      await _pump(t, task: mkTask('k', summary: 'Pay rent'));
+      expect(_k('parent-crumb'), findsNothing);
+    });
+
+    testWidgets('the project row moves the task at once', (t) async {
       final app = await _pump(
         t,
         task: mkTask('k', summary: 'Pay rent'),
-        notes: [Note(uid: 'plans', summary: 'Plans')],
+        notes: _projectNotes,
+      );
+      // The row reads Personal until the task is put in a project.
+      expect(find.text('Personal'), findsOneWidget);
+      await t.tap(_k('property-parent'));
+      await t.pumpAndSettle();
+      await t.tap(_k('property-parent-parent-proj'));
+      await t.pumpAndSettle();
+      expect(app.state.taskById('k')!.parentUid, 'proj');
+      // Back to Personal.
+      await t.tap(_k('property-parent'));
+      await t.pumpAndSettle();
+      await t.tap(_k('property-parent-parent-top'));
+      await t.pumpAndSettle();
+      expect(app.state.taskById('k')!.parentUid, isNull);
+    });
+
+    testWidgets('the project picker searches folders and sub-tasks', (t) async {
+      final app = await _pump(
+        t,
+        task: mkTask('k', summary: 'Pay rent'),
+        notes: _projectNotes,
       );
       await t.tap(_k('property-parent'));
       await t.pumpAndSettle();
-      await t.tap(_k('property-parent-parent-plans'));
+      // Only projects (and Personal) until a term is typed.
+      expect(_k('property-parent-parent-notes'), findsNothing);
+      await t.enterText(_k('property-parent-parent-search'), 'notes');
       await t.pumpAndSettle();
-      expect(app.state.taskById('k')!.parentUid, 'plans');
+      await t.tap(_k('property-parent-parent-notes'));
+      await t.pumpAndSettle();
+      expect(app.state.taskById('k')!.parentUid, 'notes');
     });
 
     testWidgets('the description opens in place, markdown when closed', (

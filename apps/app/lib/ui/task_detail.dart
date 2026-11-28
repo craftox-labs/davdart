@@ -6,7 +6,6 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/event_rules.dart' show dayLabel;
 import '../state/key_nav.dart';
-import '../state/parent_targets.dart';
 import '../state/task_draft.dart';
 import 'chips.dart';
 import 'markdown_lite.dart';
@@ -16,7 +15,8 @@ import 'parts.dart';
 import 'property/date_property_picker.dart';
 import 'property/inline_text.dart';
 import 'property/option_picker.dart';
-import 'property/parent_property_picker.dart';
+import 'property/parent_property_picker.dart'
+    show ParentPropertyPicker, projectRowValue;
 import 'property/property_picker.dart';
 import 'property/property_row.dart';
 import 'section_label.dart';
@@ -138,14 +138,6 @@ class TaskDetail extends StatelessWidget {
     final status = task.boardStatus;
     final blocked = state.taskCompletionBlockerFor(uid) != null;
     final tags = state.taskTagsOf(task);
-    final parentItem = task.parentUid == null
-        ? null
-        : state.findItem(task.parentUid!);
-    final parentName = switch (parentItem) {
-      Note n => n.summary,
-      Task k => k.summary,
-      _ => null,
-    };
     final startDay = task.dtstart?.localDay;
 
     /// The title itself is the way in: a tap opens the text buffer.
@@ -310,18 +302,18 @@ class TaskDetail extends StatelessWidget {
           text: tags.isEmpty ? null : tags.join(', '),
           readOnly: true,
         ),
-      if (edit)
+      if (edit && state.projectsByRecent.isNotEmpty)
         PropertyPicker<String>(
           id: 'parent',
           uid: uid,
           state: state,
-          icon: FLucideIcons.folderInput,
-          label: 'inside',
-          text: parentName,
+          icon: FLucideIcons.folderKanban,
+          label: 'project',
+          text: projectRowValue(state, uid),
           picker: (context, control, apply) => ParentPropertyPicker(
             id: 'parent',
-            targets: parentTargets(state, forUid: uid),
-            value: task.parentUid,
+            state: state,
+            uid: uid,
             onPick: (v) {
               control.hide();
               return apply(v);
@@ -332,9 +324,9 @@ class TaskDetail extends StatelessWidget {
       else
         PropertyRow(
           key: const Key('property-parent'),
-          icon: FLucideIcons.folderInput,
-          label: 'inside',
-          text: parentName,
+          icon: FLucideIcons.folderKanban,
+          label: 'project',
+          text: projectRowValue(state, uid),
           readOnly: true,
         ),
       if (task.rrule != null)
@@ -357,6 +349,7 @@ class TaskDetail extends StatelessWidget {
 
     final page = Column(
       children: [
+        parentCrumb(state, uid),
         ItemHeader(
           title: task.summary,
           strike: task.isClosed,

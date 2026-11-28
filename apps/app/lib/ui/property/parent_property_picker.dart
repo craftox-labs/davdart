@@ -1,26 +1,36 @@
+import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import '../../state/app_state.dart';
 import '../../state/parent_targets.dart';
 import '../parts.dart';
 import '../theme.dart';
 import 'option_picker.dart';
 
-/// Where an item sits in a picker: a search field over the [targets], each
-/// row indented by its depth and marked when it is a folder or a task.
+/// Where an item lives, in a picker: the projects first, so a pick is one row.
+///
+/// A search field, then "No project (personal)", then the Space's projects
+/// (the ones opened most recently first) with their folder in muted text. Once
+/// a search term is typed, the matching folders and sub-tasks join the list
+/// (indented, marked by kind) so an item can still be put under any note or
+/// task. The targets come from [parentTargets], so the rules about what may
+/// contain what stay in one place.
 class ParentPropertyPicker extends StatefulWidget {
   const ParentPropertyPicker({
     super.key,
     required this.id,
-    required this.targets,
-    this.value,
+    required this.state,
+    required this.uid,
     required this.onPick,
   });
 
   /// Names the rows' and field's keys (`property-parent-<id>-...`).
   final String id;
-  final List<ParentTarget> targets;
-  final String? value;
+  final AppState state;
+
+  /// The item being moved: the picker cannot offer itself or its subtree.
+  final String uid;
   final Future<bool> Function(String?) onPick;
 
   @override
@@ -37,18 +47,30 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
     super.dispose();
   }
 
-  Future<void> _pick(String? uid) async {
-    await widget.onPick(uid);
-  }
-
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
+    final state = widget.state;
     final q = _query.trim().toLowerCase();
-    final shown = [
-      for (final p in widget.targets)
-        if (q.isEmpty || p.label.toLowerCase().contains(q)) p,
-    ];
+    final project = state.projectIndex.projectOf(widget.uid);
+    final projects = state.projectsByRecent;
+    // Only a search shows the folders and sub-tasks: the projects are the
+    // everyday answer, the tree is the exception.
+    final others = q.isEmpty
+        ? const <ParentTarget>[]
+        : [
+            for (final p in parentTargets(state, forUid: widget.uid))
+              if (p.uid != null &&
+                  p.kind != ParentKind.top &&
+                  p.label.toLowerCase().contains(q))
+                p,
+          ];
+    final folderOf = {
+      for (final p in projects)
+        p.uid: p.parentUid == null
+            ? null
+            : state.tree.find(p.parentUid!)?.note.summary,
+    };
     return Padding(
       padding: EdgeInsets.all(t.space.lg),
       child: Column(
@@ -59,7 +81,7 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
           field(
             key: Key('property-parent-${widget.id}-search'),
             controller: _search,
-            hint: 'Search…',
+            hint: 'Search notes, folders and tasks…',
             prefixIcon: FLucideIcons.search,
             onChange: (v) => setState(() => _query = v),
           ),
@@ -69,26 +91,40 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  for (final p in shown)
+                  PickerRow(
+                    key: Key('property-parent-${widget.id}-top'),
+                    label: 'No project (personal)',
+                    icon: FLucideIcons.circleUser,
+                    selected: project == null,
+                    onPress: () => widget.onPick(null),
+                  ),
+                  for (final p in projects)
                     PickerRow(
-                      key: Key(
-                        'property-parent-${widget.id}-${p.uid ?? 'top'}',
-                      ),
-                      label: p.label,
-                      hint: switch (p.kind) {
+                      key: Key('property-parent-${widget.id}-${p.uid}'),
+                      label: p.summary,
+                      hint: folderOf[p.uid],
+                      icon: FLucideIcons.folderKanban,
+                      selected: project?.uid == p.uid,
+                      onPress: () => widget.onPick(p.uid),
+                    ),
+                  for (final o in others)
+                    PickerRow(
+                      key: Key('property-parent-${widget.id}-${o.uid}'),
+                      label: o.label,
+                      hint: switch (o.kind) {
                         ParentKind.folder => 'folder',
                         ParentKind.task => 'task',
                         ParentKind.note || ParentKind.top => null,
                       },
-                      icon: switch (p.kind) {
-                        ParentKind.top => FLucideIcons.arrowUpToLine,
+                      icon: switch (o.kind) {
                         ParentKind.folder => FLucideIcons.folder,
                         ParentKind.task => FLucideIcons.circleCheck,
-                        ParentKind.note => FLucideIcons.fileText,
+                        ParentKind.note ||
+                        ParentKind.top => FLucideIcons.fileText,
                       },
-                      selected: p.uid == widget.value,
-                      depth: p.depth,
-                      onPress: () => _pick(p.uid),
+                      depth: o.depth,
+                      selected: o.uid == widget.uid,
+                      onPress: () => widget.onPick(o.uid),
                     ),
                 ],
               ),
@@ -98,4 +134,22 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
       ),
     );
   }
+}
+
+/// The project [uid] sits in, or null when it sits outside every project.
+Note? projectOfItem(AppState state, String uid) =>
+    state.projectIndex.projectOf(uid);
+
+/// The value a Project row shows: the project's name, or 'Personal'.
+String projectRowValue(AppState state, String uid) =>
+    projectOfItem(state, uid)?.summary ?? 'Personal';
+
+/// The project value for a parent choice being edited (a note draft, whose
+/// parent is not saved yet): the project of [parentUid], its own name when it
+/// is not in a project, or 'Personal' when there is none.
+String projectValueFor(AppState state, String? parentUid) {
+  if (parentUid == null) return 'Personal';
+  return state.projectIndex.projectOf(parentUid)?.summary ??
+      state.tree.find(parentUid)?.note.summary ??
+      'Personal';
 }

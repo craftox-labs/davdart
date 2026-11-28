@@ -545,10 +545,25 @@ void main() {
       expect(s.taskById('k')!.summary, 'Typed');
     });
 
-    testWidgets('parent select lists notes and other tasks', (t) async {
+    testWidgets('the project picker lists projects and searches for a task', (
+      t,
+    ) async {
       final s = await pumpTasksApp(
         t,
-        notes: _notes(),
+        notes: [
+          ..._notes(),
+          Note(
+            uid: 'container',
+            summary: 'Projects',
+            categories: [folderTag, projectsTag],
+          ),
+          Note(
+            uid: 'proj',
+            summary: 'Alpha',
+            parentUid: 'container',
+            categories: [folderTag],
+          ),
+        ],
         tasks: [
           mkTask('k', summary: 'Kid'),
           mkTask('p', summary: 'Parent'),
@@ -558,14 +573,19 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('property-parent'));
       await t.pumpAndSettle();
+      // Personal first, then the Space's projects (recent first).
       expect(_k('property-parent-parent-top'), findsOneWidget);
       expect(
         find.descendant(
-          of: _k('property-parent-parent-p'),
-          matching: find.text('Parent'),
+          of: _k('property-parent-parent-proj'),
+          matching: find.text('Alpha'),
         ),
         findsOneWidget,
       );
+      // Another task is only listed once a term matches.
+      expect(_k('property-parent-parent-p'), findsNothing);
+      await t.enterText(_k('property-parent-parent-search'), 'Parent');
+      await t.pumpAndSettle();
       await t.tap(_k('property-parent-parent-p'));
       await t.pumpAndSettle();
       expect(s.taskById('k')!.parentUid, 'p');

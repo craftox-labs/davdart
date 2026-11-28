@@ -78,6 +78,7 @@ class DetailView extends StatelessWidget {
     final mobile = narrowLayout(context);
     Widget page = Column(
       children: [
+        parentCrumb(state, uid),
         ItemHeader(
           title: note.summary,
           full: full,

@@ -15,6 +15,8 @@ import 'note_editor.dart';
 import 'parts.dart';
 import 'property/inline_text.dart';
 import 'property/option_picker.dart';
+import 'property/parent_property_picker.dart'
+    show ParentPropertyPicker, projectRowValue;
 import 'property/property_picker.dart';
 import 'property/property_row.dart';
 import 'property/property_trigger.dart' show PropertyPopoverGroup;
@@ -222,10 +224,38 @@ class EventDetail extends StatelessWidget {
           text: tags.isEmpty ? null : tags.join(', '),
           readOnly: true,
         ),
+      if (edit && state.projectsByRecent.isNotEmpty)
+        PropertyPicker<String>(
+          id: 'parent',
+          uid: uid,
+          state: state,
+          icon: FLucideIcons.folderKanban,
+          label: 'project',
+          text: projectRowValue(state, uid),
+          picker: (context, control, apply) => ParentPropertyPicker(
+            id: 'parent',
+            state: state,
+            uid: uid,
+            onPick: (v) {
+              control.hide();
+              return apply(v);
+            },
+          ),
+          onPick: (v) => state.setEventParent(uid, v),
+        )
+      else
+        PropertyRow(
+          key: const Key('property-parent'),
+          icon: FLucideIcons.folderKanban,
+          label: 'project',
+          text: projectRowValue(state, uid),
+          readOnly: true,
+        ),
     ];
 
     final page = Column(
       children: [
+        parentCrumb(state, uid),
         ItemHeader(
           title: event.summary,
           strike: event.isCancelled,

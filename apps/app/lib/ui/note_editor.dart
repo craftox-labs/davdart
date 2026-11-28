@@ -5,7 +5,9 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../state/note_draft.dart';
-import '../state/parent_targets.dart';
+import 'property/parent_property_picker.dart';
+import 'property/property_row.dart';
+import 'property/property_trigger.dart';
 import 'parts.dart';
 import 'popover_track.dart';
 import 'theme.dart';
@@ -28,16 +30,6 @@ class NoteEditor extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    // Where the note can move: top level, or under any note that is not it
-    // or one of its own descendants (the shared parent list of the pickers).
-    final targets = parentTargets(state, forUid: note.uid);
-    String labelOf(String uid) {
-      for (final e in targets) {
-        if ((e.uid ?? '') == uid) return e.label;
-      }
-      return uid;
-    }
-
     return ListenableBuilder(
       listenable: draft,
       builder: (context, _) => Column(
@@ -99,34 +91,37 @@ class NoteEditor extends StatelessWidget {
             controller: draft.tagsController,
             label: 'Tags (comma separated)',
           ),
-          TrackPopover(
-            builder: (_, pc) => FSelect<String>.rich(
-              popoverControl: pc,
-              key: const Key('edit-parent'),
-              label: const Text('Inside'),
-              format: labelOf,
-              control: FSelectControl.lifted(
-                value: targets.any((e) => e.uid == draft.parent)
-                    ? draft.parent ?? ''
-                    : '',
-                onChange: (v) =>
-                    draft.setParent((v == null || v.isEmpty) ? null : v),
+          // The same project picker the task and event rows use; it moves the
+          // draft's parent, which a save writes.
+          if (state.projectsByRecent.isNotEmpty)
+            PropertyTrigger(
+              sheetKey: const Key('property-sheet-parent'),
+              picker: (context, control) => ParentPropertyPicker(
+                id: 'parent',
+                state: state,
+                uid: note.uid,
+                onPick: (v) async {
+                  control.hide();
+                  draft.setParent(v);
+                  return true;
+                },
               ),
-              children: [
-                for (final e in targets)
-                  FSelectItem<String>(
-                    title: Text(
-                      e.kind == ParentKind.folder
-                          ? '${e.label}  (folder)'
-                          : e.label,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    prefix: SizedBox(width: e.depth * t.sizes.folderIndent),
-                    value: e.uid ?? '',
-                  ),
-              ],
+              child: PropertyRow(
+                key: const Key('property-parent'),
+                icon: FLucideIcons.folderKanban,
+                label: 'project',
+                text: projectValueFor(state, draft.parent),
+                interactive: true,
+              ),
+            )
+          else
+            PropertyRow(
+              key: const Key('property-parent'),
+              icon: FLucideIcons.folderKanban,
+              label: 'project',
+              text: projectValueFor(state, draft.parent),
+              readOnly: true,
             ),
-          ),
           VimField(
             key: ValueKey('vim-${draft.uid}'),
             state: state,

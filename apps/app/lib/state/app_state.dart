@@ -353,6 +353,35 @@ class AppState extends ChangeNotifier {
     return true;
   }
 
+  /// The item [uid] sits inside (its parent note, folder, task or event), or
+  /// null at the top level. Personal containers are not offered: they are not
+  /// a place to go back to.
+  Note? parentItemOf(String uid) {
+    final item = findItem(uid);
+    final parentUid = switch (item) {
+      Note n => n.parentUid,
+      Task t => t.parentUid,
+      Event e => e.parentUid,
+      _ => null,
+    };
+    if (parentUid == null) return null;
+    final parent = tree.find(parentUid)?.note;
+    if (parent == null || isPersonalContainer(parent)) return null;
+    return parent;
+  }
+
+  /// Opens the item [uid] sits inside where [uid] is shown: in the peek when
+  /// the peek holds it, else in the main area.
+  Future<void> openParentOf(String uid) async {
+    final parent = parentItemOf(uid);
+    if (parent == null) return;
+    if (peekUid == uid) {
+      select(parent.uid);
+      return;
+    }
+    await openNote(parent.uid, mode: OpenMode.main);
+  }
+
   /// Set by the shell: the narrow layout is showing. It has no peek pane, so
   /// opening an item always opens it as a main tab.
   bool narrow = false;
@@ -4125,6 +4154,29 @@ class AppState extends ChangeNotifier {
     return ok;
   }
 
+  /// Moves an event under another note, folder or project (null: the top
+  /// level), with Undo.
+  Future<bool> setEventParent(String uid, String? parentUid) async {
+    final e = _eventById(uid);
+    if (e == null) return false;
+    if (parentUid != null && findItem(parentUid) == null) return false;
+    final before = e;
+    final ok = await _eventEdit(
+      (src) => src.saveEvent(
+        e.copyWith(parentUid: parentUid, clearParent: parentUid == null),
+      ),
+    );
+    if (ok && before.parentUid != parentUid) {
+      _postUndo(
+        parentUid == null
+            ? 'Moved "${before.summary}" to the top level'
+            : 'Moved "${before.summary}"',
+        () => _restoreEvent(before, parent: true),
+      );
+    }
+    return ok;
+  }
+
   /// Sets an event's labels, with Undo.
   Future<bool> setEventTags(String uid, List<String> tags) async {
     final e = _eventById(uid);
@@ -4202,12 +4254,15 @@ class AppState extends ChangeNotifier {
     bool tags = false,
     bool when = false,
     bool rrule = false,
+    bool parent = false,
   }) async {
     final now = _eventById(before.uid);
     if (now == null) return;
     var copy = now.copyWith(
       status: status ? before.status : null,
       clearStatus: status && before.status == null,
+      parentUid: parent ? before.parentUid : null,
+      clearParent: parent && before.parentUid == null,
       rrule: rrule ? before.rrule : null,
       clearRrule: rrule && (before.rrule == null || before.rrule!.isEmpty),
       exdates: when || rrule ? before.exdates : null,
