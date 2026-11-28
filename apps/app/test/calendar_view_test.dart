@@ -660,21 +660,28 @@ void main() {
     expect(s.homeDay, DateTime.utc(2026, 11, 22));
   });
 
-  testWidgets('a project Calendar keeps its day column on wide', (t) async {
+  testWidgets('a project Calendar puts its day under the grid, as Home does', (
+    t,
+  ) async {
     final s = await _state(t, events: [_event('e20', 'Review', 20)]);
     await _pump(t, s, scoped: true);
     expect(_k('calendar-day-card'), findsOneWidget);
+    // No second column: the card is under the grid and spans its width.
+    final card = _k('calendar-day-card');
+    final last = _k('calendar-day-2026-12-6');
+    expect(t.getTopLeft(card).dy, greaterThan(t.getBottomLeft(last).dy));
+    expect(
+      t.getSize(card).width,
+      closeTo(t.getSize(_k('calendar-month')).width, 200),
+    );
     await t.tap(_k('calendar-day-2026-11-20'));
     await t.pumpAndSettle();
     expect(
-      find.descendant(
-        of: _k('calendar-day-card'),
-        matching: find.text('Review'),
-      ),
+      find.descendant(of: card, matching: find.text('Review')),
       findsOneWidget,
     );
     expect(_k('calendar-add-event'), findsOneWidget);
-    // The project's column keeps its own selection; Home's day is untouched.
+    // The project's card keeps its own selection; Home's day is untouched.
     expect(s.homeDay, isNull);
   });
 

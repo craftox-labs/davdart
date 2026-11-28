@@ -117,8 +117,9 @@ int _byWhen(_CellItem a, _CellItem b) {
 ///
 /// Wide, Home shows the grid alone and the picked day in the Calendar panel
 /// beside it ([AppState.homeDay]): pressing a day or a bar there opens that
-/// panel on the day. A project's Calendar keeps its own day column, and the
-/// narrow layout keeps the day list under the grid on both.
+/// panel on the day. A project's Calendar keeps its own picked day in a card
+/// under the grid, at every width (it has no panel day of its own), so its
+/// grid gets the same full width Home's does.
 ///
 /// [scoped] picks the source. A project's page passes true: the open
 /// [AppState.scopeUid] narrows the items (the project index, as everywhere
@@ -133,10 +134,9 @@ int _byWhen(_CellItem a, _CellItem b) {
 /// selected day and the visible month are this view's own state, so Home and
 /// each project tab keep theirs, and both start on today.
 ///
-/// Not built yet, deliberately: event status (tentative/confirmed), multi-day
-/// span bars, overlap marking and the week/timeline views. The chip row of a
-/// day cell is where a span bar would sit, and the day list is where a status
-/// mark would go.
+/// Not built yet, deliberately: event status (tentative/confirmed), overlap
+/// marking and the week/timeline views. The day list is where a status mark
+/// would go.
 class CalendarView extends StatefulWidget {
   const CalendarView({
     super.key,
@@ -228,9 +228,9 @@ class _CalendarViewState extends State<CalendarView> {
     return out;
   }
 
-  /// Picks [day]. A project's Calendar keeps it in its own day column; Home's
-  /// shares it with the Calendar panel, which the wide grid opens (there is no
-  /// room for a column beside the full-width grid).
+  /// Picks [day]. A project's Calendar keeps it to itself (the card under its
+  /// grid); Home's shares it with the Calendar panel, which a wide press
+  /// opens.
   void _select(DateTime day, {bool openPanel = false}) {
     if (widget.scoped) {
       setState(() {
@@ -320,9 +320,9 @@ class _CalendarViewState extends State<CalendarView> {
   }
 
   /// Shows [month] and keeps the selection inside it: today when the month
-  /// holds it, else its first day, so the day column (a project's) and the
-  /// panel's pinned day (Home's) always target a day that is on screen. The
-  /// month arrows never open the panel.
+  /// holds it, else its first day, so the picked day (a project's card, or
+  /// the panel's pinned day on Home) always targets a day that is on screen.
+  /// The month arrows never open the panel.
   void _showMonth(DateTime month, DateTime today) {
     final day = month.year == today.year && month.month == today.month
         ? today
@@ -395,21 +395,14 @@ class _CalendarViewState extends State<CalendarView> {
                 t.space.xl,
                 fabInset(context) + t.space.xl,
               ),
-              // Home's wide Calendar is the grid alone: the picked day shows
-              // in the Calendar panel beside it. A project's wide Calendar
-              // keeps its day column, and the narrow layout keeps the day list
-              // under the grid on both.
+              // Home and a project's Calendar share the shape: the grid at
+              // the width it has, the picked day under it. On Home wide the
+              // day is the Calendar panel's (the grid stands alone); a
+              // project's Calendar has no panel day of its own, so its card
+              // stays under the grid at every width rather than beside it as
+              // a second column.
               child: wide && !widget.scoped
                   ? grid
-                  : wide
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 3, child: grid),
-                        SizedBox(width: t.space.lg),
-                        Expanded(flex: 2, child: list),
-                      ],
-                    )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [

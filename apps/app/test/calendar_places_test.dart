@@ -194,6 +194,10 @@ void main() {
       final day = _otherDay();
       await t.tap(_k(_dayKey(day)));
       await t.pumpAndSettle();
+      // The project's day card sits under the full-width grid (Home's shape),
+      // so on a wide window it is below the fold.
+      await t.ensureVisible(_k('calendar-add-event'));
+      await t.pumpAndSettle();
       await t.tap(_k('calendar-add-event'));
       await t.pumpAndSettle();
       await t.enterText(_k('new-event-title'), 'Site visit');
