@@ -152,6 +152,9 @@ Future<void> _pump(
   await t.pumpAndSettle();
 }
 
+/// The toolbar's period title.
+String? _title(WidgetTester t) => t.widget<Text>(_k('calendar-month')).data;
+
 void main() {
   setUp(() => LocalZone.use('Asia/Bangkok'));
   tearDown(() => LocalZone.use(null));
@@ -366,6 +369,85 @@ void main() {
     await t.tap(_k('calendar-today'));
     await t.pumpAndSettle();
     expect(t.widget<Text>(_k('calendar-month')).data, 'November 2026');
+  });
+
+  testWidgets('the scale switcher defaults to Month and sets the title', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    expect(_k('calendar-scale'), findsOneWidget);
+    expect(_title(t), 'November 2026');
+    await t.tap(_k('calendar-scale-week'));
+    await t.pumpAndSettle();
+    expect(_title(t), '16 - 22 Nov 2026');
+    await t.tap(_k('calendar-scale-day'));
+    await t.pumpAndSettle();
+    expect(_title(t), 'Wed 18 November 2026');
+    await t.tap(_k('calendar-scale-year'));
+    await t.pumpAndSettle();
+    expect(_title(t), '2026');
+    await t.tap(_k('calendar-scale-month'));
+    await t.pumpAndSettle();
+    expect(_title(t), 'November 2026');
+  });
+
+  testWidgets('arrows and Today step each scale and keep the selection in', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-week'));
+    await t.pumpAndSettle();
+    await t.tap(_k('calendar-next'));
+    await t.pumpAndSettle();
+    expect(_title(t), '23 - 29 Nov 2026');
+    expect(s.homeDay, DateTime.utc(2026, 11, 23));
+    await t.tap(_k('calendar-next'));
+    await t.pumpAndSettle();
+    expect(_title(t), '30 Nov - 6 Dec 2026');
+    await t.tap(_k('calendar-today'));
+    await t.pumpAndSettle();
+    expect(_title(t), '16 - 22 Nov 2026');
+    expect(s.homeDay, DateTime.utc(2026, 11, 18));
+
+    await t.tap(_k('calendar-scale-day'));
+    await t.pumpAndSettle();
+    await t.tap(_k('calendar-prev'));
+    await t.pumpAndSettle();
+    expect(_title(t), 'Tue 17 November 2026');
+    expect(s.homeDay, DateTime.utc(2026, 11, 17));
+    await t.tap(_k('calendar-today'));
+    await t.pumpAndSettle();
+    expect(_title(t), 'Wed 18 November 2026');
+
+    await t.tap(_k('calendar-scale-year'));
+    await t.pumpAndSettle();
+    await t.tap(_k('calendar-next'));
+    await t.pumpAndSettle();
+    expect(_title(t), '2027');
+    expect(s.homeDay, DateTime.utc(2027, 1, 1));
+    await t.tap(_k('calendar-today'));
+    await t.pumpAndSettle();
+    expect(_title(t), '2026');
+  });
+
+  testWidgets('the anchor survives a scale switch: Month shows its month', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-day'));
+    await t.pumpAndSettle();
+    for (var i = 0; i < 14; i++) {
+      await t.tap(_k('calendar-next'));
+      await t.pumpAndSettle();
+    }
+    expect(_title(t), 'Wed 2 December 2026');
+    await t.tap(_k('calendar-scale-month'));
+    await t.pumpAndSettle();
+    expect(_title(t), 'December 2026');
+    expect(_k('calendar-day-2026-12-2'), findsOneWidget);
   });
 
   testWidgets('a month arrow moves the selection into the shown month', (
@@ -993,7 +1075,7 @@ void main() {
     expect(t.getTopLeft(card).dy, greaterThan(t.getBottomLeft(last).dy));
     expect(
       t.getSize(card).width,
-      closeTo(t.getSize(_k('calendar-month')).width, 200),
+      closeTo(t.getSize(_k('calendar-view')).width, 100),
     );
     await t.tap(_k('calendar-day-2026-11-20'));
     await t.pumpAndSettle();

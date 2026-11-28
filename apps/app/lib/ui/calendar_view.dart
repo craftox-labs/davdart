@@ -17,6 +17,7 @@ import 'chips.dart';
 import 'empty_state.dart';
 import 'property/option_picker.dart';
 import 'property/property_trigger.dart';
+import 'segmented.dart';
 import 'event_menu.dart';
 import 'events_panel.dart';
 import 'parts.dart';
@@ -123,6 +124,9 @@ int _byWhen(_CellItem a, _CellItem b) {
   return 0;
 }
 
+/// How much time the calendar shows at once.
+enum CalendarScale { day, week, month, year }
+
 /// The one calendar: a month grid and the selected day's items, with a way to
 /// add an event or a task on that day.
 ///
@@ -176,8 +180,14 @@ class _CalendarViewState extends State<CalendarView> {
   /// the Calendar panel that shows the day beside the grid.
   DateTime? _selected;
 
-  /// The first of the shown month; null follows the selection.
-  DateTime? _month;
+  /// Any day inside the shown period (the first of the month on the Month
+  /// path); null follows the selection. The month, week or year shown is
+  /// derived from it, never stored.
+  DateTime? _anchor;
+
+  /// The shown scale. Widget state: it resets with the view (a Space switch
+  /// rebuilds it), and Month is the default.
+  CalendarScale _scale = CalendarScale.month;
 
   /// A drag across the wide grid: the day it started on, where it started and
   /// the day it has reached (null until the pointer has moved far enough to
@@ -246,7 +256,7 @@ class _CalendarViewState extends State<CalendarView> {
     if (widget.scoped) {
       setState(() {
         _selected = day;
-        _month = _monthOf(day);
+        _anchor = _scale == CalendarScale.month ? _monthOf(day) : day;
       });
       return;
     }
@@ -255,7 +265,9 @@ class _CalendarViewState extends State<CalendarView> {
     } else {
       state.setHomeDay(day);
     }
-    setState(() => _month = _monthOf(day));
+    setState(
+      () => _anchor = _scale == CalendarScale.month ? _monthOf(day) : day,
+    );
   }
 
   /// A press on a multi-day bar: picks [day] (the one under the pointer) and
@@ -355,23 +367,75 @@ class _CalendarViewState extends State<CalendarView> {
     await _newEvent(from, until: to);
   }
 
-  /// Shows [month] and keeps the selection inside it: today when the month
-  /// holds it, else its first day, so the picked day (a project's card, or
-  /// the panel's pinned day on Home) always targets a day that is on screen.
-  /// The month arrows never open the panel.
-  void _showMonth(DateTime month, DateTime today) {
-    final day = month.year == today.year && month.month == today.month
-        ? today
-        : DateTime.utc(month.year, month.month);
+  /// The first day of the period [anchor] sits in, at [scale].
+  DateTime _periodStart(CalendarScale scale, DateTime anchor, int first) =>
+      switch (scale) {
+        CalendarScale.day => anchor,
+        CalendarScale.week => anchor.subtract(
+          Duration(days: (anchor.weekday - first + 7) % 7),
+        ),
+        CalendarScale.month => DateTime.utc(anchor.year, anchor.month),
+        CalendarScale.year => DateTime.utc(anchor.year),
+      };
+
+  /// The period one step from [anchor]: a day, 7 days, a month or a year
+  /// ([dir] is 1 or -1).
+  DateTime _stepped(CalendarScale scale, DateTime anchor, int dir) =>
+      switch (scale) {
+        CalendarScale.day => anchor.add(Duration(days: dir)),
+        CalendarScale.week => anchor.add(Duration(days: 7 * dir)),
+        CalendarScale.month => DateTime.utc(anchor.year, anchor.month + dir),
+        CalendarScale.year => DateTime.utc(anchor.year + dir, anchor.month),
+      };
+
+  /// Shows the period [anchor] sits in and keeps the selection inside it:
+  /// today when the period holds it, else its first day, so the picked day (a
+  /// project's card, or the panel's pinned day on Home) always targets a day
+  /// that is on screen. The arrows never open the panel.
+  void _showPeriod(DateTime anchor, DateTime today, int first) {
+    final from = _periodStart(_scale, anchor, first);
+    final to = _stepped(_scale, from, 1);
+    final inside = !today.isBefore(from) && today.isBefore(to);
+    final day = inside ? today : from;
     if (widget.scoped) {
       setState(() {
-        _month = month;
+        _anchor = anchor;
         _selected = day;
       });
       return;
     }
-    setState(() => _month = month);
+    setState(() => _anchor = anchor);
     state.setHomeDay(day);
+  }
+
+  /// Switches to [scale], keeping the shown day in view: the picked day when
+  /// the new period holds it is the anchor, so Day lands on the pick and
+  /// Month on its month.
+  void _setScale(CalendarScale scale, DateTime selected) {
+    setState(() {
+      _scale = scale;
+      _anchor = scale == CalendarScale.month ? _monthOf(selected) : selected;
+    });
+  }
+
+  /// The toolbar title for the shown period.
+  String _title(CalendarScale scale, DateTime from, DateTime to) {
+    final m = _monthNames[from.month - 1];
+    switch (scale) {
+      case CalendarScale.day:
+        return '${_weekdayNames[from.weekday - 1]} ${from.day} $m ${from.year}';
+      case CalendarScale.week:
+        final last = to.subtract(const Duration(days: 1));
+        final lm = _monthNames[last.month - 1].substring(0, 3);
+        final fm = m.substring(0, 3);
+        return from.month == last.month
+            ? '${from.day} - ${last.day} $fm ${last.year}'
+            : '${from.day} $fm - ${last.day} $lm ${last.year}';
+      case CalendarScale.month:
+        return '$m ${from.year}';
+      case CalendarScale.year:
+        return '${from.year}';
+    }
   }
 
   @override
@@ -383,11 +447,11 @@ class _CalendarViewState extends State<CalendarView> {
         final clock = _clock();
         final today = wallDay(wallNow(clock));
         if (!widget.scoped) {
-          if (state.homeDay == null && _lastHome != null) _month = null;
+          if (state.homeDay == null && _lastHome != null) _anchor = null;
           _lastHome = state.homeDay;
         }
         final selected = (widget.scoped ? _selected : state.homeDay) ?? today;
-        final month = _month ?? _monthOf(selected);
+        final month = _monthOf(_anchor ?? selected);
         final first = firstWeekday(context);
         final lead = (month.weekday - first + 7) % 7;
         final start = DateTime.utc(month.year, month.month, 1 - lead);
@@ -488,6 +552,41 @@ class _CalendarViewState extends State<CalendarView> {
     final weekday = t.type.sectionLabelStyle.copyWith(color: t.muted);
     final end = start.add(Duration(days: weeks * 7));
     final spans = wide ? _spans(start, end) : const <CalendarSpan>[];
+    final from = _periodStart(_scale, _anchor ?? selected, first);
+    final unit = _scale.name;
+    final switcher = Segmented<CalendarScale>(
+      key: const Key('calendar-scale'),
+      fullWidth: !wide,
+      iconsOnly: !wide,
+      value: _scale,
+      onChanged: (v) => _setScale(v, selected),
+      segments: const [
+        Segment(
+          CalendarScale.day,
+          'Day',
+          'calendar-scale-day',
+          icon: FLucideIcons.calendar,
+        ),
+        Segment(
+          CalendarScale.week,
+          'Week',
+          'calendar-scale-week',
+          icon: FLucideIcons.columns3,
+        ),
+        Segment(
+          CalendarScale.month,
+          'Month',
+          'calendar-scale-month',
+          icon: FLucideIcons.layoutGrid,
+        ),
+        Segment(
+          CalendarScale.year,
+          'Year',
+          'calendar-scale-year',
+          icon: FLucideIcons.calendarRange,
+        ),
+      ],
+    );
     return CardBox(
       padding: EdgeInsets.all(t.space.sm),
       child: Column(
@@ -499,32 +598,30 @@ class _CalendarViewState extends State<CalendarView> {
             children: [
               Expanded(
                 child: Text(
-                  '${_monthNames[month.month - 1]} ${month.year}',
+                  _title(_scale, from, _stepped(_scale, from, 1)),
                   key: const Key('calendar-month'),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: t.type.titleStyle.copyWith(color: t.fg),
                 ),
               ),
+              if (wide) switcher,
+              SizedBox(width: t.space.xs),
               IconAction(
                 compact: true,
                 key: const Key('calendar-prev'),
-                tooltip: 'Previous month',
+                tooltip: 'Previous $unit',
                 icon: FLucideIcons.chevronLeft,
-                onPress: () => _showMonth(
-                  DateTime.utc(month.year, month.month - 1),
-                  today,
-                ),
+                onPress: () =>
+                    _showPeriod(_stepped(_scale, from, -1), today, first),
               ),
               IconAction(
                 compact: true,
                 key: const Key('calendar-next'),
-                tooltip: 'Next month',
+                tooltip: 'Next $unit',
                 icon: FLucideIcons.chevronRight,
-                onPress: () => _showMonth(
-                  DateTime.utc(month.year, month.month + 1),
-                  today,
-                ),
+                onPress: () =>
+                    _showPeriod(_stepped(_scale, from, 1), today, first),
               ),
               SizedBox(width: t.space.xs),
               touchBox(
@@ -540,6 +637,7 @@ class _CalendarViewState extends State<CalendarView> {
               ),
             ],
           ),
+          if (!wide) ...[SizedBox(height: t.space.xs), switcher],
           SizedBox(height: t.space.xs),
           SizedBox(
             // Fixed, so the grid's chrome (and with it the rows' shared
