@@ -2588,7 +2588,16 @@ class AppState extends ChangeNotifier {
     }
     if (setPriority) _setRawPriority(p, priorityRaw);
     copy = p.apply();
-    if (setParent) copy.parentUid = parentUid;
+    if (setParent) {
+      // Like [moveNote]: a move that is no longer valid (the parent went away,
+      // or a sync put the note under its own child) changes nothing, and the
+      // shell's notice says why.
+      if (!tree.canMove(uid, parentUid)) {
+        reportNotSaved('the move is no longer possible');
+        return;
+      }
+      copy.parentUid = parentUid;
+    }
     if (setRank) copy.rank = rank;
     await _save(copy);
   }
