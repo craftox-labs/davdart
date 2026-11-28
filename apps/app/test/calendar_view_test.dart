@@ -2,6 +2,7 @@ import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/state/event_rules.dart';
 import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/calendar_view.dart';
 import 'package:davdart_app/ui/chips.dart';
@@ -11,6 +12,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
+
+import 'tasks_helper.dart';
 
 Finder _k(String k) => find.byKey(Key(k));
 
@@ -1025,6 +1028,8 @@ void main() {
     );
     expect(_k('calendar-add-event'), findsNothing);
   });
+
+  group('through the app shell', _shellGroups);
 }
 
 /// A state whose Space has no event component.
@@ -1052,4 +1057,103 @@ Future<AppState> _noEventsState(
   final s = _NoEventsState(src, prefs: MemoryStorage());
   await t.runAsync(s.load);
   return s;
+}
+
+/// The multi-day bar (or bars) of event [uid], by week segment.
+Finder _barOf(String uid) => find.byWidgetPredicate(
+  (w) =>
+      w.key is ValueKey<String> &&
+      (w.key as ValueKey<String>).value.startsWith('calendar-bar-$uid@'),
+);
+
+/// The day cell under [at]: the day a press there lands on.
+DateTime? _dayUnder(WidgetTester t, Offset at) {
+  for (final e in _dayCells) {
+    final box = e.renderObject! as RenderBox;
+    final rect = box.localToGlobal(Offset.zero) & box.size;
+    if (!rect.contains(at)) continue;
+    // The cell's id is the day as `y-m-d`, unpadded.
+    final id = (e.widget.key! as ValueKey<String>).value
+        .substring('calendar-day-'.length)
+        .split('-')
+        .map(int.parse)
+        .toList();
+    return wallDay(DateTime(id[0], id[1], id[2]));
+  }
+  return null;
+}
+
+/// Every day cell on screen, whole days and leading or trailing ones alike.
+Iterable<Element> get _dayCells => find
+    .byWidgetPredicate(
+      (w) =>
+          w.key is ValueKey<String> &&
+          (w.key as ValueKey<String>).value.startsWith('calendar-day-'),
+    )
+    .evaluate();
+
+/// A point inside a bar, past its middle: a press there is a press on the bar,
+/// not on the day cell under it.
+Offset _barPoint(WidgetTester t, Finder bar) {
+  final r = t.getRect(bar);
+  return Offset(r.left + r.width * 0.8, r.center.dy);
+}
+
+/// A three-day all-day event from the day after tomorrow, so the press lands
+/// wherever the month falls on the machine's clock.
+List<Event> _threeDays() => [
+  mkEvent('visit', summary: 'Artist visit', days: 2, allDay: true, span: 3),
+];
+
+/// The tests of the app shell path: a bar pressed with a real pointer, at a
+/// wide 1265x800 window, on Home's Calendar and a project's.
+void _shellGroups() {
+  const desktop = Size(1265, 800);
+
+  testWidgets('a wide pointer tap on a bar opens it and picks its day: Home', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(t, events: _threeDays(), size: desktop);
+    s.setHomeView(HomeView.calendar);
+    await t.pumpAndSettle();
+    final bar = _barOf('visit');
+    expect(bar, findsWidgets);
+    final at = _barPoint(t, bar.first);
+    final day = _dayUnder(t, at);
+    expect(day, isNotNull, reason: 'the bar lies over a day cell');
+    await t.tapAt(at);
+    await t.pumpAndSettle();
+    // The bar's own press, not the cell's: the event is open and the day
+    // under the pointer is the one picked.
+    expect(s.peekUid, 'visit');
+    expect(s.homeDay, wallDay(day!));
+  });
+
+  testWidgets('a wide pointer tap on a bar opens it: a project Calendar', (
+    t,
+  ) async {
+    final s = await pumpHomeApp(t, events: _threeDays(), size: desktop);
+    s.setProjectTab(testProjectUid, ProjectTab.calendar);
+    await t.pumpAndSettle();
+    final bar = _barOf('visit');
+    expect(bar, findsWidgets);
+    await t.tapAt(_barPoint(t, bar.first));
+    await t.pumpAndSettle();
+    expect(s.peekUid, 'visit');
+  });
+
+  testWidgets('a drag that starts on a bar is still a range drag', (t) async {
+    final s = await pumpTasksApp(t, events: _threeDays(), size: desktop);
+    s.setHomeView(HomeView.calendar);
+    await t.pumpAndSettle();
+    final bar = _barOf('visit');
+    final cell = t.getSize(find.byKey(_dayCells.first.widget.key!)).width;
+    // Two cells to the right: far past the slop, so the press is a drag.
+    await t.dragFrom(t.getCenter(bar.first), Offset(cell * 2, 0));
+    await t.pumpAndSettle();
+    // The range, as an all-day event, is in the new-event dialog.
+    expect(_k('new-event-title'), findsOneWidget);
+    expect(t.widget<FCheckbox>(_k('new-event-allday')).value, isTrue);
+    expect(s.peekUid, isNull);
+  });
 }
