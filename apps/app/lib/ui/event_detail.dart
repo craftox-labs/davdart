@@ -230,7 +230,7 @@ class EventDetail extends StatelessWidget {
           uid: uid,
           state: state,
           icon: FLucideIcons.folderKanban,
-          label: 'project',
+          label: 'belongs to',
           text: projectRowValue(state, uid),
           picker: (context, control, apply) => ParentPropertyPicker(
             id: 'parent',
@@ -247,7 +247,7 @@ class EventDetail extends StatelessWidget {
         PropertyRow(
           key: const Key('property-parent'),
           icon: FLucideIcons.folderKanban,
-          label: 'project',
+          label: 'belongs to',
           text: projectRowValue(state, uid),
           readOnly: true,
         ),

@@ -219,6 +219,41 @@ void main() {
       expect(_k('parent-crumb'), findsNothing);
     });
 
+    testWidgets('a sub-task shows its parent task in the crumb and opens it', (
+      t,
+    ) async {
+      final app = await _pump(
+        t,
+        task: mkTask('k', summary: 'Pay rent', parent: 'p'),
+        notes: [
+          ..._projectNotes,
+          Note(uid: 'other', summary: 'Parent task', parentUid: 'proj'),
+        ],
+      );
+      await t.runAsync(
+        () => app.state.addTask('Parent task', parentUid: 'proj'),
+      );
+      await t.pumpAndSettle();
+      final parent = app.state.tasks.firstWhere(
+        (x) => x.summary == 'Parent task',
+      );
+      // No Undo toast in the way of the crumb: the move writes directly.
+      await t.runAsync(
+        () => app.state.updateTask('k', setParent: true, parentUid: parent.uid),
+      );
+      await t.pumpAndSettle();
+      // The crumb names the parent task, and the row says what it sits in.
+      expect(_k('parent-crumb'), findsOneWidget);
+      expect(t.widget<Text>(_k('parent-crumb-label')).data, 'Parent task');
+      expect(find.text('Parent task'), findsWidgets);
+      // Tapping the crumb opens the parent task in the peek, which then
+      // shows the project it sits in.
+      await t.tap(_k('parent-crumb-label'));
+      await t.pumpAndSettle();
+      expect(app.state.peekUid, parent.uid);
+      expect(t.widget<Text>(_k('parent-crumb-label')).data, 'Alpha');
+    });
+
     testWidgets('a top-level task has no crumb', (t) async {
       await _pump(t, task: mkTask('k', summary: 'Pay rent'));
       expect(_k('parent-crumb'), findsNothing);

@@ -353,10 +353,10 @@ class AppState extends ChangeNotifier {
     return true;
   }
 
-  /// The item [uid] sits inside (its parent note, folder, task or event), or
-  /// null at the top level. Personal containers are not offered: they are not
-  /// a place to go back to.
-  Note? parentItemOf(String uid) {
+  /// The uid and name of the item [uid] sits inside: its parent note, folder,
+  /// task or event, or null at the top level. A personal container is not a
+  /// place to go back to, so it stands in as the top level.
+  ({String uid, String label})? parentItemOf(String uid) {
     final item = findItem(uid);
     final parentUid = switch (item) {
       Note n => n.parentUid,
@@ -365,9 +365,15 @@ class AppState extends ChangeNotifier {
       _ => null,
     };
     if (parentUid == null) return null;
-    final parent = tree.find(parentUid)?.note;
-    if (parent == null || isPersonalContainer(parent)) return null;
-    return parent;
+    final parent = findItem(parentUid);
+    final label = switch (parent) {
+      Note n => isPersonalContainer(n) ? null : n.summary,
+      Task t => t.summary,
+      Event e => e.summary,
+      _ => null,
+    };
+    if (label == null) return null;
+    return (uid: parentUid, label: label);
   }
 
   /// Opens the item [uid] sits inside where [uid] is shown: in the peek when
@@ -380,6 +386,20 @@ class AppState extends ChangeNotifier {
       return;
     }
     await openNote(parent.uid, mode: OpenMode.main);
+  }
+
+  /// What the item [uid] really sits in, as the "Belongs to" row reads: the
+  /// parent task it is a sub-task of, else the project it belongs to, else its
+  /// parent (a note or a folder outside every project), else 'Personal'.
+  String belongsToOf(String uid) {
+    final parent = parentItemOf(uid);
+    final parentUid = parent?.uid;
+    if (parent == null || parentUid == null) return 'Personal';
+    if (_taskById(parentUid) != null) return parent.label;
+    final project =
+        projectIndex.projectOf(uid) ?? projectIndex.projectOf(parentUid);
+    if (project != null) return project.summary;
+    return parent.label;
   }
 
   /// Set by the shell: the narrow layout is showing. It has no peek pane, so

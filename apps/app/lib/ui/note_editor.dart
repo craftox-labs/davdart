@@ -109,7 +109,7 @@ class NoteEditor extends StatelessWidget {
               child: PropertyRow(
                 key: const Key('property-parent'),
                 icon: FLucideIcons.folderKanban,
-                label: 'project',
+                label: 'belongs to',
                 text: projectValueFor(state, draft.parent),
                 interactive: true,
               ),
@@ -118,7 +118,7 @@ class NoteEditor extends StatelessWidget {
             PropertyRow(
               key: const Key('property-parent'),
               icon: FLucideIcons.folderKanban,
-              label: 'project',
+              label: 'belongs to',
               text: projectValueFor(state, draft.parent),
               readOnly: true,
             ),

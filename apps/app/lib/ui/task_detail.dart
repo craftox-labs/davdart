@@ -311,7 +311,7 @@ class TaskDetail extends StatelessWidget {
           uid: uid,
           state: state,
           icon: FLucideIcons.folderKanban,
-          label: 'project',
+          label: 'belongs to',
           text: projectRowValue(state, uid),
           picker: (context, control, apply) => ParentPropertyPicker(
             id: 'parent',
@@ -328,7 +328,7 @@ class TaskDetail extends StatelessWidget {
         PropertyRow(
           key: const Key('property-parent'),
           icon: FLucideIcons.folderKanban,
-          label: 'project',
+          label: 'belongs to',
           text: projectRowValue(state, uid),
           readOnly: true,
         ),

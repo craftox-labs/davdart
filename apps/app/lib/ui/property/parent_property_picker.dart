@@ -93,7 +93,7 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
                 children: [
                   PickerRow(
                     key: Key('property-parent-${widget.id}-top'),
-                    label: 'No project (personal)',
+                    label: 'Personal (top level)',
                     icon: FLucideIcons.circleUser,
                     selected: project == null,
                     onPress: () => widget.onPick(null),
@@ -140,9 +140,9 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
 Note? projectOfItem(AppState state, String uid) =>
     state.projectIndex.projectOf(uid);
 
-/// The value a Project row shows: the project's name, or 'Personal'.
-String projectRowValue(AppState state, String uid) =>
-    projectOfItem(state, uid)?.summary ?? 'Personal';
+/// The value a Project row shows: what the item really sits in (a parent
+/// task, a project, a folder or note outside every project), or 'Personal'.
+String projectRowValue(AppState state, String uid) => state.belongsToOf(uid);
 
 /// The project value for a parent choice being edited (a note draft, whose
 /// parent is not saved yet): the project of [parentUid], its own name when it

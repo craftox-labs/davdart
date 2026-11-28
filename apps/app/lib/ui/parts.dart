@@ -367,7 +367,7 @@ Widget parentCrumb(AppState state, String uid) {
   final parent = state.parentItemOf(uid);
   if (parent == null) return const SizedBox.shrink();
   return ParentCrumb(
-    label: parent.summary,
+    label: parent.label,
     onOpen: () => state.openParentOf(uid),
   );
 }
