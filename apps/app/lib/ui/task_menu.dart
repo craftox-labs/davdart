@@ -99,16 +99,15 @@ class TaskContextMenu extends StatelessWidget {
           Props.status,
           key: const Key('menu-task-status'),
           optionPrefix: 'menu-task-status',
-          options: taskStatusOptions(),
+          options: taskStatusOptions(blocked: blocked),
           value: task.boardStatus,
           onPick: (v) => state.setTaskStatus(uid, v!),
         ),
       if (edit)
-        NoteMenuItem(
-          Props.due.setLabel,
-          Props.due.icon,
-          () => showTaskDueDialog(context, state, task),
+        dialogMenuItem(
+          Props.due,
           key: const Key('menu-task-due'),
+          onPress: () => showTaskDueDialog(context, state, task),
         ),
       if (edit)
         optionMenuItem<String>(
@@ -400,7 +399,7 @@ Future<void> showNewTaskDialog(
                     def: Props.priority,
                     text: priorityBucket(priority) == 'none'
                         ? null
-                        : priorityBucket(priority),
+                        : priorityText(priorityBucket(priority)),
                     picker: (_, control) => OptionPicker<int>(
                       id: 'new-priority',
                       value: priority,
@@ -432,12 +431,14 @@ Future<void> showNewTaskDialog(
                   ),
                   DraftPropertyRow(
                     def: Props.parent,
-                    text: projectValueFor(state, parent),
+                    text: personal && parent == null
+                        ? 'Personal'
+                        : projectValueFor(state, state.parentOrScope(parent)),
                     picker: (_, control) => ParentPropertyPicker(
                       id: 'new-parent',
                       state: state,
                       uid: '',
-                      currentParent: (parent,),
+                      currentParent: (state.parentOrScope(parent),),
                       onPick: (v) async {
                         control.hide();
                         set(() => parent = v);

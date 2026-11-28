@@ -5,6 +5,14 @@ import '../note_menu.dart' show NoteMenuItem;
 import 'option_picker.dart';
 import 'property_defs.dart';
 
+/// A menu entry that opens a picker in a dialog ("Set due"): the label and
+/// icon come from [def].
+NoteMenuItem dialogMenuItem(
+  PropertyDef def, {
+  required Key key,
+  required VoidCallback onPress,
+}) => NoteMenuItem(def.setLabel, def.icon, onPress, key: key);
+
 /// The context-menu form of an option property: a "Set <label>" submenu whose
 /// rows are the picker's [options] (same labels and icons as the pickers; a
 /// status dot reads as the property's icon), the current [value] checked.

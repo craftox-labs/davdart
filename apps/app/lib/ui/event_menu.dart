@@ -410,12 +410,17 @@ Future<String?> showNewEventDialog(
                   ),
                   DraftPropertyRow(
                     def: Props.parent,
-                    text: projectValueFor(state, form.parent),
+                    text: personal && form.parent == null
+                        ? 'Personal'
+                        : projectValueFor(
+                            state,
+                            state.parentOrScope(form.parent),
+                          ),
                     picker: (_, control) => ParentPropertyPicker(
                       id: 'new-event-parent',
                       state: state,
                       uid: '',
-                      currentParent: (form.parent,),
+                      currentParent: (state.parentOrScope(form.parent),),
                       onPick: (v) async {
                         control.hide();
                         form.pick(parent: (v,));

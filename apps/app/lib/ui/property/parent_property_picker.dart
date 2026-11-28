@@ -170,5 +170,10 @@ String projectValueFor(AppState state, String? parentUid) {
   if (parentUid == null) return 'Personal';
   return state.projectIndex.projectOf(parentUid)?.summary ??
       state.tree.find(parentUid)?.note.summary ??
+      switch (state.findItem(parentUid)) {
+        Task t => t.summary,
+        Event e => e.summary,
+        _ => null,
+      } ??
       'Personal';
 }

@@ -87,7 +87,7 @@ void main() {
       }
       expect(_k('property-parent'), findsOneWidget);
       expect(find.text('status'), findsOneWidget);
-      expect(find.text('needs-action'), findsOneWidget);
+      expect(find.text('To do'), findsOneWidget);
       expect(app.state.taskById('k')!.summary, 'Pay rent');
     });
 

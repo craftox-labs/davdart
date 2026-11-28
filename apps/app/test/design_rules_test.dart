@@ -106,8 +106,12 @@ class _Rule {
     this.pattern, {
     this.exempt = const {},
     this.allow = const {},
+    this.only,
     required this.bad,
   });
+
+  /// When set, only files whose path matches are scanned.
+  final RegExp? only;
 
   final String name;
   final RegExp pattern;
@@ -128,6 +132,9 @@ const _theme = 'lib/ui/theme.dart';
 
 /// A non-zero number literal (`8`, `0.5`, `.5`; not `0`).
 const _num = r'(?:[1-9]|0*\.0*[1-9])';
+
+/// The menu, dialog and property files the picker-words rule scans.
+final _pickerFiles = RegExp(r'menu|dialog|property/');
 
 final _rules = <_Rule>[
   _Rule(
@@ -263,11 +270,22 @@ final _rules = <_Rule>[
       r"'in-process'|PickerOption\(\s*'(?:high|medium|low|backlog|todo|doing)'|"
       r'\bFCalendar\b',
     ),
+    only: _pickerFiles,
     exempt: {
       'lib/ui/property/property_defs.dart',
       'lib/ui/property/date_property_picker.dart',
     },
     bad: "NoteMenuItem('Set status', FLucideIcons.circleDot, () {}),",
+  ),
+  _Rule(
+    'menus take property strings only from the shared menu helpers',
+    RegExp(r'''\.setLabel\b|'Set \$|"Set \$'''),
+    exempt: {
+      'lib/ui/property/property_defs.dart',
+      'lib/ui/property/property_menu.dart',
+      'lib/ui/property/property_dialog.dart',
+    },
+    bad: 'NoteMenuItem(Props.due.setLabel, Props.due.icon, () {}),',
   ),
 ];
 
@@ -329,6 +347,7 @@ List<String> _insetBreaches(String path, String src) => [
 Map<String, List<int>> _breaches(_Rule rule) {
   final found = <String, List<int>>{};
   for (final f in _uiFiles()) {
+    if (rule.only != null && !rule.only!.hasMatch(f.path)) continue;
     final src = _literal(f);
     for (final m in rule.pattern.allMatches(src)) {
       (found[f.path] ??= []).add(_line(src, m.start));

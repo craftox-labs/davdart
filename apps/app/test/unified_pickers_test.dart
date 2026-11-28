@@ -1,3 +1,5 @@
+import 'package:davdart/davdart.dart';
+import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/property/property_defs.dart';
 import 'package:davdart_app/ui/property/property_dialog.dart';
 import 'package:davdart_app/ui/task_menu.dart';
@@ -24,8 +26,10 @@ void main() {
     });
 
     test('status words and priority buckets round-trip', () {
-      expect(statusWordOf('doing'), 'in-process');
-      expect(statusWordOf('todo'), 'needs-action');
+      expect(statusWordOf('doing'), 'Doing');
+      expect(statusWordOf('todo'), 'To do');
+      expect(priorityText('high'), 'High');
+      expect(priorityText('none'), 'No priority');
       for (final b in const ['high', 'medium', 'low']) {
         expect(priorityBucket(priorityOfBucket(b)), b);
       }
@@ -136,6 +140,73 @@ void main() {
       await t.pumpAndSettle();
       final e = s.events.singleWhere((k) => k.summary == 'Event here');
       expect(e.status, 'CONFIRMED');
+    });
+  });
+
+  group('review fixes', () {
+    testWidgets('the new task row shows the open scope it will land in', (
+      t,
+    ) async {
+      final s = await pumpTasksApp(
+        t,
+        notes: [
+          Note(
+            uid: 'proj',
+            summary: 'Alpha project',
+            categories: [AppState.folderTag],
+          ),
+        ],
+      );
+      s.scopeUid = 'proj';
+      showNewTaskDialog(_ctx(t), s);
+      await t.pumpAndSettle();
+      expect(
+        find.descendant(
+          of: _k('property-parent'),
+          matching: find.text('Alpha project'),
+        ),
+        findsOneWidget,
+      );
+      await t.enterText(_k('new-task-title'), 'In scope');
+      await t.tap(_k('new-task-add'));
+      await t.pumpAndSettle();
+      expect(
+        s.tasks.singleWhere((k) => k.summary == 'In scope').parentUid,
+        'proj',
+      );
+    });
+
+    testWidgets('priority menu rows keep capitalised words', (t) async {
+      await pumpHomeApp(t, tasks: [mkTask('t', summary: 'Fix it')]);
+      await t.tap(
+        find.descendant(of: _k('nav-card-t'), matching: find.text('Fix it')),
+        buttons: kSecondaryButton,
+      );
+      await t.pumpAndSettle();
+      await t.tap(_k('menu-priority'));
+      await t.pumpAndSettle();
+      for (final w in ['High', 'Medium', 'Low', 'No priority']) {
+        expect(find.text(w), findsOneWidget, reason: w);
+      }
+    });
+
+    testWidgets('a task that cannot complete cannot pick Done in its menu', (
+      t,
+    ) async {
+      final s = await pumpHomeApp(
+        t,
+        tasks: [mkTask('p', summary: 'Parent', rrule: 'FREQ=DAILY', days: 0)],
+      );
+      expect(s.taskCompletionBlockerFor('p'), isNotNull);
+      await t.tap(
+        find.descendant(of: _k('nav-card-p'), matching: find.text('Parent')),
+        buttons: kSecondaryButton,
+      );
+      await t.pumpAndSettle();
+      await t.tap(_k('menu-task-status'));
+      await t.pumpAndSettle();
+      expect(_k('menu-task-status-doing'), findsOneWidget);
+      expect(_k('menu-task-status-done'), findsNothing);
     });
   });
 

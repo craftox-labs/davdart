@@ -3262,6 +3262,10 @@ class AppState extends ChangeNotifier {
 
   /// [parentUid] when it exists, else the open scope folder (new items go
   /// under the scope, so a project's items stay in the project).
+  /// Where a new item with [parentUid] is saved: that item, else the open
+  /// project or folder scope, else the top level.
+  String? parentOrScope(String? parentUid) => _parentOrScope(parentUid);
+
   String? _parentOrScope(String? parentUid) {
     if (parentUid != null && findItem(parentUid) != null) return parentUid;
     if (parentUid == null && scopeUid != null) {

@@ -50,16 +50,16 @@ abstract final class Props {
 
 /// The task board statuses as (board word, shown word).
 const statusWords = [
-  ('backlog', 'backlog'),
-  ('todo', 'needs-action'),
-  ('doing', 'in-process'),
-  ('blocked', 'blocked'),
-  ('review', 'review'),
-  ('done', 'completed'),
-  ('canceled', 'canceled'),
+  ('backlog', 'Backlog'),
+  ('todo', 'To do'),
+  ('doing', 'Doing'),
+  ('blocked', 'Blocked'),
+  ('review', 'Review'),
+  ('done', 'Done'),
+  ('canceled', 'Canceled'),
 ];
 
-/// The word a board status shows ('in-process' for `doing`, ...).
+/// The label a board status shows everywhere ('Doing' for `doing`, ...).
 String statusWordOf(String? status) => statusWords
     .firstWhere(
       (e) => e.$1 == status,
@@ -76,6 +76,11 @@ String priorityBucket(int? p) => p == null || p <= 0
     : p == 5
     ? 'medium'
     : 'low';
+
+/// The label a priority bucket shows ('High'); stored words stay lowercase.
+String priorityText(String bucket) => bucket == 'none'
+    ? Props.noPriority
+    : bucket[0].toUpperCase() + bucket.substring(1);
 
 int? priorityOfBucket(String? b) => switch (b) {
   'high' => 1,
@@ -99,7 +104,7 @@ List<PickerOption<String>> noteStatusOptions() => [
 /// picker's value type by [valueOf]; "none" is the picker's clear row.
 List<PickerOption<T>> priorityOptions<T>(T Function(String bucket) valueOf) => [
   for (final b in const ['high', 'medium', 'low'])
-    PickerOption(valueOf(b), b, icon: Props.priority.icon),
+    PickerOption(valueOf(b), priorityText(b), icon: Props.priority.icon),
 ];
 
 /// The event status choices: none, confirmed, tentative, cancelled.
