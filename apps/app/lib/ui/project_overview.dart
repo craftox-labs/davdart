@@ -9,6 +9,7 @@ import '../theme/tokens.dart';
 import 'calendar_view.dart';
 import 'events_panel.dart';
 import 'home_board.dart';
+import 'markdown_lite.dart';
 import 'overflow_tip.dart';
 import 'placeholder_card.dart';
 import 'section_registry.dart' show projectViews;
@@ -16,7 +17,10 @@ import 'sections.dart' show NotesSection;
 import 'segmented.dart';
 import 'empty_state.dart';
 import 'card_box.dart';
+import 'note_inline.dart';
+import 'property/property_row.dart';
 import 'section_card.dart';
+import 'section_label.dart';
 import 'count_badge.dart';
 import 'theme.dart';
 
@@ -154,11 +158,7 @@ class _OverviewTab extends StatelessWidget {
     final notes = state.notesInScope;
     final allTasks = state.scopedTasks;
     final events = state.scopedEvents;
-    final about = const PlaceholderCard(
-      name: 'project-about',
-      title: 'About',
-      willBe: 'Description, edited in place.',
-    );
+    final about = _About(state: state, uid: state.scopeUid);
     final progress = _Progress(counts: counts);
     final comingUp = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -168,7 +168,7 @@ class _OverviewTab extends StatelessWidget {
         _Upcoming(state: state, tasks: open, events: events, now: clock),
       ],
     );
-    final details = _Details(counts: counts);
+    final details = _Details(state: state, uid: state.scopeUid, counts: counts);
     const milestones = PlaceholderCard(
       name: 'project-milestones',
       title: 'Milestones',
@@ -348,10 +348,57 @@ class _Progress extends StatelessWidget {
   }
 }
 
-/// The project fields that come later: Status shows a derived word, the rest
-/// are marked placeholders.
+/// The project's About: the note's own text, edited in place.
+class _About extends StatelessWidget {
+  const _About({required this.state, required this.uid});
+  final AppState state;
+  final String? uid;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    final id = uid;
+    if (id == null) return const SizedBox.shrink();
+    return CardBox(
+      key: const Key('project-about'),
+      width: double.infinity,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: t.space.sm,
+        children: [
+          SectionLabel('About'),
+          if (!state.editable)
+            Text(
+              noteInlineValue(state, id),
+              key: const Key('project-about-text'),
+              style: t.type.bodyStyle,
+            )
+          else
+            NoteInlineText(
+              key: const Key('edit-project-about'),
+              state: state,
+              uid: id,
+              multiline: true,
+              placeholder: 'Describe the project…',
+              textKey: const Key('project-about-text'),
+              preview: MarkdownLite.new,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// The project's details: Status is derived from its tasks, and the rest are
+/// header fields of the project note, edited in place.
 class _Details extends StatelessWidget {
-  const _Details({required this.counts});
+  const _Details({
+    required this.state,
+    required this.uid,
+    required this.counts,
+  });
+  final AppState state;
+  final String? uid;
   final ({
     int total,
     int done,
@@ -360,6 +407,9 @@ class _Details extends StatelessWidget {
     Map<String, int> byStatus,
   })?
   counts;
+
+  /// The note fields the rows edit, in row order.
+  static const fields = ['lead', 'team', 'start', 'due', 'members'];
 
   @override
   Widget build(BuildContext context) {
@@ -373,38 +423,52 @@ class _Details extends StatelessWidget {
         : done == 0
         ? 'Not started'
         : 'In progress';
-    final muted = t.type.captionStyle.copyWith(color: t.muted);
-    Widget row(String id, String label, String value, {bool derived = false}) =>
-        Padding(
-          padding: EdgeInsets.symmetric(vertical: t.space.xxs),
-          child: Row(
-            children: [
-              SizedBox(
-                width: t.sizes.statLabel,
-                child: Text(label, style: muted),
-              ),
-              Expanded(
-                child: Text(
-                  value,
-                  key: Key('proj-detail-$id'),
-                  style: derived
-                      ? t.type.bodyStyle
-                      : t.type.captionStyle.copyWith(color: t.muted),
-                ),
-              ),
-            ],
-          ),
-        );
+    final id = uid;
+    Widget row(String key, String label, Widget value) => PropertyRow(
+      key: Key('proj-detail-row-$key'),
+      icon: switch (key) {
+        'status' => FLucideIcons.circleDot,
+        'lead' => FLucideIcons.circleUser,
+        'team' => FLucideIcons.command,
+        'start' => FLucideIcons.calendar,
+        'due' => FLucideIcons.calendarCheck,
+        _ => FLucideIcons.fileText,
+      },
+      label: label,
+      value: value,
+    );
     return SectionCard(
       key: const Key('proj-details'),
       title: 'Details',
       children: [
-        row('status', 'Status', status, derived: true),
-        row('lead', 'Lead', 'Placeholder'),
-        row('team', 'Team', 'Placeholder'),
-        row('start', 'Start', 'Placeholder'),
-        row('due', 'Due', 'Placeholder'),
-        row('members', 'Members', 'Placeholder'),
+        row(
+          'status',
+          'Status',
+          Text(
+            status,
+            key: const Key('proj-detail-status'),
+            style: t.type.bodyStyle,
+          ),
+        ),
+        for (final f in fields)
+          row(
+            f,
+            '${f[0].toUpperCase()}${f.substring(1)}',
+            id == null || !state.editable
+                ? Text(
+                    noteInlineValue(state, id ?? '', field: f),
+                    key: Key('proj-detail-$f'),
+                    style: t.type.bodyStyle,
+                  )
+                : NoteInlineText(
+                    key: Key('edit-proj-detail-$f'),
+                    state: state,
+                    uid: id,
+                    field: f,
+                    placeholder: '—',
+                    textKey: Key('proj-detail-$f'),
+                  ),
+          ),
       ],
     );
   }

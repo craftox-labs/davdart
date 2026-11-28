@@ -2600,6 +2600,32 @@ class AppState extends ChangeNotifier {
     await _save(p.apply());
   }
 
+  /// Sets the note body text of [uid] (its header fields stay), for the inline
+  /// text of a project's About.
+  Future<bool> setNoteText(String uid, String text) async {
+    final n = tree.find(uid)?.note;
+    if (n == null || !editable) return false;
+    await updateNote(uid, text: text);
+    return true;
+  }
+
+  /// Sets (or, with an empty [value], removes) the header field [key] of note
+  /// [uid]: the project details (lead, team, start, due, members).
+  Future<bool> setNoteField(String uid, String key, String? value) async {
+    final n = tree.find(uid)?.note;
+    if (n == null || !editable) return false;
+    final copy = n.copyWith();
+    final p = PlanItem.fromNote(copy);
+    final v = value?.trim() ?? '';
+    if (v.isEmpty) {
+      p.fields.remove(key);
+    } else {
+      p.setField(key, v);
+    }
+    await _save(p.apply());
+    return true;
+  }
+
   /// Moves note [uid] under [parentUid] (null: the top level). Returns false,
   /// changing nothing, when the Space is read-only, the note is already
   /// there, or the move would put it inside itself or one of its descendants.
@@ -3019,6 +3045,28 @@ class AppState extends ChangeNotifier {
 
   /// The user-facing tags of [n] (no `status-`/`kind-` markers).
   List<String> noteTagsOf(Note n) => _plainTags(n.categories);
+
+  /// Sets a note's labels, with Undo (the board card's labels picker).
+  Future<bool> updateNoteTags(String uid, List<String> tags) async {
+    final n = tree.find(uid)?.note;
+    if (n == null || !editable) return false;
+    final before = _plainTags(n.categories);
+    await updateNote(uid, tags: tags);
+    if (error != null) return false;
+    if (!listEquals(before, _plainTags(tags))) {
+      _postUndo(
+        'Labels of "${n.summary}" changed',
+        () => _restoreNoteTags(uid, before),
+      );
+    }
+    return true;
+  }
+
+  Future<void> _restoreNoteTags(String uid, List<String> tags) async {
+    final n = tree.find(uid)?.note;
+    if (n == null) return;
+    await updateNote(uid, tags: tags);
+  }
 
   /// Title of the nearest folder above item [uid], or null at the top level.
   String? folderNameOf(String uid) {
