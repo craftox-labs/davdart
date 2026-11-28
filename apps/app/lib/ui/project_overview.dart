@@ -18,6 +18,7 @@ import 'segmented.dart';
 import 'empty_state.dart';
 import 'card_box.dart';
 import 'note_inline.dart';
+import 'property/property_defs.dart';
 import 'property/property_row.dart';
 import 'section_card.dart';
 import 'section_label.dart';
@@ -454,11 +455,11 @@ class _Details extends StatelessWidget {
     Widget row(String key, String label, Widget value) => PropertyRow(
       key: Key('proj-detail-row-$key'),
       icon: switch (key) {
-        'status' => FLucideIcons.circleDot,
+        'status' => Props.status.icon,
         'lead' => FLucideIcons.circleUser,
         'team' => FLucideIcons.command,
-        'start' => FLucideIcons.calendar,
-        'due' => FLucideIcons.calendarCheck,
+        'start' => Props.start.icon,
+        'due' => Props.due.icon,
         _ => FLucideIcons.fileText,
       },
       label: label,

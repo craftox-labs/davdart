@@ -15,6 +15,7 @@ import 'card_box.dart';
 import 'property/inline_text.dart';
 import 'property/option_picker.dart';
 import 'property/parent_property_picker.dart';
+import 'property/property_defs.dart';
 import 'property/property_picker.dart';
 import 'property/property_row.dart';
 import 'property/tag_property_picker.dart';
@@ -119,14 +120,14 @@ class DetailView extends StatelessWidget {
       if (!folder)
         if (edit)
           PropertyPicker<String>(
-            id: 'status',
+            id: Props.status.id,
             uid: uid,
             state: state,
-            icon: FLucideIcons.circleDot,
-            label: 'status',
+            icon: Props.status.icon,
+            label: Props.status.label,
             value: statusValue,
             picker: (context, control, apply) => OptionPicker<String>(
-              id: 'status',
+              id: Props.status.id,
               value: status,
               clearable: true,
               clearLabel: 'none',
@@ -134,10 +135,7 @@ class DetailView extends StatelessWidget {
                 control.hide();
                 apply(v);
               },
-              options: [
-                for (final s in boardOrder)
-                  PickerOption(s, statusWordOf(s), dot: s),
-              ],
+              options: noteStatusOptions(),
             ),
             onPick: (v) async {
               await state.setStatus(uid, v);
@@ -147,34 +145,30 @@ class DetailView extends StatelessWidget {
         else
           PropertyRow(
             key: const Key('property-status'),
-            icon: FLucideIcons.circleDot,
-            label: 'status',
+            icon: Props.status.icon,
+            label: Props.status.label,
             value: statusValue,
             readOnly: true,
           ),
       if (!folder)
         if (edit)
           PropertyPicker<String>(
-            id: 'priority',
+            id: Props.priority.id,
             uid: uid,
             state: state,
-            icon: FLucideIcons.flag,
-            label: 'priority',
+            icon: Props.priority.icon,
+            label: Props.priority.label,
             text: priority,
             picker: (context, control, apply) => OptionPicker<String>(
-              id: 'priority',
+              id: Props.priority.id,
               value: priority,
               clearable: true,
-              clearLabel: 'No priority',
+              clearLabel: Props.noPriority,
               onPick: (v) {
                 control.hide();
                 apply(v);
               },
-              options: const [
-                PickerOption('high', 'high', icon: FLucideIcons.flag),
-                PickerOption('medium', 'medium', icon: FLucideIcons.flag),
-                PickerOption('low', 'low', icon: FLucideIcons.flag),
-              ],
+              options: priorityOptions<String>((b) => b),
             ),
             onPick: (v) async {
               await state.setNotePriority(uid, v);
@@ -184,21 +178,21 @@ class DetailView extends StatelessWidget {
         else
           PropertyRow(
             key: const Key('property-priority'),
-            icon: FLucideIcons.flag,
-            label: 'priority',
+            icon: Props.priority.icon,
+            label: Props.priority.label,
             text: priority,
             readOnly: true,
           ),
       if (edit)
         PropertyPicker<List<String>>(
-          id: 'tags',
+          id: Props.labels.id,
           uid: uid,
           state: state,
-          icon: FLucideIcons.tag,
-          label: 'labels',
+          icon: Props.labels.icon,
+          label: Props.labels.label,
           text: tags.isEmpty ? null : tags.join(', '),
           picker: (context, control, apply) => TagPropertyPicker(
-            id: 'tags',
+            id: Props.labels.id,
             value: tags,
             suggestions: tagSuggestions,
             onPick: (next) => apply(next),
@@ -208,21 +202,21 @@ class DetailView extends StatelessWidget {
       else
         PropertyRow(
           key: const Key('property-tags'),
-          icon: FLucideIcons.tag,
-          label: 'labels',
+          icon: Props.labels.icon,
+          label: Props.labels.label,
           text: tags.isEmpty ? null : tags.join(', '),
           readOnly: true,
         ),
       if (edit && state.projectsByRecent.isNotEmpty)
         PropertyPicker<String>(
-          id: 'parent',
+          id: Props.parent.id,
           uid: uid,
           state: state,
-          icon: FLucideIcons.folderKanban,
-          label: 'belongs to',
+          icon: Props.parent.icon,
+          label: Props.parent.label,
           text: state.belongsToOf(uid),
           picker: (context, control, apply) => ParentPropertyPicker(
-            id: 'parent',
+            id: Props.parent.id,
             state: state,
             uid: uid,
             onPick: (v) {
@@ -235,8 +229,8 @@ class DetailView extends StatelessWidget {
       else
         PropertyRow(
           key: const Key('property-parent'),
-          icon: FLucideIcons.folderKanban,
-          label: 'belongs to',
+          icon: Props.parent.icon,
+          label: Props.parent.label,
           text: state.belongsToOf(uid),
           readOnly: true,
         ),

@@ -17,6 +17,7 @@ import 'property/inline_text.dart';
 import 'property/option_picker.dart';
 import 'property/parent_property_picker.dart'
     show ParentPropertyPicker, projectRowValue;
+import 'property/property_defs.dart';
 import 'property/property_picker.dart';
 import 'property/property_row.dart';
 import 'property/property_trigger.dart' show PropertyPopoverGroup;
@@ -163,32 +164,20 @@ class EventDetail extends StatelessWidget {
       ),
       if (edit)
         PropertyPicker<String>(
-          id: 'status',
+          id: Props.status.id,
           uid: uid,
           state: state,
-          icon: FLucideIcons.circleDot,
-          label: 'status',
+          icon: Props.status.icon,
+          label: Props.status.label,
           value: statusValue,
           picker: (context, control, apply) => OptionPicker<String>(
-            id: 'status',
+            id: Props.status.id,
             value: status ?? '',
             onPick: (v) {
               control.hide();
               apply(v);
             },
-            options: [
-              for (final (word, label) in eventStatusWords)
-                PickerOption(
-                  word,
-                  label,
-                  icon: switch (word) {
-                    'CONFIRMED' => FLucideIcons.circleCheck,
-                    'TENTATIVE' => FLucideIcons.circleDot,
-                    'CANCELLED' => FLucideIcons.x,
-                    _ => FLucideIcons.circle,
-                  },
-                ),
-            ],
+            options: eventStatusOptions(),
           ),
           onPick: (v) =>
               state.setEventStatus(uid, v == null || v.isEmpty ? null : v),
@@ -196,21 +185,21 @@ class EventDetail extends StatelessWidget {
       else
         PropertyRow(
           key: const Key('property-status'),
-          icon: FLucideIcons.circleDot,
-          label: 'status',
+          icon: Props.status.icon,
+          label: Props.status.label,
           value: statusValue,
           readOnly: true,
         ),
       if (edit)
         PropertyPicker<List<String>>(
-          id: 'tags',
+          id: Props.labels.id,
           uid: uid,
           state: state,
-          icon: FLucideIcons.tag,
-          label: 'labels',
+          icon: Props.labels.icon,
+          label: Props.labels.label,
           text: tags.isEmpty ? null : tags.join(', '),
           picker: (context, control, apply) => TagPropertyPicker(
-            id: 'tags',
+            id: Props.labels.id,
             value: tags,
             suggestions: state.eventTags,
             onPick: apply,
@@ -220,21 +209,21 @@ class EventDetail extends StatelessWidget {
       else
         PropertyRow(
           key: const Key('property-tags'),
-          icon: FLucideIcons.tag,
-          label: 'labels',
+          icon: Props.labels.icon,
+          label: Props.labels.label,
           text: tags.isEmpty ? null : tags.join(', '),
           readOnly: true,
         ),
       if (edit && state.projectsByRecent.isNotEmpty)
         PropertyPicker<String>(
-          id: 'parent',
+          id: Props.parent.id,
           uid: uid,
           state: state,
-          icon: FLucideIcons.folderKanban,
-          label: 'belongs to',
+          icon: Props.parent.icon,
+          label: Props.parent.label,
           text: projectRowValue(state, uid),
           picker: (context, control, apply) => ParentPropertyPicker(
-            id: 'parent',
+            id: Props.parent.id,
             state: state,
             uid: uid,
             onPick: (v) {
@@ -247,8 +236,8 @@ class EventDetail extends StatelessWidget {
       else
         PropertyRow(
           key: const Key('property-parent'),
-          icon: FLucideIcons.folderKanban,
-          label: 'belongs to',
+          icon: Props.parent.icon,
+          label: Props.parent.label,
           text: projectRowValue(state, uid),
           readOnly: true,
         ),
