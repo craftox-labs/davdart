@@ -135,12 +135,12 @@ class EventsPanel extends StatelessWidget {
                 // The individual's own loose items, the seam Home's grid
                 // draws from (see AppState.isMine).
                 events: [
-                  for (final e in state.filteredPersonalEvents)
-                    if (state.isMine(e)) e,
+                  for (final e in state.events)
+                    if (!state.inProjectsLayer(e.uid) && state.isMine(e)) e,
                 ],
                 tasks: [
-                  for (final k in state.filteredPersonalTasks)
-                    if (state.isMine(k)) k,
+                  for (final k in state.tasks)
+                    if (!state.inProjectsLayer(k.uid) && state.isMine(k)) k,
                 ],
                 from: homeDay,
                 to: homeDay.add(const Duration(days: 1)),

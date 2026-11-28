@@ -272,6 +272,28 @@ void main() {
     expect(_k('events-today-toggle'), findsOneWidget);
   });
 
+  testWidgets('the pinned day ignores the Calendar panel tag filter', (
+    t,
+  ) async {
+    final day = _otherDay();
+    final off = day.difference(wallDay(wallNow(DateTime.now()))).inDays;
+    final s = await pumpTasksApp(
+      t,
+      events: [
+        mkEvent('te', summary: 'Tagged', days: off, tags: ['x']),
+        mkEvent('ue', summary: 'Other', days: 0, tags: ['y']),
+      ],
+    );
+    s.setHomeView(HomeView.calendar);
+    s.setSection(Section.events);
+    s.eventTagFilter = 'y';
+    await t.pumpAndSettle();
+    await t.tap(_k(_dayKey(day)));
+    await t.pumpAndSettle();
+    // The grid draws the day's event, so the panel must list it too.
+    expect(_k('calendar-day-pin-empty'), findsNothing);
+  });
+
   testWidgets('a picked day shuts the agenda, transiently', (t) async {
     final storage = MemoryStorage();
     final s = await pumpTasksApp(
