@@ -450,6 +450,33 @@ void main() {
     expect(find.text('Artist visit'), findsOneWidget);
   });
 
+  testWidgets('a press on a bar opens the event and picks the day pressed', (
+    t,
+  ) async {
+    final s = await _state(
+      t,
+      events: [
+        Event(
+          uid: 'visit',
+          summary: 'Artist visit',
+          dtstart: ICalDate.date(2026, 11, 20),
+          dtend: ICalDate.date(2026, 11, 23),
+        ),
+      ],
+    );
+    await _pump(t, s);
+    final bar = _k('calendar-bar-visit@2026-11-20-2026-11-16');
+    expect(bar, findsOneWidget);
+    // The bar spans the 20th to the 22nd: a press over the 21st picks that
+    // day, not the one the bar starts on, and opens the event.
+    final x = t.getCenter(_k('calendar-day-2026-11-21')).dx;
+    await t.tapAt(Offset(x, t.getCenter(bar).dy));
+    await t.pumpAndSettle();
+    expect(s.homeDay, DateTime.utc(2026, 11, 21));
+    expect(s.peekUid, 'visit');
+    expect(s.section, Section.events);
+  });
+
   testWidgets('overlapping visits stack on separate lanes', (t) async {
     Event visit(String uid, String title, int from, int to) => Event(
       uid: uid,

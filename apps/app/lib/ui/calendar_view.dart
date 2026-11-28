@@ -212,6 +212,7 @@ class _CalendarViewState extends State<CalendarView> {
             start: first.isBefore(from) ? from : first,
             end: end.isAfter(last) ? last : end,
             title: o.summary.isEmpty ? '(no title)' : o.summary,
+            uid: e.uid,
             sortKey: '${e.uid}@${_id(first)}',
           ),
         );
@@ -237,6 +238,13 @@ class _CalendarViewState extends State<CalendarView> {
       state.setHomeDay(day);
     }
     setState(() => _month = _monthOf(day));
+  }
+
+  /// A press on a multi-day bar: picks [day] (the one under the pointer) and
+  /// opens [uid], as pressing a chip's day and its row does.
+  void _openBar(DateTime day, String uid) {
+    _select(day, openPanel: true);
+    state.clickEvent(uid);
   }
 
   /// Shows [month] and keeps the selection inside it: today when the month
@@ -531,6 +539,8 @@ class _CalendarViewState extends State<CalendarView> {
               t,
               s,
               key: Key('calendar-bar-${s.span.sortKey}-$weekId'),
+              g: g,
+              weekStart: weekStart,
             ),
           ),
         if (row.hidden > 0)
@@ -550,42 +560,63 @@ class _CalendarViewState extends State<CalendarView> {
 
   /// One row segment of a multi-day bar: the event tone's tint, the tone bar
   /// at the span's real start and the title at the segment's start, rounded
-  /// only at the span's real ends. It takes no taps itself, so a press lands
-  /// on the day under it and selects it, as pressing a chip does.
-  Widget _bar(Tokens t, LaneSegment s, {required Key key}) {
+  /// only at the span's real ends.
+  ///
+  /// A press opens the event and picks the day under the pointer: the bar
+  /// covers several cells, so its own column decides which day that is (the
+  /// listener reads the press before the tap fires). A drag that starts on a
+  /// bar still drags a range across the grid: it never reaches the tap.
+  Widget _bar(
+    Tokens t,
+    LaneSegment s, {
+    required Key key,
+    required LaneGeometry g,
+    required DateTime weekStart,
+  }) {
+    var day = weekStart.add(Duration(days: s.firstCol));
     final radius = Radius.circular(t.radii.small);
-    return IgnorePointer(
+    return FTappable(
       key: key,
-      child: ClipRRect(
-        borderRadius: BorderRadius.horizontal(
-          left: s.startsSpan ? radius : Radius.zero,
-          right: s.endsSpan ? radius : Radius.zero,
-        ),
-        child: ColoredBox(
-          color: t.eventTint,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (s.startsSpan)
-                SizedBox(
-                  width: t.sizes.calendarChipBar,
-                  child: ColoredBox(color: t.accent),
-                ),
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: t.space.xxs),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      s.span.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: t.type.microStyle.copyWith(color: t.fg),
+      behavior: HitTestBehavior.opaque,
+      semanticsLabel: s.span.title,
+      onPress: () => _openBar(day, s.span.uid),
+      child: Listener(
+        onPointerDown: (e) {
+          final x = g.rectOf(s).left + e.localPosition.dx;
+          final col = (x / g.cellWidth).floor().clamp(s.firstCol, s.lastCol);
+          day = weekStart.add(Duration(days: col));
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.horizontal(
+            left: s.startsSpan ? radius : Radius.zero,
+            right: s.endsSpan ? radius : Radius.zero,
+          ),
+          child: ColoredBox(
+            color: t.eventTint,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (s.startsSpan)
+                  SizedBox(
+                    width: t.sizes.calendarChipBar,
+                    child: ColoredBox(color: t.accent),
+                  ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: t.space.xxs),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        s.span.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.type.microStyle.copyWith(color: t.fg),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
