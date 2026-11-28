@@ -475,6 +475,7 @@ class PropertyTokens {
     this.debounce = const Duration(milliseconds: 800),
     this.popoverMinWidth = 360,
     this.popoverMaxWidth = 420,
+    this.dialogWidth = 360,
     this.sheetMaxRatio = 0.8,
     this.pickerPadding = 4,
     this.pickerRowHeight = 44,
@@ -518,6 +519,9 @@ class PropertyTokens {
 
   /// Width range of a picker popover on the wide layout.
   final double popoverMinWidth, popoverMaxWidth;
+
+  /// Width of the dialogs that host a shared property picker (Set due, Move).
+  final double dialogWidth;
 
   /// Tallest a picker sheet gets on the narrow layout, as a share of the
   /// screen height (0 to 1).

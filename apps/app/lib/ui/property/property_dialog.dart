@@ -31,7 +31,7 @@ Future<void> _showParentPickerDialog(
 ) => showAppDialog(
   context,
   title: Props.moveLabel,
-  width: tokensOf(context).sizes.dialogSm,
+  width: tokensOf(context).property.dialogWidth,
   content: Builder(
     builder: (ctx) => ParentPropertyPicker(
       id: 'move',
@@ -64,7 +64,7 @@ Future<void> showDateDialog(
 }) => showAppDialog(
   context,
   title: def.setLabel,
-  width: tokensOf(context).sizes.dialogSm,
+  width: tokensOf(context).property.dialogWidth,
   content: Builder(
     builder: (ctx) => DatePropertyPicker(
       id: def.id,
