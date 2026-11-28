@@ -7,10 +7,10 @@ import 'parts.dart';
 import 'popover_track.dart';
 import 'property/date_property_picker.dart';
 import 'property/option_picker.dart';
+import 'property/property_defs.dart';
 import 'property/property_trigger.dart' show PropertyPopoverGroup;
 import 'property/tag_property_picker.dart';
 import 'section_label.dart';
-import 'task_detail.dart' show priorityBucket, priorityOfBucket;
 import 'task_parts.dart' show dueDate, dueOfDay;
 import 'theme.dart';
 
@@ -80,17 +80,19 @@ class _CardPropertiesState extends State<CardProperties>
           groupId: _group,
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minWidth: t.sizes.dialogSm,
-              maxWidth: t.sizes.dialog,
+              minWidth: t.property.popoverMinWidth,
+              maxWidth: t.property.popoverMaxWidth,
             ),
             child: SingleChildScrollView(
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: t.space.sm),
+                padding: EdgeInsets.symmetric(
+                  vertical: t.property.cardPopoverPadding,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _label(context, 'Status'),
+                    _label(context, Props.status.label),
                     OptionPicker<String>(
                       id: 'card-status',
                       value: status,
@@ -104,25 +106,25 @@ class _CardPropertiesState extends State<CardProperties>
                         );
                       },
                       options: [
-                        for (final word in boardOrder)
+                        for (final o in noteStatusOptions())
                           PickerOption(
-                            word,
-                            word,
-                            dot: word,
+                            o.value,
+                            o.label,
+                            dot: o.dot,
                             enabled:
-                                !(word == 'done' &&
+                                !(o.value == 'done' &&
                                     task != null &&
                                     _state.taskCompletionBlockerFor(task.uid) !=
                                         null),
                           ),
                       ],
                     ),
-                    _label(context, 'Priority'),
+                    _label(context, Props.priority.label),
                     OptionPicker<String>(
                       id: 'card-priority',
                       value: priority,
                       clearable: true,
-                      clearLabel: 'No priority',
+                      clearLabel: Props.noPriority,
                       onPick: (v) {
                         if (v == null) {
                           _apply(
@@ -148,14 +150,10 @@ class _CardPropertiesState extends State<CardProperties>
                                 ),
                         );
                       },
-                      options: const [
-                        PickerOption('high', 'high'),
-                        PickerOption('medium', 'medium'),
-                        PickerOption('low', 'low'),
-                      ],
+                      options: priorityOptions<String>((b) => b),
                     ),
                     if (task != null) ...[
-                      _label(context, 'Due'),
+                      _label(context, Props.due.label),
                       DatePropertyPicker(
                         id: 'card-due',
                         value: dueDate(task),
@@ -168,7 +166,7 @@ class _CardPropertiesState extends State<CardProperties>
                         ),
                       ),
                     ],
-                    _label(context, 'Labels'),
+                    _label(context, Props.labels.label),
                     TagPropertyPicker(
                       id: 'card-labels',
                       value: tags,
@@ -208,13 +206,16 @@ class _CardPropertiesState extends State<CardProperties>
     );
   }
 
-  Widget _label(BuildContext context, String text) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      tokensOf(context).space.lg,
-      tokensOf(context).space.sm,
-      tokensOf(context).space.lg,
-      tokensOf(context).space.xxs,
-    ),
-    child: SectionLabel(text),
-  );
+  Widget _label(BuildContext context, String text) {
+    final p = tokensOf(context).property;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        p.cardLabelSide,
+        p.cardLabelTop,
+        p.cardLabelSide,
+        p.cardLabelBottom,
+      ),
+      child: SectionLabel(text),
+    );
+  }
 }

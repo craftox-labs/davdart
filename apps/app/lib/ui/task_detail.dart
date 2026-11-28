@@ -18,6 +18,7 @@ import 'property/inline_text.dart';
 import 'property/option_picker.dart';
 import 'property/parent_property_picker.dart'
     show ParentPropertyPicker, projectRowValue;
+import 'property/property_defs.dart';
 import 'property/property_picker.dart';
 import 'property/property_row.dart';
 import 'section_label.dart';
@@ -26,40 +27,8 @@ import 'task_menu.dart';
 import 'task_parts.dart';
 import 'theme.dart';
 
-const _statusWords = [
-  ('backlog', 'backlog'),
-  ('todo', 'needs-action'),
-  ('doing', 'in-process'),
-  ('blocked', 'blocked'),
-  ('review', 'review'),
-  ('done', 'completed'),
-  ('canceled', 'canceled'),
-];
-
-/// The word a board status shows ('in-process' for `doing`, ...).
-String statusWordOf(String? status) => _statusWords
-    .firstWhere(
-      (e) => e.$1 == status,
-      orElse: () => (status ?? '', status ?? ''),
-    )
-    .$2;
-
-/// Priority as the three buckets the pickers offer (RFC 5545: 1-4 high,
-/// 5 medium, 6-9 low, 0 or none).
-String priorityBucket(int? p) => p == null || p <= 0
-    ? 'none'
-    : p <= 4
-    ? 'high'
-    : p == 5
-    ? 'medium'
-    : 'low';
-
-int? priorityOfBucket(String? b) => switch (b) {
-  'high' => 1,
-  'medium' => 5,
-  'low' => 9,
-  _ => null,
-};
+export 'property/property_defs.dart'
+    show statusWordOf, priorityBucket, priorityOfBucket;
 
 /// The tasks directly under note or task [parentUid]: rows plus a quick add.
 /// Shown in a task's page, and in a note's page once it has tasks.
@@ -190,28 +159,20 @@ class TaskDetail extends StatelessWidget {
     final rows = <Widget>[
       if (edit)
         PropertyPicker<String>(
-          id: 'status',
+          id: Props.status.id,
           uid: uid,
           state: state,
-          icon: FLucideIcons.circleDot,
-          label: 'status',
+          icon: Props.status.icon,
+          label: Props.status.label,
           value: statusValue,
           picker: (context, control, apply) => OptionPicker<String>(
-            id: 'status',
+            id: Props.status.id,
             value: status,
             onPick: (v) {
               control.hide();
               apply(v);
             },
-            options: [
-              for (final e in _statusWords)
-                PickerOption(
-                  e.$1,
-                  e.$2,
-                  dot: e.$1,
-                  enabled: !(e.$1 == 'done' && blocked),
-                ),
-            ],
+            options: taskStatusOptions(blocked: blocked),
           ),
           onPick: (v) =>
               v == null ? Future.value(false) : state.setTaskStatus(uid, v),
@@ -219,49 +180,45 @@ class TaskDetail extends StatelessWidget {
       else
         PropertyRow(
           key: const Key('property-status'),
-          icon: FLucideIcons.circleDot,
-          label: 'status',
+          icon: Props.status.icon,
+          label: Props.status.label,
           value: statusValue,
           readOnly: true,
         ),
       if (edit)
         PropertyPicker<int>(
-          id: 'priority',
+          id: Props.priority.id,
           uid: uid,
           state: state,
-          icon: FLucideIcons.flag,
-          label: 'priority',
+          icon: Props.priority.icon,
+          label: Props.priority.label,
           value: priorityValue,
           picker: (context, control, apply) => OptionPicker<int>(
-            id: 'priority',
+            id: Props.priority.id,
             value: priorityOfBucket(priority),
             clearable: true,
-            clearLabel: 'No priority',
+            clearLabel: Props.noPriority,
             onPick: (v) {
               control.hide();
               apply(v);
             },
-            options: const [
-              PickerOption(1, 'high', icon: FLucideIcons.flag),
-              PickerOption(5, 'medium', icon: FLucideIcons.flag),
-              PickerOption(9, 'low', icon: FLucideIcons.flag),
-            ],
+            options: priorityOptions<int>((b) => priorityOfBucket(b)!),
           ),
           onPick: (v) => state.setTaskPriority(uid, v),
         )
       else
         PropertyRow(
           key: const Key('property-priority'),
-          icon: FLucideIcons.flag,
-          label: 'priority',
+          icon: Props.priority.icon,
+          label: Props.priority.label,
           value: priorityValue,
           readOnly: true,
         ),
       _dateRow(
         context,
-        id: 'due',
-        label: 'due',
-        icon: FLucideIcons.calendar,
+        id: Props.due.id,
+        label: Props.due.label,
+        icon: Props.due.icon,
         day: task.due == null ? null : dueDate(task),
         value: dueValue,
         edit: edit,
@@ -270,9 +227,9 @@ class TaskDetail extends StatelessWidget {
       ),
       _dateRow(
         context,
-        id: 'start',
-        label: 'start',
-        icon: FLucideIcons.calendarRange,
+        id: Props.start.id,
+        label: Props.start.label,
+        icon: Props.start.icon,
         day: startDay,
         value: startValue,
         edit: edit,
@@ -283,14 +240,14 @@ class TaskDetail extends StatelessWidget {
       ),
       if (edit)
         PropertyPicker<List<String>>(
-          id: 'tags',
+          id: Props.labels.id,
           uid: uid,
           state: state,
-          icon: FLucideIcons.tag,
-          label: 'labels',
+          icon: Props.labels.icon,
+          label: Props.labels.label,
           text: tags.isEmpty ? null : tags.join(', '),
           picker: (context, control, apply) => TagPropertyPicker(
-            id: 'tags',
+            id: Props.labels.id,
             value: tags,
             suggestions: state.taskTags,
             onPick: apply,
@@ -300,21 +257,21 @@ class TaskDetail extends StatelessWidget {
       else
         PropertyRow(
           key: const Key('property-tags'),
-          icon: FLucideIcons.tag,
-          label: 'labels',
+          icon: Props.labels.icon,
+          label: Props.labels.label,
           text: tags.isEmpty ? null : tags.join(', '),
           readOnly: true,
         ),
       if (edit && state.projectsByRecent.isNotEmpty)
         PropertyPicker<String>(
-          id: 'parent',
+          id: Props.parent.id,
           uid: uid,
           state: state,
-          icon: FLucideIcons.folderKanban,
-          label: 'belongs to',
+          icon: Props.parent.icon,
+          label: Props.parent.label,
           text: projectRowValue(state, uid),
           picker: (context, control, apply) => ParentPropertyPicker(
-            id: 'parent',
+            id: Props.parent.id,
             state: state,
             uid: uid,
             onPick: (v) {
@@ -327,8 +284,8 @@ class TaskDetail extends StatelessWidget {
       else
         PropertyRow(
           key: const Key('property-parent'),
-          icon: FLucideIcons.folderKanban,
-          label: 'belongs to',
+          icon: Props.parent.icon,
+          label: Props.parent.label,
           text: projectRowValue(state, uid),
           readOnly: true,
         ),

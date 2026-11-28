@@ -106,8 +106,12 @@ class _Rule {
     this.pattern, {
     this.exempt = const {},
     this.allow = const {},
+    this.only,
     required this.bad,
   });
+
+  /// When set, only files whose path matches are scanned.
+  final RegExp? only;
 
   final String name;
   final RegExp pattern;
@@ -128,6 +132,9 @@ const _theme = 'lib/ui/theme.dart';
 
 /// A non-zero number literal (`8`, `0.5`, `.5`; not `0`).
 const _num = r'(?:[1-9]|0*\.0*[1-9])';
+
+/// The menu, dialog and property files the picker-words rule scans.
+final _pickerFiles = RegExp(r'menu|dialog|property/');
 
 final _rules = <_Rule>[
   _Rule(
@@ -256,7 +263,52 @@ final _rules = <_Rule>[
     },
     bad: 'GestureDetector(onTap: () {}),',
   ),
+  _Rule(
+    'status, priority and due pickers are built once',
+    RegExp(
+      r"'Set (?:status|priority|due)'|'No priority'|'needs-action'|"
+      r"'in-process'|PickerOption\(\s*'(?:high|medium|low|backlog|todo|doing)'|"
+      r'\bFCalendar\b',
+    ),
+    only: _pickerFiles,
+    exempt: {
+      'lib/ui/property/property_defs.dart',
+      'lib/ui/property/date_property_picker.dart',
+    },
+    bad: "NoteMenuItem('Set status', FLucideIcons.circleDot, () {}),",
+  ),
+  _Rule(
+    'menus take property strings only from the shared menu helpers',
+    RegExp(r'''\.setLabel\b|'Set \$|"Set \$'''),
+    exempt: {
+      'lib/ui/property/property_defs.dart',
+      'lib/ui/property/property_menu.dart',
+      'lib/ui/property/property_dialog.dart',
+    },
+    bad: 'NoteMenuItem(Props.due.setLabel, Props.due.icon, () {}),',
+  ),
 ];
+
+/// The property widgets, the board card's properties popover and the parent
+/// crumb: their look comes from the named groups [PropertyTokens] and
+/// [CalendarAddTokens] (`t.property`, `t.calendarAdd`), not from the shared
+/// scales or from literals, so a designer tunes them in one place.
+bool _isPropertyFile(String path) =>
+    path.startsWith('lib/ui/property/') ||
+    path == 'lib/ui/card_properties.dart';
+
+/// Source of the [ParentCrumb] widget alone (it lives in parts.dart).
+String _crumbSource() {
+  final src = _literal(File('lib/ui/parts.dart'));
+  final start = src.indexOf('class ParentCrumb');
+  final end = src.indexOf('Widget parentCrumb(');
+  return src.substring(start, end);
+}
+
+final _scaleRead = RegExp(
+  r'\b(?:t|tokens|tokensOf\(context\))\.(?:space|sizes|radii|icons|borders)\.|'
+  r'Duration\(|mainAxisMaxRatio:\s*[0-9.]',
+);
 
 /// Private widgets that repeat a shared piece were removed; these are the
 /// last ones left. Each must still exist (a removed copy must leave the list)
@@ -316,6 +368,7 @@ List<String> _insetBreaches(String path, String src) => [
 Map<String, List<int>> _breaches(_Rule rule) {
   final found = <String, List<int>>{};
   for (final f in _uiFiles()) {
+    if (rule.only != null && !rule.only!.hasMatch(f.path)) continue;
     final src = _literal(f);
     for (final m in rule.pattern.allMatches(src)) {
       (found[f.path] ??= []).add(_line(src, m.start));
@@ -410,6 +463,47 @@ void main() {
         found.addAll(_insetBreaches(f.path, _literal(f)));
       }
       expect(found, isEmpty, reason: 'use tokensOf(context).space: $found');
+    });
+
+    test('property widgets take their look from the property tokens', () {
+      final found = <String>[];
+      for (final f in _uiFiles()) {
+        if (!_isPropertyFile(f.path)) continue;
+        for (final m in _scaleRead.allMatches(_literal(f))) {
+          found.add('${f.path}: ${m.group(0)}');
+        }
+      }
+      for (final m in _scaleRead.allMatches(
+        // The page width cap is the page's, not the crumb's.
+        _crumbSource().replaceAll('t.sizes.pageMax', ''),
+      )) {
+        found.add('ParentCrumb: ${m.group(0)}');
+      }
+      expect(found, isEmpty, reason: 'use t.property (PropertyTokens): $found');
+    });
+
+    test('the calendar day cell padding comes from the calendarAdd tokens', () {
+      final src = _literal(File('lib/ui/calendar_view.dart'));
+      expect(src, contains('t.calendarAdd.cellPadding'));
+      expect(
+        RegExp(r'Padding\(\s*padding: wide\s*\? EdgeInsets[^:]*t\.space')
+            .hasMatch(src),
+        isFalse,
+      );
+    });
+
+    test('the property-token rule catches each bad form', () {
+      for (final bad in [
+        'SizedBox(width: t.space.md)',
+        'height: t.sizes.touchTarget',
+        'size: t.icons.sm',
+        'radius: t.radii.small',
+        'Duration(milliseconds: 800)',
+        'mainAxisMaxRatio: 0.8',
+      ]) {
+        expect(_scaleRead.hasMatch(bad), isTrue, reason: bad);
+      }
+      expect(_scaleRead.hasMatch('size: t.property.labelIcon'), isFalse);
     });
 
     test('the padding rule catches each bad form', () {

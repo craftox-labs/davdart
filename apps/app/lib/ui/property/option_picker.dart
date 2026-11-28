@@ -69,21 +69,23 @@ class _PickerRowState extends State<PickerRow> {
         child: Surface(
           hovered: on && _hover,
           child: SizedBox(
-            height: t.sizes.touchTarget,
+            height: t.property.pickerRowHeight,
             child: Padding(
-              padding: EdgeInsets.symmetric(horizontal: t.space.md),
+              padding: EdgeInsets.symmetric(
+                horizontal: t.property.pickerRowPadding,
+              ),
               child: Row(
                 children: [
-                  SizedBox(width: widget.depth * t.sizes.folderIndent),
+                  SizedBox(width: widget.depth * t.property.pickerIndent),
                   if (widget.dot != null)
                     StatusDot(widget.dot)
                   else if (widget.icon != null)
                     Icon(
                       widget.icon,
-                      size: t.icons.sm,
+                      size: t.property.pickerIcon,
                       color: widget.enabled ? t.muted : t.faint,
                     ),
-                  SizedBox(width: t.space.md),
+                  SizedBox(width: t.property.pickerRowGap),
                   Expanded(
                     child: Text(
                       widget.label,
@@ -95,7 +97,7 @@ class _PickerRowState extends State<PickerRow> {
                     ),
                   ),
                   if (widget.hint != null) ...[
-                    SizedBox(width: t.space.sm),
+                    SizedBox(width: t.property.pickerHintGap),
                     Text(
                       widget.hint!,
                       maxLines: 1,
@@ -104,8 +106,12 @@ class _PickerRowState extends State<PickerRow> {
                     ),
                   ],
                   if (widget.selected) ...[
-                    SizedBox(width: t.space.sm),
-                    Icon(FLucideIcons.check, size: t.icons.sm, color: t.accent),
+                    SizedBox(width: t.property.pickerHintGap),
+                    Icon(
+                      FLucideIcons.check,
+                      size: t.property.pickerIcon,
+                      color: t.accent,
+                    ),
                   ],
                 ],
               ),
@@ -141,7 +147,7 @@ class OptionPicker<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     return Padding(
-      padding: EdgeInsets.all(t.space.xs),
+      padding: EdgeInsets.all(t.property.pickerPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [

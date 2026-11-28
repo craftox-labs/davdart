@@ -26,7 +26,7 @@ class InlineText extends StatefulWidget {
     required this.controller,
     required this.onCommit,
     this.multiline = false,
-    this.debounce = const Duration(milliseconds: 800),
+    this.debounce,
     this.placeholder,
     this.style,
     this.readOnly = false,
@@ -48,7 +48,7 @@ class InlineText extends StatefulWidget {
   final bool multiline;
 
   /// How long typing must pause before it commits.
-  final Duration debounce;
+  final Duration? debounce;
   final String? placeholder;
 
   /// The text style of both the value and the field.
@@ -164,7 +164,10 @@ class _InlineTextState extends State<InlineText> {
   void _edited(String text) {
     _seen = text;
     _timer?.cancel();
-    _timer = Timer(widget.debounce, () => unawaited(_commit()));
+    _timer = Timer(
+      widget.debounce ?? tokensOf(context).property.debounce,
+      () => unawaited(_commit()),
+    );
   }
 
   /// A change made around the field (a sync rebase, or a text this widget put

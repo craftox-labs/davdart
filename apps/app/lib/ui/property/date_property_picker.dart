@@ -40,7 +40,7 @@ class DatePropertyPicker extends StatelessWidget {
       onPress: () => onPick(dayFromToday(days, clock)),
     );
     return Padding(
-      padding: EdgeInsets.all(t.space.xs),
+      padding: EdgeInsets.all(t.property.pickerPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -50,17 +50,21 @@ class DatePropertyPicker extends StatelessWidget {
           for (var d = 2; d <= 8; d++)
             day(d, dayLabel(dayFromToday(d, clock), clock)),
           Container(
-            height: t.borders.hairline,
-            margin: EdgeInsets.symmetric(vertical: t.space.xs),
+            height: t.property.dividerThickness,
+            margin: EdgeInsets.symmetric(
+              vertical: t.property.pickerDividerMargin,
+            ),
             color: t.divider,
           ),
           ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: t.sizes.dialogLg),
+            constraints: BoxConstraints(
+              maxHeight: t.property.pickerListMaxHeight,
+            ),
             child: SingleChildScrollView(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: SizedBox(
-                  width: t.sizes.dialogMd,
+                  width: t.property.datePickerWidth,
                   child: FCalendar.grid(
                     key: Key('property-date-$id-calendar'),
                     selectionControl: FDateSelectionControl.managedSingle(

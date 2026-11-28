@@ -81,11 +81,11 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
             : state.tree.find(p.parentUid!)?.note.summary,
     };
     return Padding(
-      padding: EdgeInsets.all(t.space.lg),
+      padding: EdgeInsets.all(t.property.formPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: t.space.sm,
+        spacing: t.property.searchGap,
         children: [
           field(
             key: Key('property-parent-${widget.id}-search'),
@@ -95,7 +95,9 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
             onChange: (v) => setState(() => _query = v),
           ),
           ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: t.sizes.dialogLg),
+            constraints: BoxConstraints(
+              maxHeight: t.property.pickerListMaxHeight,
+            ),
             child: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -170,5 +172,10 @@ String projectValueFor(AppState state, String? parentUid) {
   if (parentUid == null) return 'Personal';
   return state.projectIndex.projectOf(parentUid)?.summary ??
       state.tree.find(parentUid)?.note.summary ??
+      switch (state.findItem(parentUid)) {
+        Task t => t.summary,
+        Event e => e.summary,
+        _ => null,
+      } ??
       'Personal';
 }

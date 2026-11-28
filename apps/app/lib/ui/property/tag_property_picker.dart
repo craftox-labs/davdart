@@ -81,18 +81,18 @@ class _TagPropertyPickerState extends State<TagPropertyPicker> {
         if (s.isNotEmpty) s,
     }.toList()..sort();
     return Padding(
-      padding: EdgeInsets.all(t.space.lg),
+      padding: EdgeInsets.all(t.property.formPadding),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: t.space.lg,
+        spacing: t.property.formGap,
         children: [
           if (all.isEmpty)
             const EmptyState('No labels yet')
           else
             Wrap(
-              spacing: t.space.sm,
-              runSpacing: t.space.sm,
+              spacing: t.property.chipGap,
+              runSpacing: t.property.chipGap,
               children: [
                 for (final tag in all)
                   FTappable(

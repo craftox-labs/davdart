@@ -327,8 +327,8 @@ class ParentCrumb extends StatelessWidget {
     final t = tokensOf(context);
     return PaneHeaderRow(
       key: const Key('parent-crumb'),
-      startPad: t.space.xxl,
-      endPad: t.space.xxl,
+      startPad: t.property.crumbInset,
+      endPad: t.property.crumbInset,
       maxContentWidth: narrowLayout(context) ? null : t.sizes.pageMax,
       children: [
         Expanded(
@@ -341,10 +341,10 @@ class ParentCrumb extends StatelessWidget {
                 children: [
                   Icon(
                     FLucideIcons.arrowUpToLine,
-                    size: t.icons.sm,
+                    size: t.property.crumbIcon,
                     color: t.muted,
                   ),
-                  SizedBox(width: t.space.xs),
+                  SizedBox(width: t.property.crumbGap),
                   Flexible(
                     child: OverflowTip(
                       label,

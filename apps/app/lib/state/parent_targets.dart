@@ -26,12 +26,14 @@ List<ParentTarget> parentTargets(AppState state, {required String forUid}) {
     const ParentTarget(null, 'Top level', ParentKind.top, 0),
   ];
   final task = state.taskById(forUid) != null;
+  // An item that does not exist yet (a new-item dialog) has no subtree to avoid.
+  final fresh = state.findItem(forUid) == null;
   void collect(List<NoteNode> nodes, int depth) {
     for (final n in nodes) {
       if (isPersonalContainer(n.note)) continue;
       final folder = AppState.isFolder(n.note);
       // A note cannot move under itself or into its own subtree.
-      if (task || state.tree.canMove(forUid, n.note.uid)) {
+      if (task || fresh || state.tree.canMove(forUid, n.note.uid)) {
         targets.add(
           ParentTarget(
             n.note.uid,
