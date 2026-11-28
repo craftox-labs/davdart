@@ -684,6 +684,7 @@ class AppState extends ChangeNotifier {
     scopeUid = null;
     savedViews.clear();
     homeDay = null;
+    calendarSectionCollapsed = const {};
     _resetTabs();
     _restoreScopePending = true;
     await load();
@@ -1538,11 +1539,26 @@ class AppState extends ChangeNotifier {
   /// grid's own view state.
   DateTime? homeDay;
 
+  /// While [homeDay] is picked: the Calendar panel's agenda sections a hand
+  /// toggle has opened or shut (id -> collapsed). Layered over the saved
+  /// per-section prefs, which are never written from here; cleared by every
+  /// day pick, so the next pick puts the sections back where a pick leaves
+  /// them.
+  Map<String, bool> calendarSectionCollapsed = const {};
+
+  void setCalendarSectionCollapsed(String id, bool collapsed) {
+    if (calendarSectionCollapsed[id] == collapsed) return;
+    calendarSectionCollapsed = {...calendarSectionCollapsed, id: collapsed};
+    notifyListeners();
+  }
+
   /// Picks [day] on Home's calendar and brings the Calendar panel up beside
   /// it: a folded panel, or one on another section, opens on Calendar (which
   /// unfolds it); a panel already there is left alone, so a press never folds
-  /// it. The main area stays where it is (Home).
+  /// it. The main area stays where it is (Home). A pick collapses the panel's
+  /// other agenda sections (see [calendarSectionCollapsed]).
   void selectHomeDay(DateTime day) {
+    calendarSectionCollapsed = const {};
     setHomeDay(day);
     if (section != Section.events || sidebarCollapsed) {
       setSection(Section.events);
