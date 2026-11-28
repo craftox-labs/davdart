@@ -5,6 +5,7 @@ import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../state/note_draft.dart';
+import '../state/parent_targets.dart';
 import 'parts.dart';
 import 'popover_track.dart';
 import 'theme.dart';
@@ -28,30 +29,15 @@ class NoteEditor extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     // Where the note can move: top level, or under any note that is not it
-    // or one of its own descendants. Indented like the sidebar tree.
-    final targets = <(String?, String, bool, int)>[
-      (null, 'Top level', false, 0),
-    ];
-    void collect(List<NoteNode> nodes, int depth) {
-      for (final n in nodes) {
-        if (!isPersonalContainer(n.note) &&
-            state.tree.canMove(note.uid, n.note.uid)) {
-          targets.add((
-            n.note.uid,
-            n.note.summary,
-            AppState.isFolder(n.note),
-            depth,
-          ));
-        }
-        collect(n.children, depth + 1);
+    // or one of its own descendants (the shared parent list of the pickers).
+    final targets = parentTargets(state, forUid: note.uid);
+    String labelOf(String uid) {
+      for (final e in targets) {
+        if ((e.uid ?? '') == uid) return e.label;
       }
+      return uid;
     }
 
-    collect(state.tree.roots, 0);
-    final labels = {for (final e in targets) e.$1 ?? '': e.$2};
-    final parent = targets.any((e) => e.$1 == draft.parent)
-        ? draft.parent
-        : null;
     return ListenableBuilder(
       listenable: draft,
       builder: (context, _) => Column(
@@ -118,9 +104,11 @@ class NoteEditor extends StatelessWidget {
               popoverControl: pc,
               key: const Key('edit-parent'),
               label: const Text('Inside'),
-              format: (v) => labels[v] ?? v,
+              format: labelOf,
               control: FSelectControl.lifted(
-                value: parent ?? '',
+                value: targets.any((e) => e.uid == draft.parent)
+                    ? draft.parent ?? ''
+                    : '',
                 onChange: (v) =>
                     draft.setParent((v == null || v.isEmpty) ? null : v),
               ),
@@ -128,11 +116,13 @@ class NoteEditor extends StatelessWidget {
                 for (final e in targets)
                   FSelectItem<String>(
                     title: Text(
-                      e.$3 ? '${e.$2}  (folder)' : e.$2,
+                      e.kind == ParentKind.folder
+                          ? '${e.label}  (folder)'
+                          : e.label,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    prefix: SizedBox(width: e.$4 * t.sizes.folderIndent),
-                    value: e.$1 ?? '',
+                    prefix: SizedBox(width: e.depth * t.sizes.folderIndent),
+                    value: e.uid ?? '',
                   ),
               ],
             ),

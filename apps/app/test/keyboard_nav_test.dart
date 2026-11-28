@@ -586,9 +586,11 @@ void main() {
     testWidgets('a click on selectable text keeps its focus (copy works)', (
       t,
     ) async {
+      // A note's body, where the read view is what a press lands on (a task's
+      // description is an inline field now).
       final s = await pumpTasksApp(
         t,
-        tasks: [Task(uid: 'a', summary: 'A', description: 'some words here')],
+        notes: [Note(uid: 'a', summary: 'A', description: 'some words here')],
       );
       s.select('a');
       await t.pumpAndSettle();
