@@ -415,6 +415,35 @@ void main() {
     expect(grip.right, card.right);
   });
 
+  testWidgets('the card ⋯ edits status, priority, due and labels', (t) async {
+    final s = await pump(t);
+    // Task card: all four sections, and every pick saves at once.
+    await t.tap(_k('card-more-t'));
+    await t.pumpAndSettle();
+    await t.tap(_k('property-option-card-status-doing'));
+    await t.pumpAndSettle();
+    expect(s.taskById('t')!.boardStatus, 'doing');
+    await t.tap(_k('card-more-t'));
+    await t.pumpAndSettle();
+    await t.tap(_k('property-option-card-priority-high'));
+    await t.pumpAndSettle();
+    expect(s.taskById('t')!.priority, 1);
+    await t.tap(_k('card-more-t'));
+    await t.pumpAndSettle();
+    t.takeException(); // the test font overflows the calendar header
+    await t.tap(_k('property-date-card-due-tomorrow'));
+    await t.pumpAndSettle();
+    expect(s.taskById('t')!.due, dueIn(1));
+    // A note card: status and priority only.
+    await t.tap(_k('card-more-n'));
+    await t.pumpAndSettle();
+    expect(_k('property-option-card-status-doing'), findsOneWidget);
+    expect(_k('property-date-card-due-today'), findsNothing);
+    await t.tap(_k('property-option-card-priority-high'));
+    await t.pumpAndSettle();
+    expect(PlanItem.fromNote(s.tree.find('n')!.note).priorityWord, 'high');
+  });
+
   testWidgets('wide: the folder chip sits at the right padding edge', (
     t,
   ) async {
@@ -422,9 +451,11 @@ void main() {
     for (final id in ['n', 't']) {
       final card = t.getRect(_k('nav-card-$id'));
       final folder = t.getRect(_k('card-folder-$id'));
-      // The card padding is 12 (space.lg); the chip ends there, however
-      // short the tags are.
-      expect(card.right - folder.right, closeTo(12, 1.5), reason: id);
+      // The properties button holds the right padding edge now; the folder
+      // chip ends just before it, however short the tags are.
+      final more = t.getRect(_k('card-more-$id'));
+      expect(card.right - more.right, closeTo(12, 1.5), reason: id);
+      expect(folder.right, lessThan(more.left), reason: id);
     }
   });
 

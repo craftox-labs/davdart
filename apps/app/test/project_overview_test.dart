@@ -96,7 +96,7 @@ void main() {
       await _end(t);
     });
 
-    testWidgets('the project page carries the marked placeholders', (t) async {
+    testWidgets('the page carries real details and one placeholder', (t) async {
       await _app(t);
       // The header row names the project; the old chips are gone.
       expect(_text(t, 'page-title'), 'Alpha');
@@ -109,13 +109,57 @@ void main() {
       ]) {
         expect(_k(chip), findsNothing);
       }
-      expect(_k('placeholder-project-about'), findsOneWidget);
+      // About is a real field now; milestones is still marked.
+      expect(_k('placeholder-project-about'), findsNothing);
+      expect(_k('project-about'), findsOneWidget);
+      expect(_k('edit-project-about'), findsOneWidget);
       expect(_k('placeholder-project-milestones'), findsOneWidget);
       expect(_k('proj-placeholder-due'), findsOneWidget);
-      // Status is the one derived detail row; the rest say Placeholder.
+      // Status is derived; the other details are empty note fields.
       expect(_text(t, 'proj-detail-status'), 'In progress');
-      expect(_text(t, 'proj-detail-lead'), 'Placeholder');
-      expect(_text(t, 'proj-detail-members'), 'Placeholder');
+      expect(_text(t, 'proj-detail-lead'), '—');
+      expect(_text(t, 'proj-detail-members'), '—');
+      await _end(t);
+    });
+
+    testWidgets('About and the details save as the project note', (t) async {
+      final s = await _app(t);
+      // About is the note's own text, edited in place.
+      await t.ensureVisible(_k('edit-project-about'));
+      await t.pumpAndSettle();
+      await t.tap(_k('edit-project-about'));
+      await t.pumpAndSettle();
+      await t.enterText(_k('edit-project-about'), 'A short project.');
+      await t.pump(const Duration(milliseconds: 900));
+      await t.pumpAndSettle();
+      final uid = s.scopeUid!;
+      expect(
+        PlanItem.fromNote(s.tree.find(uid)!.note).text,
+        'A short project.',
+      );
+      // A detail row writes a header field of the same note.
+      await t.ensureVisible(_k('edit-proj-detail-lead'));
+      await t.pumpAndSettle();
+      await t.tap(_k('edit-proj-detail-lead'));
+      await t.pumpAndSettle();
+      await t.enterText(_k('edit-proj-detail-lead'), 'tm');
+      await t.pump(const Duration(milliseconds: 900));
+      await t.pumpAndSettle();
+      final note = s.tree.find(uid)!.note;
+      expect(PlanItem.fromNote(note).fields['lead'], 'tm');
+      // The body text is untouched by the field write.
+      expect(PlanItem.fromNote(note).text, 'A short project.');
+      // Closed again, the row shows the saved value.
+      FocusManager.instance.primaryFocus?.unfocus();
+      await t.pumpAndSettle();
+      expect(_text(t, 'proj-detail-lead'), 'tm');
+      // Clearing the field removes the header line.
+      await t.tap(_k('edit-proj-detail-lead'));
+      await t.pumpAndSettle();
+      await t.enterText(_k('edit-proj-detail-lead'), '');
+      await t.pump(const Duration(milliseconds: 900));
+      await t.pumpAndSettle();
+      expect(PlanItem.fromNote(s.tree.find(uid)!.note).fields['lead'], isNull);
       await _end(t);
     });
 
