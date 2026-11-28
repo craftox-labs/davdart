@@ -235,11 +235,9 @@ class _ShellState extends State<Shell>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    // Narrow: an edit pending its typing pause is saved before the app may
-    // be stopped.
-    if (s != AppLifecycleState.resumed && widget.state.narrow) {
-      widget.state.flushAllEdits();
-    }
+    // An edit pending its typing pause is saved before the app may be
+    // stopped: the narrow layout's drafts, and a task's inline text.
+    if (s != AppLifecycleState.resumed) widget.state.flushAllEdits();
   }
 
   @override

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
@@ -30,6 +31,8 @@ class InlineText extends StatefulWidget {
     this.maxLines,
     this.preview,
     this.focusNode,
+    this.autoBegin = false,
+    this.onBegan,
   });
 
   final TextEditingController controller;
@@ -57,6 +60,14 @@ class InlineText extends StatefulWidget {
   /// widget makes its own when null.
   final FocusNode? focusNode;
 
+  /// Opens the field and takes the focus as soon as it is in the tree (the
+  /// page was just asked to edit this value).
+  final bool autoBegin;
+
+  /// Called once [autoBegin] has been used, so the page does not open it
+  /// again.
+  final VoidCallback? onBegan;
+
   @override
   State<InlineText> createState() => _InlineTextState();
 }
@@ -81,6 +92,16 @@ class _InlineTextState extends State<InlineText> {
     _saved = widget.controller.text;
     _focus.addListener(_focusChanged);
     widget.controller.addListener(_typed);
+    if (widget.autoBegin) _autoBegin();
+  }
+
+  /// Takes the focus once the field this build creates is in the tree.
+  void _autoBegin() {
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      widget.onBegan?.call();
+      _focus.requestFocus();
+    });
   }
 
   @override
@@ -91,6 +112,7 @@ class _InlineTextState extends State<InlineText> {
       widget.controller.addListener(_typed);
       _saved = widget.controller.text;
     }
+    if (widget.autoBegin && !old.autoBegin) _autoBegin();
   }
 
   @override

@@ -224,6 +224,76 @@ void main() {
     );
   });
 
+  testWidgets('a due date pick toasts, Undo puts the old day back', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      tasks: [mkTask('t', summary: 'Fix it', days: 2)],
+    );
+    expect(await s.setTaskDue('t', dueIn(5)), isTrue);
+    expect(s.taskById('t')!.due, dueIn(5));
+    await t.pumpAndSettle();
+    expect(find.text('Due date of "Fix it" changed'), findsOneWidget);
+    await t.tap(_k('board-undo'));
+    await t.pumpAndSettle();
+    expect(s.taskById('t')!.due, dueIn(2));
+    // Clearing it is undone the same way.
+    expect(await s.setTaskDue('t', null), isTrue);
+    await t.pumpAndSettle();
+    expect(find.text('Due date of "Fix it" cleared'), findsOneWidget);
+    await s.undoBoard(s.pendingUndo!);
+    await t.pumpAndSettle();
+    expect(s.taskById('t')!.due, dueIn(2));
+  });
+
+  testWidgets('a start date pick toasts, Undo clears it again', (t) async {
+    final s = await pumpTasksApp(t, tasks: [mkTask('t', summary: 'Fix it')]);
+    expect(await s.setTaskStart('t', dueIn(1)), isTrue);
+    expect(s.taskById('t')!.dtstart, dueIn(1));
+    await t.pumpAndSettle();
+    expect(find.text('Start date of "Fix it" changed'), findsOneWidget);
+    await s.undoBoard(s.pendingUndo!);
+    await t.pumpAndSettle();
+    expect(s.taskById('t')!.dtstart, isNull);
+  });
+
+  testWidgets('labels and the parent pick toast, Undo restores them', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(
+      t,
+      tasks: [
+        mkTask('p', summary: 'Parent'),
+        mkTask('c', summary: 'Child', tags: ['a']),
+      ],
+    );
+    expect(await s.setTaskTags('c', ['b', 'd']), isTrue);
+    expect(s.taskTagsOf(s.taskById('c')!), ['b', 'd']);
+    await t.pumpAndSettle();
+    expect(find.text('Labels of "Child" changed'), findsOneWidget);
+    await s.undoBoard(s.pendingUndo!);
+    await t.pumpAndSettle();
+    expect(s.taskTagsOf(s.taskById('c')!), ['a']);
+    expect(await s.setTaskParent('c', 'p'), isTrue);
+    expect(s.taskById('c')!.parentUid, 'p');
+    await t.pumpAndSettle();
+    expect(find.text('Moved "Child"'), findsOneWidget);
+    await s.undoBoard(s.pendingUndo!);
+    await t.pumpAndSettle();
+    expect(s.taskById('c')!.parentUid, isNull);
+  });
+
+  testWidgets('a parent move the rules refuse changes nothing', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      tasks: [
+        mkTask('p', summary: 'Parent'),
+        mkTask('c', summary: 'Child', parent: 'p'),
+      ],
+    );
+    expect(await s.setTaskParent('p', 'c'), isFalse);
+    expect(s.taskById('p')!.parentUid, isNull);
+  });
+
   testWidgets('undo of an item deleted meanwhile does nothing', (t) async {
     final s = await pumpHomeApp(
       t,

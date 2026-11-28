@@ -3,8 +3,11 @@ import 'package:flutter/widgets.dart';
 
 import 'note_draft.dart' show setText;
 
-/// An open in-place edit of one task, like [NoteDraft]: text fields, parent,
-/// due date and priority, and whether anything differs from what was loaded.
+/// The open text buffer of one task: the title and the description, plus the
+/// selector values a rebase keeps, and whether anything differs from what was
+/// loaded. It is invisible: the page shows the title and the description as
+/// [InlineText], and each selector is picked in place ([updateTask] and its
+/// siblings), never through this buffer.
 class TaskDraft extends ChangeNotifier {
   TaskDraft({
     required this.uid,
@@ -34,6 +37,11 @@ class TaskDraft extends ChangeNotifier {
   ICalDate? originalDue;
   int? originalPriority;
   final TextEditingController titleController, bodyController, tagsController;
+
+  /// The inline fields of the title and the description: [AppState] focuses
+  /// one when a tap on the value (or `e`) starts an edit.
+  final FocusNode titleFocus = FocusNode(debugLabel: 'task-title');
+  final FocusNode bodyFocus = FocusNode(debugLabel: 'task-body');
 
   String? parent;
   ICalDate? due;
@@ -128,6 +136,8 @@ class TaskDraft extends ChangeNotifier {
     titleController.dispose();
     bodyController.dispose();
     tagsController.dispose();
+    titleFocus.dispose();
+    bodyFocus.dispose();
     super.dispose();
   }
 }

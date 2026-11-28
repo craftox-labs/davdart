@@ -2470,8 +2470,8 @@ class AppState extends ChangeNotifier {
       ? 'Priority of "$title" cleared'
       : 'Priority of "$title" set to ${word[0].toUpperCase()}${word.substring(1)}';
 
-  /// Puts back only the status, priority and/or rank of a note or task; its
-  /// other fields stay as they are now.
+  /// Puts back only the status, priority, due date, start, parent, labels
+  /// and/or rank of a note or task; its other fields stay as they are now.
   Future<void> _restoreItem(
     String uid, {
     bool setStatus = false,
@@ -2482,13 +2482,35 @@ class AppState extends ChangeNotifier {
     _TaskStatusState? taskState,
     bool setRank = false,
     double? rank,
+    bool setDue = false,
+    ICalDate? due,
+    bool setStart = false,
+    ICalDate? start,
+    bool setParent = false,
+    String? parentUid,
+    bool setTags = false,
+    List<String>? tags,
   }) async {
     final t = _taskById(uid);
     if (t != null) {
       final copy = t.copyWith(
         priority: setPriority ? priorityInt : null,
         clearPriority: setPriority && priorityInt == null,
+        due: setDue ? due : null,
+        clearDue: setDue && due == null,
+        dtstart: setStart ? start : null,
+        clearStart: setStart && start == null,
+        parentUid: setParent ? parentUid : null,
+        clearParent: setParent && parentUid == null,
       );
+      if (setTags) {
+        copy.categories = [
+          ...t.categories.where(
+            (c) => c.startsWith('status-') || c.startsWith('kind-'),
+          ),
+          ..._plainTags(tags ?? const []),
+        ];
+      }
       if (setStatus && taskState != null) {
         taskState.applyTo(copy);
         if (taskState.status == 'COMPLETED') {
@@ -3132,10 +3154,10 @@ class AppState extends ChangeNotifier {
         c.trim(),
   ];
 
-  /// Changes a task. Only what is passed changes; [setParent], [setDue] and
-  /// [setPriority] say that a null value means "clear". A parent move that is
-  /// not valid (see [canMoveTask]) is dropped and the rest saves. Returns
-  /// false when nothing was saved.
+  /// Changes a task. Only what is passed changes; [setParent], [setDue],
+  /// [setStart] and [setPriority] say that a null value means "clear". A
+  /// parent move that is not valid (see [canMoveTask]) is dropped and the rest
+  /// saves. Returns false when nothing was saved.
   Future<bool> updateTask(
     String uid, {
     String? title,
@@ -3145,6 +3167,8 @@ class AppState extends ChangeNotifier {
     String? parentUid,
     bool setDue = false,
     ICalDate? due,
+    bool setStart = false,
+    ICalDate? start,
     bool setPriority = false,
     int? priority,
   }) async {
@@ -3160,6 +3184,8 @@ class AppState extends ChangeNotifier {
       clearParent: move && parentUid == null,
       due: setDue ? due : null,
       clearDue: setDue && due == null,
+      dtstart: setStart ? start : null,
+      clearStart: setStart && start == null,
       priority: setPriority ? priority : null,
       clearPriority: setPriority && priority == null,
     );
@@ -3245,6 +3271,78 @@ class AppState extends ChangeNotifier {
         : p == 5
         ? 'medium'
         : 'low';
+  }
+
+  /// Sets a task's due date (null clears it), with Undo.
+  Future<bool> setTaskDue(String uid, ICalDate? due) async {
+    final t = _taskById(uid);
+    if (t == null) return false;
+    final before = t.due;
+    final title = t.summary;
+    final ok = await updateTask(uid, setDue: true, due: due);
+    if (ok && before != due) {
+      _postUndo(
+        due == null
+            ? 'Due date of "$title" cleared'
+            : 'Due date of "$title" changed',
+        () => _restoreItem(uid, setDue: true, due: before),
+      );
+    }
+    return ok;
+  }
+
+  /// Sets when a task starts (null clears it), with Undo.
+  Future<bool> setTaskStart(String uid, ICalDate? start) async {
+    final t = _taskById(uid);
+    if (t == null) return false;
+    final before = t.dtstart;
+    final title = t.summary;
+    final ok = await updateTask(uid, setStart: true, start: start);
+    if (ok && before != start) {
+      _postUndo(
+        start == null
+            ? 'Start date of "$title" cleared'
+            : 'Start date of "$title" changed',
+        () => _restoreItem(uid, setStart: true, start: before),
+      );
+    }
+    return ok;
+  }
+
+  /// Moves a task under another note or task (null is the top level), with
+  /// Undo. A move [canMoveTask] rejects changes nothing and returns false.
+  Future<bool> setTaskParent(String uid, String? parentUid) async {
+    final t = _taskById(uid);
+    if (t == null) return false;
+    if (!canMoveTask(uid, parentUid)) return false;
+    final before = t.parentUid;
+    final title = t.summary;
+    final ok = await updateTask(uid, setParent: true, parentUid: parentUid);
+    if (ok && before != parentUid) {
+      _postUndo(
+        parentUid == null
+            ? 'Moved "$title" to the top level'
+            : 'Moved "$title"',
+        () => _restoreItem(uid, setParent: true, parentUid: before),
+      );
+    }
+    return ok;
+  }
+
+  /// Sets a task's labels, with Undo.
+  Future<bool> setTaskTags(String uid, List<String> tags) async {
+    final t = _taskById(uid);
+    if (t == null) return false;
+    final before = _plainTags(t.categories);
+    final title = t.summary;
+    final ok = await updateTask(uid, tags: tags);
+    if (ok && !listEquals(before, _plainTags(tags))) {
+      _postUndo(
+        'Labels of "$title" changed',
+        () => _restoreItem(uid, setTags: true, tags: before),
+      );
+    }
+    return ok;
   }
 
   /// Drops a Home board card into [column]. With [index] (the insertion
@@ -3444,9 +3542,7 @@ class AppState extends ChangeNotifier {
   TaskDraft? taskDraftFor(String uid) => _taskDrafts[uid];
   bool dirtyTaskFor(String uid) => _taskDrafts[uid]?.dirty ?? false;
 
-  /// Starts editing task [uid] (no-op if read-only, unknown or already open).
-  /// Edit keys (Esc, Ctrl+Enter) act on the focused area's editor: the
-  /// area that shows [uid] takes the focus when its edit starts.
+  /// Gives the area showing [uid] the focus, so the edit keys act on it.
   void _focusEditor(String uid) =>
       nav.focusArea(uid == mainItemUid ? NavArea.main : NavArea.peek);
 
@@ -3455,22 +3551,55 @@ class AppState extends ChangeNotifier {
       ? t.parentUid
       : null;
 
-  void startTaskEdit(String uid) {
+  /// Opens the text buffer of task [uid] (no-op if read-only or unknown) and
+  /// focuses one of its inline fields: the title, or the description with
+  /// [focusBody] (a tap on the value it edits). It stays open until the page
+  /// leaves it, so typing survives a sync; [saveTaskDraft] keeps its text.
+  /// Edit keys act on the focused area: the area that shows [uid] takes the
+  /// focus when its edit starts.
+  void startTaskEdit(String uid, {bool focusBody = false}) {
     final t = _taskById(uid);
-    if (t == null || !tasksEditable || _taskDrafts.containsKey(uid)) return;
-    _taskDrafts[uid] = TaskDraft(
-      uid: uid,
-      title: t.summary,
-      body: t.description,
-      tags: _plainTags(t.categories).join(', '),
-      originalParent: _taskParentOf(t),
-      originalDue: t.due,
-      originalPriority: t.priority,
-    );
-    final d = _taskDrafts[uid]!;
-    _watchDraft(uid, d, () => (d.parent, d.due, d.priority));
+    if (t == null || !tasksEditable) return;
+    var d = _taskDrafts[uid];
+    if (d == null) {
+      d = TaskDraft(
+        uid: uid,
+        title: t.summary,
+        body: t.description,
+        tags: _plainTags(t.categories).join(', '),
+        originalParent: _taskParentOf(t),
+        originalDue: t.due,
+        originalPriority: t.priority,
+      );
+      _taskDrafts[uid] = d;
+      final fresh = d;
+      _watchDraft(uid, fresh, () => (fresh.parent, fresh.due, fresh.priority));
+    }
+    // The field the page builds next opens and takes the focus (a tap on the
+    // value, or `e` on the item).
+    taskTextIntent = (uid: uid, body: focusBody);
     _focusEditor(uid);
     notifyListeners();
+  }
+
+  /// The task text field a tap on a value (or `e`) asked to open, waiting for
+  /// the page to build it; null when none is waiting.
+  ({String uid, bool body})? taskTextIntent;
+
+  /// Whether the field of task [uid] is the one the last tap asked for.
+  bool taskTextTargets(String uid, {required bool body}) =>
+      taskTextIntent?.uid == uid && taskTextIntent!.body == body;
+
+  /// The field the intent named has opened: the next build does not open it
+  /// again.
+  void clearTaskTextIntent() => taskTextIntent = null;
+
+  /// Saves the open text buffer of task [uid] (the typing pause, a blur, a
+  /// picker opening, the page going away) and says why when it cannot.
+  Future<bool> commitTaskText(String uid) async {
+    final ok = await flushEdit(uid);
+    if (!ok) reportNotSaved(_notSavedReason(uid));
+    return ok;
   }
 
   /// Saves the edit of task [uid]. Text typed while the save runs stays as
@@ -4569,10 +4698,12 @@ class AppState extends ChangeNotifier {
     return empty ? 'a title is required' : (error ?? 'could not save');
   }
 
-  /// Flushes every pending edit (the app is going to the background).
+  /// Flushes every pending edit (the app is going to the background): the
+  /// narrow layout's drafts save themselves, and a task's inline text does on
+  /// both layouts.
   Future<void> flushAllEdits() => Future.wait([
     for (final u in _allDraftUids())
-      if (dirtyItem(u)) flushEdit(u),
+      if (dirtyItem(u) && (narrow || _taskDrafts.containsKey(u))) flushEdit(u),
   ]);
 
   /// Whether a save of [uid] is waiting for its typing pause or running.
@@ -4597,9 +4728,9 @@ class AppState extends ChangeNotifier {
   }
 
   /// Like [_rebaseDrafts] for tasks: a clean draft takes the synced task, a
-  /// draft with changes is left alone.
+  /// draft with changes is left alone. The task text buffer exists on both
+  /// layouts, so this runs always.
   void _rebaseTaskDrafts() {
-    if (!narrow) return;
     for (final d in _taskDrafts.values) {
       final t = _taskById(d.uid);
       if (t == null || d.dirty) continue;
@@ -4674,10 +4805,16 @@ class AppState extends ChangeNotifier {
   }
 
   /// Leaves edit mode for [uid] (Esc, Cancel): a clean edit just closes; a
-  /// dirty one asks first (save, discard or keep editing). False when the
-  /// user keeps editing.
+  /// dirty one asks first (save, discard or keep editing). A task's text
+  /// buffer has no edit mode to leave: its text is committed and the buffer
+  /// closes. False when the user keeps editing.
   Future<bool> leaveEdit(String uid) async {
     if (!isEditing(uid)) return true;
+    if (_taskDrafts.containsKey(uid)) {
+      await commitTaskText(uid);
+      if (!dirtyTaskFor(uid)) _dropDraft(uid);
+      return true;
+    }
     if (!await _settleDrafts([uid])) return false;
     if (isEditing(uid)) _dropDraft(uid);
     return true;
@@ -4707,6 +4844,12 @@ class AppState extends ChangeNotifier {
   /// title, failure): edit mode stays.
   Future<bool> saveAndLeave(String uid) async {
     if (!isEditing(uid)) return true;
+    // A task's text is inline: saving it closes the buffer, nothing else.
+    if (_taskDrafts.containsKey(uid)) {
+      final saved = await commitTaskText(uid);
+      if (saved && !dirtyTaskFor(uid)) _dropDraft(uid);
+      return saved;
+    }
     // Narrow: through the autosave queue, so it waits for a save in flight
     // (and drops the pending timer) instead of racing it.
     if (narrow) {
@@ -4717,9 +4860,7 @@ class AppState extends ChangeNotifier {
       _dropDraft(uid);
       return true;
     }
-    final saved = _taskDrafts.containsKey(uid)
-        ? await saveTaskDraft(uid)
-        : _eventDrafts.containsKey(uid)
+    final saved = _eventDrafts.containsKey(uid)
         ? await saveEventDraft(uid)
         : await saveDraft(uid);
     return saved;
@@ -4744,9 +4885,19 @@ class AppState extends ChangeNotifier {
           : isEvent
           ? dirtyEventFor(u)
           : dirtyFor(u);
-      if (!dirty) continue;
-      // Narrow: edits save themselves; the dialog is the fallback when the
-      // save cannot go through (empty title, error).
+      if (!dirty) {
+        // A clean buffer on the way out is closed; nothing is lost.
+        if (isTask) _taskDrafts.remove(u);
+        continue;
+      }
+      // A task's text commits itself (a failed write keeps the buffer);
+      // narrow edits save themselves too; the dialog is the fallback when
+      // the save cannot go through (empty title, error).
+      if (isTask) {
+        await commitTaskText(u);
+        if (!dirtyTaskFor(u)) _taskDrafts.remove(u);
+        continue;
+      }
       if (narrow && await flushEdit(u)) continue;
       if (g == null) continue;
       switch (await g()) {

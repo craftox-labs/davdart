@@ -324,17 +324,17 @@ void main() {
       expect(s.taskById(uid)!.description, 'first, more');
     });
 
-    test('switching Space asks about an unsaved task edit', () async {
+    test('switching Space saves an inline task text on its own', () async {
       final s = await _open(MemoryStorage(), seed: _Seed());
       await s.createSpace('Other');
       await s.switchSpace(SpaceCatalog.planningId);
       final uid = (await s.addTask('One'))!;
       s.startTaskEdit(uid);
       s.taskDraftFor(uid)!.titleController.text = 'Edited';
+      // A task's text has no edit mode left to ask about: it commits.
       s.leaveGuard = () async => DraftChoice.keep;
-      expect(await s.switchSpace(s.spaces.last.id), isFalse);
-      s.leaveGuard = () async => DraftChoice.save;
       expect(await s.switchSpace(s.spaces.last.id), isTrue);
+      expect(s.taskDraftFor(uid), isNull);
       await s.switchSpace(SpaceCatalog.planningId);
       expect(s.tasks.single.summary, 'Edited');
     });
