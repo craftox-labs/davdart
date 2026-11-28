@@ -456,6 +456,115 @@ class SizeTokens {
   final double fabClearance;
 }
 
+/// Property widgets (lib/ui/property/*, the parent crumb, the board card's
+/// properties popover): one row per property, its value, and the pickers that
+/// open from it. Values are in logical pixels unless noted; they start equal
+/// to the matching steps of the shared scales and can be tuned apart.
+class PropertyTokens {
+  const PropertyTokens({
+    this.rowHeight = 32,
+    this.rowHeightTouch = 44,
+    this.rowRadius = 6,
+    this.labelWidth = 104,
+    this.labelIcon = 14,
+    this.labelIconGap = 6,
+    this.labelValueGap = 8,
+    this.chevronGap = 6,
+    this.chevronIcon = 14,
+    this.dividerThickness = 1,
+    this.debounce = const Duration(milliseconds: 800),
+    this.popoverMinWidth = 360,
+    this.popoverMaxWidth = 420,
+    this.sheetMaxRatio = 0.8,
+    this.pickerPadding = 4,
+    this.pickerRowHeight = 44,
+    this.pickerRowPadding = 8,
+    this.pickerRowGap = 8,
+    this.pickerHintGap = 6,
+    this.pickerIcon = 14,
+    this.pickerIndent = 12,
+    this.pickerListMaxHeight = 480,
+    this.pickerDividerMargin = 4,
+    this.datePickerWidth = 380,
+    this.formPadding = 12,
+    this.formGap = 12,
+    this.chipGap = 6,
+    this.searchGap = 6,
+    this.cardPopoverPadding = 6,
+    this.cardLabelSide = 12,
+    this.cardLabelTop = 6,
+    this.cardLabelBottom = 2,
+    this.crumbInset = 20,
+    this.crumbIcon = 14,
+    this.crumbGap = 4,
+  });
+
+  /// Height of one property row on the wide layout, and on the narrow
+  /// (touch) one; the hover-fill radius.
+  final double rowHeight, rowHeightTouch, rowRadius;
+
+  /// The label column: its width, the icon in it, and the gap after the icon.
+  final double labelWidth, labelIcon, labelIconGap;
+
+  /// Gap between the label column and the value, and between the value and
+  /// the hover chevron; the chevron's size.
+  final double labelValueGap, chevronGap, chevronIcon;
+
+  /// The hairline between two rows.
+  final double dividerThickness;
+
+  /// Typing in an inline text value pauses this long before it is saved.
+  final Duration debounce;
+
+  /// Width range of a picker popover on the wide layout.
+  final double popoverMinWidth, popoverMaxWidth;
+
+  /// Tallest a picker sheet gets on the narrow layout, as a share of the
+  /// screen height (0 to 1).
+  final double sheetMaxRatio;
+
+  /// Option lists: padding round the list, one row's height, its side
+  /// padding, the gap after its icon, the gap before its hint and check, the
+  /// icon size and one folder level of indent.
+  final double pickerPadding,
+      pickerRowHeight,
+      pickerRowPadding,
+      pickerRowGap,
+      pickerHintGap,
+      pickerIcon,
+      pickerIndent;
+
+  /// Tallest a scrolling picker list gets, and the margin round the divider
+  /// above the date calendar.
+  final double pickerListMaxHeight, pickerDividerMargin;
+
+  /// Width the date picker's calendar is laid out at.
+  final double datePickerWidth;
+
+  /// Pickers with a field (labels, parent): padding round the content, the
+  /// gap between its parts, the gap between label chips and the gap under
+  /// the search field.
+  final double formPadding, formGap, chipGap, searchGap;
+
+  /// The board card's properties popover: vertical padding round its list,
+  /// and the side, top and bottom padding of each section label in it.
+  final double cardPopoverPadding, cardLabelSide, cardLabelTop, cardLabelBottom;
+
+  /// The parent crumb: side inset of its row, its icon size and the gap after
+  /// the icon.
+  final double crumbInset, crumbIcon, crumbGap;
+}
+
+/// The calendar day cell's add button and its popover.
+class CalendarAddTokens {
+  const CalendarAddTokens({this.cellPadding = 2});
+
+  /// Padding round a day cell's content; the add button sits over its top
+  /// right corner and its popover is as wide as the cell. The picker inside
+  /// is an option list ([PropertyTokens.pickerRowHeight] and the rest).
+  final double cellPadding;
+}
+
 /// Design tokens shared with the web board (apps/web/lib/web_app.dart). One
 /// place for colour, type, spacing, radius and size, so the look is set once.
 class Tokens {
@@ -498,6 +607,8 @@ class Tokens {
     this.icons = const IconTokens(),
     this.sizes = const SizeTokens(),
     this.motion = const MotionTokens(),
+    this.property = const PropertyTokens(),
+    this.calendarAdd = const CalendarAddTokens(),
   });
 
   /// Window background: behind the rail and around the panel.
@@ -646,6 +757,8 @@ class Tokens {
   final IconTokens icons;
   final SizeTokens sizes;
   final MotionTokens motion;
+  final PropertyTokens property;
+  final CalendarAddTokens calendarAdd;
 
   /// A copy with some colours or groups replaced (used by tests and previews).
   Tokens copyWith({
@@ -659,6 +772,8 @@ class Tokens {
     BorderTokens? borders,
     IconTokens? icons,
     SizeTokens? sizes,
+    PropertyTokens? property,
+    CalendarAddTokens? calendarAdd,
   }) => Tokens(
     frame: frame ?? this.frame,
     panel: panel ?? this.panel,
@@ -698,6 +813,8 @@ class Tokens {
     icons: icons ?? this.icons,
     sizes: sizes ?? this.sizes,
     motion: motion,
+    property: property ?? this.property,
+    calendarAdd: calendarAdd ?? this.calendarAdd,
   );
 
   // Neutral placeholders; real colours come later.

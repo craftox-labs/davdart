@@ -941,8 +941,8 @@ class _CalendarViewState extends State<CalendarView> {
     }
     Widget content = Padding(
       padding: wide
-          ? EdgeInsets.symmetric(horizontal: t.space.xxs)
-          : EdgeInsets.all(t.space.xxs),
+          ? EdgeInsets.symmetric(horizontal: t.calendarAdd.cellPadding)
+          : EdgeInsets.all(t.calendarAdd.cellPadding),
       child: body,
     );
     // Wide: a small add button at the cell's top-right, on hover and always

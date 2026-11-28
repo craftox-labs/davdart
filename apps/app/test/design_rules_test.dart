@@ -258,6 +258,27 @@ final _rules = <_Rule>[
   ),
 ];
 
+/// The property widgets, the board card's properties popover and the parent
+/// crumb: their look comes from the named groups [PropertyTokens] and
+/// [CalendarAddTokens] (`t.property`, `t.calendarAdd`), not from the shared
+/// scales or from literals, so a designer tunes them in one place.
+bool _isPropertyFile(String path) =>
+    path.startsWith('lib/ui/property/') ||
+    path == 'lib/ui/card_properties.dart';
+
+/// Source of the [ParentCrumb] widget alone (it lives in parts.dart).
+String _crumbSource() {
+  final src = _literal(File('lib/ui/parts.dart'));
+  final start = src.indexOf('class ParentCrumb');
+  final end = src.indexOf('Widget parentCrumb(');
+  return src.substring(start, end);
+}
+
+final _scaleRead = RegExp(
+  r'\b(?:t|tokens|tokensOf\(context\))\.(?:space|sizes|radii|icons|borders)\.|'
+  r'Duration\(|mainAxisMaxRatio:\s*[0-9.]',
+);
+
 /// Private widgets that repeat a shared piece were removed; these are the
 /// last ones left. Each must still exist (a removed copy must leave the list)
 /// and the list may only shrink.
@@ -410,6 +431,47 @@ void main() {
         found.addAll(_insetBreaches(f.path, _literal(f)));
       }
       expect(found, isEmpty, reason: 'use tokensOf(context).space: $found');
+    });
+
+    test('property widgets take their look from the property tokens', () {
+      final found = <String>[];
+      for (final f in _uiFiles()) {
+        if (!_isPropertyFile(f.path)) continue;
+        for (final m in _scaleRead.allMatches(_literal(f))) {
+          found.add('${f.path}: ${m.group(0)}');
+        }
+      }
+      for (final m in _scaleRead.allMatches(
+        // The page width cap is the page's, not the crumb's.
+        _crumbSource().replaceAll('t.sizes.pageMax', ''),
+      )) {
+        found.add('ParentCrumb: ${m.group(0)}');
+      }
+      expect(found, isEmpty, reason: 'use t.property (PropertyTokens): $found');
+    });
+
+    test('the calendar day cell padding comes from the calendarAdd tokens', () {
+      final src = _literal(File('lib/ui/calendar_view.dart'));
+      expect(src, contains('t.calendarAdd.cellPadding'));
+      expect(
+        RegExp(r'Padding\(\s*padding: wide\s*\? EdgeInsets[^:]*t\.space')
+            .hasMatch(src),
+        isFalse,
+      );
+    });
+
+    test('the property-token rule catches each bad form', () {
+      for (final bad in [
+        'SizedBox(width: t.space.md)',
+        'height: t.sizes.touchTarget',
+        'size: t.icons.sm',
+        'radius: t.radii.small',
+        'Duration(milliseconds: 800)',
+        'mainAxisMaxRatio: 0.8',
+      ]) {
+        expect(_scaleRead.hasMatch(bad), isTrue, reason: bad);
+      }
+      expect(_scaleRead.hasMatch('size: t.property.labelIcon'), isFalse);
     });
 
     test('the padding rule catches each bad form', () {

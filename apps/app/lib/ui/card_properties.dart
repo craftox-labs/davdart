@@ -80,12 +80,14 @@ class _CardPropertiesState extends State<CardProperties>
           groupId: _group,
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              minWidth: t.sizes.dialogSm,
-              maxWidth: t.sizes.dialog,
+              minWidth: t.property.popoverMinWidth,
+              maxWidth: t.property.popoverMaxWidth,
             ),
             child: SingleChildScrollView(
               child: Padding(
-                padding: EdgeInsets.symmetric(vertical: t.space.sm),
+                padding: EdgeInsets.symmetric(
+                  vertical: t.property.cardPopoverPadding,
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -208,13 +210,16 @@ class _CardPropertiesState extends State<CardProperties>
     );
   }
 
-  Widget _label(BuildContext context, String text) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      tokensOf(context).space.lg,
-      tokensOf(context).space.sm,
-      tokensOf(context).space.lg,
-      tokensOf(context).space.xxs,
-    ),
-    child: SectionLabel(text),
-  );
+  Widget _label(BuildContext context, String text) {
+    final p = tokensOf(context).property;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        p.cardLabelSide,
+        p.cardLabelTop,
+        p.cardLabelSide,
+        p.cardLabelBottom,
+      ),
+      child: SectionLabel(text),
+    );
+  }
 }

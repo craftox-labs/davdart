@@ -98,8 +98,8 @@ class _PropertyTriggerState extends State<PropertyTrigger>
             groupId: _group,
             child: ConstrainedBox(
               constraints: BoxConstraints(
-                minWidth: widget.popoverWidth ?? t.sizes.dialogSm,
-                maxWidth: widget.popoverWidth ?? t.sizes.dialog,
+                minWidth: widget.popoverWidth ?? t.property.popoverMinWidth,
+                maxWidth: widget.popoverWidth ?? t.property.popoverMaxWidth,
               ),
               child: widget.picker(context, c),
             ),
@@ -143,7 +143,7 @@ class _PropertyTriggerState extends State<PropertyTrigger>
       await showFSheet<void>(
         context: context,
         side: FLayout.btt,
-        mainAxisMaxRatio: 0.8,
+        mainAxisMaxRatio: tokensOf(context).property.sheetMaxRatio,
         useSafeArea: true,
         builder: (ctx) => SingleChildScrollView(
           key: widget.sheetKey,

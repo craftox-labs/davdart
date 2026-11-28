@@ -72,7 +72,9 @@ class _PropertyRowState extends State<PropertyRow> {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final h = narrowLayout(context) ? t.sizes.touchTarget : t.sizes.propertyRow;
+    final h = narrowLayout(context)
+        ? t.property.rowHeightTouch
+        : t.property.rowHeight;
     final tappable =
         !widget.readOnly && (widget.onTap != null || widget.interactive);
     final text = widget.text;
@@ -101,17 +103,17 @@ class _PropertyRowState extends State<PropertyRow> {
     // text (a title, a section label), and the hover fill does not move it.
     final row = Surface(
       hovered: tappable && _hover,
-      radius: t.radii.small,
+      radius: t.property.rowRadius,
       child: SizedBox(
         height: h,
         child: Row(
           children: [
             SizedBox(
-              width: t.sizes.metaLabel,
+              width: t.property.labelWidth,
               child: Row(
                 children: [
-                  Icon(widget.icon, size: t.icons.sm, color: t.muted),
-                  SizedBox(width: t.space.sm),
+                  Icon(widget.icon, size: t.property.labelIcon, color: t.muted),
+                  SizedBox(width: t.property.labelIconGap),
                   Expanded(
                     child: Text(
                       widget.label,
@@ -123,11 +125,15 @@ class _PropertyRowState extends State<PropertyRow> {
                 ],
               ),
             ),
-            SizedBox(width: t.space.md),
+            SizedBox(width: t.property.labelValueGap),
             Expanded(child: value),
             if (tappable && _hover) ...[
-              SizedBox(width: t.space.sm),
-              Icon(FLucideIcons.chevronRight, size: t.icons.sm, color: t.muted),
+              SizedBox(width: t.property.chevronGap),
+              Icon(
+                FLucideIcons.chevronRight,
+                size: t.property.chevronIcon,
+                color: t.muted,
+              ),
             ],
           ],
         ),
@@ -153,6 +159,6 @@ class PropertyDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    return Container(height: t.borders.hairline, color: t.divider);
+    return Container(height: t.property.dividerThickness, color: t.divider);
   }
 }
