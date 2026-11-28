@@ -1,11 +1,12 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:davdart_app/state/event_rules.dart'
+    show eventAllDaySwitched, eventWhenOf;
 import 'package:davdart_app/state/note_draft.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
-import 'package:davdart_app/ui/parts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 
@@ -487,7 +488,7 @@ void main() {
         );
         expect(t.widget<Text>(_k('event-location')).data, 'Hall');
         expect(t.widget<Text>(_k('event-status-text')).data, 'tentative');
-        expect(find.textContaining('FREQ=WEEKLY;BYDAY=MO'), findsOneWidget);
+        expect(find.text('Weekly on Mon'), findsOneWidget);
         expect(find.text('Hall'), findsWidgets); // breadcrumb too
         await _end(t);
       },
@@ -505,125 +506,133 @@ void main() {
       await _end(t);
     });
 
-    testWidgets('edit, save: title, location, status and all day', (t) async {
+    testWidgets('no pencil: the title, where, status and all day edit here', (
+      t,
+    ) async {
       final s = await pumpTasksApp(
         t,
         events: [mkEvent('k', summary: 'Edit me', days: 1, hour: 9)],
       );
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
-      await t.pumpAndSettle();
-      expect(s.eventDraftFor('k'), isNotNull);
-      expect(_k('dirty-indicator'), findsNothing);
+      // No pencil and no Save or Cancel on an event.
+      for (final k in [
+        'edit-note',
+        'edit-save-action',
+        'edit-cancel-action',
+        'dirty-indicator',
+      ]) {
+        expect(_k(k), findsNothing, reason: k);
+      }
       expect(_k('event-series-note'), findsNothing);
-      await t.enterText(_k('edit-title'), 'Edited');
+      // Where opens its own field in the row (no text buffer yet).
+      await t.tap(_k('event-where-tap'));
+      await t.pumpAndSettle();
       await t.enterText(_k('edit-location'), 'Pub');
-      await t.pump();
-      expect(_k('dirty-indicator'), findsOneWidget);
-      await t.tap(_k('edit-status'));
+      await t.pump(const Duration(milliseconds: 900));
       await t.pumpAndSettle();
-      await t.tap(find.text('confirmed').last);
+      expect(s.eventById('k')!.location, 'Pub');
+      // The title saves on the pause.
+      await t.tap(_k('pane-title'));
       await t.pumpAndSettle();
-      expect(s.eventDraftFor('k')!.status, 'CONFIRMED');
-      await t.tap(_k('edit-allday'));
+      await t.enterText(_k('edit-title'), 'Edited');
+      await t.pump(const Duration(milliseconds: 900));
       await t.pumpAndSettle();
-      expect(_k('edit-start-time'), findsNothing);
-      expect(s.eventDraftFor('k')!.allDay, isTrue);
-      await t.tap(_k('edit-save-action'));
+      expect(s.eventById('k')!.summary, 'Edited');
+      // Status is a pick that saves at once.
+      await t.tap(_k('property-status'));
       await t.pumpAndSettle();
-      final e = s.eventById('k')!;
-      expect(e.summary, 'Edited');
-      expect(e.location, 'Pub');
-      expect(e.status, 'CONFIRMED');
-      expect(e.allDay, isTrue);
-      expect(s.eventDraftFor('k'), isNull);
+      await t.tap(_k('property-option-status-CONFIRMED'));
+      await t.pumpAndSettle();
+      expect(s.eventById('k')!.status, 'CONFIRMED');
+      // All day through the when picker, which stays open.
+      await t.tap(_k('property-when'));
+      await t.pumpAndSettle();
+      await t.tap(_k('property-when-allday'));
+      await t.pumpAndSettle();
+      expect(s.eventById('k')!.allDay, isTrue);
+      expect(_k('property-when-start-time'), findsNothing);
+      expect(_k('property-when-start-date'), findsOneWidget);
       await _end(t);
     });
 
-    testWidgets('the time field drives the draft; end before start blocks', (
-      t,
-    ) async {
+    testWidgets('the when picker moves the start and the end', (t) async {
       final s = await pumpTasksApp(
         t,
         events: [mkEvent('k', days: 1, hour: 9, hours: 1)],
       );
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
+      expect(_k('property-when'), findsOneWidget);
+      await t.tap(_k('property-when'));
       await t.pumpAndSettle();
-      expect(_k('edit-start-date'), findsOneWidget);
-      expect(_k('edit-end-date'), findsOneWidget);
-      expect(_k('edit-start-time'), findsOneWidget);
-      expect(_k('edit-end-time'), findsOneWidget);
-      final d = s.eventDraftFor('k')!;
-      d.moveStart(minutes: 14 * 60);
+      expect(_k('property-when-start-date'), findsOneWidget);
+      expect(_k('property-when-end-date'), findsOneWidget);
+      expect(_k('property-when-start-time'), findsOneWidget);
+      expect(_k('property-when-end-time'), findsOneWidget);
+      // A start date further on moves the end with it (the length stays).
+      await t.tap(_k('property-when-start-date'));
       await t.pumpAndSettle();
-      expect(d.end.hour, 15);
-      d.setEnd(minutes: 13 * 60);
+      t.takeException(); // the test font overflows the calendar header
+      final day = DateTime.now().day == 15 ? 16 : 15;
+      await t.tap(find.text('$day').last);
       await t.pumpAndSettle();
-      expect(_k('edit-error'), findsOneWidget);
-      expect(t.widget<IconAction>(_k('edit-save-action')).onPress, isNull);
-      d.setEnd(minutes: 16 * 60);
-      await t.pumpAndSettle();
-      expect(_k('edit-error'), findsNothing);
-      expect(t.widget<IconAction>(_k('edit-save-action')).onPress, isNotNull);
+      t.takeException();
+      final e = s.eventById('k')!;
+      final w = eventWhenOf(e);
+      expect(w.start.day, day);
+      expect(w.end.difference(w.start), const Duration(hours: 1));
       await _end(t);
     });
 
-    testWidgets('editing a repeating event says it edits the series', (
-      t,
-    ) async {
+    testWidgets('a repeating event says it edits the series', (t) async {
       final s = await pumpTasksApp(
         t,
         events: [mkEvent('k', days: 1, rrule: 'FREQ=DAILY')],
       );
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
-      await t.pumpAndSettle();
       expect(_k('event-series-note'), findsOneWidget);
       expect(find.textContaining('whole series'), findsOneWidget);
+      expect(find.text('Daily'), findsOneWidget);
       await _end(t);
     });
 
-    testWidgets('the repeat section sets weekly days and saves', (t) async {
+    testWidgets('the repeat picker sets weekly days, at once', (t) async {
       final s = await pumpTasksApp(t, events: [mkEvent('k', days: 1, hour: 9)]);
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
+      expect(find.text('Does not repeat'), findsOneWidget);
+      await t.tap(_k('property-repeat'));
       await t.pumpAndSettle();
-      expect(_k('edit-interval'), findsNothing);
-      await t.tap(_k('edit-repeat'));
+      expect(_k('property-repeat-interval'), findsNothing);
+      await t.tap(_k('property-repeat-repeat'));
       await t.pumpAndSettle();
       await t.tap(find.text('Weekly').last);
       await t.pumpAndSettle();
-      expect(s.eventDraftFor('k')!.rrule, startsWith('FREQ=WEEKLY;BYDAY='));
-      expect(_k('edit-interval'), findsOneWidget);
-      await t.tap(_k('edit-weekday-1'));
+      expect(s.eventById('k')!.rrule, startsWith('FREQ=WEEKLY;BYDAY='));
+      expect(_k('property-repeat-interval'), findsOneWidget);
+      await t.tap(_k('property-repeat-weekday-1'));
       await t.pumpAndSettle();
-      await t.tap(_k('edit-weekday-3'));
+      await t.tap(_k('property-repeat-weekday-3'));
       await t.pumpAndSettle();
-      final r = RepeatRule.parse(s.eventDraftFor('k')!.rrule)!;
-      expect(r.weekdays, contains(1));
-      await t.tap(_k('edit-save-action'));
-      await t.pumpAndSettle();
-      expect(s.eventById('k')!.rrule, startsWith('FREQ=WEEKLY'));
+      final r = RepeatRule.parse(s.eventById('k')!.rrule)!;
+      expect(r.weekdays, contains(3));
       await _end(t);
     });
 
-    testWidgets('a custom repeat rule is shown and kept', (t) async {
+    testWidgets('a custom repeat rule is shown as it is', (t) async {
       final s = await pumpTasksApp(
         t,
         events: [mkEvent('k', days: 1, rrule: 'FREQ=MONTHLY;BYDAY=-1FR')],
       );
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
+      expect(find.text('FREQ=MONTHLY;BYDAY=-1FR'), findsOneWidget);
+      await t.tap(_k('property-repeat'));
       await t.pumpAndSettle();
-      expect(_k('edit-custom'), findsOneWidget);
-      expect(_k('edit-interval'), findsNothing);
-      expect(s.eventDraftFor('k')!.dirty, isFalse);
+      expect(_k('property-repeat-custom'), findsOneWidget);
+      expect(_k('property-repeat-interval'), findsNothing);
       await _end(t);
     });
 
@@ -640,19 +649,23 @@ void main() {
       await _end(t);
     });
 
-    testWidgets('empty title cannot be saved', (t) async {
-      final s = await pumpTasksApp(t, events: [mkEvent('k')]);
+    testWidgets('an empty title is not saved and says so', (t) async {
+      final s = await pumpTasksApp(t, events: [mkEvent('k', summary: 'Keep')]);
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
+      await t.tap(_k('pane-title'));
       await t.pumpAndSettle();
       await t.enterText(_k('edit-title'), '  ');
-      await t.pump();
-      expect(t.widget<IconAction>(_k('edit-save-action')).onPress, isNull);
+      await t.pump(const Duration(milliseconds: 900));
+      await t.pumpAndSettle();
+      expect(s.eventById('k')!.summary, 'Keep');
+      expect(find.textContaining('Not saved'), findsOneWidget);
       await _end(t);
     });
 
-    testWidgets('dirty guard: keep editing, discard, save', (t) async {
+    testWidgets('leaving an event saves its typed text without asking', (
+      t,
+    ) async {
       final s = await pumpTasksApp(
         t,
         events: [
@@ -665,21 +678,13 @@ void main() {
       s.startEventEdit('k');
       s.eventDraftFor('k')!.titleController.text = 'Changed';
       await t.pump();
-      expect(_k('dirty-indicator'), findsWidgets);
+      // An event's text has no edit mode to ask about: it commits.
       s.leaveGuard = () async => DraftChoice.keep;
-      await s.openNote('m');
-      expect(s.peekUid, 'k');
-      s.leaveGuard = () async => DraftChoice.discard;
-      await s.openNote('m');
-      expect(s.peekUid, 'm');
-      expect(s.eventById('k')!.summary, 'Guard');
-      s.select('k');
-      s.startEventEdit('k');
-      s.eventDraftFor('k')!.titleController.text = 'Saved';
-      s.leaveGuard = () async => DraftChoice.save;
       await t.runAsync(() => s.openNote('m'));
       await t.pumpAndSettle();
-      expect(s.eventById('k')!.summary, 'Saved');
+      expect(s.peekUid, 'm');
+      expect(s.eventById('k')!.summary, 'Changed');
+      expect(s.eventDraftFor('k'), isNull);
       await _end(t);
     });
 
@@ -693,7 +698,6 @@ void main() {
       await t.pumpAndSettle();
       expect(s.mainEventUid, 'k');
       expect(s.eventDraftFor('k')!.titleController.text, 'Typed');
-      expect(find.text('Typed'), findsWidgets);
       expect(_k('main-note'), findsOneWidget);
       await _end(t);
     });
@@ -822,7 +826,7 @@ void main() {
         'An exceedingly long event title that goes on and on '
         'without any sensible place to stop at all, really';
     for (final w in [320.0, 600.0, 880.0, 1280.0, 1911.0]) {
-      testWidgets('panel, menu, dialog, detail and editor at $w', (t) async {
+      testWidgets('panel, menu, dialog, detail and fields at $w', (t) async {
         final s = await pumpTasksApp(
           t,
           events: [
@@ -866,15 +870,17 @@ void main() {
         expect(t.takeException(), isNull, reason: 'detail at $w');
         s.startEventEdit('l1');
         await t.pumpAndSettle();
-        expect(t.takeException(), isNull, reason: 'editor at $w');
-        s.eventDraftFor('l1')!.setAllDay(true);
+        expect(t.takeException(), isNull, reason: 'fields at $w');
+        var when = eventWhenOf(s.eventById('l1')!);
+        when = eventAllDaySwitched(when, true);
+        await s.setEventWhen('l1', when);
         await t.pumpAndSettle();
-        expect(t.takeException(), isNull, reason: 'editor all day at $w');
+        expect(t.takeException(), isNull, reason: 'all day at $w');
         s.openEventTab('l2');
         await t.pumpAndSettle();
         s.startEventEdit('l2');
         await t.pumpAndSettle();
-        expect(t.takeException(), isNull, reason: 'main editor at $w');
+        expect(t.takeException(), isNull, reason: 'main fields at $w');
         await _end(t);
       });
     }

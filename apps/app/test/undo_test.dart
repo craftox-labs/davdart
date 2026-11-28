@@ -6,6 +6,8 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:davdart_app/state/event_rules.dart';
+
 import 'tasks_helper.dart';
 
 Finder _k(String k) => find.byKey(Key(k));
@@ -292,6 +294,77 @@ void main() {
     );
     expect(await s.setTaskParent('p', 'c'), isFalse);
     expect(s.taskById('p')!.parentUid, isNull);
+  });
+
+  testWidgets('an event status pick toasts, Undo puts it back', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      events: [mkEvent('e', summary: 'Standup', status: 'CONFIRMED')],
+    );
+    expect(await s.setEventStatus('e', 'TENTATIVE'), isTrue);
+    await t.pumpAndSettle();
+    expect(s.eventById('e')!.status, 'TENTATIVE');
+    expect(find.text('Status of "Standup" set to tentative'), findsOneWidget);
+    await t.tap(_k('board-undo'));
+    await t.pumpAndSettle();
+    expect(s.eventById('e')!.status, 'CONFIRMED');
+    // Clearing it is undone too.
+    expect(await s.setEventStatus('e', null), isTrue);
+    await s.undoBoard(s.pendingUndo!);
+    await t.pumpAndSettle();
+    expect(s.eventById('e')!.status, 'CONFIRMED');
+  });
+
+  testWidgets('an event when pick toasts, Undo puts the time back', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      events: [mkEvent('e', summary: 'Standup', days: 0, hour: 9)],
+    );
+    final before = eventWhenOf(s.eventById('e')!);
+    final moved = eventStartMoved(before, minutes: 14 * 60);
+    expect(await s.setEventWhen('e', moved), isTrue);
+    await t.pumpAndSettle();
+    expect(eventWhenOf(s.eventById('e')!).start.hour, 14);
+    expect(find.text('When of "Standup" changed'), findsOneWidget);
+    await t.tap(_k('board-undo'));
+    await t.pumpAndSettle();
+    final back = eventWhenOf(s.eventById('e')!);
+    expect(back, before);
+    // All day and back through the Undo restores the timed fields.
+    expect(await s.setEventWhen('e', eventAllDaySwitched(back, true)), isTrue);
+    expect(s.eventById('e')!.allDay, isTrue);
+    await s.undoBoard(s.pendingUndo!);
+    await t.pumpAndSettle();
+    expect(s.eventById('e')!.allDay, isFalse);
+    expect(eventWhenOf(s.eventById('e')!), before);
+  });
+
+  testWidgets('clearing an event repeat restores it and its exceptions', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(
+      t,
+      events: [
+        Event(
+          uid: 'e',
+          summary: 'Weekly',
+          dtstart: ICalDate('20261201T090000Z'),
+          dtend: ICalDate('20261201T100000Z'),
+          rrule: 'FREQ=WEEKLY',
+          exdates: ['EXDATE:20261208T090000Z'],
+          lastModified: DateTime.utc(2026, 1, 1),
+        ),
+      ],
+    );
+    expect(await s.setEventRrule('e', null), isTrue);
+    await t.pumpAndSettle();
+    expect(s.eventById('e')!.rrule, isNull);
+    expect(s.eventById('e')!.exdates, isEmpty);
+    expect(find.text('Repeat of "Weekly" cleared'), findsOneWidget);
+    await t.tap(_k('board-undo'));
+    await t.pumpAndSettle();
+    expect(s.eventById('e')!.rrule, 'FREQ=WEEKLY');
+    expect(s.eventById('e')!.exdates, ['EXDATE:20261208T090000Z']);
   });
 
   testWidgets('undo of an item deleted meanwhile does nothing', (t) async {

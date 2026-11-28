@@ -405,7 +405,9 @@ void main() {
       _noError(t);
     });
 
-    testWidgets('an event: toggle, ⋯, autosave of text', (t) async {
+    testWidgets('an event: no toggle, the text and the rows edit in place', (
+      t,
+    ) async {
       final s = await pumpTasksApp(
         t,
         events: [mkEvent('e1', summary: 'Standup')],
@@ -413,15 +415,25 @@ void main() {
       );
       await s.openNote('e1');
       await t.pumpAndSettle();
-      expect(_icon(FLucideIcons.pencil), findsOneWidget);
-      await t.tap(_k('item-mode'));
+      expect(_k('item-more'), findsOneWidget);
+      expect(_k('item-mode'), findsNothing);
+      expect(_k('edit-note'), findsNothing);
+      // The empty description offers the way into its field.
+      await t.ensureVisible(_k('event-description-tap'));
       await t.pumpAndSettle();
-      expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
-      expect(_k('edit-save-action'), findsNothing);
+      await t.tap(_k('event-description-tap'));
+      await t.pumpAndSettle();
       await t.enterText(_k('edit-body'), 'Agenda');
-      await t.pump(const Duration(milliseconds: 1600));
+      await t.pump(const Duration(milliseconds: 900));
       await t.pumpAndSettle();
       expect(s.eventById('e1')!.description, contains('Agenda'));
+      // The status row is a sheet of the same options.
+      await t.tap(_k('property-status'));
+      await t.pumpAndSettle();
+      expect(_k('property-sheet-status'), findsOneWidget);
+      await t.tap(_k('property-option-status-TENTATIVE'));
+      await t.pumpAndSettle();
+      expect(s.eventById('e1')!.status, 'TENTATIVE');
       await t.tap(_k('item-more'));
       await t.pumpAndSettle();
       expect(_k('menu-delete'), findsOneWidget);

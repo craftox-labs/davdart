@@ -80,29 +80,27 @@ void main() {
       expect(d.dirty, isTrue);
     });
 
-    test(
-      'event: fields follow; a selector save keeps the remote text',
-      () async {
-        final server = FakeCalDav()..external('re.ics', _event(summary: 'Old'));
-        final s = await _open(server);
-        s.startEventEdit('re');
-        final d = s.eventDraftFor('re')!;
-        server.external(
-          're.ics',
-          _event(summary: 'Remote edit', location: 'Hall'),
-        );
-        await s.sync();
-        expect(d.titleController.text, 'Remote edit');
-        expect(d.locationController.text, 'Hall');
-        expect(d.dirty, isFalse);
-        d.setStatus('TENTATIVE');
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        final e = s.eventById('re')!;
-        expect(e.summary, 'Remote edit');
-        expect(e.location, 'Hall');
-        expect(e.status, 'TENTATIVE');
-      },
-    );
+    test('event: the text follows the synced event', () async {
+      final server = FakeCalDav()..external('re.ics', _event(summary: 'Old'));
+      final s = await _open(server);
+      s.startEventEdit('re');
+      final d = s.eventDraftFor('re')!;
+      server.external(
+        're.ics',
+        _event(summary: 'Remote edit', location: 'Hall'),
+      );
+      await s.sync();
+      expect(d.titleController.text, 'Remote edit');
+      expect(d.locationController.text, 'Hall');
+      expect(d.dirty, isFalse);
+      // A pick writes straight to the event; the buffer stays out of it.
+      expect(await s.setEventStatus('re', 'TENTATIVE'), isTrue);
+      final e = s.eventById('re')!;
+      expect(e.summary, 'Remote edit');
+      expect(e.location, 'Hall');
+      expect(e.status, 'TENTATIVE');
+      expect(d.dirty, isFalse);
+    });
 
     test('event: a draft with changes is never overwritten', () async {
       final server = FakeCalDav()..external('re.ics', _event(summary: 'Old'));

@@ -425,6 +425,58 @@ void main() {
     });
   });
 
+  group('when and repeat wording', () {
+    test('a repeat rule reads as one line', () {
+      expect(repeatLabel(null), 'Does not repeat');
+      expect(repeatLabel(''), 'Does not repeat');
+      expect(repeatLabel('FREQ=DAILY'), 'Daily');
+      expect(repeatLabel('FREQ=WEEKLY;BYDAY=MO,WE'), 'Weekly on Mon, Wed');
+      expect(repeatLabel('FREQ=WEEKLY;INTERVAL=2'), 'Every 2 weeks');
+      expect(repeatLabel('FREQ=MONTHLY;COUNT=4'), 'Monthly, 4 times');
+      expect(
+        repeatLabel('FREQ=YEARLY;UNTIL=20261231'),
+        'Yearly, until ${dayLabel(DateTime.utc(2026, 12, 31))}',
+      );
+      // A rule the picker cannot write back is shown as it is.
+      expect(repeatLabel('FREQ=MONTHLY;BYDAY=-1FR'), 'FREQ=MONTHLY;BYDAY=-1FR');
+    });
+
+    test('the when fields switch to all day and back', () {
+      var when = (
+        allDay: false,
+        start: DateTime.utc(2026, 12, 1, 9),
+        end: DateTime.utc(2026, 12, 1, 10),
+      );
+      final allDay = eventAllDaySwitched(when, true);
+      expect(allDay.allDay, isTrue);
+      expect(allDay.start, DateTime.utc(2026, 12, 1));
+      expect(allDay.end, DateTime.utc(2026, 12, 1));
+      when = eventAllDaySwitched(allDay, false);
+      expect(when.allDay, isFalse);
+      expect(when.start.hour, 9);
+      expect(when.end.hour, 10);
+      // Moving the start keeps the length; the end is set on its own.
+      final moved = eventStartMoved(when, minutes: 14 * 60);
+      expect(moved.start.hour, 14);
+      expect(moved.end.hour, 15);
+      expect(eventEndSet(moved, minutes: 16 * 60).end.hour, 16);
+      expect(
+        eventStartMoved(when, date: DateTime.utc(2026, 12, 3)).start.day,
+        3,
+      );
+    });
+
+    test('an event with no times starts today', () {
+      final e = Event(uid: 'x', summary: 'x');
+      LocalZone.use('Asia/Bangkok');
+      addTearDown(() => LocalZone.use(null));
+      final when = eventWhenOf(e);
+      expect(when.allDay, isFalse);
+      expect(when.start, wallDay(wallNow(DateTime.now())));
+      expect(when.end, when.start);
+    });
+  });
+
   group('drafts', () {
     test('start, edit, dirty, save, discard', () async {
       final s = await _open(MemoryStorage(), seed: _Seed());
@@ -437,30 +489,34 @@ void main() {
       s.startEventEdit(uid);
       final d = s.eventDraftFor(uid)!;
       expect(d.dirty, isFalse);
-      expect(d.allDay, isFalse);
-      expect(d.start, DateTime.utc(2026, 12, 1, 9));
       d.titleController.text = 'Plan B';
       expect(s.dirtyEventFor(uid), isTrue);
-      d.moveStart(minutes: 11 * 60);
-      expect(d.end, DateTime.utc(2026, 12, 1, 12)); // the length stays
-      d.setEnd(minutes: 10 * 60);
-      expect(d.endBeforeStart, isTrue);
-      expect(await s.saveEventDraft(uid), isFalse);
-      d.setEnd(minutes: 13 * 60);
       expect(await s.saveEventDraft(uid), isTrue);
       expect(s.eventDraftFor(uid), isNull);
       final e = s.eventById(uid)!;
       expect(e.summary, 'Plan B');
-      expect(e.dtstart!.value, '20261201T040000Z');
-      expect(e.dtend!.value, '20261201T060000Z');
-      s.startEventEdit(uid);
-      s.eventDraftFor(uid)!.setAllDay(true);
-      expect(s.eventDraftFor(uid)!.dirty, isTrue);
-      s.eventDraftFor(uid)!.setAllDay(false);
-      expect(s.eventDraftFor(uid)!.start.hour, 9);
-      s.discardEdit(uid);
-      expect(s.eventDraftFor(uid), isNull);
-      // an empty title cannot be saved
+      // The start and end only change through a when pick.
+      expect(e.dtstart!.value, '20261201T020000Z');
+      expect(e.dtend!.value, '20261201T030000Z');
+      // When is a pick now: moving the start keeps the length.
+      var when = eventWhenOf(e);
+      when = eventStartMoved(when, minutes: 11 * 60);
+      expect(when.end, DateTime.utc(2026, 12, 1, 12));
+      expect(await s.setEventWhen(uid, when), isTrue);
+      final moved = s.eventById(uid)!;
+      expect(moved.dtstart!.value, '20261201T040000Z');
+      expect(moved.dtend!.value, '20261201T050000Z');
+      // An end before the start is taken as the start (the pick cannot
+      // produce one; updateEvent clamps it too).
+      expect(
+        await s.setEventWhen(uid, (
+          allDay: false,
+          start: moved.startWall!,
+          end: moved.startWall!,
+        )),
+        isTrue,
+      );
+      expect(s.eventById(uid)!.dtend, isNull);
       s.startEventEdit(uid);
       s.eventDraftFor(uid)!.titleController.text = ' ';
       expect(await s.saveEventDraft(uid), isFalse);
@@ -475,24 +531,19 @@ void main() {
           start: DateTime.utc(2026, 12, 1, 9),
           end: DateTime.utc(2026, 12, 1, 10),
         ))!;
-        s.startEventEdit(uid);
-        var d = s.eventDraftFor(uid)!;
-        expect(d.rrule, isNull);
-        d.setRrule('FREQ=WEEKLY;BYDAY=TU');
-        expect(d.dirty, isTrue);
-        expect(await s.saveEventDraft(uid), isTrue);
+        expect(s.eventById(uid)!.rrule, isNull);
+        expect(await s.setEventRrule(uid, 'FREQ=WEEKLY;BYDAY=TU'), isTrue);
         expect(s.eventById(uid)!.rrule, 'FREQ=WEEKLY;BYDAY=TU');
-        s.startEventEdit(uid);
-        d = s.eventDraftFor(uid)!;
-        expect(d.dirty, isFalse);
-        d.setRrule('FREQ=WEEKLY;BYDAY=TU,TH;COUNT=4');
-        expect(await s.saveEventDraft(uid), isTrue);
+        expect(
+          await s.setEventRrule(uid, 'FREQ=WEEKLY;BYDAY=TU,TH;COUNT=4'),
+          isTrue,
+        );
         expect(s.eventById(uid)!.rrule, 'FREQ=WEEKLY;BYDAY=TU,TH;COUNT=4');
-        s.startEventEdit(uid);
-        s.eventDraftFor(uid)!.setRrule(null);
-        expect(await s.saveEventDraft(uid), isTrue);
+        expect(await s.setEventRrule(uid, null), isTrue);
         expect(s.eventById(uid)!.rrule, isNull);
         expect(s.eventById(uid)!.isRecurring, isFalse);
+        // Setting the same rule again writes nothing.
+        expect(await s.setEventRrule(uid, null), isTrue);
       },
     );
 
@@ -506,11 +557,11 @@ void main() {
           end: DateTime.utc(2026, 12, 3),
           allDay: true,
         ))!;
+        final allDay = s.eventById(uid)!;
+        expect(allDay.allDay, isTrue);
+        expect(eventWhenOf(allDay).end, DateTime.utc(2026, 12, 3));
         s.startEventEdit(uid);
-        final d = s.eventDraftFor(uid)!;
-        expect(d.allDay, isTrue);
-        expect(d.end, DateTime.utc(2026, 12, 3));
-        d.locationController.text = 'Alps';
+        s.eventDraftFor(uid)!.locationController.text = 'Alps';
         expect(await s.saveEventDraft(uid), isTrue);
         final e = s.eventById(uid)!;
         expect(e.location, 'Alps');
@@ -518,27 +569,20 @@ void main() {
       },
     );
 
-    test('read-only: no draft; dirty guard covers the peek and tabs', () async {
+    test('leaving an event saves its inline text without asking', () async {
       final s = await _open(MemoryStorage(), seed: _Seed());
       final a = (await s.addEvent('A', start: _day))!;
       final b = (await s.addEvent('B', start: _day))!;
       s.select(a);
       s.startEventEdit(a);
       s.eventDraftFor(a)!.titleController.text = 'Changed';
+      // An event's text has no edit mode to ask about: it commits.
       s.leaveGuard = () async => DraftChoice.keep;
       await s.openNote(b);
-      expect(s.peekUid, a);
-      s.leaveGuard = () async => DraftChoice.discard;
-      await s.openNote(b);
       expect(s.peekUid, b);
-      expect(s.eventById(a)!.summary, 'A');
-      s.select(a);
-      s.startEventEdit(a);
-      s.eventDraftFor(a)!.titleController.text = 'Saved';
-      s.leaveGuard = () async => DraftChoice.save;
-      await s.openNote(b);
-      expect(s.eventById(a)!.summary, 'Saved');
-      // peek and main tab share the draft
+      expect(s.eventById(a)!.summary, 'Changed');
+      expect(s.eventDraftFor(a), isNull);
+      // peek and main tab share the buffer
       s.select(a);
       s.startEventEdit(a);
       s.eventDraftFor(a)!.titleController.text = 'Typed';
@@ -547,10 +591,11 @@ void main() {
       expect(s.eventDraftFor(a)!.titleController.text, 'Typed');
       expect(s.tabDirty(DocTab.event(a)), isTrue);
       expect(s.tabs.single.code, 'e:$a');
+      // Closing the tab commits the text and closes it.
       s.leaveGuard = () async => DraftChoice.keep;
       await s.closeTab(DocTab.event(a));
-      expect(s.tabs, isNotEmpty);
-      expect(await s.unsyncedInCurrent(), greaterThanOrEqualTo(1));
+      expect(s.tabs, isEmpty);
+      expect(s.eventById(a)!.summary, 'Typed');
     });
 
     test('a dirty draft outlives its deleted event, with a notice', () async {
@@ -847,9 +892,8 @@ void main() {
       );
       final g = s.upcomingOccurrences(day, 7);
       expect(g.first.id, 'today');
-      // Editing writes back UTC: the draft holds local wall time.
-      s.startEventEdit('u');
-      expect(s.eventDraftFor('u')!.start, e.startWall);
+      // Editing writes back UTC: the row holds local wall time.
+      expect(eventWhenOf(s.eventById('u')!).start, e.startWall);
       final ns = e.startWall!.add(const Duration(hours: 1));
       expect(
         await s.updateEvent(

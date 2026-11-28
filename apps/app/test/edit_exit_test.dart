@@ -42,12 +42,6 @@ void main() {
       (s) => s.startEdit('n1'),
       (s) => s.draftFor('n1')!.titleController.text = 'Changed',
     ),
-    _Kind(
-      'event',
-      'e1',
-      (s) => s.startEventEdit('e1'),
-      (s) => s.eventDraftFor('e1')!.titleController.text = 'Changed',
-    ),
   ];
 
   Future<AppState> open(WidgetTester t, _Kind k, {bool main = false}) async {
@@ -184,6 +178,62 @@ void main() {
     await t.pump();
     await _esc(t);
     expect(s.isEditing('k1'), isFalse);
+  });
+
+  group('edit exit: event (inline text)', () {
+    Future<AppState> openEvent(WidgetTester t) async {
+      final s = await pumpTasksApp(
+        t,
+        events: [mkEvent('e1', summary: 'Event one', days: 0, hour: 9)],
+      );
+      s.select('e1');
+      await t.pumpAndSettle();
+      s.startEventEdit('e1');
+      await t.pumpAndSettle();
+      expect(s.isEditing('e1'), isTrue);
+      return s;
+    }
+
+    testWidgets('an event header has no Cancel or Save icon', (t) async {
+      await openEvent(t);
+      expect(_k('edit-cancel-action'), findsNothing);
+      expect(_k('edit-save-action'), findsNothing);
+      expect(_k('edit-note'), findsNothing);
+      expect(_k('inline-text-editing'), findsOneWidget);
+    });
+
+    testWidgets('Esc reverts the field; the next Esc leaves the buffer', (
+      t,
+    ) async {
+      final s = await openEvent(t);
+      await t.enterText(_k('edit-title'), 'Half typed');
+      await _esc(t);
+      expect(s.eventDraftFor('e1')!.titleController.text, 'Event one');
+      expect(s.eventById('e1')!.summary, 'Event one');
+      expect(_k('inline-text-editing'), findsNothing);
+      expect(s.isEditing('e1'), isTrue);
+      await _esc(t);
+      expect(s.isEditing('e1'), isFalse);
+    });
+
+    testWidgets('Ctrl+Enter saves the text and closes the buffer', (t) async {
+      final s = await openEvent(t);
+      await t.enterText(_k('edit-title'), 'Saved by keys');
+      await _ctrlEnter(t);
+      expect(s.eventById('e1')!.summary, 'Saved by keys');
+      expect(s.isEditing('e1'), isFalse);
+    });
+
+    testWidgets('the text fields are the title, where and description', (
+      t,
+    ) async {
+      final s = await openEvent(t);
+      // A buffer holds three fields; each is its own row or header field.
+      expect(_k('edit-title'), findsOneWidget);
+      expect(_k('edit-location'), findsOneWidget);
+      expect(_k('edit-body'), findsOneWidget);
+      expect(s.eventDraftFor('e1')!.titleController.text, 'Event one');
+    });
   });
 
   group('edit exit: task (inline text)', () {
