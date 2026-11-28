@@ -300,13 +300,16 @@ class SizeTokens {
     this.calendarWidth = 320,
     this.calendarCellMax = 72,
     this.calendarCell = 36,
-    this.calendarCellChips = 104,
+    this.calendarCellChips = 120,
     this.segmentMin = 72,
     this.segmentHeight = 28,
     this.calendarDot = 5,
     this.calendarNumber = 22,
+    this.calendarNumberRow = 24,
     this.calendarChip = 16,
     this.calendarChipBar = 3,
+    this.calendarLanePitch = 18,
+    this.calendarLanes = 3,
     this.ring = 2,
     this.progressBar = 4,
     this.statLabel = 80,
@@ -394,8 +397,14 @@ class SizeTokens {
   final double calendarDot, ring;
 
   /// Diameter of the circle (or ring) around a day cell's date number, the
-  /// height of a day cell's event/task chip and the width of its tone bar.
-  final double calendarNumber, calendarChip, calendarChipBar;
+  /// height of that number's row at the top of the cell (the bars start under
+  /// it), the height of a day cell's event/task chip and of a multi-day bar,
+  /// the width of the tone bar on either, the pitch of the lane bars (a bar
+  /// plus the gap under it) and the most lanes a cell shows (more go into
+  /// "+N more").
+  final double calendarNumber, calendarNumberRow, calendarChip, calendarChipBar;
+  final double calendarLanePitch;
+  final int calendarLanes;
 
   /// Height of the thin progress bar on a project row.
   final double progressBar;
