@@ -34,7 +34,7 @@ class PropertyPicker<T> extends StatefulWidget {
   /// The picker content; `apply` writes the picked value.
   final Widget Function(
     BuildContext context,
-    FPopoverControl control,
+    FPopoverController control,
     ValueChanged<T?> apply,
   )
   picker;

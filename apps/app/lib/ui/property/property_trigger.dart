@@ -19,7 +19,8 @@ class PropertyTrigger extends StatefulWidget {
     this.sheetKey,
   });
 
-  final Widget Function(BuildContext context, FPopoverControl control) picker;
+  final Widget Function(BuildContext context, FPopoverController control)
+  picker;
   final Widget child;
   final Key? sheetKey;
 
@@ -38,12 +39,12 @@ class _PropertyTriggerState extends State<PropertyTrigger>
     return TrackPopover(
       builder: (context, pc) => FPopover(
         control: pc,
-        popoverBuilder: (context, _) => ConstrainedBox(
+        popoverBuilder: (context, c) => ConstrainedBox(
           constraints: BoxConstraints(
             minWidth: t.sizes.dialogSm,
             maxWidth: t.sizes.dialog,
           ),
-          child: widget.picker(context, pc),
+          child: widget.picker(context, c),
         ),
         builder: (context, c, child) =>
             FTappable(onPress: c.toggle, child: child!),
@@ -72,7 +73,7 @@ class _PropertyTriggerState extends State<PropertyTrigger>
         useSafeArea: true,
         builder: (ctx) => SingleChildScrollView(
           key: widget.sheetKey,
-          child: widget.picker(ctx, FPopoverControl.managed(controller: c)),
+          child: widget.picker(ctx, c),
         ),
       );
     } finally {
