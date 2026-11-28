@@ -293,19 +293,53 @@ void main() {
       d.titleController.text = '';
       expect(await s.saveTaskDraft(uid), isFalse);
       d.titleController.text = 'Two';
-      d.setPriority(3);
-      d.setDue(ICalDate.date(2026, 12, 2));
-      d.tagsController.text = 'a, b';
       expect(s.dirtyTaskFor(uid), isTrue);
       expect(await s.saveTaskDraft(uid), isTrue);
       expect(s.taskDraftFor(uid), isNull);
-      final t = s.taskById(uid)!;
-      expect((t.summary, t.priority, t.due!.value), ('Two', 3, '20261202'));
-      expect(t.categories, ['a', 'b']);
+      expect(s.taskById(uid)!.summary, 'Two');
       s.startTaskEdit(uid);
       s.taskDraftFor(uid)!.titleController.text = 'Nope';
       s.discardEdit(uid);
       expect(s.taskById(uid)!.summary, 'Two');
+    });
+
+    test('a text save writes only the text, never a picked selector', () async {
+      final s = await _open(MemoryStorage(), seed: _Seed());
+      final uid = (await s.addTask('One'))!;
+      s.startTaskEdit(uid);
+      final d = s.taskDraftFor(uid)!;
+      d.titleController.text = 'Title only';
+      // A pick and an Undo land while the text is still dirty.
+      expect(
+        await s.updateTask(
+          uid,
+          tags: ['a'],
+          setDue: true,
+          due: ICalDate.date(2026, 12, 2),
+          setPriority: true,
+          priority: 3,
+        ),
+        isTrue,
+      );
+      expect(await s.saveTaskDraft(uid), isTrue);
+      final t = s.taskById(uid)!;
+      expect(t.summary, 'Title only');
+      expect(t.categories, ['a']);
+      expect(t.due!.value, '20261202');
+      expect(t.priority, 3);
+    });
+
+    test('a title edit leaves a synced description alone', () async {
+      final s = await _open(MemoryStorage(), seed: _Seed());
+      final uid = (await s.addTask('One'))!;
+      s.startTaskEdit(uid);
+      s.taskDraftFor(uid)!.titleController.text = 'Renamed';
+      // Something else changed the description (a sync, another client).
+      await s.updateTask(uid, description: 'From elsewhere');
+      expect(await s.saveTaskDraft(uid), isTrue);
+      final t = s.taskById(uid)!;
+      expect(t.summary, 'Renamed');
+      expect(t.description, 'From elsewhere');
     });
 
     test('text typed while saving stays as the draft', () async {

@@ -3546,11 +3546,6 @@ class AppState extends ChangeNotifier {
   void _focusEditor(String uid) =>
       nav.focusArea(uid == mainItemUid ? NavArea.main : NavArea.peek);
 
-  String? _taskParentOf(Task t) =>
-      t.parentUid != null && findItem(t.parentUid!) != null
-      ? t.parentUid
-      : null;
-
   /// Opens the text buffer of task [uid] (no-op if read-only or unknown) and
   /// focuses one of its inline fields: the title, or the description with
   /// [focusBody] (a tap on the value it edits). It stays open until the page
@@ -3560,20 +3555,10 @@ class AppState extends ChangeNotifier {
   void startTaskEdit(String uid, {bool focusBody = false}) {
     final t = _taskById(uid);
     if (t == null || !tasksEditable) return;
-    var d = _taskDrafts[uid];
-    if (d == null) {
-      d = TaskDraft(
-        uid: uid,
-        title: t.summary,
-        body: t.description,
-        tags: _plainTags(t.categories).join(', '),
-        originalParent: _taskParentOf(t),
-        originalDue: t.due,
-        originalPriority: t.priority,
-      );
+    if (!_taskDrafts.containsKey(uid)) {
+      final d = TaskDraft(uid: uid, title: t.summary, body: t.description);
       _taskDrafts[uid] = d;
-      final fresh = d;
-      _watchDraft(uid, fresh, () => (fresh.parent, fresh.due, fresh.priority));
+      _watchDraft(uid, d);
     }
     // The field the page builds next opens and takes the focus (a tap on the
     // value, or `e` on the item).
@@ -3602,39 +3587,24 @@ class AppState extends ChangeNotifier {
     return ok;
   }
 
-  /// Saves the edit of task [uid]. Text typed while the save runs stays as
-  /// the draft, still dirty. False if nothing was saved.
+  /// Saves the text buffer of task [uid]: only the field that changed, so a
+  /// value written elsewhere (a pick, an undo, a sync) is never put back by
+  /// this save. Text typed while the save runs stays as the draft, still
+  /// dirty. False if nothing was saved.
   Future<bool> saveTaskDraft(String uid, {bool stay = false}) async {
     final d = _taskDrafts[uid];
     if (d == null || d.titleEmpty) return false;
-    final title = d.titleController.text;
-    final body = d.bodyController.text;
-    final tagText = d.tagsController.text;
-    final parent = d.parent;
-    final due = d.due;
-    final priority = d.priority;
-    final ok = await updateTask(
-      uid,
-      title: title,
-      description: body,
-      tags: d.tagList,
-      setParent: parent != d.originalParent,
-      parentUid: parent,
-      setDue: due != d.originalDue,
-      due: due,
-      setPriority: priority != d.originalPriority,
-      priority: priority,
-    );
+    final title = d.titleDirty ? d.titleController.text : null;
+    final body = d.bodyDirty ? d.bodyController.text : null;
+    if (title == null && body == null) {
+      if (!stay) _taskDrafts.remove(uid);
+      notifyListeners();
+      return true;
+    }
+    final ok = await updateTask(uid, title: title, description: body);
     if (!ok) return false;
     if (_taskDrafts[uid] == d) {
-      d.markSaved(
-        title: title,
-        body: body,
-        tags: tagText,
-        parent: parent,
-        due: due,
-        priority: priority,
-      );
+      d.markSaved(title: title, body: body);
       if (!d.dirty && !stay) _taskDrafts.remove(uid);
     }
     notifyListeners();
@@ -4644,13 +4614,14 @@ class AppState extends ChangeNotifier {
   }
 
   /// Saves [uid] when [draft] changes (narrow only): at once when [choices]
-  /// (the selector values) changed, else after the typing pause.
-  void _watchDraft(String uid, Listenable draft, Object Function() choices) {
-    var last = choices();
+  /// (the selector values) changed, else after the typing pause. A task's
+  /// buffer has no selector, so it always takes the pause.
+  void _watchDraft(String uid, Listenable draft, [Object Function()? choices]) {
+    var last = choices?.call();
     draft.addListener(() {
       if (!narrow || !isEditing(uid)) return;
-      final now = choices();
-      final picked = now != last;
+      final now = choices?.call();
+      final picked = choices != null && now != last;
       last = now;
       _autosaveTimers.remove(uid)?.cancel();
       if (!dirtyItem(uid)) return;
@@ -4727,31 +4698,18 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Like [_rebaseDrafts] for tasks: a clean draft takes the synced task, a
-  /// draft with changes is left alone. The task text buffer exists on both
-  /// layouts, so this runs always.
+  /// Like [_rebaseDrafts] for tasks: a buffer with nothing typed takes the
+  /// text a sync brought, a buffer with typed text is left alone. The task
+  /// text buffer exists on both layouts, so this runs always.
   void _rebaseTaskDrafts() {
     for (final d in _taskDrafts.values) {
       final t = _taskById(d.uid);
       if (t == null || d.dirty) continue;
-      final tags = _plainTags(t.categories).join(', ');
-      final parent = _taskParentOf(t);
       if (t.summary.trim() == d.originalTitle.trim() &&
-          t.description.trimRight() == d.originalBody.trimRight() &&
-          tags == d.originalTags &&
-          parent == d.originalParent &&
-          t.due == d.originalDue &&
-          t.priority == d.originalPriority) {
+          t.description.trimRight() == d.originalBody.trimRight()) {
         continue;
       }
-      d.rebase(
-        title: t.summary,
-        body: t.description,
-        tags: tags,
-        parent: parent,
-        due: t.due,
-        priority: t.priority,
-      );
+      d.rebase(title: t.summary, body: t.description);
     }
   }
 

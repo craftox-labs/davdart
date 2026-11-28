@@ -45,33 +45,26 @@ Future<AppState> _open(FakeCalDav server) async {
 
 void main() {
   group('a clean draft takes what a sync brings', () {
-    test(
-      'task: fields follow; a selector save keeps the remote text',
-      () async {
-        final server = FakeCalDav()
-          ..external('rt.ics', _todo(summary: 'Old', body: 'old body'));
-        final s = await _open(server);
-        s.startTaskEdit('rt');
-        final d = s.taskDraftFor('rt')!;
-        expect(d.titleController.text, 'Old');
-        server.external(
-          'rt.ics',
-          _todo(summary: 'Remote edit', body: 'new body', priority: 1),
-        );
-        await s.sync();
-        expect(d.titleController.text, 'Remote edit');
-        expect(d.bodyController.text, 'new body');
-        expect(d.priority, 1);
-        expect(d.dirty, isFalse);
-        // A selector change saves at once; it must not send the stale text.
-        d.setPriority(9);
-        await Future<void>.delayed(const Duration(milliseconds: 50));
-        final t = s.taskById('rt')!;
-        expect(t.summary, 'Remote edit');
-        expect(t.description, 'new body');
-        expect(t.priority, 9);
-      },
-    );
+    test('task: a clean text buffer follows the synced text', () async {
+      final server = FakeCalDav()
+        ..external('rt.ics', _todo(summary: 'Old', body: 'old body'));
+      final s = await _open(server);
+      s.startTaskEdit('rt');
+      final d = s.taskDraftFor('rt')!;
+      expect(d.titleController.text, 'Old');
+      server.external(
+        'rt.ics',
+        _todo(summary: 'Remote edit', body: 'new body', priority: 1),
+      );
+      await s.sync();
+      expect(d.titleController.text, 'Remote edit');
+      expect(d.bodyController.text, 'new body');
+      expect(d.dirty, isFalse);
+      // A pick writes straight to the task, so the buffer stays out of it.
+      await s.updateTask('rt', setPriority: true, priority: 9);
+      expect(s.taskById('rt')!.priority, 9);
+      expect(d.dirty, isFalse);
+    });
 
     test('task: a draft with changes is never overwritten', () async {
       final server = FakeCalDav()..external('rt.ics', _todo(summary: 'Old'));
