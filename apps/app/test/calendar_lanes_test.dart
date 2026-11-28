@@ -9,6 +9,7 @@ CalendarSpan _span(int from, int to, String title, [int month = 11]) =>
       start: _d(from, month),
       end: _d(to, month),
       title: title,
+      uid: 'e-$title',
       sortKey: title,
     );
 

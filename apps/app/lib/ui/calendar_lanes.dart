@@ -18,6 +18,7 @@ class CalendarSpan {
     required this.start,
     required this.end,
     required this.title,
+    required this.uid,
     required this.sortKey,
   });
 
@@ -29,6 +30,9 @@ class CalendarSpan {
 
   /// What the bar reads; truncated to the space it has.
   final String title;
+
+  /// The event the bar stands for, so a press on it opens that event.
+  final String uid;
 
   /// Tie-breaker, so two visits with the same days and title keep a fixed
   /// order between rebuilds (the occurrence's uid and day).

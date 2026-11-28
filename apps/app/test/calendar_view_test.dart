@@ -450,6 +450,152 @@ void main() {
     expect(find.text('Artist visit'), findsOneWidget);
   });
 
+  testWidgets('a press on a bar opens the event and picks the day pressed', (
+    t,
+  ) async {
+    final s = await _state(
+      t,
+      events: [
+        Event(
+          uid: 'visit',
+          summary: 'Artist visit',
+          dtstart: ICalDate.date(2026, 11, 20),
+          dtend: ICalDate.date(2026, 11, 23),
+        ),
+      ],
+    );
+    await _pump(t, s);
+    final bar = _k('calendar-bar-visit@2026-11-20-2026-11-16');
+    expect(bar, findsOneWidget);
+    // The bar spans the 20th to the 22nd: a press over the 21st picks that
+    // day, not the one the bar starts on, and opens the event.
+    final x = t.getCenter(_k('calendar-day-2026-11-21')).dx;
+    await t.tapAt(Offset(x, t.getCenter(bar).dy));
+    await t.pumpAndSettle();
+    expect(s.homeDay, DateTime.utc(2026, 11, 21));
+    expect(s.peekUid, 'visit');
+    expect(s.section, Section.events);
+  });
+
+  testWidgets('dragging across days makes an all-day event in that range', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    final b = t.getCenter(_k('calendar-day-2026-11-19'));
+    await t.dragFrom(a, b - a);
+    await t.pumpAndSettle();
+    // The range lands in the new-event dialog, all day, from the 17th to the
+    // 19th (an all-day end is its last day).
+    expect(_k('new-event-title'), findsOneWidget);
+    expect(t.widget<FCheckbox>(_k('new-event-allday')).value, isTrue);
+    await t.enterText(_k('new-event-title'), 'Sprint');
+    await t.tap(_k('new-event-add'));
+    await t.pumpAndSettle();
+    final e = s.events.single;
+    expect(e.summary, 'Sprint');
+    expect(e.allDay, isTrue);
+    expect(e.dtstart!.value, '20261117');
+    expect(e.dtend!.value, '20261120');
+  });
+
+  testWidgets('a drag highlights the days of its range as it goes', (t) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    // The cell's own wash: the outer fill of the day's box.
+    Color? fill(String id) {
+      final box = t.widget<DecoratedBox>(
+        find
+            .descendant(
+              of: _k('calendar-day-$id'),
+              matching: find.byType(DecoratedBox),
+            )
+            .first,
+      );
+      return (box.decoration as BoxDecoration).color;
+    }
+
+    expect(fill('2026-11-18'), isNull);
+    final g = await t.startGesture(t.getCenter(_k('calendar-day-2026-11-17')));
+    await g.moveTo(t.getCenter(_k('calendar-day-2026-11-19')));
+    await t.pump();
+    // The three days of the range carry the event tint; the day after is
+    // untouched.
+    for (final d in [17, 18, 19]) {
+      expect(fill('2026-11-$d'), Tokens.light.eventTint, reason: 'Nov $d');
+    }
+    expect(fill('2026-11-20'), isNull);
+    await g.up();
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsOneWidget);
+  });
+
+  testWidgets('a drag back along the row makes the same range', (t) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    final a = t.getCenter(_k('calendar-day-2026-11-19'));
+    final b = t.getCenter(_k('calendar-day-2026-11-17'));
+    await t.dragFrom(a, b - a);
+    await t.pumpAndSettle();
+    await t.enterText(_k('new-event-title'), 'Trip');
+    await t.tap(_k('new-event-add'));
+    await t.pumpAndSettle();
+    final e = s.events.single;
+    expect(e.dtstart!.value, '20261117');
+    expect(e.dtend!.value, '20261120');
+  });
+
+  testWidgets('a vertical drag scrolls and makes no event', (t) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    await t.dragFrom(a, const Offset(0, -200));
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsNothing);
+    expect(s.events, isEmpty);
+  });
+
+  testWidgets('the phone has no range drag; a press picks the day', (t) async {
+    final s = await _state(t);
+    await _pump(t, s, size: const Size(400, 800));
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    final b = t.getCenter(_k('calendar-day-2026-11-19'));
+    await t.dragFrom(a, b - a);
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsNothing);
+    await t.tap(_k('calendar-day-2026-11-19'));
+    await t.pumpAndSettle();
+    expect(s.homeDay, DateTime.utc(2026, 11, 19));
+  });
+
+  testWidgets('a project Calendar drags a range too, scoped to it', (t) async {
+    final s = await _state(t);
+    await _pump(t, s, scoped: true);
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    final b = t.getCenter(_k('calendar-day-2026-11-19'));
+    await t.dragFrom(a, b - a);
+    await t.pumpAndSettle();
+    await t.enterText(_k('new-event-title'), 'Scoped');
+    await t.tap(_k('new-event-add'));
+    await t.pumpAndSettle();
+    final e = s.events.single;
+    expect(e.dtstart!.value, '20261117');
+    expect(e.dtend!.value, '20261120');
+    // The project's Calendar keeps its own picked day; Home's stays unset.
+    expect(s.homeDay, isNull);
+  });
+
+  testWidgets('a Space without events has no range drag', (t) async {
+    final s = await _noEventsState(t);
+    await _pump(t, s);
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    final b = t.getCenter(_k('calendar-day-2026-11-19'));
+    await t.dragFrom(a, b - a);
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsNothing);
+  });
+
   testWidgets('overlapping visits stack on separate lanes', (t) async {
     Event visit(String uid, String title, int from, int to) => Event(
       uid: uid,
@@ -545,21 +691,28 @@ void main() {
     expect(s.homeDay, DateTime.utc(2026, 11, 22));
   });
 
-  testWidgets('a project Calendar keeps its day column on wide', (t) async {
+  testWidgets('a project Calendar puts its day under the grid, as Home does', (
+    t,
+  ) async {
     final s = await _state(t, events: [_event('e20', 'Review', 20)]);
     await _pump(t, s, scoped: true);
     expect(_k('calendar-day-card'), findsOneWidget);
+    // No second column: the card is under the grid and spans its width.
+    final card = _k('calendar-day-card');
+    final last = _k('calendar-day-2026-12-6');
+    expect(t.getTopLeft(card).dy, greaterThan(t.getBottomLeft(last).dy));
+    expect(
+      t.getSize(card).width,
+      closeTo(t.getSize(_k('calendar-month')).width, 200),
+    );
     await t.tap(_k('calendar-day-2026-11-20'));
     await t.pumpAndSettle();
     expect(
-      find.descendant(
-        of: _k('calendar-day-card'),
-        matching: find.text('Review'),
-      ),
+      find.descendant(of: card, matching: find.text('Review')),
       findsOneWidget,
     );
     expect(_k('calendar-add-event'), findsOneWidget);
-    // The project's column keeps its own selection; Home's day is untouched.
+    // The project's card keeps its own selection; Home's day is untouched.
     expect(s.homeDay, isNull);
   });
 

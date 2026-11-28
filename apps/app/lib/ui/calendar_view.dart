@@ -1,6 +1,7 @@
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:davdart/davdart.dart';
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -116,8 +117,9 @@ int _byWhen(_CellItem a, _CellItem b) {
 ///
 /// Wide, Home shows the grid alone and the picked day in the Calendar panel
 /// beside it ([AppState.homeDay]): pressing a day or a bar there opens that
-/// panel on the day. A project's Calendar keeps its own day column, and the
-/// narrow layout keeps the day list under the grid on both.
+/// panel on the day. A project's Calendar keeps its own picked day in a card
+/// under the grid, at every width (it has no panel day of its own), so its
+/// grid gets the same full width Home's does.
 ///
 /// [scoped] picks the source. A project's page passes true: the open
 /// [AppState.scopeUid] narrows the items (the project index, as everywhere
@@ -132,10 +134,9 @@ int _byWhen(_CellItem a, _CellItem b) {
 /// selected day and the visible month are this view's own state, so Home and
 /// each project tab keep theirs, and both start on today.
 ///
-/// Not built yet, deliberately: event status (tentative/confirmed), multi-day
-/// span bars, overlap marking and the week/timeline views. The chip row of a
-/// day cell is where a span bar would sit, and the day list is where a status
-/// mark would go.
+/// Not built yet, deliberately: event status (tentative/confirmed), overlap
+/// marking and the week/timeline views. The day list is where a status mark
+/// would go.
 class CalendarView extends StatefulWidget {
   const CalendarView({
     super.key,
@@ -166,6 +167,12 @@ class _CalendarViewState extends State<CalendarView> {
 
   /// The first of the shown month; null follows the selection.
   DateTime? _month;
+
+  /// A drag across the wide grid: the day it started on, where it started and
+  /// the day it has reached (null until the pointer has moved far enough to
+  /// mean a range rather than a press).
+  DateTime? _dragFrom, _dragTo;
+  Offset? _dragAt;
 
   /// Home's last seen picked day, to drop the shown month when a Space switch
   /// clears the pick.
@@ -212,6 +219,7 @@ class _CalendarViewState extends State<CalendarView> {
             start: first.isBefore(from) ? from : first,
             end: end.isAfter(last) ? last : end,
             title: o.summary.isEmpty ? '(no title)' : o.summary,
+            uid: e.uid,
             sortKey: '${e.uid}@${_id(first)}',
           ),
         );
@@ -220,9 +228,9 @@ class _CalendarViewState extends State<CalendarView> {
     return out;
   }
 
-  /// Picks [day]. A project's Calendar keeps it in its own day column; Home's
-  /// shares it with the Calendar panel, which the wide grid opens (there is no
-  /// room for a column beside the full-width grid).
+  /// Picks [day]. A project's Calendar keeps it to itself (the card under its
+  /// grid); Home's shares it with the Calendar panel, which a wide press
+  /// opens.
   void _select(DateTime day, {bool openPanel = false}) {
     if (widget.scoped) {
       setState(() {
@@ -239,10 +247,82 @@ class _CalendarViewState extends State<CalendarView> {
     setState(() => _month = _monthOf(day));
   }
 
+  /// A press on a multi-day bar: picks [day] (the one under the pointer) and
+  /// opens [uid], as pressing a chip's day and its row does.
+  void _openBar(DateTime day, String uid) {
+    _select(day, openPanel: true);
+    state.clickEvent(uid);
+  }
+
+  /// Opens the new-event dialog on [day] (an all-day event to [until], when a
+  /// drag across the grid picked a range) and opens what it adds.
+  Future<void> _newEvent(DateTime day, {DateTime? until}) async {
+    final uid = await showNewEventDialog(
+      context,
+      state,
+      day: day,
+      until: until,
+      personal: !widget.scoped,
+    );
+    if (uid != null) await state.clickEvent(uid);
+  }
+
+  /// The day under [at], in the grid starting on [start]: a column per
+  /// weekday, a row per week.
+  DateTime _dayAt(
+    Offset at,
+    DateTime start,
+    int weeks,
+    double cellWidth,
+    double rowHeight,
+  ) {
+    final col = cellWidth <= 0 ? 0 : (at.dx / cellWidth).floor().clamp(0, 6);
+    final row = rowHeight <= 0
+        ? 0
+        : (at.dy / rowHeight).floor().clamp(0, weeks - 1);
+    return start.add(Duration(days: row * 7 + col));
+  }
+
+  /// The range a drag is showing, oldest first, or null when no drag is on.
+  (DateTime, DateTime)? get _range {
+    final from = _dragFrom, to = _dragTo;
+    if (from == null || to == null) return null;
+    return to.isBefore(from) ? (to, from) : (from, to);
+  }
+
+  /// Extends the range a drag is drawing: it starts once the pointer has moved
+  /// horizontally past the slop (a vertical drag is a scroll), and stays on
+  /// the row it started in.
+  void _dragMove(Offset at, int Function(Offset) colOf) {
+    final from = _dragFrom, origin = _dragAt;
+    if (from == null || origin == null) return;
+    final d = at - origin;
+    final on = _dragTo != null;
+    if (!on && (d.dx.abs() < kTouchSlop || d.dx.abs() <= d.dy.abs())) return;
+    final steps = colOf(at) - colOf(origin);
+    final to = steps == 0 ? null : from.add(Duration(days: steps));
+    if (to == _dragTo) return;
+    setState(() => _dragTo = to);
+  }
+
+  /// Ends a drag: a range opens the new-event dialog on it, an all-day event
+  /// from its first day to its last. A press (no range) does nothing here;
+  /// the day cell's own tap has already picked the day.
+  Future<void> _dragUp({bool cancel = false}) async {
+    final range = cancel ? null : _range;
+    _dragAt = null;
+    _dragFrom = null;
+    if (_dragTo != null) setState(() => _dragTo = null);
+    if (range == null || !mounted) return;
+    final (from, to) = range;
+    _select(from);
+    await _newEvent(from, until: to);
+  }
+
   /// Shows [month] and keeps the selection inside it: today when the month
-  /// holds it, else its first day, so the day column (a project's) and the
-  /// panel's pinned day (Home's) always target a day that is on screen. The
-  /// month arrows never open the panel.
+  /// holds it, else its first day, so the picked day (a project's card, or
+  /// the panel's pinned day on Home) always targets a day that is on screen.
+  /// The month arrows never open the panel.
   void _showMonth(DateTime month, DateTime today) {
     final day = month.year == today.year && month.month == today.month
         ? today
@@ -315,21 +395,14 @@ class _CalendarViewState extends State<CalendarView> {
                 t.space.xl,
                 fabInset(context) + t.space.xl,
               ),
-              // Home's wide Calendar is the grid alone: the picked day shows
-              // in the Calendar panel beside it. A project's wide Calendar
-              // keeps its day column, and the narrow layout keeps the day list
-              // under the grid on both.
+              // Home and a project's Calendar share the shape: the grid at
+              // the width it has, the picked day under it. On Home wide the
+              // day is the Calendar panel's (the grid stands alone); a
+              // project's Calendar has no panel day of its own, so its card
+              // stays under the grid at every width rather than beside it as
+              // a second column.
               child: wide && !widget.scoped
                   ? grid
-                  : wide
-                  ? Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(flex: 3, child: grid),
-                        SizedBox(width: t.space.lg),
-                        Expanded(flex: 2, child: list),
-                      ],
-                    )
                   : Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
@@ -445,7 +518,7 @@ class _CalendarViewState extends State<CalendarView> {
                 barHeight: t.sizes.calendarChip,
                 inset: t.space.xxs,
               );
-              return Column(
+              final rows = Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   for (var w = 0; w < weeks; w++)
@@ -462,8 +535,30 @@ class _CalendarViewState extends State<CalendarView> {
                       height: cellHeight,
                       wide: wide,
                       topRule: w > 0,
+                      range: _range,
                     ),
                 ],
+              );
+              // A drag across the wide grid picks a range of days for a new
+              // all-day event. A press is untouched (a tap never moves far
+              // enough), a vertical drag stays a scroll, and the phone has no
+              // gesture: a touch drag there would fight the scroll.
+              if (!wide || !state.eventsEditable) return rows;
+              DateTime dayAt(Offset p) =>
+                  _dayAt(p, start, weeks, g.cellWidth, cellHeight);
+              int colAt(Offset p) => g.cellWidth <= 0
+                  ? 0
+                  : (p.dx / g.cellWidth).floor().clamp(0, 6);
+              return Listener(
+                onPointerDown: (e) {
+                  _dragAt = e.localPosition;
+                  _dragFrom = dayAt(e.localPosition);
+                  _dragTo = null;
+                },
+                onPointerMove: (e) => _dragMove(e.localPosition, colAt),
+                onPointerUp: (_) => _dragUp(),
+                onPointerCancel: (_) => _dragUp(cancel: true),
+                child: rows,
               );
             },
           ),
@@ -488,6 +583,7 @@ class _CalendarViewState extends State<CalendarView> {
     required double height,
     required bool wide,
     required bool topRule,
+    required (DateTime, DateTime)? range,
   }) {
     final row = wide
         ? layOutWeek(spans, weekStart, maxLanes: t.sizes.calendarLanes)
@@ -512,6 +608,10 @@ class _CalendarViewState extends State<CalendarView> {
               lanesInset: inset,
               topRule: topRule,
               leftRule: i > 0,
+              inRange:
+                  range != null &&
+                  !weekStart.add(Duration(days: i)).isBefore(range.$1) &&
+                  !weekStart.add(Duration(days: i)).isAfter(range.$2),
             ),
           ),
       ],
@@ -531,6 +631,8 @@ class _CalendarViewState extends State<CalendarView> {
               t,
               s,
               key: Key('calendar-bar-${s.span.sortKey}-$weekId'),
+              g: g,
+              weekStart: weekStart,
             ),
           ),
         if (row.hidden > 0)
@@ -550,42 +652,63 @@ class _CalendarViewState extends State<CalendarView> {
 
   /// One row segment of a multi-day bar: the event tone's tint, the tone bar
   /// at the span's real start and the title at the segment's start, rounded
-  /// only at the span's real ends. It takes no taps itself, so a press lands
-  /// on the day under it and selects it, as pressing a chip does.
-  Widget _bar(Tokens t, LaneSegment s, {required Key key}) {
+  /// only at the span's real ends.
+  ///
+  /// A press opens the event and picks the day under the pointer: the bar
+  /// covers several cells, so its own column decides which day that is (the
+  /// listener reads the press before the tap fires). A drag that starts on a
+  /// bar still drags a range across the grid: it never reaches the tap.
+  Widget _bar(
+    Tokens t,
+    LaneSegment s, {
+    required Key key,
+    required LaneGeometry g,
+    required DateTime weekStart,
+  }) {
+    var day = weekStart.add(Duration(days: s.firstCol));
     final radius = Radius.circular(t.radii.small);
-    return IgnorePointer(
+    return FTappable(
       key: key,
-      child: ClipRRect(
-        borderRadius: BorderRadius.horizontal(
-          left: s.startsSpan ? radius : Radius.zero,
-          right: s.endsSpan ? radius : Radius.zero,
-        ),
-        child: ColoredBox(
-          color: t.eventTint,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              if (s.startsSpan)
-                SizedBox(
-                  width: t.sizes.calendarChipBar,
-                  child: ColoredBox(color: t.accent),
-                ),
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: t.space.xxs),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      s.span.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: t.type.microStyle.copyWith(color: t.fg),
+      behavior: HitTestBehavior.opaque,
+      semanticsLabel: s.span.title,
+      onPress: () => _openBar(day, s.span.uid),
+      child: Listener(
+        onPointerDown: (e) {
+          final x = g.rectOf(s).left + e.localPosition.dx;
+          final col = (x / g.cellWidth).floor().clamp(s.firstCol, s.lastCol);
+          day = weekStart.add(Duration(days: col));
+        },
+        child: ClipRRect(
+          borderRadius: BorderRadius.horizontal(
+            left: s.startsSpan ? radius : Radius.zero,
+            right: s.endsSpan ? radius : Radius.zero,
+          ),
+          child: ColoredBox(
+            color: t.eventTint,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (s.startsSpan)
+                  SizedBox(
+                    width: t.sizes.calendarChipBar,
+                    child: ColoredBox(color: t.accent),
+                  ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: t.space.xxs),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        s.span.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.type.microStyle.copyWith(color: t.fg),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -613,6 +736,7 @@ class _CalendarViewState extends State<CalendarView> {
     required double lanesInset,
     required bool topRule,
     required bool leftRule,
+    required bool inRange,
   }) {
     final id = _id(day);
     final inMonth = day.month == month.month;
@@ -749,7 +873,11 @@ class _CalendarViewState extends State<CalendarView> {
         height: height,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: weekend ? t.weekendTint : null,
+            color: inRange
+                ? t.eventTint
+                : weekend
+                ? t.weekendTint
+                : null,
             border: Border(
               top: topRule
                   ? BorderSide(color: t.divider, width: t.borders.hairline)
@@ -854,15 +982,7 @@ class _CalendarViewState extends State<CalendarView> {
           key: const Key('calendar-add-event'),
           tooltip: 'New event',
           icon: FLucideIcons.calendarPlus,
-          onPress: () async {
-            final uid = await showNewEventDialog(
-              context,
-              state,
-              day: day,
-              personal: !widget.scoped,
-            );
-            if (uid != null) await state.clickEvent(uid);
-          },
+          onPress: () => _newEvent(day),
         ),
       if (state.tasksEditable)
         IconAction(
