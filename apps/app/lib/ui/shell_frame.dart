@@ -500,6 +500,9 @@ class IconRail extends StatelessWidget {
 
     Widget button(SectionDef d, {bool tabJoined = true}) {
       final s = d.section;
+      // Folded at Home, no panel is docked: Home is the one current place, so
+      // the section the folded panel would reopen is not lit as well.
+      final onlyHome = !strip && state.atHome && state.sidebarCollapsed;
       final b = NavRow(
         nav: state.nav,
         list: KeyNav.railList,
@@ -512,8 +515,10 @@ class IconRail extends StatelessWidget {
           // never as a tab joined to the panel.
           active: s == null
               ? !strip && state.atHome
-              : active == s ||
-                    (s == Section.projects && state.mainProjectUid != null),
+              : !onlyHome &&
+                    (active == s ||
+                        (s == Section.projects &&
+                            state.mainProjectUid != null)),
           tab: s != null && tabJoined && (strip || !state.sidebarCollapsed),
           tabMargin: (t.sizes.rail - item) / 2,
           size: item,

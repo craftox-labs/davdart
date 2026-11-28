@@ -202,6 +202,44 @@ void main() {
       await _end(t);
     });
 
+    testWidgets('folded at Home, only Home is lit', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        tasks: [mkTask('a')],
+        size: const Size(1400, 900),
+      );
+      expect(s.section, Section.notes);
+      await t.tap(home);
+      await t.pumpAndSettle();
+      expect(s.atHome, isTrue);
+      expect(s.sidebarCollapsed, isTrue);
+      expect(t.widget<SectionButton>(home).active, isTrue);
+      // The folded panel's section is not lit as well.
+      expect(t.widget<SectionButton>(_k('rail-notes')).active, isFalse);
+      expect(fillOf(t, _k('rail-notes')), isNull);
+      await _end(t);
+    });
+
+    testWidgets('unfolding lights the reopened section again', (t) async {
+      final s = await pumpTasksApp(
+        t,
+        tasks: [mkTask('a')],
+        size: const Size(1400, 900),
+      );
+      await t.tap(home);
+      await t.pumpAndSettle();
+      expect(t.widget<SectionButton>(_k('rail-notes')).active, isFalse);
+      await t.tap(_k('rail-notes'));
+      await t.pumpAndSettle();
+      expect(s.sidebarCollapsed, isFalse);
+      expect(t.widget<SectionButton>(_k('rail-notes')).active, isTrue);
+      expect(
+        find.descendant(of: _k('rail-notes'), matching: railTab),
+        findsOneWidget,
+      );
+      await _end(t);
+    });
+
     testWidgets('another rail press reopens its section over Home', (t) async {
       final s = await pumpTasksApp(
         t,
