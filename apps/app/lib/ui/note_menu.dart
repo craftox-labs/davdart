@@ -7,10 +7,12 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/tab_state.dart';
 import 'edit_note_dialog.dart' show confirmDeleteNote;
-import 'move_folder_dialog.dart';
 import 'move_space_dialog.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
+import 'property/property_defs.dart';
+import 'property/property_dialog.dart';
+import 'property/property_menu.dart';
 import 'task_menu.dart';
 import 'theme.dart';
 
@@ -538,9 +540,9 @@ class NoteContextMenu extends StatelessWidget {
         ),
       if (edit)
         NoteMenuItem(
-          'Move to project…',
-          FLucideIcons.folderInput,
-          () => showMoveFolderDialog(context, state, note),
+          Props.moveLabel,
+          Props.moveIcon,
+          () => showMoveToParentDialog(context, state, note.uid),
           key: const Key('menu-move-folder'),
         ),
       if (edit && state.spaces.length > 1)
@@ -551,52 +553,24 @@ class NoteContextMenu extends StatelessWidget {
           key: const Key('menu-move-space'),
         ),
       if (edit && !folder)
-        NoteMenuItem(
-          'Set status',
-          FLucideIcons.circleDot,
-          () {},
+        optionMenuItem<String>(
+          Props.status,
           key: const Key('menu-status'),
-          children: [
-            NoteMenuItem(
-              'No status',
-              FLucideIcons.circle,
-              () => state.setStatus(note.uid, null),
-              key: const Key('menu-status-none'),
-              selected: status == null,
-            ),
-            for (final s in boardOrder)
-              NoteMenuItem(
-                s,
-                FLucideIcons.circleDot,
-                () => state.setStatus(note.uid, s),
-                key: Key('menu-status-$s'),
-                selected: s == status,
-              ),
-          ],
+          optionPrefix: 'menu-status',
+          options: noteStatusOptions(),
+          value: status,
+          noneLabel: Props.noStatus,
+          onPick: (v) => state.setStatus(note.uid, v),
         ),
       if (edit && !folder)
-        NoteMenuItem(
-          'Set priority',
-          FLucideIcons.flag,
-          () {},
+        optionMenuItem<String>(
+          Props.priority,
           key: const Key('menu-priority'),
-          children: [
-            NoteMenuItem(
-              'No priority',
-              FLucideIcons.circle,
-              () => state.setNotePriority(note.uid, null),
-              key: const Key('menu-priority-none'),
-              selected: priority == null,
-            ),
-            for (final p in notePriorities.keys)
-              NoteMenuItem(
-                p,
-                FLucideIcons.flag,
-                () => state.setNotePriority(note.uid, p),
-                key: Key('menu-priority-$p'),
-                selected: p == priority,
-              ),
-          ],
+          optionPrefix: 'menu-priority',
+          options: priorityOptions<String>((b) => b),
+          value: priority,
+          noneLabel: Props.noPriority,
+          onPick: (v) => state.setNotePriority(note.uid, v),
         ),
       NoteMenuItem(
         'Copy id',

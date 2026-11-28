@@ -241,12 +241,15 @@ void main() {
       await t.tap(_p('menu-task-toggle'));
       await t.pumpAndSettle();
       expect(s.taskById('today')!.isCompleted, isTrue);
-      // Set due tomorrow through the submenu, then clear it.
+      // Set due tomorrow in the shared date picker, then clear it.
       await t.tap(_panelText('Whenever'), buttons: kSecondaryButton);
       await t.pumpAndSettle();
       await t.tap(_p('menu-task-due'));
       await t.pumpAndSettle();
-      await t.tap(_p('menu-task-due-tomorrow'));
+      // The test font is wider than the real one: the calendar header may
+      // overflow, which says nothing about the app.
+      t.takeException();
+      await t.tap(_k('property-date-due-tomorrow'));
       await t.pumpAndSettle();
       expect(s.taskById('nodate')!.due, dueIn(1));
       expect(
@@ -260,7 +263,12 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_p('menu-task-due'));
       await t.pumpAndSettle();
-      await t.tap(_p('menu-task-due-clear'));
+      // The test font is wider than the real one: the calendar header may
+      // overflow, which says nothing about the app.
+      t.takeException();
+      await t.ensureVisible(_k('property-date-due-clear'));
+      await t.pumpAndSettle();
+      await t.tap(_k('property-date-due-clear'));
       await t.pumpAndSettle();
       expect(s.taskById('nodate')!.due, isNull);
       // Delete asks first.
@@ -287,12 +295,10 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_p('menu-task-due'));
       await t.pumpAndSettle();
-      await t.tap(_p('menu-task-due-pick'));
-      await t.pumpAndSettle();
       // The test font is wider than the real one: the calendar header may
       // overflow here, which says nothing about the app.
       t.takeException();
-      expect(_k('task-date-calendar'), findsOneWidget);
+      expect(_k('property-date-due-calendar'), findsOneWidget);
       final n = DateTime.now();
       // A day of this month that is not today.
       final day = n.day == 15 ? 16 : 15;

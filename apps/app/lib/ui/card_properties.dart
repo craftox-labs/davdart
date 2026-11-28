@@ -7,10 +7,10 @@ import 'parts.dart';
 import 'popover_track.dart';
 import 'property/date_property_picker.dart';
 import 'property/option_picker.dart';
+import 'property/property_defs.dart';
 import 'property/property_trigger.dart' show PropertyPopoverGroup;
 import 'property/tag_property_picker.dart';
 import 'section_label.dart';
-import 'task_detail.dart' show priorityBucket, priorityOfBucket;
 import 'task_parts.dart' show dueDate, dueOfDay;
 import 'theme.dart';
 
@@ -92,7 +92,7 @@ class _CardPropertiesState extends State<CardProperties>
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    _label(context, 'Status'),
+                    _label(context, Props.status.label),
                     OptionPicker<String>(
                       id: 'card-status',
                       value: status,
@@ -106,25 +106,25 @@ class _CardPropertiesState extends State<CardProperties>
                         );
                       },
                       options: [
-                        for (final word in boardOrder)
+                        for (final o in noteStatusOptions())
                           PickerOption(
-                            word,
-                            word,
-                            dot: word,
+                            o.value,
+                            o.label,
+                            dot: o.dot,
                             enabled:
-                                !(word == 'done' &&
+                                !(o.value == 'done' &&
                                     task != null &&
                                     _state.taskCompletionBlockerFor(task.uid) !=
                                         null),
                           ),
                       ],
                     ),
-                    _label(context, 'Priority'),
+                    _label(context, Props.priority.label),
                     OptionPicker<String>(
                       id: 'card-priority',
                       value: priority,
                       clearable: true,
-                      clearLabel: 'No priority',
+                      clearLabel: Props.noPriority,
                       onPick: (v) {
                         if (v == null) {
                           _apply(
@@ -150,14 +150,10 @@ class _CardPropertiesState extends State<CardProperties>
                                 ),
                         );
                       },
-                      options: const [
-                        PickerOption('high', 'high'),
-                        PickerOption('medium', 'medium'),
-                        PickerOption('low', 'low'),
-                      ],
+                      options: priorityOptions<String>((b) => b),
                     ),
                     if (task != null) ...[
-                      _label(context, 'Due'),
+                      _label(context, Props.due.label),
                       DatePropertyPicker(
                         id: 'card-due',
                         value: dueDate(task),
@@ -170,7 +166,7 @@ class _CardPropertiesState extends State<CardProperties>
                         ),
                       ),
                     ],
-                    _label(context, 'Labels'),
+                    _label(context, Props.labels.label),
                     TagPropertyPicker(
                       id: 'card-labels',
                       value: tags,
