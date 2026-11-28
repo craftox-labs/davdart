@@ -29,6 +29,7 @@ class CollapsibleSection extends StatefulWidget {
     this.onChanged,
     this.collapsed,
     this.trailing,
+    this.highlight = false,
   });
   final String id;
   final String title;
@@ -56,6 +57,9 @@ class CollapsibleSection extends StatefulWidget {
 
   /// Shown at the right end of the header row (links, add buttons).
   final Widget? trailing;
+
+  /// Draws the heading in the accent tone: the section a press just picked.
+  final bool highlight;
   final Widget child;
 
   @override
@@ -130,6 +134,7 @@ class _CollapsibleSectionState extends State<CollapsibleSection> {
                             child: SectionLabel(
                               widget.title,
                               upper: widget.upper,
+                              highlight: widget.highlight,
                             ),
                           ),
                           if (widget.count != null) ...[

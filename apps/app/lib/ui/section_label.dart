@@ -6,7 +6,8 @@ import 'theme.dart';
 
 /// The one section label: the small uppercase muted title above a group of
 /// rows, with an optional [action] at the end and an optional hairline
-/// [rule] under it. Style and spacing come from [TypeTokens.sectionLabelStyle].
+/// [rule] under it. Style and spacing come from [TypeTokens.sectionLabelStyle];
+/// [highlight] switches its colour to the accent tone.
 class SectionLabel extends StatelessWidget {
   const SectionLabel(
     this.text, {
@@ -15,6 +16,7 @@ class SectionLabel extends StatelessWidget {
     this.rule = false,
     this.padding,
     this.upper = true,
+    this.highlight = false,
   });
 
   final String text;
@@ -25,12 +27,17 @@ class SectionLabel extends StatelessWidget {
   /// Uppercases the label; off for a title that keeps its own case.
   final bool upper;
 
+  /// Draws the label in the accent tone, for the section a press just picked.
+  final bool highlight;
+
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     final label = OverflowTip(
       upper ? text.toUpperCase() : text,
-      style: t.type.sectionLabelStyle.copyWith(color: t.muted),
+      style: t.type.sectionLabelStyle.copyWith(
+        color: highlight ? t.accent : t.muted,
+      ),
     );
     Widget row = action == null
         ? label
