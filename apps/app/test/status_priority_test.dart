@@ -137,16 +137,22 @@ void main() {
       );
     });
 
-    testWidgets('the editor sets the priority with Save', (t) async {
+    testWidgets('the priority row picks a word at once, and Undo puts it '
+        'back', (t) async {
       final s = await _pump(t);
       s.select('b');
-      s.startEdit('b');
       await t.pumpAndSettle();
-      expect(_k('edit-note-priority'), findsOneWidget);
-      s.activeDraft!.setPriority('low');
-      expect(s.dirty, isTrue);
-      expect(await s.saveDraft('b'), isTrue);
+      expect(_k('property-priority'), findsOneWidget);
+      await t.tap(_k('property-priority'));
+      await t.pumpAndSettle();
+      await t.tap(_k('property-option-priority-low'));
+      await t.pumpAndSettle();
       expect(PlanItem.fromNote(s.tree.find('b')!.note).priorityWord, 'low');
+      expect(PlanItem.fromNote(s.tree.find('b')!.note).status, 'todo');
+      expect(find.text('Priority of "Plain" set to Low'), findsOneWidget);
+      await t.tap(_k('board-undo'));
+      await t.pumpAndSettle();
+      expect(PlanItem.fromNote(s.tree.find('b')!.note).priorityWord, isNull);
       expect(PlanItem.fromNote(s.tree.find('b')!.note).status, 'todo');
     });
   });

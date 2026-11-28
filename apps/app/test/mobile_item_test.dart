@@ -266,13 +266,13 @@ void main() {
       expect(_body(s), contains('Paused'));
     });
 
-    testWidgets('a selector change saves at once', (t) async {
+    testWidgets('a property pick saves at once, outside the edit', (t) async {
       final s = await _openNote(t);
-      await t.tap(_k('item-mode'));
+      await t.tap(_k('property-status'));
       await t.pumpAndSettle();
-      s.draftFor('n1')!.setStatus('doing');
+      await t.tap(_k('property-option-status-doing'));
       await t.pumpAndSettle();
-      expect(s.dirtyFor('n1'), isFalse);
+      expect(s.draftFor('n1'), isNull);
       expect(PlanItem.fromNote(s.tree.find('n1')!.note).status, 'doing');
     });
 
@@ -283,10 +283,10 @@ void main() {
       await t.enterText(_k('edit-title'), '');
       await t.pump(const Duration(seconds: 2));
       await t.pumpAndSettle();
+      // The text goes back to what the note holds, with the reason.
       expect(s.tree.find('n1')!.note.summary, 'Alpha');
-      expect(_k('autosave-failed'), findsOneWidget);
-      // Back keeps the edit (nothing saved, nothing lost) and asks.
-      expect(s.dirtyFor('n1'), isTrue);
+      expect(s.draftFor('n1')!.titleController.text, 'Alpha');
+      expect(find.textContaining('Not saved'), findsOneWidget);
     });
 
     testWidgets('saves run one at a time, the newest text wins', (t) async {

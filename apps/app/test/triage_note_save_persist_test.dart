@@ -27,7 +27,18 @@ void main() {
     await t.pumpAndSettle();
     s.startEdit('n1');
     await t.pumpAndSettle();
-    await t.enterText(_k('edit-tags'), 'test,cod');
+    // Labels are picked from their row, at once (not part of the edit).
+    await t.tap(_k('property-tags'));
+    await t.pumpAndSettle();
+    await t.enterText(_k('property-tag-tags-field'), 'test');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
+    await t.enterText(_k('property-tag-tags-field'), 'cod');
+    await t.testTextInput.receiveAction(TextInputAction.done);
+    await t.pumpAndSettle();
+    // Esc closes the labels popover before it reaches anything else.
+    await t.sendKeyEvent(LogicalKeyboardKey.escape);
+    await t.pumpAndSettle();
     // A click puts the body in INSERT; in NORMAL it is readOnly and ignores
     // typed text (vim by design).
     await t.tap(_k('edit-body'));
@@ -45,7 +56,10 @@ void main() {
     expect(n.categories, containsAll(['test', 'cod']));
     s.startEdit('n1');
     await t.pumpAndSettle();
-    expect(s.draftFor('n1')!.tagsController.text, contains('cod'));
+    expect(
+      s.notes.firstWhere((e) => e.uid == 'n1').categories,
+      contains('cod'),
+    );
     expect(s.draftFor('n1')!.bodyController.text, 'body line from cod test');
   });
 

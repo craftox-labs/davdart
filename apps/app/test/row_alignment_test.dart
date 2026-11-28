@@ -124,7 +124,7 @@ void main() {
     final label = t.getRect(_k('pane-title')).left;
     // The title sits in the header row, level with the body's left edge.
     final body = t
-        .getRect(find.descendant(of: peek, matching: find.text('Status')))
+        .getRect(find.descendant(of: peek, matching: _k('property-status')))
         .left;
     final title = label;
     expect((label - body).abs(), lessThanOrEqualTo(1));

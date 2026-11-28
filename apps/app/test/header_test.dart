@@ -404,7 +404,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('edit-note'));
       await t.pumpAndSettle();
-      await t.enterText(_k('edit-title'), 'Changed');
+      await t.enterText(_k('edit-body'), 'Changed');
       await t.pump();
       expect(_in('detail-tab', 'tab-dirty'), findsOneWidget);
       await t.tap(_in('detail-tab', 'tab-close'));
@@ -444,7 +444,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('edit-note'));
       await t.pumpAndSettle();
-      await t.enterText(_k('edit-title'), 'Changed');
+      await t.enterText(_k('edit-body'), 'Changed');
       await t.pump();
       await t.tap(_k('peek-promote'));
       await t.pumpAndSettle();

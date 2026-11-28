@@ -25,74 +25,41 @@ class CommitSignal extends ChangeNotifier {
   void ping() => notifyListeners();
 }
 
-/// An open in-place edit of one note: the text fields and selectors, and
-/// whether anything differs from what was loaded. Held by AppState so the
-/// peek pane and the full page share one session.
+/// The open text buffer of one note: its title and its body, and whether
+/// either differs from what was loaded.
+///
+/// Like a task's buffer it holds no selector: the page shows the title as an
+/// [InlineText] and every property (status, priority, labels, belongs to) is
+/// picked in place and written at once through [AppState], never through this
+/// buffer. The body keeps the note's explicit edit mode (the Vim field), and a
+/// save writes only the text that changed, so it can never put a stale selector
+/// back.
 class NoteDraft extends ChangeNotifier {
-  NoteDraft({
-    required this.uid,
-    required String title,
-    required String body,
-    required String tags,
-    required this.originalParent,
-    required this.originalStatus,
-    this.originalPriority,
-  }) : originalTitle = title,
-       originalBody = body,
-       originalTags = tags,
-       parent = originalParent,
-       status = originalStatus,
-       priority = originalPriority,
-       titleController = TextEditingController(text: title),
-       bodyController = TextEditingController(text: body),
-       tagsController = TextEditingController(text: tags) {
+  NoteDraft({required this.uid, required String title, required String body})
+    : originalTitle = title,
+      originalBody = body,
+      titleController = TextEditingController(text: title),
+      bodyController = TextEditingController(text: body) {
     titleController.addListener(notifyListeners);
     bodyController.addListener(notifyListeners);
-    tagsController.addListener(notifyListeners);
   }
 
   final String uid;
-  String originalTitle, originalBody, originalTags;
-  String? originalParent, originalStatus, originalPriority;
-  final TextEditingController titleController, bodyController, tagsController;
+  String originalTitle, originalBody;
+  final TextEditingController titleController, bodyController;
 
-  String? parent;
-  String? status;
+  /// The title's inline field: [AppState] focuses it when a tap on the title
+  /// starts the edit.
+  final FocusNode titleFocus = FocusNode(debugLabel: 'note-title');
 
-  /// `high`, `medium`, `low` or null (none).
-  String? priority;
+  /// The fields' Ctrl+S: the page pings it to save through them.
+  final commitSignal = CommitSignal();
 
-  void setParent(String? v) {
-    parent = v;
-    notifyListeners();
-  }
-
-  void setStatus(String? v) {
-    status = v;
-    notifyListeners();
-  }
-
-  void setPriority(String? v) {
-    priority = v;
-    notifyListeners();
-  }
-
-  /// Records that the given values were saved: the draft is dirty only for
-  /// what was typed or changed after them.
-  void markSaved({
-    required String title,
-    required String body,
-    required String tags,
-    required String? parent,
-    required String? status,
-    String? priority,
-  }) {
-    originalTitle = title;
-    originalBody = body;
-    originalTags = tags;
-    originalParent = parent;
-    originalStatus = status;
-    originalPriority = priority;
+  /// Takes the fields that were saved as their new originals; a null field was
+  /// not written and keeps its own.
+  void markSaved({String? title, String? body}) {
+    originalTitle = title ?? originalTitle;
+    originalBody = body ?? originalBody;
     notifyListeners();
   }
 
@@ -108,8 +75,7 @@ class NoteDraft extends ChangeNotifier {
   void rebase({required String title, required String body}) {
     // One change for the listeners: no half-way "dirty" in between.
     _quiet = true;
-    originalTitle = title;
-    originalBody = body;
+    markSaved(title: title, body: body);
     setText(titleController, title);
     setText(bodyController, body);
     _quiet = false;
@@ -118,24 +84,20 @@ class NoteDraft extends ChangeNotifier {
 
   bool get titleEmpty => titleController.text.trim().isEmpty;
 
-  bool get dirty =>
-      titleController.text != originalTitle ||
-      bodyController.text != originalBody ||
-      tagsController.text != originalTags ||
-      parent != originalParent ||
-      status != originalStatus ||
-      priority != originalPriority;
+  /// The title changed and was not saved yet.
+  bool get titleDirty => titleController.text != originalTitle;
 
-  List<String> get tagList => [
-    for (final t in tagsController.text.split(','))
-      if (t.trim().isNotEmpty) t.trim(),
-  ];
+  /// The body changed and was not saved yet.
+  bool get bodyDirty => bodyController.text != originalBody;
+
+  bool get dirty => titleDirty || bodyDirty;
 
   @override
   void dispose() {
     titleController.dispose();
     bodyController.dispose();
-    tagsController.dispose();
+    titleFocus.dispose();
+    commitSignal.dispose();
     super.dispose();
   }
 }

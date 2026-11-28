@@ -1,30 +1,26 @@
-import 'package:davdart/davdart.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
 import '../state/app_state.dart';
 import '../state/note_draft.dart';
-import 'property/parent_property_picker.dart';
-import 'property/property_row.dart';
-import 'property/property_trigger.dart';
 import 'parts.dart';
 import 'popover_track.dart';
 import 'theme.dart';
 import 'vim_field.dart';
 
-/// The fields of an open edit: title, status, priority, tags, Inside, body.
+/// The open edit of a note's body: its Vim field, under the page's property
+/// rows. The title is the header's inline field and every property is a row,
+/// so neither is part of this editor; only the long Markdown text is.
 class NoteEditor extends StatelessWidget {
   const NoteEditor({
     super.key,
     required this.state,
     required this.draft,
-    required this.note,
     required this.full,
   });
   final AppState state;
   final NoteDraft draft;
-  final Note note;
   final bool full;
 
   @override
@@ -40,90 +36,6 @@ class NoteEditor extends StatelessWidget {
             Text(
               'A title is required',
               style: t.type.captionStyle.copyWith(color: t.error),
-            ),
-          if (!AppState.isFolder(note))
-            TrackPopover(
-              builder: (_, pc) => FSelect<String>.rich(
-                popoverControl: pc,
-                key: const Key('edit-status'),
-                label: const Text('Status'),
-                format: (v) => v.isEmpty ? 'none' : v,
-                hint: 'none',
-                control: FSelectControl.lifted(
-                  value: draft.status,
-                  // '' is the "none" row: the note leaves the boards.
-                  onChange: (v) =>
-                      draft.setStatus(v == null || v.isEmpty ? null : v),
-                ),
-                children: [
-                  const FSelectItem<String>(
-                    key: Key('edit-status-none'),
-                    title: Text('none'),
-                    value: '',
-                  ),
-                  for (final s in boardOrder)
-                    FSelectItem<String>(title: Text(s), value: s),
-                ],
-              ),
-            ),
-          if (!AppState.isFolder(note))
-            TrackPopover(
-              builder: (_, pc) => FSelect<String>.rich(
-                popoverControl: pc,
-                key: const Key('edit-note-priority'),
-                label: const Text('Priority'),
-                format: (v) => v.isEmpty ? 'none' : v,
-                hint: 'none',
-                control: FSelectControl.lifted(
-                  value: draft.priority ?? '',
-                  onChange: (v) =>
-                      draft.setPriority(v == null || v.isEmpty ? null : v),
-                ),
-                children: [
-                  const FSelectItem<String>(title: Text('none'), value: ''),
-                  for (final p in notePriorities.keys)
-                    FSelectItem<String>(title: Text(p), value: p),
-                ],
-              ),
-            ),
-          field(
-            key: const Key('edit-tags'),
-            controller: draft.tagsController,
-            label: 'Tags (comma separated)',
-          ),
-          // The same project picker the task and event rows use; it moves the
-          // draft's parent, which a save writes.
-          if (state.projectsByRecent.isNotEmpty)
-            PropertyTrigger(
-              sheetKey: const Key('property-sheet-parent'),
-              picker: (context, control) => ParentPropertyPicker(
-                id: 'parent',
-                state: state,
-                uid: note.uid,
-                // The draft's parent, which a save writes: the row marked is
-                // the one the pick would keep.
-                currentParent: (draft.parent,),
-                onPick: (v) async {
-                  control.hide();
-                  draft.setParent(v);
-                  return true;
-                },
-              ),
-              child: PropertyRow(
-                key: const Key('property-parent'),
-                icon: FLucideIcons.folderKanban,
-                label: 'belongs to',
-                text: projectValueFor(state, draft.parent),
-                interactive: true,
-              ),
-            )
-          else
-            PropertyRow(
-              key: const Key('property-parent'),
-              icon: FLucideIcons.folderKanban,
-              label: 'belongs to',
-              text: projectValueFor(state, draft.parent),
-              readOnly: true,
             ),
           VimField(
             key: ValueKey('vim-${draft.uid}'),

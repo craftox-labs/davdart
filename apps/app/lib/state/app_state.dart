@@ -2588,6 +2588,7 @@ class AppState extends ChangeNotifier {
     }
     if (setPriority) _setRawPriority(p, priorityRaw);
     copy = p.apply();
+    if (setParent) copy.parentUid = parentUid;
     if (setRank) copy.rank = rank;
     await _save(copy);
   }
@@ -3119,6 +3120,22 @@ class AppState extends ChangeNotifier {
     final n = tree.find(uid)?.note;
     if (n == null) return;
     await updateNote(uid, tags: tags);
+  }
+
+  /// Moves note [uid] under [parentUid] (null: the top level), with Undo (the
+  /// belongs-to row). False when the Space is read-only, the note is already
+  /// there, or the move would put it inside itself or a descendant.
+  Future<bool> setNoteParent(String uid, String? parentUid) async {
+    final n = tree.find(uid)?.note;
+    if (n == null || !editable) return false;
+    final before = n.parentUid;
+    if (before == parentUid) return true;
+    if (!await moveNote(uid, parentUid)) return false;
+    _postUndo(
+      'Moved "${n.summary}"',
+      () => _restoreItem(uid, setParent: true, parentUid: before),
+    );
+    return true;
   }
 
   /// Title of the nearest folder above item [uid], or null at the top level.
@@ -4753,33 +4770,52 @@ class AppState extends ChangeNotifier {
   /// Asks the user what to do with unsaved edits; set by the shell.
   Future<DraftChoice> Function()? leaveGuard;
 
-  /// Starts editing note [uid] (the peek note by default).
-  void startEdit([String? uid]) {
+  /// Starts editing note [uid] (the peek note by default). With [focusTitle]
+  /// (the default) the title's inline field opens and takes the focus, as the
+  /// pencil's title field did.
+  void startEdit([String? uid, bool focusTitle = true]) {
     uid ??= peekUid;
     if (uid == null) return;
     final n = tree.find(uid)?.note;
-    if (n == null || !editable || _drafts.containsKey(uid)) return;
-    final p = PlanItem.fromNote(n);
-    _drafts[uid] = NoteDraft(
-      uid: n.uid,
-      title: n.summary,
-      body: p.text,
-      tags: n.categories
-          .where((c) => !c.startsWith('status-') && !c.startsWith('kind-'))
-          .join(', '),
-      originalParent: tree.find(n.uid)?.parent?.note.uid,
-      originalStatus: boardOrder.contains(p.status) ? p.status : null,
-      originalPriority: p.priorityWord,
-    );
-    final d = _drafts[uid]!;
-    _watchDraft(uid, d, () => (d.parent, d.status, d.priority));
+    if (n == null || !editable) return;
+    var d = _drafts[uid];
+    if (d == null) {
+      d = NoteDraft(
+        uid: n.uid,
+        title: n.summary,
+        body: PlanItem.fromNote(n).text,
+      );
+      _drafts[uid] = d;
+      _watchDraft(uid, d);
+    }
+    // The field the page builds next opens and takes the focus.
+    if (focusTitle) noteTextIntent = uid;
     _focusEditor(uid);
     notifyListeners();
   }
 
-  /// Saves the edit of note [uid] (the peek note by default) through
-  /// [updateNote] (and [setStatus] when the status changed). False if
-  /// nothing was saved (empty title, failure).
+  /// The note title field a tap on the title asked to open, waiting for the
+  /// page to build it; null when none is waiting.
+  String? noteTextIntent;
+
+  /// Whether the title field of note [uid] is the one the last tap asked for.
+  bool noteTextTargets(String uid) => noteTextIntent == uid;
+
+  /// The field the intent named has opened: the next build does not open it
+  /// again.
+  void clearNoteTextIntent() => noteTextIntent = null;
+
+  /// Saves the open text buffer of note [uid] and says why when it cannot.
+  Future<bool> commitNoteText(String uid) async {
+    final ok = await flushEdit(uid);
+    if (!ok) reportNotSaved(_notSavedReason(uid));
+    return ok;
+  }
+
+  /// Saves the edit of note [uid] (the peek note by default): only the text
+  /// that changed, so a property picked in place (or an undo, or a sync) is
+  /// never put back by this save. False if nothing was saved (empty title,
+  /// failure).
   Future<bool> saveDraft([String? uid, bool stay = false]) async {
     final key = uid ?? peekUid;
     final d = key == null ? null : _drafts[key];
@@ -4792,26 +4828,14 @@ class AppState extends ChangeNotifier {
       return false;
     }
     // What this save sends; text typed while it runs is newer than this.
-    final title = d.titleController.text;
-    final body = d.bodyController.text;
-    final tagText = d.tagsController.text;
-    final parent = d.parent;
-    final status = d.status;
-    final priority = d.priority;
-    await updateNote(
-      d.uid,
-      title: title,
-      text: body,
-      tags: d.tagList,
-      setParent: parent != d.originalParent,
-      parentUid: parent,
-    );
-    if (error == null && status != null && status != d.originalStatus) {
-      await setStatus(d.uid, status, undoable: false);
+    final title = d.titleDirty ? d.titleController.text : null;
+    final body = d.bodyDirty ? d.bodyController.text : null;
+    if (title == null && body == null) {
+      if (!stay) _drafts.remove(key);
+      notifyListeners();
+      return true;
     }
-    if (error == null && priority != d.originalPriority) {
-      await setNotePriority(d.uid, priority, undoable: false);
-    }
+    await updateNote(d.uid, title: title, text: body);
     if (error != null) return false;
     // Deleted while this save ran: updateNote did nothing. Keep the draft.
     if (tree.find(d.uid) == null) {
@@ -4822,14 +4846,7 @@ class AppState extends ChangeNotifier {
     }
     if (error == _goneNote) error = null;
     if (_drafts[key] == d) {
-      d.markSaved(
-        title: title,
-        body: body,
-        tags: tagText,
-        parent: parent,
-        status: status ?? d.originalStatus,
-        priority: priority,
-      );
+      d.markSaved(title: title, body: body);
       // Nothing typed meanwhile: the edit is done. Otherwise the newer text
       // stays as the draft, still dirty.
       if (!d.dirty && !stay) _drafts.remove(key);

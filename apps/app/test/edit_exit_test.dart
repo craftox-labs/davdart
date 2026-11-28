@@ -83,6 +83,10 @@ void main() {
         final where = main ? 'main tab' : 'peek';
         testWidgets('Esc on a clean edit leaves edit mode ($where)', (t) async {
           final s = await open(t, k, main: main);
+          // The title is an inline field: the first Esc closes it, the next
+          // reaches the page.
+          await _esc(t);
+          expect(_k('inline-text-editing'), findsNothing);
           await _esc(t);
           expect(s.isEditing(k.uid), isFalse);
           expect(_k('edit-note'), findsOneWidget);
@@ -94,7 +98,8 @@ void main() {
           final s = await open(t, k, main: main);
           k.dirty(s);
           await t.pumpAndSettle();
-          await _esc(t);
+          await _esc(t); // closes the title field
+          await _esc(t); // asks about the dirty text
           expect(find.text('Unsaved changes'), findsWidgets);
           await t.tap(find.text('Keep editing'));
           await t.pumpAndSettle();
@@ -283,26 +288,20 @@ void main() {
     });
   });
 
+  /// Opens the note's status picker: the row's popover while the edit is on.
   Future<void> openSelect(WidgetTester t) async {
-    final focus = find
-        .descendant(of: _k('edit-status'), matching: find.byType(Focus))
-        .evaluate()
-        .map((e) => (e.widget as Focus).focusNode)
-        .firstWhere((n) => n?.debugLabel == 'FSelect')!;
-    focus.requestFocus();
-    await t.pump();
-    await t.tap(_k('edit-status'));
+    await t.tap(_k('property-status'));
     await t.pumpAndSettle();
   }
 
-  testWidgets('Esc closes a real FSelect first; the second Esc leaves', (
+  testWidgets('Esc closes the status picker first; the next Esc leaves', (
     t,
   ) async {
     final s = await open(t, kinds[0]);
     await openSelect(t);
-    expect(find.text('backlog'), findsWidgets);
+    expect(_k('property-option-status-doing'), findsOneWidget);
     await _esc(t);
-    expect(find.text('backlog'), findsNothing);
+    expect(_k('property-option-status-doing'), findsNothing);
     expect(s.isEditing('n1'), isTrue);
     await _esc(t);
     expect(s.isEditing('n1'), isFalse);
@@ -353,6 +352,8 @@ void main() {
     await t.pumpAndSettle();
     t.takeException(); // the test font overflows the calendar header
     expect(find.byType(FCalendar), findsOneWidget);
+    // The title field takes the first Esc; the page's edit the next.
+    await _esc(t);
     await _esc(t);
     expect(s.isEditing('n1'), isFalse);
   });

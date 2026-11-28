@@ -1,4 +1,4 @@
-import 'popover_track.dart';
+import 'dart:async';
 
 import 'package:davdart/davdart.dart';
 import 'package:flutter/services.dart';
@@ -12,6 +12,12 @@ import 'edit_note_dialog.dart' show confirmDeleteNote;
 import 'markdown_lite.dart';
 import 'parts.dart';
 import 'card_box.dart';
+import 'property/inline_text.dart';
+import 'property/option_picker.dart';
+import 'property/parent_property_picker.dart';
+import 'property/property_picker.dart';
+import 'property/property_row.dart';
+import 'property/tag_property_picker.dart';
 import 'theme.dart';
 import 'move_space_dialog.dart';
 import 'mobile_item.dart';
@@ -74,8 +80,180 @@ class DetailView extends StatelessWidget {
     }
     final p = PlanItem.fromNote(note);
     final draft = state.draftFor(uid);
+    final edit = state.editable;
+    final folder = AppState.isFolder(note);
     // Narrow: edit/preview toggle and ⋯ in the header; edits autosave.
     final mobile = narrowLayout(context);
+    final status = boardOrder.contains(p.status) ? p.status : null;
+    final priority = p.priorityWord;
+    final tags = state.noteTagsOf(note);
+    final tagSuggestions = ({
+      for (final n in state.notes)
+        for (final g in state.noteTagsOf(n))
+          if (g.isNotEmpty) g,
+    }.toList()..sort());
+
+    final statusValue = status == null
+        ? null
+        : Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              StatusDot(status),
+              SizedBox(width: t.space.sm),
+              Flexible(
+                child: Text(
+                  statusWordOf(status),
+                  key: const Key('note-status-text'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.type.bodyStyle,
+                ),
+              ),
+            ],
+          );
+
+    /// The properties, flat rows like a task's: a pick saves at once (with
+    /// Undo) through the same writes the board and the menus use. A read-only
+    /// Space reads them as plain text.
+    final rows = <Widget>[
+      if (!folder)
+        if (edit)
+          PropertyPicker<String>(
+            id: 'status',
+            uid: uid,
+            state: state,
+            icon: FLucideIcons.circleDot,
+            label: 'status',
+            value: statusValue,
+            picker: (context, control, apply) => OptionPicker<String>(
+              id: 'status',
+              value: status,
+              clearable: true,
+              clearLabel: 'none',
+              onPick: (v) {
+                control.hide();
+                apply(v);
+              },
+              options: [
+                for (final s in boardOrder)
+                  PickerOption(s, statusWordOf(s), dot: s),
+              ],
+            ),
+            onPick: (v) async {
+              await state.setStatus(uid, v);
+              return state.error == null;
+            },
+          )
+        else
+          PropertyRow(
+            key: const Key('property-status'),
+            icon: FLucideIcons.circleDot,
+            label: 'status',
+            value: statusValue,
+            readOnly: true,
+          ),
+      if (!folder)
+        if (edit)
+          PropertyPicker<String>(
+            id: 'priority',
+            uid: uid,
+            state: state,
+            icon: FLucideIcons.flag,
+            label: 'priority',
+            text: priority,
+            picker: (context, control, apply) => OptionPicker<String>(
+              id: 'priority',
+              value: priority,
+              clearable: true,
+              clearLabel: 'No priority',
+              onPick: (v) {
+                control.hide();
+                apply(v);
+              },
+              options: const [
+                PickerOption('high', 'high', icon: FLucideIcons.flag),
+                PickerOption('medium', 'medium', icon: FLucideIcons.flag),
+                PickerOption('low', 'low', icon: FLucideIcons.flag),
+              ],
+            ),
+            onPick: (v) async {
+              await state.setNotePriority(uid, v);
+              return state.error == null;
+            },
+          )
+        else
+          PropertyRow(
+            key: const Key('property-priority'),
+            icon: FLucideIcons.flag,
+            label: 'priority',
+            text: priority,
+            readOnly: true,
+          ),
+      if (edit)
+        PropertyPicker<List<String>>(
+          id: 'tags',
+          uid: uid,
+          state: state,
+          icon: FLucideIcons.tag,
+          label: 'labels',
+          text: tags.isEmpty ? null : tags.join(', '),
+          picker: (context, control, apply) => TagPropertyPicker(
+            id: 'tags',
+            value: tags,
+            suggestions: tagSuggestions,
+            onPick: (next) => apply(next),
+          ),
+          onPick: (v) => state.updateNoteTags(uid, v ?? const []),
+        )
+      else
+        PropertyRow(
+          key: const Key('property-tags'),
+          icon: FLucideIcons.tag,
+          label: 'labels',
+          text: tags.isEmpty ? null : tags.join(', '),
+          readOnly: true,
+        ),
+      if (edit && state.projectsByRecent.isNotEmpty)
+        PropertyPicker<String>(
+          id: 'parent',
+          uid: uid,
+          state: state,
+          icon: FLucideIcons.folderKanban,
+          label: 'belongs to',
+          text: state.belongsToOf(uid),
+          picker: (context, control, apply) => ParentPropertyPicker(
+            id: 'parent',
+            state: state,
+            uid: uid,
+            onPick: (v) {
+              control.hide();
+              return apply(v);
+            },
+          ),
+          onPick: (v) => state.setNoteParent(uid, v),
+        )
+      else
+        PropertyRow(
+          key: const Key('property-parent'),
+          icon: FLucideIcons.folderKanban,
+          label: 'belongs to',
+          text: state.belongsToOf(uid),
+          readOnly: true,
+        ),
+      // The rest of the header (item_id, owner, decided_by, ...) has no picker
+      // of its own: it reads as plain text, as the meta card did. A non-folder
+      // shows status and priority in the rows above.
+      for (final e in p.fields.entries)
+        if (folder || (e.key != 'status' && e.key != 'priority'))
+          PropertyRow(
+            key: Key('property-field-${e.key}'),
+            icon: FLucideIcons.alignLeft,
+            label: e.key,
+            text: e.value,
+            readOnly: true,
+          ),
+    ];
+
     Widget page = Column(
       children: [
         parentCrumb(state, uid),
@@ -84,9 +262,23 @@ class DetailView extends StatelessWidget {
           full: full,
           inHeader: inHeader,
           onClose: onClose,
+          onTitleTap: edit && draft == null
+              ? () => state.startEdit(uid, true)
+              : null,
           editor: draft == null
               ? null
-              : itemTitleField(context, controller: draft.titleController),
+              : InlineText(
+                  key: const Key('edit-title'),
+                  controller: draft.titleController,
+                  focusNode: draft.titleFocus,
+                  commitSignal: draft.commitSignal,
+                  style: paneTitleStyle(t),
+                  autoBegin: state.noteTextTargets(uid),
+                  onBegan: state.clearNoteTextIntent,
+                  onCommit: (_) => state.commitNoteText(uid),
+                  preview: (text) =>
+                      PaneTitle(text, textKey: const Key('pane-title')),
+                ),
           actions: [
             if (mobile)
               MobileItemActions(
@@ -147,115 +339,15 @@ class DetailView extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (draft != null)
-                        NoteEditor(
-                          state: state,
-                          draft: draft,
-                          note: note,
-                          full: full,
-                        )
-                      else ...[
-                        if (state.editable && !AppState.isFolder(note)) ...[
-                          SizedBox(height: t.space.md),
-                          Row(
-                            children: [
-                              Text(
-                                'Status',
-                                style: t.type.bodyStyle.copyWith(
-                                  color: t.muted,
-                                ),
-                              ),
-                              SizedBox(width: t.space.lg),
-                              SizedBox(
-                                width: t.sizes.statusField,
-                                child: TrackPopover(
-                                  builder: (_, pc) => FSelect<String>.rich(
-                                    popoverControl: pc,
-                                    key: const Key('status-menu'),
-                                    format: (v) => v.isEmpty ? 'none' : v,
-                                    hint: 'none',
-                                    control: FSelectControl.lifted(
-                                      value: boardOrder.contains(p.status)
-                                          ? p.status
-                                          : null,
-                                      // '' is the "none" row: off the boards.
-                                      onChange: (v) {
-                                        if (v != null) {
-                                          state.setStatus(
-                                            note.uid,
-                                            v.isEmpty ? null : v,
-                                          );
-                                        }
-                                      },
-                                    ),
-                                    children: [
-                                      const FSelectItem<String>(
-                                        key: Key('status-menu-none'),
-                                        title: Text('none'),
-                                        value: '',
-                                      ),
-                                      for (final s in boardOrder)
-                                        FSelectItem<String>(
-                                          title: Text(s),
-                                          value: s,
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                        SizedBox(height: t.space.lg),
-                        if (p.fields.isNotEmpty)
-                          CardBox(
-                            width: double.infinity,
-                            padding: EdgeInsets.all(t.space.lg),
-                            child: Column(
-                              children: [
-                                for (final e in p.fields.entries)
-                                  Padding(
-                                    padding: EdgeInsets.symmetric(
-                                      vertical: t.space.xxs,
-                                    ),
-                                    child: Row(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        SizedBox(
-                                          width: t.sizes.metaLabel,
-                                          child: Text(
-                                            e.key,
-                                            style: t.type.monoStyle.copyWith(
-                                              color: t.muted,
-                                            ),
-                                          ),
-                                        ),
-                                        Expanded(
-                                          child: Text(
-                                            e.value,
-                                            style: t.type.bodyStyle,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        if (note.categories.isNotEmpty) ...[
-                          SizedBox(height: t.space.lg),
-                          Wrap(
-                            spacing: t.space.sm,
-                            runSpacing: t.space.sm,
-                            children: [
-                              for (final c in note.categories) TagChip(c),
-                            ],
-                          ),
-                        ],
+                      if (rows.isNotEmpty) ...[
+                        SizedBox(height: t.space.md),
+                        PropertySection(rows: rows),
                         SizedBox(height: t.space.xl),
-                        MarkdownLite(p.text),
                       ],
+                      if (draft != null)
+                        NoteEditor(state: state, draft: draft, full: full)
+                      else
+                        MarkdownLite(p.text),
                       if (draft == null &&
                           state.tasksByParent(note.uid).isNotEmpty)
                         Padding(
@@ -329,16 +421,20 @@ class DetailView extends StatelessWidget {
         ),
       ],
     );
-    // Ctrl/Cmd+S saves an open edit;
+    // Ctrl/Cmd+S saves an open edit: the title field writes what it shows and
+    // the body's own field follows.
+    void saveNow() {
+      if (draft == null) return;
+      draft.commitSignal.ping();
+      unawaited(state.flushEdit(uid));
+    }
+
     page = CallbackShortcuts(
       bindings: {
         if (draft != null) ...{
-          const SingleActivator(LogicalKeyboardKey.keyS, control: true): () {
-            if (draft.dirty) state.saveDraft(uid);
-          },
-          const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () {
-            if (draft.dirty) state.saveDraft(uid);
-          },
+          const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+              saveNow,
+          const SingleActivator(LogicalKeyboardKey.keyS, meta: true): saveNow,
         },
       },
       child: page,

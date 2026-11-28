@@ -173,7 +173,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('edit-note'));
       await t.pumpAndSettle();
-      await t.enterText(_k('edit-title'), 'Changed');
+      await t.enterText(_k('edit-body'), 'Changed');
       await t.pump();
       expect(
         find.descendant(of: _k('tab-n:a'), matching: _k('tab-dirty')),

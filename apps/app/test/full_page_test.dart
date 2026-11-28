@@ -292,7 +292,7 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('edit-note'));
       await _settle(t);
-      await _type(t, 'edit-title', 'Changed');
+      await _type(t, 'edit-body', 'Changed');
       expect(s.dirty, isTrue);
 
       final stay = s.switchSpace(other.id);
@@ -315,21 +315,30 @@ void main() {
   });
 
   group('in-place editing', () {
-    testWidgets('edit, Save writes title, status, tags and text', (t) async {
+    testWidgets('edit, Save writes title and text; labels pick at once', (
+      t,
+    ) async {
       final s = await _pump(t);
       await t.tap(_k('edit-note'));
       await _settle(t);
       expect(_k('dirty-indicator'), findsNothing);
       await _type(t, 'edit-title', 'Alpha 2');
-      await _type(t, 'edit-tags', 'x, y');
       await _type(t, 'edit-body', 'New body');
       expect(_k('dirty-indicator'), findsOneWidget);
+      // A label is picked from its row, at once and outside the draft.
+      await t.tap(_k('property-tags'));
+      await _settle(t);
+      await t.enterText(_k('property-tag-tags-field'), 'x');
+      await t.testTextInput.receiveAction(TextInputAction.done);
+      await _settle(t);
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await _settle(t);
       await t.tap(_k('edit-save-action'));
       await _settle(t);
       expect(s.activeDraft, isNull);
       final n = (await space.notes()).firstWhere((n) => n.uid == 'a');
       expect(n.summary, 'Alpha 2');
-      expect(n.categories, containsAll(['x', 'y', 'status-todo']));
+      expect(n.categories, containsAll(['x', 'status-todo']));
       expect(PlanItem.fromNote(n).text, 'New body');
       expect(PlanItem.fromNote(n).status, 'todo');
       // The card's snippet and the detail body both show it.
@@ -352,13 +361,13 @@ void main() {
       final s = await _pump(t);
       await t.tap(_k('edit-note'));
       await _settle(t);
-      await _type(t, 'edit-title', 'Nope');
+      await _type(t, 'edit-body', 'Nope');
       await t.tap(_k('edit-cancel-action'));
       await _settle(t);
       await t.tap(find.text('Discard'));
       await _settle(t);
       expect(s.activeDraft, isNull);
-      expect(await _titles(), isNot(contains('Nope')));
+      expect(PlanItem.fromNote(s.tree.find('a')!.note).text, 'Alpha body');
       expect(find.text('Alpha'), findsWidgets);
     });
 
@@ -378,7 +387,7 @@ void main() {
       final s = await _pump(t);
       await t.tap(_k('edit-note'));
       await _settle(t);
-      await _type(t, 'edit-title', 'Changed');
+      await _type(t, 'edit-body', 'Changed');
       await t.tap(find.text('Beta').first);
       await _settle(t);
       expect(find.text('Unsaved changes'), findsWidgets);
@@ -394,39 +403,28 @@ void main() {
       await t.tap(_k('leave-discard'));
       await _settle(t);
       expect(s.peekUid, 'b');
-      expect(await _titles(), isNot(contains('Changed')));
+      expect(PlanItem.fromNote(s.tree.find('a')!.note).text, 'Alpha body');
       // Save path, from changing the selection.
       await t.tap(_k('edit-note'));
       await _settle(t);
-      await _type(t, 'edit-title', 'Beta 2');
+      await _type(t, 'edit-body', 'Beta 2 body');
       await t.tap(find.text('Alpha').first);
       await _settle(t);
       await t.tap(_k('leave-save'));
       await _settle(t);
       expect(s.peekUid, 'a');
-      expect(await _titles(), contains('Beta 2'));
+      expect(PlanItem.fromNote(s.tree.find('b')!.note).text, 'Beta 2 body');
     });
 
     testWidgets('the draft survives promoting', (t) async {
       final s = await _pump(t);
       await t.tap(_k('edit-note'));
       await _settle(t);
-      await _type(t, 'edit-title', 'Kept');
+      await _type(t, 'edit-body', 'Kept');
       await t.tap(_k('peek-promote'));
       await _settle(t);
       expect(s.dirtyFor('a'), isTrue);
-      expect(
-        t
-            .widget<EditableText>(
-              find.descendant(
-                of: _k('edit-title'),
-                matching: find.byType(EditableText),
-              ),
-            )
-            .controller
-            .text,
-        'Kept',
-      );
+      expect(s.draftFor('a')!.bodyController.text, 'Kept');
     });
   });
 }

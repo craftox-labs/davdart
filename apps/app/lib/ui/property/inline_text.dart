@@ -277,7 +277,10 @@ class _InlineTextState extends State<InlineText> {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    final style = widget.style ?? t.type.bodyStyle;
+    // The value is a Text, so it takes the inherited style; the field must
+    // show the same (an EditableText does not inherit it by itself).
+    final style = DefaultTextStyle.of(context).style
+        .merge(widget.style ?? t.type.bodyStyle);
     return ListenableBuilder(
       listenable: widget.controller,
       builder: (context, _) {

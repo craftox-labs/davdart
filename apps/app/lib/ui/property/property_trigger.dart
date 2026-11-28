@@ -114,6 +114,9 @@ class _PropertyTriggerState extends State<PropertyTrigger>
 
   /// Flushes what is pending, then shows [show] (the popover or the sheet).
   Future<void> _open(Future<void> Function() show) async {
+    // A picker takes over from the field that had the focus: its text is
+    // committed, and Esc then belongs to the popover, not to that field.
+    FocusManager.instance.primaryFocus?.unfocus();
     await widget.onOpen?.call();
     if (!mounted) return;
     await show();

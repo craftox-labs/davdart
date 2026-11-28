@@ -86,8 +86,8 @@ void main() {
       expect(_in('main-note', _k('peek-toolbar')), findsOneWidget);
       expect(_in('peek-toolbar', find.text('Beta')), findsOneWidget);
       expect(find.text('Beta'), findsWidgets);
-      // Body starts right under the header: status row, not a title.
-      expect(_in('main-note', find.text('Status')), findsOneWidget);
+      // Body starts right under the header: the status row, not a title.
+      expect(_in('main-note', _k('property-status')), findsOneWidget);
     });
 
     testWidgets('a long title ellipsizes on a phone without overflow', (

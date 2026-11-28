@@ -258,10 +258,15 @@ void main() {
         expect(s.isEditing(k.uid), isFalse);
       });
 
-      testWidgets('Esc in the title field still leaves edit mode', (t) async {
+      testWidgets('Esc in the title field closes it, the next leaves', (
+        t,
+      ) async {
         final s = await _open(t, k);
         await t.tap(_k('edit-title'));
         await t.pumpAndSettle();
+        await _esc(t);
+        expect(_k('inline-text-editing'), findsNothing);
+        expect(s.isEditing(k.uid), isTrue);
         await _esc(t);
         expect(s.isEditing(k.uid), isFalse);
       });

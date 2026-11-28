@@ -380,24 +380,17 @@ void main() {
       await t.pumpAndSettle();
       s.startEdit('n1');
       await t.pumpAndSettle();
-      final focus = find
-          .descendant(of: _k('edit-status'), matching: find.byType(Focus))
-          .evaluate()
-          .map((e) => (e.widget as Focus).focusNode)
-          .firstWhere((n) => n?.debugLabel == 'FSelect')!;
-      focus.requestFocus();
-      await t.pump();
-      await t.tap(_k('edit-status'));
+      await t.tap(_k('property-status'));
       await t.pumpAndSettle();
-      expect(find.text('backlog'), findsWidgets);
+      expect(_k('property-option-status-doing'), findsOneWidget);
       return s;
     }
 
-    testWidgets('a chord does nothing while an FSelect is open', (t) async {
+    testWidgets('a chord does nothing while a picker is open', (t) async {
       final s = await openSelect(t);
       expect(await _chord(t, _c('ctrl+shift+q')), isTrue);
       expect(s.section, Section.notes);
-      expect(find.text('backlog'), findsWidgets);
+      expect(_k('property-option-status-doing'), findsOneWidget);
       expect(s.isEditing('n1'), isTrue);
     });
 
@@ -405,7 +398,7 @@ void main() {
       final s = await openSelect(t);
       await t.sendKeyEvent(LogicalKeyboardKey.escape);
       await t.pumpAndSettle();
-      expect(find.text('backlog'), findsNothing);
+      expect(_k('property-option-status-doing'), findsNothing);
       expect(await _chord(t, _c('ctrl+shift+q')), isTrue);
       expect(s.section, Section.tasks);
     });
