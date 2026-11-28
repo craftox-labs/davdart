@@ -201,6 +201,8 @@ class _CalendarViewState extends State<CalendarView> {
 
   DateTime _clock() => widget.now ?? DateTime.now();
 
+  DateTime _wallToday() => wallDay(wallNow(_clock()));
+
   static DateTime _monthOf(DateTime d) => DateTime.utc(d.year, d.month);
 
   /// The events of the view's source (see [CalendarView.scoped]).
@@ -458,11 +460,12 @@ class _CalendarViewState extends State<CalendarView> {
         final days = DateTime.utc(month.year, month.month + 1, 0).day;
         final weeks = ((lead + days) / 7).ceil();
         final end = start.add(Duration(days: weeks * 7));
+        final year = _scale == CalendarScale.year;
         final buckets = bucketByDay(
           events: _events(),
           tasks: _tasks(),
-          from: start,
-          to: end,
+          from: year ? DateTime.utc(month.year) : start,
+          to: year ? DateTime.utc(month.year + 1) : end,
         );
         final bucket = buckets[selected];
         return LayoutBuilder(
@@ -638,99 +641,287 @@ class _CalendarViewState extends State<CalendarView> {
             ],
           ),
           if (!wide) ...[SizedBox(height: t.space.xs), switcher],
-          SizedBox(height: t.space.xs),
-          SizedBox(
-            // Fixed, so the grid's chrome (and with it the rows' shared
-            // height) is the same whatever the label font renders at.
-            height: t.sizes.calendarWeekdayRow,
-            child: Row(
-              children: [
-                for (var i = 0; i < 7; i++)
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        _weekdayNames[(first - 1 + i) % 7].substring(0, 2),
-                        style: weekday,
+          if (_scale == CalendarScale.year)
+            _yearBody(
+              context,
+              t: t,
+              year: from.year,
+              first: first,
+              today: today,
+              selected: selected,
+              buckets: buckets,
+              wide: wide,
+            )
+          else ...[
+            SizedBox(height: t.space.xs),
+            SizedBox(
+              // Fixed, so the grid's chrome (and with it the rows' shared
+              // height) is the same whatever the label font renders at.
+              height: t.sizes.calendarWeekdayRow,
+              child: Row(
+                children: [
+                  for (var i = 0; i < 7; i++)
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          _weekdayNames[(first - 1 + i) % 7].substring(0, 2),
+                          style: weekday,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-          SizedBox(height: t.space.xs),
-          Container(height: t.borders.hairline, color: t.divider),
-          LayoutBuilder(
-            builder: (context, c) {
-              // The bar layer's pixels: one column per weekday, so a bar can
-              // cover consecutive cells.
-              final g = LaneGeometry(
-                cellWidth: c.maxWidth / 7,
-                laneTop: t.sizes.calendarNumberRow,
-                pitch: t.sizes.calendarLanePitch,
-                barHeight: t.sizes.calendarChip,
-                inset: t.space.xxs,
-              );
-              // The lanes a row holds come from its height, so a row
-              // shortened to fit the window shows fewer bars rather than
-              // clipping them.
-              final lanes = wide
-                  ? lanesThatFit(
-                      rowHeight,
-                      top: t.sizes.calendarNumberRow,
-                      pitch: t.sizes.calendarLanePitch,
-                      bar: t.sizes.calendarChip,
-                      max: t.sizes.calendarLanes,
-                    )
-                  : t.sizes.calendarLanes;
-              final rows = Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (var w = 0; w < weeks; w++)
-                    _week(
+            SizedBox(height: t.space.xs),
+            Container(height: t.borders.hairline, color: t.divider),
+            LayoutBuilder(
+              builder: (context, c) {
+                // The bar layer's pixels: one column per weekday, so a bar can
+                // cover consecutive cells.
+                final g = LaneGeometry(
+                  cellWidth: c.maxWidth / 7,
+                  laneTop: t.sizes.calendarNumberRow,
+                  pitch: t.sizes.calendarLanePitch,
+                  barHeight: t.sizes.calendarChip,
+                  inset: t.space.xxs,
+                );
+                // The lanes a row holds come from its height, so a row
+                // shortened to fit the window shows fewer bars rather than
+                // clipping them.
+                final lanes = wide
+                    ? lanesThatFit(
+                        rowHeight,
+                        top: t.sizes.calendarNumberRow,
+                        pitch: t.sizes.calendarLanePitch,
+                        bar: t.sizes.calendarChip,
+                        max: t.sizes.calendarLanes,
+                      )
+                    : t.sizes.calendarLanes;
+                final rows = Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (var w = 0; w < weeks; w++)
+                      _week(
+                        context,
+                        t: t,
+                        g: g,
+                        weekStart: start.add(Duration(days: w * 7)),
+                        month: month,
+                        today: today,
+                        selected: selected,
+                        buckets: buckets,
+                        spans: spans,
+                        height: rowHeight,
+                        lanes: lanes,
+                        wide: wide,
+                        topRule: w > 0,
+                        range: _range,
+                      ),
+                  ],
+                );
+                // A drag across the wide grid picks a range of days for a new
+                // all-day event. A press is untouched (a tap never moves far
+                // enough), a vertical drag stays a scroll, and the phone has no
+                // gesture: a touch drag there would fight the scroll.
+                if (!wide || !state.eventsEditable) return rows;
+                DateTime dayAt(Offset p) =>
+                    _dayAt(p, start, weeks, g.cellWidth, rowHeight);
+                int colAt(Offset p) => g.cellWidth <= 0
+                    ? 0
+                    : (p.dx / g.cellWidth).floor().clamp(0, 6);
+                return Listener(
+                  onPointerDown: (e) {
+                    // Only the primary button, a finger or a pen starts a range:
+                    // a right or middle press scrolls or opens a menu instead.
+                    if (e.buttons & kPrimaryButton == 0) return;
+                    _dragAt = e.localPosition;
+                    _dragFrom = dayAt(e.localPosition);
+                    _dragTo = null;
+                  },
+                  onPointerMove: (e) => _dragMove(e.localPosition, colAt),
+                  onPointerUp: (_) => _dragUp(),
+                  onPointerCancel: (_) => _dragUp(cancel: true),
+                  child: rows,
+                );
+              },
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// The Year scale: twelve mini-months, three across on wide and one on the
+  /// phone. A day is an untouched square without its number; a day with items
+  /// carries a dot per kind, the dot rule the narrow month cell uses. A press
+  /// on a day opens Day view there, a press on a month's name opens Month.
+  Widget _yearBody(
+    BuildContext context, {
+    required Tokens t,
+    required int year,
+    required int first,
+    required DateTime today,
+    required DateTime selected,
+    required Map<DateTime, DayBucket> buckets,
+    required bool wide,
+  }) {
+    final across = wide ? 3 : 1;
+    return Padding(
+      key: const Key('calendar-year'),
+      padding: EdgeInsets.only(top: t.space.sm),
+      child: Column(
+        children: [
+          for (var row = 0; row < 12 ~/ across; row++) ...[
+            if (row > 0) SizedBox(height: t.space.lg),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var col = 0; col < across; col++) ...[
+                  if (col > 0) SizedBox(width: t.space.lg),
+                  Expanded(
+                    child: _miniMonth(
                       context,
                       t: t,
-                      g: g,
-                      weekStart: start.add(Duration(days: w * 7)),
-                      month: month,
+                      month: DateTime.utc(year, row * across + col + 1),
+                      first: first,
                       today: today,
                       selected: selected,
                       buckets: buckets,
-                      spans: spans,
-                      height: rowHeight,
-                      lanes: lanes,
-                      wide: wide,
-                      topRule: w > 0,
-                      range: _range,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// One month of the Year scale: its name (a press opens Month view) over
+  /// seven columns of day squares.
+  Widget _miniMonth(
+    BuildContext context, {
+    required Tokens t,
+    required DateTime month,
+    required int first,
+    required DateTime today,
+    required DateTime selected,
+    required Map<DateTime, DayBucket> buckets,
+  }) {
+    final lead = (month.weekday - first + 7) % 7;
+    final days = DateTime.utc(month.year, month.month + 1, 0).day;
+    final weeks = ((lead + days) / 7).ceil();
+    final name = _monthNames[month.month - 1];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FTappable(
+            key: Key('calendar-year-month-${month.month}'),
+            behavior: HitTestBehavior.opaque,
+            semanticsLabel: name,
+            onPress: () {
+              setState(() => _scale = CalendarScale.month);
+              _showPeriod(month, _wallToday(), first);
+            },
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: t.space.xs),
+              child: Text(
+                name,
+                style: t.type.captionStrong.copyWith(color: t.fg),
+              ),
+            ),
+          ),
+        ),
+        for (var w = 0; w < weeks; w++)
+          Row(
+            children: [
+              for (var i = 0; i < 7; i++)
+                Expanded(
+                  child: _yearDay(
+                    t: t,
+                    day: (w * 7 + i - lead) < 0 || (w * 7 + i - lead) >= days
+                        ? null
+                        : DateTime.utc(
+                            month.year,
+                            month.month,
+                            w * 7 + i - lead + 1,
+                          ),
+                    today: today,
+                    selected: selected,
+                    buckets: buckets,
+                  ),
+                ),
+            ],
+          ),
+      ],
+    );
+  }
+
+  /// One day square of a mini-month; null is the blank before the 1st or
+  /// after the last day.
+  Widget _yearDay({
+    required Tokens t,
+    required DateTime? day,
+    required DateTime today,
+    required DateTime selected,
+    required Map<DateTime, DayBucket> buckets,
+  }) {
+    if (day == null) return const AspectRatio(aspectRatio: 1);
+    final id = _id(day);
+    final bucket = buckets[day];
+    final hasEvent = bucket != null && bucket.events.isNotEmpty;
+    final hasTask = bucket != null && bucket.tasks.isNotEmpty;
+    return AspectRatio(
+      aspectRatio: 1,
+      child: FTappable(
+        key: Key('calendar-year-day-$id'),
+        behavior: HitTestBehavior.opaque,
+        semanticsLabel: dayLabel(day, _clock()),
+        onPress: () {
+          setState(() => _scale = CalendarScale.day);
+          _select(day);
+        },
+        child: Padding(
+          padding: EdgeInsets.all(t.borders.hairline),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: day == selected
+                  ? t.selectionFill
+                  : day.weekday >= DateTime.saturday
+                  ? t.weekendTint
+                  : null,
+              border: day == today
+                  ? Border.all(color: t.accent, width: t.sizes.ring)
+                  : null,
+              borderRadius: BorderRadius.circular(t.radii.small),
+            ),
+            child: Center(
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (hasEvent)
+                    StatusDot(
+                      null,
+                      key: Key('calendar-year-dot-event-$id'),
+                      color: t.accent,
+                      size: t.sizes.calendarDot,
+                    ),
+                  if (hasEvent && hasTask) SizedBox(width: t.space.xxs),
+                  if (hasTask)
+                    StatusDot(
+                      null,
+                      key: Key('calendar-year-dot-task-$id'),
+                      color: t.statusTodo,
+                      size: t.sizes.calendarDot,
                     ),
                 ],
-              );
-              // A drag across the wide grid picks a range of days for a new
-              // all-day event. A press is untouched (a tap never moves far
-              // enough), a vertical drag stays a scroll, and the phone has no
-              // gesture: a touch drag there would fight the scroll.
-              if (!wide || !state.eventsEditable) return rows;
-              DateTime dayAt(Offset p) =>
-                  _dayAt(p, start, weeks, g.cellWidth, rowHeight);
-              int colAt(Offset p) => g.cellWidth <= 0
-                  ? 0
-                  : (p.dx / g.cellWidth).floor().clamp(0, 6);
-              return Listener(
-                onPointerDown: (e) {
-                  // Only the primary button, a finger or a pen starts a range:
-                  // a right or middle press scrolls or opens a menu instead.
-                  if (e.buttons & kPrimaryButton == 0) return;
-                  _dragAt = e.localPosition;
-                  _dragFrom = dayAt(e.localPosition);
-                  _dragTo = null;
-                },
-                onPointerMove: (e) => _dragMove(e.localPosition, colAt),
-                onPointerUp: (_) => _dragUp(),
-                onPointerCancel: (_) => _dragUp(cancel: true),
-                child: rows,
-              );
-            },
+              ),
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

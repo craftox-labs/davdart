@@ -450,6 +450,88 @@ void main() {
     expect(_k('calendar-day-2026-12-2'), findsOneWidget);
   });
 
+  testWidgets('Year shows twelve mini-months with a dot per kind', (t) async {
+    final s = await _state(
+      t,
+      events: [_event('e18', 'Visit', 18)],
+      tasks: [_task('k18', 'Pay', 18), _task('k20', 'File', 20)],
+    );
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-year'));
+    await t.pumpAndSettle();
+    expect(_k('calendar-year'), findsOneWidget);
+    for (var m = 1; m <= 12; m++) {
+      expect(_k('calendar-year-month-$m'), findsOneWidget);
+    }
+    // 365 day squares, no date numbers, and the month grid is gone.
+    expect(find.byKey(const Key('calendar-year-day-2026-1-1')), findsOneWidget);
+    expect(
+      find.byKey(const Key('calendar-year-day-2026-12-31')),
+      findsOneWidget,
+    );
+    expect(_k('calendar-day-2026-11-18'), findsNothing);
+    expect(find.text('18'), findsNothing);
+    // Both kinds on the 18th, a task alone on the 20th, nothing on the 19th.
+    expect(_k('calendar-year-dot-event-2026-11-18'), findsOneWidget);
+    expect(_k('calendar-year-dot-task-2026-11-18'), findsOneWidget);
+    expect(_k('calendar-year-dot-task-2026-11-20'), findsOneWidget);
+    expect(_k('calendar-year-dot-event-2026-11-20'), findsNothing);
+    expect(_k('calendar-year-dot-event-2026-11-19'), findsNothing);
+    expect(_k('calendar-year-dot-task-2026-11-19'), findsNothing);
+  });
+
+  testWidgets('Year: a day opens Day view there, a month name opens Month', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-year'));
+    await t.pumpAndSettle();
+    await t.ensureVisible(_k('calendar-year-day-2026-3-9'));
+    await t.tap(_k('calendar-year-day-2026-3-9'));
+    await t.pumpAndSettle();
+    expect(_title(t), 'Mon 9 March 2026');
+    expect(s.homeDay, DateTime.utc(2026, 3, 9));
+    expect(_k('calendar-year'), findsNothing);
+
+    await t.tap(_k('calendar-scale-year'));
+    await t.pumpAndSettle();
+    await t.ensureVisible(_k('calendar-year-month-7'));
+    await t.tap(_k('calendar-year-month-7'));
+    await t.pumpAndSettle();
+    expect(_title(t), 'July 2026');
+    expect(s.homeDay, DateTime.utc(2026, 7, 1));
+    expect(_k('calendar-day-2026-7-1'), findsOneWidget);
+  });
+
+  testWidgets('Year arrows step a year and Today comes back', (t) async {
+    final s = await _state(t, events: [_event('e18', 'Visit', 18)]);
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-year'));
+    await t.pumpAndSettle();
+    await t.tap(_k('calendar-prev'));
+    await t.pumpAndSettle();
+    expect(_title(t), '2025');
+    expect(_k('calendar-year-day-2025-12-31'), findsOneWidget);
+    expect(_k('calendar-year-dot-event-2026-11-18'), findsNothing);
+    await t.tap(_k('calendar-today'));
+    await t.pumpAndSettle();
+    expect(_title(t), '2026');
+    expect(_k('calendar-year-dot-event-2026-11-18'), findsOneWidget);
+  });
+
+  testWidgets('Year at 320 wide: one month per row, no overflow', (t) async {
+    final s = await _state(t, events: [_event('e18', 'Visit', 18)]);
+    await _pump(t, s, size: const Size(320, 640));
+    await t.tap(_k('calendar-scale-year'));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+    expect(
+      t.getTopLeft(_k('calendar-year-month-2')).dy,
+      greaterThan(t.getTopLeft(_k('calendar-year-month-1')).dy),
+    );
+  });
+
   testWidgets('a month arrow moves the selection into the shown month', (
     t,
   ) async {
