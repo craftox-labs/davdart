@@ -512,6 +512,7 @@ class AppState extends ChangeNotifier {
 
   /// A press on a rail icon: the open section folds the side panel away,
   /// any other section (or any icon while folded) opens that section.
+  /// The rail's Home entry is not a section: see [pressRailHome].
   void pressRail(Section s) {
     if (s == section && !sidebarCollapsed) {
       setSidebarCollapsed(true);
@@ -583,6 +584,19 @@ class AppState extends ChangeNotifier {
   /// Shows the Home tab in the main area (the Home rail action and the
   /// palette entry). Home is personal, so it clears the project scope.
   void showHome() => _show(null);
+
+  /// True when the main area shows Home: no document tab is focused.
+  bool get atHome => activeTab == null;
+
+  /// A press on the rail's Home entry: shows Home and folds the docked side
+  /// panel away (the same persisted pref as folding a section), so Home takes
+  /// the whole width. Only this press folds; reaching Home any other way (the
+  /// tab strip, the palette, a 'Go to' action, a keyboard shortcut) leaves the
+  /// panel exactly as it is.
+  void pressRailHome() {
+    showHome();
+    setSidebarCollapsed(true);
+  }
 
   /// After a Space switch: the Tasks and Events lists stay (the choice on
   /// the rail survives), any other section falls back to Notes (a project
