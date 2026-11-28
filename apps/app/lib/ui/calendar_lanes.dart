@@ -90,7 +90,8 @@ DateTime _add(DateTime d, int days) =>
 int _gap(DateTime from, DateTime to) => _day(to).difference(_day(from)).inDays;
 
 /// Spreads [spans] over the lanes of the week row that starts on [weekStart]
-/// (seven days), at most [maxLanes] lanes deep.
+/// ([days] days, seven by default; the Day scale passes one), at most
+/// [maxLanes] lanes deep.
 ///
 /// Placement is stable: the earliest start takes the first lane, then the
 /// longer span, then the title, then [CalendarSpan.sortKey]. Each span takes
@@ -101,9 +102,10 @@ WeekLanes layOutWeek(
   List<CalendarSpan> spans,
   DateTime weekStart, {
   required int maxLanes,
+  int days = 7,
 }) {
   final first = _day(weekStart);
-  final last = _add(first, 6);
+  final last = _add(first, days - 1);
   final week =
       [
         for (final s in spans)

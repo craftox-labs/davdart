@@ -152,6 +152,18 @@ Future<void> _pump(
   await t.pumpAndSettle();
 }
 
+Event _range3(String uid, String title, int from, int to) => Event(
+  uid: uid,
+  summary: title,
+  dtstart: ICalDate.date(2026, 11, from),
+  dtend: ICalDate.date(2026, 11, to + 1),
+);
+
+/// The ring or fill around a Week or Day header's date number.
+BoxDecoration _circle2(WidgetTester t, String id) =>
+    t.widget<Container>(find.byKey(Key('calendar-head-number-$id'))).decoration!
+        as BoxDecoration;
+
 /// The toolbar's period title.
 String? _title(WidgetTester t) => t.widget<Text>(_k('calendar-month')).data;
 
@@ -530,6 +542,91 @@ void main() {
       t.getTopLeft(_k('calendar-year-month-2')).dy,
       greaterThan(t.getTopLeft(_k('calendar-year-month-1')).dy),
     );
+  });
+
+  testWidgets('Week: header, one column per day, bars and chips in the strip', (
+    t,
+  ) async {
+    final s = await _state(
+      t,
+      events: [_range3('trip', 'Trip', 17, 19), _event('e18', 'Visit', 18)],
+      tasks: [_task('k18', 'Pay', 18)],
+    );
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-week'));
+    await t.pumpAndSettle();
+    expect(_k('calendar-time-week'), findsOneWidget);
+    expect(_k('calendar-day-2026-11-18'), findsNothing);
+    for (var d = 16; d <= 22; d++) {
+      expect(_k('calendar-head-2026-11-$d'), findsOneWidget);
+    }
+    expect(_k('calendar-head-2026-11-23'), findsNothing);
+    // The bar spans Tuesday to Thursday: three columns wide.
+    final bar = _k('calendar-strip-bar-trip@2026-11-17-2026-11-16');
+    final col = t.getSize(_k('calendar-head-2026-11-17')).width;
+    expect(t.getSize(bar).width, closeTo(col * 3, col * .25));
+    expect(
+      t.getTopLeft(bar).dx,
+      greaterThan(t.getTopLeft(_k('calendar-head-2026-11-17')).dx - 1),
+    );
+    // Single-day items are chips in the strip.
+    expect(_k('calendar-strip-chip-2026-11-18-0'), findsOneWidget);
+    expect(_k('calendar-strip-chip-2026-11-18-1'), findsOneWidget);
+    // A press on a header picks the day (a project keeps it, Home shares it).
+    await t.tap(_k('calendar-head-2026-11-20'));
+    await t.pumpAndSettle();
+    expect(s.homeDay, DateTime.utc(2026, 11, 20));
+    expect(_circle2(t, '2026-11-20').color, Tokens.light.accent);
+  });
+
+  testWidgets('Day: one column, the picked day', (t) async {
+    final s = await _state(t, events: [_event('e18', 'Visit', 18)]);
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-day'));
+    await t.pumpAndSettle();
+    expect(_k('calendar-time-day'), findsOneWidget);
+    expect(_k('calendar-head-2026-11-18'), findsOneWidget);
+    expect(_k('calendar-head-2026-11-17'), findsNothing);
+    expect(_k('calendar-head-2026-11-19'), findsNothing);
+    expect(_k('calendar-strip-chip-2026-11-18-0'), findsOneWidget);
+  });
+
+  testWidgets('Week: "+N more" chips and lanes open Day on that column', (
+    t,
+  ) async {
+    final s = await _state(
+      t,
+      events: [
+        for (var i = 0; i < 4; i++) _range3('b$i', 'Bar $i', 16, 17),
+        for (var i = 0; i < 4; i++) _event('c$i', 'Chip $i', 19),
+      ],
+    );
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-week'));
+    await t.pumpAndSettle();
+    // Three chips show, the fourth is "+1 more".
+    expect(_k('calendar-strip-chip-2026-11-19-2'), findsOneWidget);
+    expect(_k('calendar-strip-chip-2026-11-19-3'), findsNothing);
+    await t.tap(_k('calendar-strip-more-2026-11-19'));
+    await t.pumpAndSettle();
+    expect(_title(t), 'Thu 19 November 2026');
+    // Day shows every chip.
+    expect(_k('calendar-strip-chip-2026-11-19-3'), findsOneWidget);
+
+    await t.tap(_k('calendar-scale-week'));
+    await t.pumpAndSettle();
+    await t.tap(_k('calendar-strip-lanes-more-2026-11-16'));
+    await t.pumpAndSettle();
+    expect(_title(t), 'Mon 16 November 2026');
+  });
+
+  testWidgets('Week at 320 wide: no overflow', (t) async {
+    final s = await _state(t, events: [_range3('trip', 'Trip', 17, 19)]);
+    await _pump(t, s, size: const Size(320, 640));
+    await t.tap(_k('calendar-scale-week'));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+    expect(_k('calendar-head-2026-11-22'), findsOneWidget);
   });
 
   testWidgets('a month arrow moves the selection into the shown month', (

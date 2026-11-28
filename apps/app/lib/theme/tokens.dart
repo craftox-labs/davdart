@@ -314,6 +314,8 @@ class SizeTokens {
     this.calendarChipBar = 3,
     this.calendarLanePitch = 18,
     this.calendarLanes = 3,
+    this.calendarHourGutter = 44,
+    this.calendarHourRow = 48,
     this.ring = 2,
     this.progressBar = 4,
     this.statLabel = 80,
@@ -421,6 +423,11 @@ class SizeTokens {
   final double calendarNumber, calendarNumberRow, calendarChip, calendarChipBar;
   final double calendarLanePitch;
   final int calendarLanes;
+
+  /// Week and Day time grid: the width of the hour-label gutter and the least
+  /// height of one hour (the pitch grows with the viewport, see
+  /// [Tokens.calendarHourPitch]).
+  final double calendarHourGutter, calendarHourRow;
 
   /// Height of the thin progress bar on a project row.
   final double progressBar;
@@ -753,6 +760,13 @@ class Tokens {
       sizes.calendarCellChips,
     );
   }
+
+  /// The height of one hour in the Week and Day time grid: the viewport's
+  /// share of a working day (ten hours) so that day fits without scrolling,
+  /// never under [SizeTokens.calendarHourRow].
+  double calendarHourPitch(double areaHeight) => areaHeight.isFinite
+      ? (areaHeight / 10).clamp(sizes.calendarHourRow, double.infinity)
+      : sizes.calendarHourRow;
 
   final TypeTokens type;
   final SpaceTokens space;

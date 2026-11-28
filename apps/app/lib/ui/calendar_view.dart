@@ -461,11 +461,15 @@ class _CalendarViewState extends State<CalendarView> {
         final weeks = ((lead + days) / 7).ceil();
         final end = start.add(Duration(days: weeks * 7));
         final year = _scale == CalendarScale.year;
+        final timed =
+            _scale == CalendarScale.day || _scale == CalendarScale.week;
+        final shown = _periodStart(_scale, _anchor ?? selected, first);
+        final shownTo = _stepped(_scale, shown, 1);
         final buckets = bucketByDay(
           events: _events(),
           tasks: _tasks(),
-          from: year ? DateTime.utc(month.year) : start,
-          to: year ? DateTime.utc(month.year + 1) : end,
+          from: year || timed ? shown : start,
+          to: year || timed ? shownTo : end,
         );
         final bucket = buckets[selected];
         return LayoutBuilder(
@@ -495,6 +499,7 @@ class _CalendarViewState extends State<CalendarView> {
               buckets: buckets,
               wide: wide,
               rowHeight: rowHeight,
+              viewport: c.maxHeight,
             );
             final list = _day(
               context,
@@ -551,6 +556,7 @@ class _CalendarViewState extends State<CalendarView> {
     required Map<DateTime, DayBucket> buckets,
     required bool wide,
     required double rowHeight,
+    required double viewport,
   }) {
     final weekday = t.type.sectionLabelStyle.copyWith(color: t.muted);
     final end = start.add(Duration(days: weeks * 7));
@@ -652,6 +658,18 @@ class _CalendarViewState extends State<CalendarView> {
               buckets: buckets,
               wide: wide,
             )
+          else if (_scale == CalendarScale.day || _scale == CalendarScale.week)
+            _timeBody(
+              context,
+              t: t,
+              from: from,
+              days: _scale == CalendarScale.day ? 1 : 7,
+              today: today,
+              selected: selected,
+              buckets: buckets,
+              wide: wide,
+              viewport: viewport,
+            )
           else ...[
             SizedBox(height: t.space.xs),
             SizedBox(
@@ -748,6 +766,269 @@ class _CalendarViewState extends State<CalendarView> {
           ],
         ],
       ),
+    );
+  }
+
+  /// Opens Day view on [day]: the strip's "+N more" and a Year square both
+  /// land here.
+  void _openDay(DateTime day) {
+    setState(() => _scale = CalendarScale.day);
+    _select(day);
+  }
+
+  /// The Week and Day scales: a header (weekday and date number per column),
+  /// the strip of all-day items (multi-day bars on lanes, then chips) and,
+  /// below, the timed area. Day is the same with one column.
+  ///
+  /// Late-night events stay bars: [_multiDay] makes any occurrence over two
+  /// days a bar in the strip, as Month does. A task with a due time stays a
+  /// chip in the strip, never a block: a due moment has no length.
+  Widget _timeBody(
+    BuildContext context, {
+    required Tokens t,
+    required DateTime from,
+    required int days,
+    required DateTime today,
+    required DateTime selected,
+    required Map<DateTime, DayBucket> buckets,
+    required bool wide,
+    required double viewport,
+  }) {
+    final to = from.add(Duration(days: days));
+    final spans = _spans(from, to);
+    final lanes = layOutWeek(
+      spans,
+      from,
+      maxLanes: t.sizes.calendarLanes,
+      days: days,
+    );
+    final gutter = t.sizes.calendarHourGutter;
+    final dayList = [
+      for (var i = 0; i < days; i++) from.add(Duration(days: i)),
+    ];
+    final cap = days == 1 ? 1 << 20 : 3;
+
+    // Chips of one day's strip: its single-day all-day events and its tasks.
+    List<_CellItem> stripItems(DateTime day) {
+      final bucket = buckets[day];
+      return [
+        for (final o in bucket?.events ?? const <EventOccurrence>[])
+          if (!_multiDay(o) && o.allDay)
+            (
+              title: o.summary.isEmpty ? '(no title)' : o.summary,
+              event: true,
+              start: o.start,
+              allDay: true,
+              uid: o.event.uid,
+            ),
+        for (final k in bucket?.tasks ?? const <TaskOccurrence>[])
+          (
+            title: k.task.summary.isEmpty ? '(no title)' : k.task.summary,
+            event: false,
+            start: k.start,
+            allDay: k.allDay,
+            uid: k.task.uid,
+          ),
+      ]..sort(_byWhen);
+    }
+
+    Widget head(DateTime day) {
+      final id = _id(day);
+      final isSelected = day == selected;
+      final isToday = day == today;
+      return Expanded(
+        child: FTappable(
+          key: Key('calendar-head-$id'),
+          behavior: HitTestBehavior.opaque,
+          semanticsLabel: dayLabel(day, _clock()),
+          onPress: () => _select(day, openPanel: wide),
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: t.space.xs),
+            child: Column(
+              children: [
+                SizedBox(
+                  height: t.sizes.calendarWeekdayRow,
+                  child: Text(
+                    _weekdayNames[day.weekday - 1].substring(0, 2),
+                    style: t.type.sectionLabelStyle.copyWith(color: t.muted),
+                  ),
+                ),
+                Container(
+                  key: Key('calendar-head-number-$id'),
+                  width: t.sizes.calendarNumber,
+                  height: t.sizes.calendarNumber,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isSelected ? t.accent : null,
+                    border: isToday && !isSelected
+                        ? Border.all(color: t.accent, width: t.sizes.ring)
+                        : null,
+                  ),
+                  child: Text(
+                    '${day.day}',
+                    style: t.type.captionStrong.copyWith(
+                      color: isSelected ? t.onAccent : t.fg,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    Widget column(DateTime day, double top, {required bool rule}) {
+      final id = _id(day);
+      final items = stripItems(day);
+      return Expanded(
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: day.weekday >= DateTime.saturday ? t.weekendTint : null,
+            border: rule
+                ? Border(
+                    left: BorderSide(
+                      color: t.divider,
+                      width: t.borders.hairline,
+                    ),
+                  )
+                : null,
+          ),
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              t.space.xxs,
+              top,
+              t.space.xxs,
+              t.space.xxs,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (final (i, item) in items.take(cap).indexed)
+                  _chip(
+                    t: t,
+                    key: Key('calendar-strip-chip-$id-$i'),
+                    title: item.title,
+                    event: item.event,
+                    start: item.start,
+                    allDay: item.allDay,
+                    muted: false,
+                    day: day,
+                    uid: item.uid,
+                  ),
+                if (items.length > cap)
+                  FTappable(
+                    key: Key('calendar-strip-more-$id'),
+                    behavior: HitTestBehavior.opaque,
+                    semanticsLabel: 'Open ${dayLabel(day, _clock())}',
+                    onPress: () => _openDay(day),
+                    child: Padding(
+                      padding: EdgeInsets.only(top: t.space.xxs),
+                      child: Text(
+                        '+${items.length - cap} more',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.type.microStyle.copyWith(color: t.muted),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final top =
+        t.sizes.calendarLanePitch * lanes.lanes +
+        (lanes.hidden > 0 ? t.sizes.calendarLanePitch : 0);
+    final weekId = _id(from);
+    return Column(
+      key: Key('calendar-time-${_scale.name}'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            SizedBox(width: gutter),
+            for (final d in dayList) head(d),
+          ],
+        ),
+        Container(height: t.borders.hairline, color: t.divider),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(width: gutter),
+            Expanded(
+              child: LayoutBuilder(
+                builder: (context, c) {
+                  final g = LaneGeometry(
+                    cellWidth: c.maxWidth / days,
+                    laneTop: 0,
+                    pitch: t.sizes.calendarLanePitch,
+                    barHeight: t.sizes.calendarChip,
+                    inset: t.space.xxs,
+                  );
+                  return ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: t.sizes.calendarLanePitch,
+                    ),
+                    child: Stack(
+                      children: [
+                        IntrinsicHeight(
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              for (final (i, d) in dayList.indexed)
+                                column(d, top, rule: i > 0),
+                            ],
+                          ),
+                        ),
+                        for (final s in lanes.segments)
+                          Positioned(
+                            left: g.rectOf(s).left,
+                            top: g.rectOf(s).top,
+                            width: g.rectOf(s).width,
+                            height: g.barHeight,
+                            child: _bar(
+                              t,
+                              s,
+                              key: Key(
+                                'calendar-strip-bar-${s.span.sortKey}-$weekId',
+                              ),
+                              g: g,
+                              weekStart: from,
+                            ),
+                          ),
+                        if (lanes.hidden > 0)
+                          Positioned(
+                            left: g.inset,
+                            top: g.moreTop(lanes.lanes),
+                            child: FTappable(
+                              key: Key('calendar-strip-lanes-more-$weekId'),
+                              behavior: HitTestBehavior.opaque,
+                              semanticsLabel:
+                                  'Open ${dayLabel(from, _clock())}',
+                              onPress: () => _openDay(from),
+                              child: Text(
+                                '+${lanes.hidden} more',
+                                maxLines: 1,
+                                style: t.type.microStyle.copyWith(
+                                  color: t.muted,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        Container(height: t.borders.hairline, color: t.divider),
+      ],
     );
   }
 
@@ -880,10 +1161,7 @@ class _CalendarViewState extends State<CalendarView> {
         key: Key('calendar-year-day-$id'),
         behavior: HitTestBehavior.opaque,
         semanticsLabel: dayLabel(day, _clock()),
-        onPress: () {
-          setState(() => _scale = CalendarScale.day);
-          _select(day);
-        },
+        onPress: () => _openDay(day),
         child: Padding(
           padding: EdgeInsets.all(t.borders.hairline),
           child: DecoratedBox(

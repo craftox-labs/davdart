@@ -131,4 +131,23 @@ void main() {
     expect(g.reserved(2, more: true), 54);
     expect(g.moreTop(2), 60);
   });
+
+  test('days: 1 lays out a single column and clips spans to it', () {
+    final w = layOutWeek(
+      [_span(17, 20, 'Visit'), _span(18, 18, 'Other')],
+      _d(18),
+      maxLanes: 3,
+      days: 1,
+    );
+    expect(_shape(w), ['0:0-0', '1:0-0:start:end']);
+    expect(w.lanes, 2);
+  });
+
+  test('days: 3 drops spans outside the window and keeps the default 7', () {
+    final spans = [_span(16, 17, 'Early'), _span(20, 22, 'Late')];
+    final three = layOutWeek(spans, _d(17), maxLanes: 3, days: 3);
+    expect(_shape(three), ['0:0-0:end']);
+    final seven = layOutWeek(spans, _d(16), maxLanes: 3);
+    expect(_shape(seven), ['0:0-1:start:end', '0:4-6:start:end']);
+  });
 }
