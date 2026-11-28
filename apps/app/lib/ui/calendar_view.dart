@@ -80,7 +80,13 @@ int firstWeekday(BuildContext context) {
 
 /// One item of a wide day cell's chip list: what to show, its kind and when
 /// it starts, so all-day items lead and the rest follow in start order.
-typedef _CellItem = ({String title, bool event, DateTime start, bool allDay});
+typedef _CellItem = ({
+  String title,
+  bool event,
+  DateTime start,
+  bool allDay,
+  String uid,
+});
 
 /// `y-m-d`, the id a day's widget keys end with.
 String _id(DateTime d) => '${d.year}-${d.month}-${d.day}';
@@ -249,9 +255,17 @@ class _CalendarViewState extends State<CalendarView> {
 
   /// A press on a multi-day bar: picks [day] (the one under the pointer) and
   /// opens [uid], as pressing a chip's day and its row does.
-  void _openBar(DateTime day, String uid) {
+  void _openBar(DateTime day, String uid) => _openItem(day, uid, event: true);
+
+  /// A press on an item's chip: picks its day and opens that item (an event or
+  /// a task), not just the day.
+  void _openItem(DateTime day, String uid, {required bool event}) {
     _select(day, openPanel: true);
-    state.clickEvent(uid);
+    if (event) {
+      state.clickEvent(uid);
+    } else {
+      state.clickTask(uid);
+    }
   }
 
   /// Opens the new-event dialog on [day] (an all-day event to [until], when a
@@ -775,6 +789,7 @@ class _CalendarViewState extends State<CalendarView> {
             event: true,
             start: o.start,
             allDay: o.allDay,
+            uid: o.event.uid,
           ),
       for (final k in bucket?.tasks ?? const <TaskOccurrence>[])
         (
@@ -782,6 +797,7 @@ class _CalendarViewState extends State<CalendarView> {
           event: false,
           start: k.start,
           allDay: k.allDay,
+          uid: k.task.uid,
         ),
     ]..sort(_byWhen);
     Widget body;
@@ -812,6 +828,8 @@ class _CalendarViewState extends State<CalendarView> {
                       start: item.start,
                       allDay: item.allDay,
                       muted: !inMonth,
+                      day: day,
+                      uid: item.uid,
                     ),
                   if (items.length > cap)
                     Padding(
@@ -901,7 +919,9 @@ class _CalendarViewState extends State<CalendarView> {
   /// One item in a wide day cell: a small rounded chip whose left bar carries
   /// the tone (an event's accent, a task's todo tone, with a hollow dot for a
   /// task), a timed item's start time in muted text, then the truncated
-  /// title.
+  /// title. A press opens that item and picks its day, so the chip takes its
+  /// own taps instead of the cell's (a press on the cell's empty space still
+  /// picks the day, and a drag across the grid still makes a range).
   Widget _chip({
     required Tokens t,
     required Key key,
@@ -910,56 +930,66 @@ class _CalendarViewState extends State<CalendarView> {
     required DateTime start,
     required bool allDay,
     required bool muted,
+    required DateTime day,
+    required String uid,
   }) {
     final tone = event ? t.accent : t.statusTodo;
     final small = t.type.microStyle.copyWith;
-    return Padding(
+    return FTappable(
       key: key,
-      padding: EdgeInsets.only(top: t.space.xxs),
-      child: SizedBox(
-        height: t.sizes.calendarChip,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(t.radii.small),
-          child: ColoredBox(
-            color: event ? t.eventTint : t.taskTint,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                SizedBox(
-                  width: t.sizes.calendarChipBar,
-                  child: ColoredBox(color: tone),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: t.space.xxs),
-                    child: Row(
-                      children: [
-                        if (!event) ...[
-                          StatusDot(
-                            null,
-                            color: tone,
-                            size: t.sizes.calendarDot,
-                            hollow: true,
+      behavior: HitTestBehavior.opaque,
+      semanticsLabel: title,
+      onPress: () => _openItem(day, uid, event: event),
+      child: Padding(
+        padding: EdgeInsets.only(top: t.space.xxs),
+        child: SizedBox(
+          height: t.sizes.calendarChip,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(t.radii.small),
+            child: ColoredBox(
+              color: event ? t.eventTint : t.taskTint,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  SizedBox(
+                    width: t.sizes.calendarChipBar,
+                    child: ColoredBox(color: tone),
+                  ),
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: t.space.xxs),
+                      child: Row(
+                        children: [
+                          if (!event) ...[
+                            StatusDot(
+                              null,
+                              color: tone,
+                              size: t.sizes.calendarDot,
+                              hollow: true,
+                            ),
+                            SizedBox(width: t.space.xxs),
+                          ],
+                          if (!allDay) ...[
+                            Text(
+                              timeLabel(start),
+                              style: small(color: t.muted),
+                            ),
+                            SizedBox(width: t.space.xxs),
+                          ],
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: small(color: muted ? t.muted : t.fg),
+                            ),
                           ),
-                          SizedBox(width: t.space.xxs),
                         ],
-                        if (!allDay) ...[
-                          Text(timeLabel(start), style: small(color: t.muted)),
-                          SizedBox(width: t.space.xxs),
-                        ],
-                        Expanded(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: small(color: muted ? t.muted : t.fg),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

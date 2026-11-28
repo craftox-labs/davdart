@@ -129,6 +129,35 @@ void main() {
   setUp(() => LocalZone.use('Asia/Bangkok'));
   tearDown(() => LocalZone.use(null));
 
+  testWidgets('a chip opens its event; empty cell space picks the day', (
+    t,
+  ) async {
+    final s = await _state(
+      t,
+      events: [
+        Event(
+          uid: 'ev',
+          summary: 'Standup',
+          dtstart: const ICalDate('20261120T090000Z'),
+          dtend: const ICalDate('20261120T100000Z'),
+        ),
+      ],
+    );
+    await _pump(t, s);
+    await t.tap(_k('calendar-chip-2026-11-20-0'));
+    await t.pumpAndSettle();
+    // The chip opens the event itself, not just its day.
+    expect(s.peekUid, 'ev');
+    // A press on the cell's empty corner still picks the day.
+    s.select(null);
+    await t.pumpAndSettle();
+    final cell = t.getRect(_k('calendar-day-2026-11-21'));
+    await t.tapAt(Offset(cell.right - 4, cell.top + 4));
+    await t.pumpAndSettle();
+    expect(s.homeDay, isNotNull);
+    expect(s.homeDay!.day, 21);
+  });
+
   testWidgets('grid math: Monday-first weeks from the locale', (t) async {
     final s = await _state(t);
     await _pump(t, s);

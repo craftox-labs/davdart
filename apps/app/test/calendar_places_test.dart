@@ -140,6 +140,41 @@ void main() {
     expect(_k('calendar-view'), findsNothing);
   });
 
+  testWidgets('a chip opens its event in Home and in a project Calendar', (
+    t,
+  ) async {
+    // Wide enough for the calendar's chips in both places (the grid needs
+    // 600 px of its own).
+    final s = await pumpTasksApp(
+      t,
+      notes: _notes,
+      events: [
+        mkEvent('le', summary: 'Loose ev', days: 0),
+        mkEvent('pe', summary: 'Project ev', days: 0, parent: 'p'),
+      ],
+      size: const Size(1800, 1000),
+    );
+    s.setHomeView(HomeView.calendar);
+    await t.pumpAndSettle();
+    final day = wallDay(wallNow(DateTime.now()));
+    final id = '${day.year}-${day.month}-${day.day}';
+    Finder chip(String title) => find.descendant(
+      of: find.byKey(Key('calendar-day-$id')),
+      matching: find.text(title),
+    );
+    // Home: the loose event's chip opens that event.
+    await t.tap(chip('Loose ev'));
+    await t.pumpAndSettle();
+    expect(s.peekUid, 'le');
+    // A project's Calendar tab: its own event's chip opens it.
+    s.openProjectTab('p');
+    s.setProjectTab('p', ProjectTab.calendar);
+    await t.pumpAndSettle();
+    await t.tap(chip('Project ev'));
+    await t.pumpAndSettle();
+    expect(s.peekUid, 'pe');
+  });
+
   testWidgets('Home Calendar shows loose items only, never a project item', (
     t,
   ) async {
