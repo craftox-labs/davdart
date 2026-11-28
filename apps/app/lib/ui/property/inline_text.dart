@@ -9,14 +9,16 @@ import '../../theme/tokens.dart';
 import '../note_editor.dart' show imeComposing;
 import '../theme.dart';
 
-/// A text value that becomes an inline field on tap: a [Text] (or a [preview])
-/// until the user picks it, then the field in the same place and style, so the
-/// row does not shift.
+/// A text value edited in place: the value itself until a press lands on it,
+/// then the field, in the same place and style, so nothing shifts.
 ///
-/// Typing pauses for [debounce] and commits through [onCommit]; so does a
-/// blur, Enter (a single line) and losing the field. Esc reverts the field to
-/// the last saved text. A commit that fails reverts the text too and colours
-/// it with [Tokens.error] until the next edit; the caller shows the toast.
+/// The field is mounted throughout ([EditableText], read-only while it has no
+/// focus) so a press lands on a text field and takes the focus the way any
+/// other field does. Typing pauses for [debounce] and commits through
+/// [onCommit]; so does a blur, Enter (a single line) and leaving the field.
+/// Esc reverts the field to the last saved text. A commit that fails reverts
+/// the text too and colours it with [Tokens.error] until the next edit; the
+/// caller shows the toast.
 class InlineText extends StatefulWidget {
   const InlineText({
     super.key,
@@ -52,7 +54,7 @@ class InlineText extends StatefulWidget {
   final bool readOnly;
   final int? maxLines;
 
-  /// Draws the value while the field is not focused (a markdown preview).
+  /// Draws the value while the field has no focus (a markdown preview).
   final Widget Function(String text)? preview;
 
   /// The node the caller focuses to start editing (a tap on the row); the
@@ -204,7 +206,7 @@ class _InlineTextState extends State<InlineText> {
       listenable: widget.controller,
       builder: (context, _) {
         final text = widget.controller.text;
-        if (widget.readOnly) return _value(t, style, text, null);
+        if (widget.readOnly) return _value(t, style, text);
         final focused = _focus.hasFocus;
         // The field is always in the tree (invisibly while it has no focus):
         // it owns the focus node, so a press on the value lands on a text
@@ -217,7 +219,7 @@ class _InlineTextState extends State<InlineText> {
               : AlignmentDirectional.centerStart,
           children: [
             Opacity(opacity: focused ? 1 : 0, child: _field(t, style, focused)),
-            if (!focused) IgnorePointer(child: _value(t, style, text, null)),
+            if (!focused) IgnorePointer(child: _value(t, style, text)),
             if (focused)
               const Positioned.fill(
                 key: Key('inline-text-editing'),
@@ -229,8 +231,8 @@ class _InlineTextState extends State<InlineText> {
     );
   }
 
-  /// The value while the field is closed.
-  Widget _value(Tokens t, TextStyle style, String text, Color? color) {
+  /// The value while the field has no focus.
+  Widget _value(Tokens t, TextStyle style, String text) {
     if (text.isEmpty && widget.placeholder != null) {
       return Text(
         widget.placeholder!,
@@ -245,7 +247,7 @@ class _InlineTextState extends State<InlineText> {
           text,
           maxLines: widget.multiline ? widget.maxLines : 1,
           overflow: widget.multiline ? null : TextOverflow.ellipsis,
-          style: style.copyWith(color: _failed ? t.error : color),
+          style: style.copyWith(color: _failed ? t.error : null),
         );
     return widget.multiline
         ? shown
