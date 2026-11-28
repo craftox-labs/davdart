@@ -8,8 +8,9 @@ import '../state/note_drag.dart';
 import '../state/task_rules.dart';
 import '../theme/tokens.dart';
 import 'board_layout.dart';
+import 'card_properties.dart';
 import 'chips.dart' show priorityColorOf;
-import 'task_detail.dart' show priorityBucket, priorityOfBucket;
+import 'task_detail.dart' show priorityBucket;
 import 'drag_drop.dart';
 import 'key_nav_ui.dart';
 import 'new_note_dialog.dart';
@@ -19,13 +20,6 @@ import 'task_menu.dart';
 import 'task_parts.dart';
 import 'empty_state.dart';
 import 'card_box.dart';
-import 'parts.dart';
-import 'popover_track.dart';
-import 'property/date_property_picker.dart';
-import 'property/option_picker.dart';
-import 'property/property_trigger.dart' show PropertyPopoverGroup;
-import 'property/tag_property_picker.dart';
-import 'section_label.dart';
 import 'theme.dart';
 
 /// The glyph of a card's kind: a document for a note, a checklist (the rail icon) for a
@@ -562,7 +556,7 @@ class _Card extends StatelessWidget {
         // the card itself).
         if (state.editable) ...[
           SizedBox(width: t.space.xs),
-          _CardProperties(state: state, item: item),
+          CardProperties(state: state, uid: item.uid),
         ],
       ],
     );
@@ -575,206 +569,5 @@ class _Card extends StatelessWidget {
     id: 'card-${item.uid}',
     radius: t.radii.card,
     child: child,
-  );
-}
-
-/// The board card's properties, from its ⋯ button: the same pickers the item
-/// page uses (status, priority, due, labels), so a card can be triaged without
-/// opening it. Nothing is added to the card itself but the button.
-class _CardProperties extends StatefulWidget {
-  const _CardProperties({required this.state, required this.item});
-  final AppState state;
-  final BoardItem item;
-
-  @override
-  State<_CardProperties> createState() => _CardPropertiesState();
-}
-
-class _CardPropertiesState extends State<_CardProperties>
-    with TickerProviderStateMixin {
-  /// The tap region of this popover; stable while the card is.
-  final _group = Object();
-
-  AppState get _state => widget.state;
-
-  /// A note write (these return nothing): it failed when the state says so.
-  Future<bool> _note(Future<void> Function() change) async {
-    await change();
-    return _state.error == null;
-  }
-
-  /// Runs [write] after closing the picker, and says why when it fails.
-  Future<void> _apply(
-    FPopoverController c,
-    Future<bool> Function() write, {
-    bool close = true,
-  }) async {
-    if (close) c.hide();
-    final ok = await write();
-    if (!ok && mounted) {
-      _state.reportNotSaved(_state.error ?? 'could not save');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    final item = widget.item;
-    final task = item.task;
-    final note = item.note;
-    final tags = task != null
-        ? _state.taskTagsOf(task)
-        : note == null
-        ? const <String>[]
-        : _state.noteTagsOf(note);
-    final plan = note == null ? null : PlanItem.fromNote(note);
-    final status = task != null ? task.boardStatus : plan?.status ?? 'todo';
-    final priority = task != null
-        ? priorityBucket(task.priority)
-        : (plan?.priorityWord ?? 'none');
-    return TrackPopover(
-      builder: (context, pc) => FPopover(
-        control: pc,
-        groupId: _group,
-        popoverBuilder: (context, c) => PropertyPopoverGroup(
-          groupId: _group,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: t.sizes.dialogSm,
-              maxWidth: t.sizes.dialog,
-            ),
-            child: SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: t.space.sm),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    _label(context, 'Status'),
-                    OptionPicker<String>(
-                      id: 'card-status',
-                      value: status,
-                      onPick: (v) {
-                        if (v == null) return;
-                        _apply(
-                          c,
-                          () => task != null
-                              ? _state.setTaskStatus(task.uid, v)
-                              : _note(() => _state.setStatus(note!.uid, v)),
-                        );
-                      },
-                      options: [
-                        for (final word in boardOrder)
-                          PickerOption(
-                            word,
-                            word,
-                            dot: word,
-                            enabled:
-                                !(word == 'done' &&
-                                    task != null &&
-                                    _state.taskCompletionBlockerFor(task.uid) !=
-                                        null),
-                          ),
-                      ],
-                    ),
-                    _label(context, 'Priority'),
-                    OptionPicker<String>(
-                      id: 'card-priority',
-                      value: priority,
-                      clearable: true,
-                      clearLabel: 'No priority',
-                      onPick: (v) {
-                        if (v == null) {
-                          _apply(
-                            c,
-                            () => task != null
-                                ? _state.setTaskPriority(task.uid, null)
-                                : _note(
-                                    () =>
-                                        _state.setNotePriority(note!.uid, null),
-                                  ),
-                          );
-                          return;
-                        }
-                        _apply(
-                          c,
-                          () => task != null
-                              ? _state.setTaskPriority(
-                                  task.uid,
-                                  priorityOfBucket(v),
-                                )
-                              : _note(
-                                  () => _state.setNotePriority(note!.uid, v),
-                                ),
-                        );
-                      },
-                      options: const [
-                        PickerOption('high', 'high'),
-                        PickerOption('medium', 'medium'),
-                        PickerOption('low', 'low'),
-                      ],
-                    ),
-                    if (task != null) ...[
-                      _label(context, 'Due'),
-                      DatePropertyPicker(
-                        id: 'card-due',
-                        value: dueDate(task),
-                        onPick: (d) => _apply(
-                          c,
-                          () => _state.setTaskDue(
-                            task.uid,
-                            d == null ? null : dueOfDay(d, task.due),
-                          ),
-                        ),
-                      ),
-                    ],
-                    _label(context, 'Labels'),
-                    TagPropertyPicker(
-                      id: 'card-labels',
-                      value: tags,
-                      suggestions: task != null
-                          ? _state.taskTags
-                          : ({
-                              for (final n in _state.notes)
-                                ..._state.noteTagsOf(n),
-                            }.toList()..sort()),
-                      onPick: (next) async {
-                        final ok = await (task != null
-                            ? _state.setTaskTags(task.uid, next)
-                            : _state.updateNoteTags(note!.uid, next));
-                        if (!ok && mounted) {
-                          _state.reportNotSaved(
-                            _state.error ?? 'could not save',
-                          );
-                        }
-                        return ok;
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        builder: (context, c, child) =>
-            FTappable(onPress: c.toggle, child: child!),
-        child: IconAction(
-          key: Key('card-more-${item.uid}'),
-          tooltip: 'Edit properties',
-          icon: FLucideIcons.ellipsis,
-          onPress: null,
-        ),
-      ),
-    );
-  }
-
-  Widget _label(BuildContext context, String text) => Padding(
-    padding: EdgeInsets.fromLTRB(
-      tokensOf(context).space.lg,
-      tokensOf(context).space.sm,
-      tokensOf(context).space.lg,
-      tokensOf(context).space.xxs,
-    ),
-    child: SectionLabel(text),
   );
 }

@@ -7,6 +7,7 @@ import '../state/note_drag.dart';
 import 'drag_drop.dart';
 import 'board_layout.dart';
 import 'chips.dart' show priorityColorOf;
+import 'card_properties.dart';
 import 'new_note_dialog.dart';
 import 'note_menu.dart';
 import 'empty_state.dart';
@@ -134,42 +135,61 @@ class _Card extends StatelessWidget {
           child: CardBox(
             selected: selected,
             onTap: () => state.clickNote(note.uid),
-            child: compact
-                ? Text(note.summary, style: t.type.semiboldStyle)
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        p.itemId ?? note.summary,
-                        style: t.type.semiboldStyle,
-                      ),
-                      if (p.itemId != null) ...[
-                        SizedBox(height: t.space.xxs),
-                        OverflowTip(
-                          note.summary,
-                          maxLines: 2,
-                          style: t.type.bodyStyle.copyWith(color: t.muted),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: compact
+                      ? Text(note.summary, style: t.type.semiboldStyle)
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              p.itemId ?? note.summary,
+                              style: t.type.semiboldStyle,
+                            ),
+                            if (p.itemId != null) ...[
+                              SizedBox(height: t.space.xxs),
+                              OverflowTip(
+                                note.summary,
+                                maxLines: 2,
+                                style: t.type.bodyStyle.copyWith(
+                                  color: t.muted,
+                                ),
+                              ),
+                            ],
+                            if (p.priorityWord != null) ...[
+                              SizedBox(height: t.space.sm),
+                              Text(
+                                _label(p.priorityWord!),
+                                key: Key('card-priority-${note.uid}'),
+                                style: t.type.captionStyle.copyWith(
+                                  color: priorityColorOf(
+                                    t,
+                                    p.priorityWord ?? 'none',
+                                  ),
+                                ),
+                              ),
+                            ],
+                            if (p.owner != null) ...[
+                              SizedBox(height: t.space.sm),
+                              Text(
+                                p.owner!,
+                                style: t.type.captionStyle.copyWith(
+                                  color: t.muted,
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
-                      ],
-                      if (p.priorityWord != null) ...[
-                        SizedBox(height: t.space.sm),
-                        Text(
-                          _label(p.priorityWord!),
-                          key: Key('card-priority-${note.uid}'),
-                          style: t.type.captionStyle.copyWith(
-                            color: priorityColorOf(t, p.priorityWord ?? 'none'),
-                          ),
-                        ),
-                      ],
-                      if (p.owner != null) ...[
-                        SizedBox(height: t.space.sm),
-                        Text(
-                          p.owner!,
-                          style: t.type.captionStyle.copyWith(color: t.muted),
-                        ),
-                      ],
-                    ],
-                  ),
+                ),
+                // The same properties popover the unified board's cards have.
+                if (state.editable) ...[
+                  SizedBox(width: t.space.xs),
+                  CardProperties(state: state, uid: note.uid),
+                ],
+              ],
+            ),
           ),
         ),
       ),

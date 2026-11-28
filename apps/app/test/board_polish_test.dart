@@ -380,4 +380,39 @@ void main() {
       );
     });
   });
+
+  group('saved-view board', () {
+    testWidgets('a card has the same properties popover as the unified board', (
+      t,
+    ) async {
+      final s = await pumpHomeApp(
+        t,
+        notes: [
+          Note(
+            uid: 'n1',
+            summary: 'One',
+            description: 'status: todo\n\nbody',
+            categories: const ['status-todo'],
+          ),
+        ],
+      );
+      s.setView(ViewMode.board);
+      await t.runAsync(() async {
+        await s.saveView('Board');
+      });
+      s.applyView(s.savedViews.single);
+      await t.pumpAndSettle();
+      expect(_k('card-more-n1'), findsOneWidget);
+      await t.tap(_k('card-more-n1'));
+      await t.pumpAndSettle();
+      await t.tap(_k('property-option-card-priority-high'));
+      await t.pumpAndSettle();
+      expect(PlanItem.fromNote(s.tree.find('n1')!.note).priorityWord, 'high');
+      await t.tap(_k('card-more-n1'));
+      await t.pumpAndSettle();
+      await t.tap(_k('property-option-card-status-doing'));
+      await t.pumpAndSettle();
+      expect(PlanItem.fromNote(s.tree.find('n1')!.note).status, 'doing');
+    });
+  });
 }
