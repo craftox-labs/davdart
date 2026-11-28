@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../state/event_rules.dart';
 import '../state/task_rules.dart';
 import '../theme/tokens.dart';
+import 'calendar_view.dart';
 import 'events_panel.dart';
 import 'home_board.dart';
 import 'overflow_tip.dart';
@@ -90,7 +91,7 @@ class ProjectOverviewPage extends StatelessWidget {
         key: ValueKey('proj-calendar-$projectUid'),
         child: KeyedSubtree(
           key: const Key('proj-calendar-tab'),
-          child: EventsPanel(state: state, scoped: true),
+          child: CalendarView(state: state, scoped: true),
         ),
       ),
     };
