@@ -6,6 +6,7 @@ import '../state/app_state.dart';
 import '../state/event_rules.dart';
 import '../state/key_nav.dart';
 import '../state/task_rules.dart';
+import 'calendar_view.dart';
 import 'events_panel.dart';
 import 'key_nav_ui.dart';
 import 'overflow_tip.dart';
@@ -14,6 +15,7 @@ import 'placeholder_card.dart';
 import 'projects_panel.dart' show ProjectProgressBar, projectCounts;
 import 'empty_state.dart';
 import 'section_card.dart';
+import 'segmented.dart';
 import 'theme.dart';
 
 /// Home: the individual's page, scoped to the open Space and ignoring the
@@ -377,34 +379,80 @@ class HomePage extends StatelessWidget {
     );
 
     state.nav.homeStacked = true;
-    state.nav.publish(KeyNav.homeList, navRows);
+    // Only the visible view publishes rows: the calendar grid has no keyboard
+    // cursor of its own yet.
+    state.nav.publish(
+      KeyNav.homeList,
+      state.homeView == HomeView.calendar ? const [] : navRows,
+    );
 
-    return SingleChildScrollView(
-      key: const Key('home-page'),
-      padding: EdgeInsets.fromLTRB(
-        t.space.xl,
-        t.space.lg,
-        t.space.xl,
-        fabInset(context) + t.space.xl,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: t.space.lg,
-        children: [
-          tiles,
-          PlaceholderCard(
-            name: 'inbox',
-            title: 'Inbox',
-            willBe:
-                'Unfiled captures you assign onwards (to a project, a task, '
-                'or a note). Capture box now, share-to-app later.',
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(t.space.xl, t.space.lg, t.space.xl, 0),
+          child: Segmented<HomeView>(
+            key: const Key('home-tabs'),
+            value: state.homeView,
+            fullWidth: narrowLayout(context),
+            onChanged: state.setHomeView,
+            segments: const [
+              Segment(
+                HomeView.overview,
+                'Overview',
+                'home-tab-overview',
+                icon: FLucideIcons.layoutDashboard,
+              ),
+              Segment(
+                HomeView.calendar,
+                'Calendar',
+                'home-tab-calendar',
+                icon: FLucideIcons.calendar,
+              ),
+            ],
           ),
-          ?projectsCard,
-          tasksCard,
-          calendarCard,
-          recentCard,
-        ],
-      ),
+        ),
+        SizedBox(height: t.space.sm),
+        Expanded(
+          child: state.homeView == HomeView.calendar
+              // Keyed by Space: a Space switch starts on today again, as a
+              // project's tab does per project.
+              ? CalendarView(
+                  key: ValueKey(
+                    'home-calendar-${state.currentSpaceId ?? 'default'}',
+                  ),
+                  state: state,
+                  now: now,
+                )
+              : SingleChildScrollView(
+                  key: const Key('home-page'),
+                  padding: EdgeInsets.fromLTRB(
+                    t.space.xl,
+                    t.space.lg,
+                    t.space.xl,
+                    fabInset(context) + t.space.xl,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: t.space.lg,
+                    children: [
+                      tiles,
+                      PlaceholderCard(
+                        name: 'inbox',
+                        title: 'Inbox',
+                        willBe:
+                            'Unfiled captures you assign onwards (to a project, a '
+                            'task, or a note). Capture box now, share-to-app later.',
+                      ),
+                      ?projectsCard,
+                      tasksCard,
+                      calendarCard,
+                      recentCard,
+                    ],
+                  ),
+                ),
+        ),
+      ],
     );
   }
 }

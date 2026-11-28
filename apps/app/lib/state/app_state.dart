@@ -51,6 +51,9 @@ enum NotesView { list, tree }
 /// The tabs of a project's page, in switcher order.
 enum ProjectTab { overview, board, notes, calendar }
 
+/// The views of Home, in switcher order (the same shape as [ProjectTab]).
+enum HomeView { overview, calendar }
+
 /// The fixed status set, in board order.
 const boardOrder = allowedStatuses;
 
@@ -1497,6 +1500,19 @@ class AppState extends ChangeNotifier {
   void setProjectTab(String uid, ProjectTab tab) {
     if (projectTab(uid) == tab) return;
     prefs?.write('davdart.proj.tab.v1.$_spaceKey.$uid', tab.name);
+    notifyListeners();
+  }
+
+  /// The view Home opens on, remembered per Space (Overview by default), the
+  /// way a project's page remembers its tab.
+  HomeView get homeView =>
+      prefs?.read('davdart.home.view.v1.$_spaceKey') == 'calendar'
+      ? HomeView.calendar
+      : HomeView.overview;
+
+  void setHomeView(HomeView view) {
+    if (homeView == view) return;
+    prefs?.write('davdart.home.view.v1.$_spaceKey', view.name);
     notifyListeners();
   }
 

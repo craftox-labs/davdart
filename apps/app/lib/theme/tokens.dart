@@ -300,6 +300,7 @@ class SizeTokens {
     this.calendarWidth = 320,
     this.calendarCellMax = 72,
     this.calendarCell = 36,
+    this.calendarCellChips = 88,
     this.segmentMin = 72,
     this.segmentHeight = 28,
     this.calendarDot = 5,
@@ -378,11 +379,13 @@ class SizeTokens {
   /// Square of the outlined count badge in the narrow top bar.
   final double countBox;
 
-  /// Home calendar: grid width, wide day cell, dot, today ring; the Day|Board
-  /// switch segment minimum width and height.
+  /// Calendar: grid width, widest day cell, plain day cell, the day cell that
+  /// carries item chips, the dot and the today ring; the Day|Board switch
+  /// segment minimum width and height.
   final double calendarWidth,
       calendarCellMax,
       calendarCell,
+      calendarCellChips,
       segmentMin,
       segmentHeight;
   final double calendarDot, ring;
@@ -559,6 +562,10 @@ class Tokens {
 
   /// Opacity of dimmed content: a canceled card, a ghost left by a drag.
   double get dimmed => .5;
+
+  /// Content outside the current period (a month grid's neighbouring days):
+  /// [muted] at [dimmed] opacity.
+  Color get faint => muted.withValues(alpha: dimmed);
 
   final TypeTokens type;
   final SpaceTokens space;

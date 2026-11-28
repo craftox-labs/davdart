@@ -30,18 +30,23 @@ Color statusColor(String? status, BuildContext context) {
   }
 }
 
+/// The one small round marker: a status colour, or any token colour through
+/// [color] (a kind mark rather than a status, as in the calendar's day cells).
+/// [size] overrides [SizeTokens.statusDot] for denser places.
 class StatusDot extends StatelessWidget {
-  const StatusDot(this.status, {super.key});
+  const StatusDot(this.status, {super.key, this.color, this.size});
   final String? status;
+  final Color? color;
+  final double? size;
 
   @override
   Widget build(BuildContext context) {
-    final size = tokensOf(context).sizes.statusDot;
+    final dot = size ?? tokensOf(context).sizes.statusDot;
     return Container(
-      width: size,
-      height: size,
+      width: dot,
+      height: dot,
       decoration: BoxDecoration(
-        color: statusColor(status, context),
+        color: color ?? statusColor(status, context),
         shape: BoxShape.circle,
       ),
     );
