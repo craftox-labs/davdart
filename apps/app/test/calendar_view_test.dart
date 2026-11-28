@@ -159,6 +159,19 @@ Event _range3(String uid, String title, int from, int to) => Event(
   dtend: ICalDate.date(2026, 11, to + 1),
 );
 
+/// A timed event on 18 November 2026, from [h1]:[m1] to [h2]:[m2].
+Event _timed(String uid, String title, int h1, int m1, int h2, int m2) => Event(
+  uid: uid,
+  summary: title,
+  dtstart: ICalDate.utc(DateTime.utc(2026, 11, 18, h1, m1)),
+  dtend: ICalDate.utc(DateTime.utc(2026, 11, 18, h2, m2)),
+);
+
+/// The pixel height of one hour on the time grid, from a column's day rule.
+double _pitchOf(WidgetTester t) =>
+    t.getSize(find.byKey(const Key('calendar-time-column-2026-11-18'))).height /
+    24;
+
 /// The ring or fill around a Week or Day header's date number.
 BoxDecoration _circle2(WidgetTester t, String id) =>
     t.widget<Container>(find.byKey(Key('calendar-head-number-$id'))).decoration!
@@ -627,6 +640,125 @@ void main() {
     await t.pumpAndSettle();
     expect(t.takeException(), isNull);
     expect(_k('calendar-head-2026-11-22'), findsOneWidget);
+  });
+
+  testWidgets(
+    'Day: timed events are blocks placed by minutes, overlaps split',
+    (t) async {
+      final s = await _state(
+        t,
+        events: [
+          _timed('a', 'Standup', 9, 0, 10, 0),
+          _timed('b', 'Review', 9, 30, 11, 0),
+          _timed('lun', 'Lunch', 13, 0, 14, 0),
+        ],
+      );
+      await _pump(t, s);
+      await t.tap(_k('calendar-scale-day'));
+      await t.pumpAndSettle();
+      expect(_k('calendar-time-area'), findsOneWidget);
+      final a = _k('calendar-block-a@2026-11-18');
+      final b = _k('calendar-block-b@2026-11-18');
+      final c = _k('calendar-block-lun@2026-11-18');
+      expect(a, findsOneWidget);
+      // An hour is the same pitch everywhere: Standup is 60 min, Review 90.
+      final pitch = t.getSize(a).height;
+      expect(t.getSize(b).height, closeTo(pitch * 1.5, 1));
+      expect(t.getTopLeft(b).dy - t.getTopLeft(a).dy, closeTo(pitch / 2, 1));
+      // The overlap splits the column in two; Lunch is alone, full width.
+      expect(t.getSize(a).width, closeTo(t.getSize(b).width, 1));
+      expect(t.getTopLeft(b).dx, greaterThan(t.getTopLeft(a).dx));
+      expect(t.getSize(c).width, closeTo(t.getSize(a).width * 2, 2));
+      // Timed events are no chips in the strip.
+      expect(_k('calendar-strip-chip-2026-11-18-0'), findsNothing);
+      // The timed area is bounded and scrolls on its own.
+      final scroll = t.state<ScrollableState>(
+        find.descendant(
+          of: _k('calendar-time-scroll'),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      expect(scroll.position.maxScrollExtent, greaterThan(0));
+      // Now line: today, 10:00 in the fixed clock.
+      expect(_k('calendar-now-line'), findsOneWidget);
+    },
+  );
+
+  testWidgets('a block press opens its event, not a new one', (t) async {
+    final s = await _state(t, events: [_timed('a', 'Standup', 9, 0, 10, 0)]);
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-week'));
+    await t.pumpAndSettle();
+    await t.tap(_k('calendar-block-a@2026-11-18'));
+    await t.pumpAndSettle();
+    expect(s.peekUid, 'a');
+    expect(_k('new-event-title'), findsNothing);
+  });
+
+  testWidgets('a pointer drag down a column opens the dialog on that slot', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-week'));
+    await t.pumpAndSettle();
+    final col = _k('calendar-time-column-2026-11-19');
+    final pitch = _pitchOf(t);
+    final x = t.getCenter(col).dx;
+    // Drag from 09:00 down an hour.
+    final y9 = t.getTopLeft(col).dy + pitch * 9;
+    await t.dragFrom(Offset(x, y9 + 2), Offset(0, pitch));
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsOneWidget);
+    await t.enterText(_k('new-event-title'), 'Planning');
+    await t.tap(_k('new-event-add'));
+    await t.pumpAndSettle();
+    final e = s.events.firstWhere((e) => e.summary == 'Planning');
+    expect(e.startWall, DateTime.utc(2026, 11, 19, 9));
+    expect(e.endWall, DateTime.utc(2026, 11, 19, 10));
+  });
+
+  testWidgets('a pointer press with no drag picks the day, no dialog', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    await t.tap(_k('calendar-scale-week'));
+    await t.pumpAndSettle();
+    await t.tap(_k('calendar-time-column-2026-11-20'));
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsNothing);
+    expect(s.homeDay, DateTime.utc(2026, 11, 20));
+  });
+
+  testWidgets('phone: a press on an empty slot opens the dialog at that time', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s, size: const Size(400, 800));
+    await t.tap(_k('calendar-scale-day'));
+    await t.pumpAndSettle();
+    final pitch = _pitchOf(t);
+    final col = t.getTopLeft(_k('calendar-time-column-2026-11-18'));
+    final x = t.getCenter(_k('calendar-time-column-2026-11-18')).dx;
+    // 10:20 sits 10h20 down the column, so the slot is 10:15.
+    await t.tapAt(Offset(x, col.dy + pitch * (10 + 20 / 60)));
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsOneWidget);
+    await t.enterText(_k('new-event-title'), 'Call');
+    await t.tap(_k('new-event-add'));
+    await t.pumpAndSettle();
+    final e = s.events.firstWhere((e) => e.summary == 'Call');
+    expect(e.startWall, DateTime.utc(2026, 11, 18, 10, 15));
+  });
+
+  testWidgets('Week at 320 wide with blocks: no overflow', (t) async {
+    final s = await _state(t, events: [_timed('a', 'Standup', 9, 0, 10, 0)]);
+    await _pump(t, s, size: const Size(320, 640));
+    await t.tap(_k('calendar-scale-week'));
+    await t.pumpAndSettle();
+    expect(t.takeException(), isNull);
+    expect(_k('calendar-block-a@2026-11-18'), findsOneWidget);
   });
 
   testWidgets('a month arrow moves the selection into the shown month', (

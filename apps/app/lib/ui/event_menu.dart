@@ -307,15 +307,24 @@ class _NewEventForm extends ChangeNotifier {
 /// end time) and location. Resolves to the new event's uid, or null when
 /// cancelled. [day] is the date it starts on (default: today); [until] makes
 /// it an all-day event to that last day (a range dragged on the calendar).
+/// [startMinute] and [endMinute] (wall minutes from midnight of [day]) open it
+/// as a timed event on that slot; the end defaults to an hour after the start.
 Future<String?> showNewEventDialog(
   BuildContext context,
   AppState state, {
   DateTime? day,
   DateTime? until,
+  int? startMinute,
+  int? endMinute,
   bool personal = false,
 }) {
   final first = wallDay(day ?? wallNow(DateTime.now()));
   final form = _NewEventForm(first);
+  if (startMinute != null) {
+    // A slot picked on the time grid: wall minutes from the day's midnight.
+    form.setStart(first, startMinute);
+    form.setEnd(first, endMinute ?? startMinute + 60);
+  }
   if (until != null) {
     // The form's all-day end is the last day, so a range needs no arithmetic.
     form.setAllDay(true);

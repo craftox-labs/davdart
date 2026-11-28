@@ -761,6 +761,31 @@ class Tokens {
     );
   }
 
+  /// The height of the Week and Day timed area: what the viewport leaves
+  /// under the toolbar, the header and a two-lane strip, never under six
+  /// hours' worth. The area scrolls on its own inside that height, so the
+  /// page does not scroll twice.
+  double calendarTimeAreaHeight({
+    required double viewport,
+    double bottomInset = 0,
+  }) {
+    final least = sizes.calendarHourRow * 6;
+    if (!viewport.isFinite) return sizes.calendarHourRow * 10;
+    final chrome =
+        space.md +
+        bottomInset +
+        space.xl +
+        space.sm * 2 +
+        sizes.paneHeader +
+        sizes.segmentHeight +
+        space.xs * 3 +
+        sizes.calendarWeekdayRow +
+        sizes.calendarNumber +
+        sizes.calendarLanePitch * 2 +
+        borders.hairline * 3;
+    return (viewport - chrome).clamp(least, double.infinity);
+  }
+
   /// The height of one hour in the Week and Day time grid: the viewport's
   /// share of a working day (ten hours) so that day fits without scrolling,
   /// never under [SizeTokens.calendarHourRow].

@@ -12,6 +12,7 @@ import '../state/app_state.dart';
 import '../state/event_rules.dart';
 import '../theme/tokens.dart';
 import 'calendar_lanes.dart';
+import 'calendar_timegrid.dart';
 import 'card_box.dart';
 import 'chips.dart';
 import 'empty_state.dart';
@@ -199,6 +200,26 @@ class _CalendarViewState extends State<CalendarView> {
   /// clears the pick.
   DateTime? _lastHome;
 
+  /// The time grid's own scroll, so the timed area never fights the page's.
+  final _timeScroll = ScrollController();
+
+  /// True once the grid has scrolled to the morning for this visit to a time
+  /// scale.
+  bool _timeSeen = false;
+
+  /// A drag on the Week or Day grid: the day it started on, the slot it
+  /// started on and the one it has reached, in minutes (null until the pointer
+  /// has moved far enough to mean a range rather than a press).
+  DateTime? _slotDay;
+  int? _slotFrom, _slotTo;
+  Offset? _slotAt;
+
+  @override
+  void dispose() {
+    _timeScroll.dispose();
+    super.dispose();
+  }
+
   DateTime _clock() => widget.now ?? DateTime.now();
 
   DateTime _wallToday() => wallDay(wallNow(_clock()));
@@ -298,12 +319,19 @@ class _CalendarViewState extends State<CalendarView> {
 
   /// Opens the new-event dialog on [day] (an all-day event to [until], when a
   /// drag across the grid picked a range) and opens what it adds.
-  Future<void> _newEvent(DateTime day, {DateTime? until}) async {
+  Future<void> _newEvent(
+    DateTime day, {
+    DateTime? until,
+    int? startMinute,
+    int? endMinute,
+  }) async {
     final uid = await showNewEventDialog(
       context,
       state,
       day: day,
       until: until,
+      startMinute: startMinute,
+      endMinute: endMinute,
       personal: !widget.scoped,
     );
     if (uid != null) await state.clickEvent(uid);
@@ -460,6 +488,9 @@ class _CalendarViewState extends State<CalendarView> {
         final days = DateTime.utc(month.year, month.month + 1, 0).day;
         final weeks = ((lead + days) / 7).ceil();
         final end = start.add(Duration(days: weeks * 7));
+        if (_scale != CalendarScale.day && _scale != CalendarScale.week) {
+          _timeSeen = false;
+        }
         final year = _scale == CalendarScale.year;
         final timed =
             _scale == CalendarScale.day || _scale == CalendarScale.week;
@@ -1028,7 +1059,329 @@ class _CalendarViewState extends State<CalendarView> {
           ],
         ),
         Container(height: t.borders.hairline, color: t.divider),
+        _timedArea(
+          context,
+          t: t,
+          days: dayList,
+          today: today,
+          buckets: buckets,
+          wide: wide,
+          areaHeight: t.calendarTimeAreaHeight(
+            viewport: viewport,
+            bottomInset: fabInset(context),
+          ),
+        ),
       ],
+    );
+  }
+
+  /// The timed area of Week and Day: an hour gutter and a column per day, in
+  /// a bounded, self-scrolling box. Events with a start and an end are blocks
+  /// placed by wall minutes (overlaps share the column's width), a line marks
+  /// now, and a pointer drag down an empty column picks a slot (15-minute
+  /// snap) for a new event. A touch has no drag: a press on an empty slot
+  /// opens the dialog at that time. A block takes its own press and opens
+  /// its event.
+  Widget _timedArea(
+    BuildContext context, {
+    required Tokens t,
+    required List<DateTime> days,
+    required DateTime today,
+    required Map<DateTime, DayBucket> buckets,
+    required bool wide,
+    required double areaHeight,
+  }) {
+    final pitch = t.calendarHourPitch(areaHeight);
+    final total = pitch * 24;
+    final gutter = t.sizes.calendarHourGutter;
+    final n = days.length;
+    final nowWall = wallNow(_clock());
+    final nowMinute = nowWall.hour * 60 + nowWall.minute;
+    if (!_timeSeen) {
+      _timeSeen = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_timeScroll.hasClients) return;
+        final max = _timeScroll.position.maxScrollExtent;
+        _timeScroll.jumpTo((pitch * 7).clamp(0.0, max));
+      });
+    }
+    double yOf(int minute) => minute / 60 * pitch;
+
+    // Blocks per day.
+    final blocks = <DateTime, List<TimedBlock>>{};
+    for (final d in days) {
+      final spans = <TimedSpan>[];
+      for (final o in buckets[d]?.events ?? const <EventOccurrence>[]) {
+        if (o.allDay || _multiDay(o) || o.isCancelled) continue;
+        final start = o.start.hour * 60 + o.start.minute;
+        final sameDay = o.end.day == o.start.day;
+        final end = o.end.isAfter(o.start)
+            ? (sameDay ? o.end.hour * 60 + o.end.minute : minutesPerDay)
+            : start;
+        spans.add(
+          TimedSpan(
+            startMinute: start,
+            endMinute: end,
+            uid: o.event.uid,
+            sortKey: '${o.event.uid}@${_id(d)}',
+          ),
+        );
+      }
+      blocks[d] = layOutDay(spans);
+    }
+    final titles = <String, String>{
+      for (final d in days)
+        for (final o in buckets[d]?.events ?? const <EventOccurrence>[])
+          '${o.event.uid}@${_id(d)}': o.summary.isEmpty
+              ? '(no title)'
+              : o.summary,
+    };
+
+    final label = t.type.microStyle.copyWith(color: t.muted);
+    final canCreate = state.eventsEditable;
+    return SizedBox(
+      key: const Key('calendar-time-area'),
+      height: areaHeight,
+      child: SingleChildScrollView(
+        key: const Key('calendar-time-scroll'),
+        controller: _timeScroll,
+        child: SizedBox(
+          height: total,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: gutter,
+                child: Stack(
+                  children: [
+                    for (var h = 1; h < 24; h++)
+                      Positioned(
+                        top: yOf(h * 60) - t.type.microStyle.fontSize! / 2,
+                        left: 0,
+                        right: t.space.xs,
+                        child: Text(
+                          '${h.toString().padLeft(2, '0')}:00',
+                          textAlign: TextAlign.right,
+                          style: label,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, c) {
+                    final colW = c.maxWidth / n;
+                    DateTime dayAtX(double x) =>
+                        days[(x / colW).floor().clamp(0, n - 1)];
+                    final live = _slotDay != null && _slotTo != null
+                        ? (_slotDay!, _slotFrom!, _slotTo!)
+                        : null;
+                    bool onBlock(Offset p) {
+                      final d = dayAtX(p.dx);
+                      final minute = p.dy / pitch * 60;
+                      for (final b in blocks[d] ?? const <TimedBlock>[]) {
+                        final left =
+                            days.indexOf(d) * colW +
+                            colW * b.column / b.columns;
+                        if (p.dx >= left &&
+                            p.dx < left + colW / b.columns &&
+                            minute >= b.startMinute &&
+                            minute < b.endMinute) {
+                          return true;
+                        }
+                      }
+                      return false;
+                    }
+
+                    final stack = Stack(
+                      children: [
+                        Row(
+                          children: [
+                            for (final (i, d) in days.indexed)
+                              Expanded(
+                                child: DecoratedBox(
+                                  key: Key('calendar-time-column-${_id(d)}'),
+                                  position: DecorationPosition.background,
+                                  decoration: BoxDecoration(
+                                    color: d.weekday >= DateTime.saturday
+                                        ? t.weekendTint
+                                        : null,
+                                    border: i > 0
+                                        ? Border(
+                                            left: BorderSide(
+                                              color: t.divider,
+                                              width: t.borders.hairline,
+                                            ),
+                                          )
+                                        : null,
+                                  ),
+                                  child: const SizedBox.expand(),
+                                ),
+                              ),
+                          ],
+                        ),
+                        for (var h = 1; h < 24; h++)
+                          Positioned(
+                            top: yOf(h * 60),
+                            left: 0,
+                            right: 0,
+                            height: t.borders.hairline,
+                            child: ColoredBox(color: t.divider),
+                          ),
+                        if (live != null)
+                          Positioned(
+                            key: const Key('calendar-slot-selection'),
+                            left: days.indexOf(live.$1) * colW,
+                            width: colW,
+                            top: yOf(live.$2 < live.$3 ? live.$2 : live.$3),
+                            height: yOf((live.$3 - live.$2).abs()),
+                            child: ColoredBox(color: t.selectionFill),
+                          ),
+                        for (final (i, d) in days.indexed)
+                          for (final b in blocks[d]!)
+                            Positioned(
+                              left: i * colW + colW * b.column / b.columns,
+                              width: colW / b.columns,
+                              top: yOf(b.startMinute),
+                              height: yOf(b.minutes),
+                              child: _block(
+                                t,
+                                b,
+                                day: d,
+                                title: titles[b.span.sortKey] ?? '',
+                                text: !wide ? n == 1 : true,
+                              ),
+                            ),
+                        if (days.contains(today))
+                          Positioned(
+                            key: const Key('calendar-now-line'),
+                            left: days.indexOf(today) * colW,
+                            width: colW,
+                            top: yOf(nowMinute) - t.sizes.ring / 2,
+                            height: t.sizes.ring,
+                            child: ColoredBox(color: t.accent),
+                          ),
+                      ],
+                    );
+                    if (!canCreate) return stack;
+                    if (!wide) {
+                      // A touch: a press on an empty slot opens the dialog at
+                      // its time; a drag stays the scroll.
+                      return GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTapUp: (e) {
+                          final p = e.localPosition;
+                          if (onBlock(p)) return;
+                          final day = dayAtX(p.dx);
+                          final start =
+                              (p.dy / pitch * 4).floor().clamp(0, 95) * 15;
+                          _select(day);
+                          _newEvent(day, startMinute: start);
+                        },
+                        child: stack,
+                      );
+                    }
+                    return Listener(
+                      onPointerDown: (e) {
+                        if (e.buttons & kPrimaryButton == 0) return;
+                        if (onBlock(e.localPosition)) return;
+                        _slotAt = e.localPosition;
+                        _slotDay = dayAtX(e.localPosition.dx);
+                        _slotFrom = snapMinutes(
+                          e.localPosition.dy / pitch * 60 - 7.5,
+                        ).clamp(0, minutesPerDay - 15);
+                        _slotTo = null;
+                      },
+                      onPointerMove: (e) {
+                        final origin = _slotAt, from = _slotFrom;
+                        if (origin == null || from == null) return;
+                        final d = e.localPosition - origin;
+                        if (_slotTo == null &&
+                            (d.dy.abs() < kTouchSlop ||
+                                d.dy.abs() <= d.dx.abs())) {
+                          return;
+                        }
+                        final to = snapMinutes(e.localPosition.dy / pitch * 60);
+                        final end = to <= from ? from + 15 : to;
+                        if (end != _slotTo) setState(() => _slotTo = end);
+                      },
+                      onPointerUp: (_) => _slotUp(),
+                      onPointerCancel: (_) => _slotUp(cancel: true),
+                      child: stack,
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Ends a slot drag: a range opens the new-event dialog on it. A press with
+  /// no range picks the column's day, as a press on a month cell does.
+  Future<void> _slotUp({bool cancel = false}) async {
+    final day = _slotDay, from = _slotFrom, to = _slotTo;
+    final moved = to != null;
+    _slotDay = _slotFrom = _slotTo = null;
+    _slotAt = null;
+    if (moved) setState(() {});
+    if (cancel || day == null || !mounted) return;
+    if (!moved) {
+      _select(day, openPanel: true);
+      return;
+    }
+    _select(day);
+    await _newEvent(day, startMinute: from, endMinute: to);
+  }
+
+  /// One timed block: a tone bar and the title (and start time) in a tinted
+  /// box; on a narrow Week only the tone, so seven columns stay legible. A
+  /// press opens the event.
+  Widget _block(
+    Tokens t,
+    TimedBlock b, {
+    required DateTime day,
+    required String title,
+    required bool text,
+  }) {
+    return FTappable(
+      key: Key('calendar-block-${b.span.sortKey}'),
+      behavior: HitTestBehavior.opaque,
+      semanticsLabel: title,
+      onPress: () => _openItem(day, b.span.uid, event: true),
+      child: Padding(
+        padding: EdgeInsets.all(t.borders.hairline),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(t.radii.small),
+          child: ColoredBox(
+            color: t.eventTint,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: t.sizes.calendarChipBar,
+                  child: ColoredBox(color: t.accent),
+                ),
+                if (text)
+                  Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: t.space.xxs),
+                      child: Text(
+                        title,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: t.type.microStyle.copyWith(color: t.fg),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
