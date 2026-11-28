@@ -111,7 +111,25 @@ class EventsPanel extends StatelessWidget {
         // own add buttons. The rows are a quick look and stay out of the
         // panel's keyboard list, which the agenda below already fills.
         final homeDay = scoped ? null : state.homeDay;
-        final pinned = homeDay == null
+        // Picking today pins nothing: the Today section below is the same
+        // rows, so it becomes the selection instead of a copy of itself.
+        final dayIsToday = homeDay != null && homeDay == today0;
+        final selectedSection = dayIsToday ? 'today' : null;
+
+        /// The collapsed state of agenda section [id] while a day is picked:
+        /// a hand toggle wins, else the selection is open and the rest are
+        /// shut. Null (no day picked) leaves the saved prefs in charge.
+        bool? collapsedFor(String id) {
+          if (homeDay == null) return null;
+          return state.calendarSectionCollapsed[id] ?? id != selectedSection;
+        }
+
+        /// Whether agenda section [id] is shut, for the keyboard list.
+        bool hidden(String id) =>
+            collapsedFor(id) ??
+            state.prefs?.read('davdart.events.$id.collapsed.v1') == 'true';
+
+        final pinned = homeDay == null || dayIsToday
             ? null
             : bucketByDay(
                 // The individual's own loose items, the seam Home's grid
@@ -160,7 +178,7 @@ class EventsPanel extends StatelessWidget {
               ),
             ),
         ];
-        final dayBlock = homeDay == null
+        final dayBlock = homeDay == null || dayIsToday
             ? null
             : Padding(
                 padding: EdgeInsets.only(top: t.space.md),
@@ -210,9 +228,7 @@ class EventsPanel extends StatelessWidget {
               NavEntry(
                 eventRowId(o),
                 uid: o.event.uid,
-                hidden: () =>
-                    state.prefs?.read('davdart.events.${s.$1}.collapsed.v1') ==
-                    'true',
+                hidden: () => hidden(s.$1),
                 open: (mode) async {
                   await state.openNote(o.event.uid, mode: mode);
                   onPick?.call();
@@ -222,9 +238,7 @@ class EventsPanel extends StatelessWidget {
               NavEntry(
                 'task-row-${k.uid}',
                 uid: k.uid,
-                hidden: () =>
-                    state.prefs?.read('davdart.events.${s.$1}.collapsed.v1') ==
-                    'true',
+                hidden: () => hidden(s.$1),
                 open: (mode) async {
                   await state.openTask(k.uid, mode: mode);
                   onPick?.call();
@@ -290,7 +304,9 @@ class EventsPanel extends StatelessWidget {
                     padding: EdgeInsets.all(t.space.md),
                   ),
                 for (final s in sections)
-                  if (s.$3.isNotEmpty || tasks[s.$1]!.isNotEmpty)
+                  if (s.$3.isNotEmpty ||
+                      tasks[s.$1]!.isNotEmpty ||
+                      s.$1 == selectedSection)
                     Padding(
                       padding: EdgeInsets.only(top: t.space.md),
                       child: CollapsibleSection(
@@ -301,6 +317,18 @@ class EventsPanel extends StatelessWidget {
                         prefs: state.prefs,
                         prefKey: 'davdart.events.${s.$1}.collapsed.v1',
                         headerPadding: EdgeInsets.all(t.space.xs),
+                        collapsed: collapsedFor(s.$1),
+                        onChanged: homeDay == null
+                            ? null
+                            : (v) => state.setCalendarSectionCollapsed(s.$1, v),
+                        highlight: s.$1 == selectedSection,
+                        trailing:
+                            s.$1 == selectedSection && pinnedAdds.isNotEmpty
+                            ? Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: pinnedAdds,
+                              )
+                            : null,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [

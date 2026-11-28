@@ -152,10 +152,11 @@ void main() {
     final day = wallDay(wallNow(DateTime.now()));
     await t.tap(_k(_dayKey(day)));
     await t.pumpAndSettle();
-    // Home has no day column: the Calendar panel pins the picked day.
+    // Home has no day column: the Calendar panel shows the picked day. Today
+    // is the agenda's own Today section (no separate pinned day).
     expect(_k('calendar-day-card'), findsNothing);
-    final pin = _k('calendar-day-pin');
-    expect(pin, findsOneWidget);
+    final pin = _k('events-panel');
+    expect(_k('calendar-day-pin'), findsNothing);
     expect(
       find.descendant(of: pin, matching: find.text('Loose task')),
       findsOneWidget,
@@ -262,15 +263,13 @@ void main() {
       findsOneWidget,
     );
     expect(_k('calendar-day-pin-empty'), findsOneWidget);
-    // Today selects today, so the pinned day follows the grid.
+    // Today selects today: no pinned copy of the agenda's own Today section.
     await t.tap(_k('calendar-today'));
     await t.pumpAndSettle();
     final today = wallDay(wallNow(DateTime.now()));
     expect(s.homeDay, today);
-    expect(
-      find.descendant(of: pin, matching: find.text(dayLabel(today))),
-      findsOneWidget,
-    );
+    expect(_k('calendar-day-pin'), findsNothing);
+    expect(_k('events-today-toggle'), findsOneWidget);
   });
 
   testWidgets('narrow keeps the day list under the grid and no panel day', (
@@ -346,17 +345,21 @@ void main() {
     await t.pumpAndSettle();
     expect(find.text('Mine'), findsWidgets);
     expect(find.text('Not mine'), findsNothing);
+    // The grid's own rows read the seam: the hidden task leaves no chip.
+    expect(
+      find.descendant(
+        of: _k('calendar-view'),
+        matching: find.text('Not my task'),
+      ),
+      findsNothing,
+    );
     final today = wallDay(wallNow(DateTime.now()));
     await t.tap(_k(_dayKey(today)));
     await t.pumpAndSettle();
-    final pin = _k('calendar-day-pin');
+    // Picking today makes the agenda's own Today section the selection.
     expect(
-      find.descendant(of: pin, matching: find.text('Mine')),
+      find.descendant(of: _k('events-panel'), matching: find.text('Mine')),
       findsOneWidget,
-    );
-    expect(
-      find.descendant(of: pin, matching: find.text('Not my task')),
-      findsNothing,
     );
   });
 
