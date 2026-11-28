@@ -192,7 +192,9 @@ void main() {
       await t.pumpAndSettle();
     });
 
-    testWidgets('the section is one card block of rows', (t) async {
+    testWidgets('the section is flat: no card, a divider between rows', (
+      t,
+    ) async {
       await _pump(
         t,
         PropertySection(
@@ -204,12 +206,16 @@ void main() {
       );
       expect(find.text('a'), findsOneWidget);
       expect(find.text('b'), findsOneWidget);
-      final column = t.widget<Column>(
-        find
-            .descendant(of: find.byType(CardBox), matching: find.byType(Column))
-            .first,
+      // Rows sit straight on the page: no card around them.
+      expect(find.byType(CardBox), findsNothing);
+      // One hairline between the two rows.
+      expect(
+        find.descendant(
+          of: find.byType(PropertySection),
+          matching: find.byType(PropertyDivider),
+        ),
+        findsOneWidget,
       );
-      expect(column.spacing, _tokens.space.xxs);
     });
   });
 }

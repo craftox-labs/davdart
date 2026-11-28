@@ -17,12 +17,16 @@ class SectionLabel extends StatelessWidget {
     this.padding,
     this.upper = true,
     this.highlight = false,
+    this.textKey,
   });
 
   final String text;
   final Widget? action;
   final bool rule;
   final EdgeInsets? padding;
+
+  /// Key of the label text (tests find a section by it).
+  final Key? textKey;
 
   /// Uppercases the label; off for a title that keeps its own case.
   final bool upper;
@@ -35,6 +39,7 @@ class SectionLabel extends StatelessWidget {
     final t = tokensOf(context);
     final label = OverflowTip(
       upper ? text.toUpperCase() : text,
+      textKey: textKey,
       style: t.type.sectionLabelStyle.copyWith(
         color: highlight ? t.accent : t.muted,
       ),

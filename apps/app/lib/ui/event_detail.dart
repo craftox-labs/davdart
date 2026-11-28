@@ -20,6 +20,7 @@ import 'property/property_row.dart';
 import 'property/property_trigger.dart' show PropertyPopoverGroup;
 import 'property/tag_property_picker.dart';
 import 'repeat_fields.dart';
+import 'section_label.dart';
 import 'theme.dart';
 
 /// An event's page (peek pane or main tab): its title, location and
@@ -325,6 +326,11 @@ class EventDetail extends StatelessWidget {
                         ),
                       ],
                       SizedBox(height: t.space.xl),
+                      if (edit || event.description.trim().isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: t.space.sm),
+                          child: SectionLabel('Description'),
+                        ),
                       _description(context, event, draft, edit, bodyTap),
                     ],
                   ),

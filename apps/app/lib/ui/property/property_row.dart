@@ -1,23 +1,26 @@
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
-import '../card_box.dart';
 import '../surface.dart';
 import '../theme.dart';
 
-/// One card block of property rows: the meta block of a note, a task or an
-/// event, with the card padding and the tight gap between its rows.
+/// The rows of one item's properties, flat on the page: no card and no
+/// padding box, with a hairline divider between rows, so the rows read as the
+/// page's own lines. Each row keeps its hover fill.
 class PropertySection extends StatelessWidget {
   const PropertySection({super.key, required this.rows});
   final List<Widget> rows;
 
   @override
   Widget build(BuildContext context) {
-    final t = tokensOf(context);
-    return CardBox(
-      width: double.infinity,
-      padding: EdgeInsets.all(t.space.lg),
-      child: Column(spacing: t.space.xxs, children: rows),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (var i = 0; i < rows.length; i++) ...[
+          if (i > 0) const PropertyDivider(),
+          rows[i],
+        ],
+      ],
     );
   }
 }
@@ -137,6 +140,20 @@ class _PropertyRowState extends State<PropertyRow> {
       onEnter: (_) => setState(() => _hover = true),
       onExit: (_) => setState(() => _hover = false),
       child: out,
+    );
+  }
+}
+
+/// The hairline between two [PropertyRow]s of a flat [PropertySection].
+class PropertyDivider extends StatelessWidget {
+  const PropertyDivider({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: t.space.sm),
+      child: Container(height: t.borders.hairline, color: t.divider),
     );
   }
 }

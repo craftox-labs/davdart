@@ -19,6 +19,7 @@ import 'property/option_picker.dart';
 import 'property/parent_property_picker.dart';
 import 'property/property_picker.dart';
 import 'property/property_row.dart';
+import 'section_label.dart';
 import 'property/tag_property_picker.dart';
 import 'task_menu.dart';
 import 'task_parts.dart';
@@ -78,9 +79,9 @@ class ChildTasks extends StatelessWidget {
       children: [
         Padding(
           padding: EdgeInsets.only(bottom: t.space.xs),
-          child: Text(
+          child: SectionLabel(
             kids.isEmpty ? 'Tasks' : 'Tasks (${kids.length})',
-            style: t.type.labelStyle.copyWith(color: t.muted),
+            textKey: Key('child-tasks-label-$parentUid'),
           ),
         ),
         for (final k in kids)
@@ -438,6 +439,11 @@ class TaskDetail extends StatelessWidget {
                     children: [
                       PropertySection(rows: rows),
                       SizedBox(height: t.space.xl),
+                      if (edit || task.description.trim().isNotEmpty)
+                        Padding(
+                          padding: EdgeInsets.only(bottom: t.space.sm),
+                          child: SectionLabel('Description'),
+                        ),
                       _description(context, task, draft, edit, bodyTap),
                       SizedBox(height: t.space.xxl),
                       ChildTasks(state: state, parentUid: uid),

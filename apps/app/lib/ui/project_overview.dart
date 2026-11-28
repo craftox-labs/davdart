@@ -359,32 +359,29 @@ class _About extends StatelessWidget {
     final t = tokensOf(context);
     final id = uid;
     if (id == null) return const SizedBox.shrink();
-    return CardBox(
+    return Column(
       key: const Key('project-about'),
-      width: double.infinity,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: t.space.sm,
-        children: [
-          SectionLabel('About'),
-          if (!state.editable)
-            Text(
-              noteInlineValue(state, id),
-              key: const Key('project-about-text'),
-              style: t.type.bodyStyle,
-            )
-          else
-            NoteInlineText(
-              key: const Key('edit-project-about'),
-              state: state,
-              uid: id,
-              multiline: true,
-              placeholder: 'Describe the project…',
-              textKey: const Key('project-about-text'),
-              preview: MarkdownLite.new,
-            ),
-        ],
-      ),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: t.space.sm,
+      children: [
+        SectionLabel('About'),
+        if (!state.editable)
+          Text(
+            noteInlineValue(state, id),
+            key: const Key('project-about-text'),
+            style: t.type.bodyStyle,
+          )
+        else
+          NoteInlineText(
+            key: const Key('edit-project-about'),
+            state: state,
+            uid: id,
+            multiline: true,
+            placeholder: 'Describe the project…',
+            textKey: const Key('project-about-text'),
+            preview: MarkdownLite.new,
+          ),
+      ],
     );
   }
 }
@@ -437,38 +434,44 @@ class _Details extends StatelessWidget {
       label: label,
       value: value,
     );
-    return SectionCard(
+    return Column(
       key: const Key('proj-details'),
-      title: 'Details',
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: t.space.sm,
       children: [
-        row(
-          'status',
-          'Status',
-          Text(
-            status,
-            key: const Key('proj-detail-status'),
-            style: t.type.bodyStyle,
-          ),
+        const SectionLabel('Details'),
+        PropertySection(
+          rows: [
+            row(
+              'status',
+              'Status',
+              Text(
+                status,
+                key: const Key('proj-detail-status'),
+                style: t.type.bodyStyle,
+              ),
+            ),
+            for (final f in fields)
+              row(
+                f,
+                '${f[0].toUpperCase()}${f.substring(1)}',
+                id == null || !state.editable
+                    ? Text(
+                        noteInlineValue(state, id ?? '', field: f),
+                        key: Key('proj-detail-$f'),
+                        style: t.type.bodyStyle,
+                      )
+                    : NoteInlineText(
+                        key: Key('edit-proj-detail-$f'),
+                        state: state,
+                        uid: id,
+                        field: f,
+                        placeholder: '—',
+                        textKey: Key('proj-detail-$f'),
+                      ),
+              ),
+          ],
         ),
-        for (final f in fields)
-          row(
-            f,
-            '${f[0].toUpperCase()}${f.substring(1)}',
-            id == null || !state.editable
-                ? Text(
-                    noteInlineValue(state, id ?? '', field: f),
-                    key: Key('proj-detail-$f'),
-                    style: t.type.bodyStyle,
-                  )
-                : NoteInlineText(
-                    key: Key('edit-proj-detail-$f'),
-                    state: state,
-                    uid: id,
-                    field: f,
-                    placeholder: '—',
-                    textKey: Key('proj-detail-$f'),
-                  ),
-          ),
       ],
     );
   }
