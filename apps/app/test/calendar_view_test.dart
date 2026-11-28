@@ -22,6 +22,12 @@ List<String> _header(WidgetTester t) {
   ].take(7).toList();
 }
 
+/// The circle (or ring) around a day's date number, from its
+/// `calendar-day-<y-m-d>` id.
+BoxDecoration _circle(WidgetTester t, String id) =>
+    t.widget<Container>(find.byKey(Key('calendar-number-$id'))).decoration!
+        as BoxDecoration;
+
 /// A fixed clock: mid-November 2026 (the 1st is a Sunday, 30 days).
 final _now = DateTime.utc(2026, 11, 18, 10);
 
@@ -180,31 +186,29 @@ void main() {
       ],
     );
     await _pump(t, s);
-    expect(find.text('Wed 18 Nov'), findsOneWidget);
+    // Home keeps the picked day in the app state, shared with the panel.
+    // Nothing is picked yet, so the grid circles today.
+    expect(s.homeDay, isNull);
+    expect(_circle(t, '2026-11-18').color, Tokens.light.accent);
     // December: the selection follows to the 1st, and the grid is a year
     // rollover away from January.
     await t.tap(_k('calendar-next'));
     await t.pumpAndSettle();
     expect(t.widget<Text>(_k('calendar-month')).data, 'December 2026');
-    expect(find.text('Tue 1 Dec'), findsOneWidget);
-    expect(_k('calendar-empty'), findsOneWidget);
-    // December to January rolls the year over; that day's items show.
+    expect(s.homeDay, DateTime.utc(2026, 12, 1));
+    expect(_circle(t, '2026-12-1').color, Tokens.light.accent);
+    // December to January rolls the year over with the selection.
     await t.tap(_k('calendar-next'));
     await t.pumpAndSettle();
     expect(t.widget<Text>(_k('calendar-month')).data, 'January 2027');
-    expect(find.text('Fri 1 Jan 2027'), findsOneWidget);
-    expect(
-      find.descendant(
-        of: _k('calendar-day-card'),
-        matching: find.text('New year'),
-      ),
-      findsOneWidget,
-    );
+    expect(s.homeDay, DateTime.utc(2027, 1, 1));
+    expect(_circle(t, '2027-1-1').color, Tokens.light.accent);
     // Back to the current month: the selection returns to today.
     await t.tap(_k('calendar-today'));
     await t.pumpAndSettle();
     expect(t.widget<Text>(_k('calendar-month')).data, 'November 2026');
-    expect(find.text('Wed 18 Nov'), findsOneWidget);
+    expect(s.homeDay, DateTime.utc(2026, 11, 18));
+    expect(_circle(t, '2026-11-18').color, Tokens.light.accent);
   });
 
   testWidgets('selecting a day lists its items; an empty day says so', (
@@ -215,7 +219,9 @@ void main() {
       events: [_event('e20', 'Review', 20)],
       tasks: [_task('k20', 'Pay rent', 20)],
     );
-    await _pump(t, s);
+    // Narrow: the day list stays under the grid (wide Home shows it in the
+    // Calendar panel instead; see calendar_places_test).
+    await _pump(t, s, size: const Size(400, 800));
     // Today by default, and nothing on it.
     expect(find.text('Wed 18 Nov'), findsOneWidget);
     expect(_k('calendar-empty'), findsOneWidget);
@@ -364,9 +370,7 @@ void main() {
   testWidgets('the selection is a filled circle; today keeps the ring', (
     t,
   ) async {
-    BoxDecoration circle(String day) =>
-        t.widget<Container>(_k('calendar-number-2026-11-$day')).decoration!
-            as BoxDecoration;
+    BoxDecoration circle(String day) => _circle(t, '2026-11-$day');
     final s = await _state(t);
     await _pump(t, s);
     // November 18 is today and the selection: filled, no ring.
@@ -513,16 +517,63 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  testWidgets('Home wide is the grid alone; a day press picks it', (t) async {
+    final s = await _state(t, events: [_event('e20', 'Review', 20)]);
+    await _pump(t, s);
+    // No day column, no day-card adds: the Calendar panel shows the day.
+    expect(_k('calendar-day-card'), findsNothing);
+    expect(_k('calendar-add-event'), findsNothing);
+    expect(s.homeDay, isNull);
+    await t.tap(_k('calendar-day-2026-11-20'));
+    await t.pumpAndSettle();
+    expect(s.homeDay, DateTime.utc(2026, 11, 20));
+    // The panel opens on Calendar, unfolded, and the main area stays Home.
+    expect(s.section, Section.events);
+    expect(s.sidebarCollapsed, isFalse);
+    expect(s.atHome, isTrue);
+    // A press with the panel already there does not fold it.
+    await t.tap(_k('calendar-day-2026-11-21'));
+    await t.pumpAndSettle();
+    expect(s.sidebarCollapsed, isFalse);
+    expect(s.section, Section.events);
+    // A folded panel opens again on the Calendar section.
+    s.setSidebarCollapsed(true);
+    await t.pumpAndSettle();
+    await t.tap(_k('calendar-day-2026-11-22'));
+    await t.pumpAndSettle();
+    expect(s.sidebarCollapsed, isFalse);
+    expect(s.homeDay, DateTime.utc(2026, 11, 22));
+  });
+
+  testWidgets('a project Calendar keeps its day column on wide', (t) async {
+    final s = await _state(t, events: [_event('e20', 'Review', 20)]);
+    await _pump(t, s, scoped: true);
+    expect(_k('calendar-day-card'), findsOneWidget);
+    await t.tap(_k('calendar-day-2026-11-20'));
+    await t.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: _k('calendar-day-card'),
+        matching: find.text('Review'),
+      ),
+      findsOneWidget,
+    );
+    expect(_k('calendar-add-event'), findsOneWidget);
+    // The project's column keeps its own selection; Home's day is untouched.
+    expect(s.homeDay, isNull);
+  });
+
   testWidgets('a Space without events hides them and the event add', (t) async {
     final s = await _noEventsState(
       t,
       events: [_event('e1', 'Alpha ev', 20)],
       tasks: [_task('t1', 'Delta task', 20)],
     );
-    await _pump(t, s);
-    // Only the task has a chip (the Space has no event component at all).
-    expect(_k('calendar-chip-2026-11-20-0'), findsOneWidget);
-    expect(_k('calendar-chip-2026-11-20-1'), findsNothing);
+    // Narrow, so the day card below the grid carries the add buttons.
+    await _pump(t, s, size: const Size(400, 800));
+    // Only the task has a dot (the Space has no event component at all).
+    expect(_k('calendar-dot-event-2026-11-20'), findsNothing);
+    expect(_k('calendar-dot-task-2026-11-20'), findsOneWidget);
     await t.tap(_k('calendar-day-2026-11-20'));
     await t.pumpAndSettle();
     expect(

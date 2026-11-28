@@ -114,6 +114,11 @@ int _byWhen(_CellItem a, _CellItem b) {
 /// The one calendar: a month grid and the selected day's items, with a way to
 /// add an event or a task on that day.
 ///
+/// Wide, Home shows the grid alone and the picked day in the Calendar panel
+/// beside it ([AppState.homeDay]): pressing a day or a bar there opens that
+/// panel on the day. A project's Calendar keeps its own day column, and the
+/// narrow layout keeps the day list under the grid on both.
+///
 /// [scoped] picks the source. A project's page passes true: the open
 /// [AppState.scopeUid] narrows the items (the project index, as everywhere
 /// else). Home passes false: the individual's loose items only, filtered by
@@ -154,7 +159,9 @@ class CalendarView extends StatefulWidget {
 class _CalendarViewState extends State<CalendarView> {
   AppState get state => widget.state;
 
-  /// The picked day (a plain UTC-flagged date); null shows today.
+  /// The picked day (a plain UTC-flagged date); null shows today. A project's
+  /// Calendar keeps its own here; Home's is [AppState.homeDay], shared with
+  /// the Calendar panel that shows the day beside the grid.
   DateTime? _selected;
 
   /// The first of the shown month; null follows the selection.
@@ -209,20 +216,43 @@ class _CalendarViewState extends State<CalendarView> {
     return out;
   }
 
-  void _select(DateTime day) => setState(() {
-    _selected = day;
-    _month = _monthOf(day);
-  });
+  /// Picks [day]. A project's Calendar keeps it in its own day column; Home's
+  /// shares it with the Calendar panel, which the wide grid opens (there is no
+  /// room for a column beside the full-width grid).
+  void _select(DateTime day, {bool openPanel = false}) {
+    if (widget.scoped) {
+      setState(() {
+        _selected = day;
+        _month = _monthOf(day);
+      });
+      return;
+    }
+    if (openPanel) {
+      state.selectHomeDay(day);
+    } else {
+      state.setHomeDay(day);
+    }
+    setState(() => _month = _monthOf(day));
+  }
 
   /// Shows [month] and keeps the selection inside it: today when the month
-  /// holds it, else its first day. The day card and the add buttons always
-  /// target a day that is on screen.
-  void _showMonth(DateTime month, DateTime today) => setState(() {
-    _month = month;
-    _selected = month.year == today.year && month.month == today.month
+  /// holds it, else its first day, so the day column (a project's) and the
+  /// panel's pinned day (Home's) always target a day that is on screen. The
+  /// month arrows never open the panel.
+  void _showMonth(DateTime month, DateTime today) {
+    final day = month.year == today.year && month.month == today.month
         ? today
         : DateTime.utc(month.year, month.month);
-  });
+    if (widget.scoped) {
+      setState(() {
+        _month = month;
+        _selected = day;
+      });
+      return;
+    }
+    setState(() => _month = month);
+    state.setHomeDay(day);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -232,7 +262,7 @@ class _CalendarViewState extends State<CalendarView> {
       builder: (context, _) {
         final clock = _clock();
         final today = wallDay(wallNow(clock));
-        final selected = _selected ?? today;
+        final selected = (widget.scoped ? _selected : state.homeDay) ?? today;
         final month = _month ?? _monthOf(selected);
         final first = firstWeekday(context);
         final lead = (month.weekday - first + 7) % 7;
@@ -277,7 +307,13 @@ class _CalendarViewState extends State<CalendarView> {
                 t.space.xl,
                 fabInset(context) + t.space.xl,
               ),
-              child: wide
+              // Home's wide Calendar is the grid alone: the picked day shows
+              // in the Calendar panel beside it. A project's wide Calendar
+              // keeps its day column, and the narrow layout keeps the day list
+              // under the grid on both.
+              child: wide && !widget.scoped
+                  ? grid
+                  : wide
                   ? Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -368,7 +404,7 @@ class _CalendarViewState extends State<CalendarView> {
                   variant: FButtonVariant.secondary,
                   size: FButtonSizeVariant.xs,
                   mainAxisSize: MainAxisSize.min,
-                  onPress: () => _select(today),
+                  onPress: () => _select(today, openPanel: wide),
                   child: const Text('Today'),
                 ),
               ),
@@ -700,7 +736,7 @@ class _CalendarViewState extends State<CalendarView> {
       key: Key('calendar-day-$id'),
       behavior: HitTestBehavior.opaque,
       semanticsLabel: dayLabel(day, _clock()),
-      onPress: () => _select(day),
+      onPress: () => _select(day, openPanel: wide),
       child: SizedBox(
         height: height,
         child: DecoratedBox(
