@@ -477,6 +477,94 @@ void main() {
     expect(s.section, Section.events);
   });
 
+  testWidgets('dragging across days makes an all-day event in that range', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    final b = t.getCenter(_k('calendar-day-2026-11-19'));
+    await t.dragFrom(a, b - a);
+    await t.pumpAndSettle();
+    // The range lands in the new-event dialog, all day, from the 17th to the
+    // 19th (an all-day end is its last day).
+    expect(_k('new-event-title'), findsOneWidget);
+    expect(t.widget<FCheckbox>(_k('new-event-allday')).value, isTrue);
+    await t.enterText(_k('new-event-title'), 'Sprint');
+    await t.tap(_k('new-event-add'));
+    await t.pumpAndSettle();
+    final e = s.events.single;
+    expect(e.summary, 'Sprint');
+    expect(e.allDay, isTrue);
+    expect(e.dtstart!.value, '20261117');
+    expect(e.dtend!.value, '20261120');
+  });
+
+  testWidgets('a drag back along the row makes the same range', (t) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    final a = t.getCenter(_k('calendar-day-2026-11-19'));
+    final b = t.getCenter(_k('calendar-day-2026-11-17'));
+    await t.dragFrom(a, b - a);
+    await t.pumpAndSettle();
+    await t.enterText(_k('new-event-title'), 'Trip');
+    await t.tap(_k('new-event-add'));
+    await t.pumpAndSettle();
+    final e = s.events.single;
+    expect(e.dtstart!.value, '20261117');
+    expect(e.dtend!.value, '20261120');
+  });
+
+  testWidgets('a vertical drag scrolls and makes no event', (t) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    await t.dragFrom(a, const Offset(0, -200));
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsNothing);
+    expect(s.events, isEmpty);
+  });
+
+  testWidgets('the phone has no range drag; a press picks the day', (t) async {
+    final s = await _state(t);
+    await _pump(t, s, size: const Size(400, 800));
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    final b = t.getCenter(_k('calendar-day-2026-11-19'));
+    await t.dragFrom(a, b - a);
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsNothing);
+    await t.tap(_k('calendar-day-2026-11-19'));
+    await t.pumpAndSettle();
+    expect(s.homeDay, DateTime.utc(2026, 11, 19));
+  });
+
+  testWidgets('a project Calendar drags a range too, scoped to it', (t) async {
+    final s = await _state(t);
+    await _pump(t, s, scoped: true);
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    final b = t.getCenter(_k('calendar-day-2026-11-19'));
+    await t.dragFrom(a, b - a);
+    await t.pumpAndSettle();
+    await t.enterText(_k('new-event-title'), 'Scoped');
+    await t.tap(_k('new-event-add'));
+    await t.pumpAndSettle();
+    final e = s.events.single;
+    expect(e.dtstart!.value, '20261117');
+    expect(e.dtend!.value, '20261120');
+    // The project's Calendar keeps its own picked day; Home's stays unset.
+    expect(s.homeDay, isNull);
+  });
+
+  testWidgets('a Space without events has no range drag', (t) async {
+    final s = await _noEventsState(t);
+    await _pump(t, s);
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    final b = t.getCenter(_k('calendar-day-2026-11-19'));
+    await t.dragFrom(a, b - a);
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsNothing);
+  });
+
   testWidgets('overlapping visits stack on separate lanes', (t) async {
     Event visit(String uid, String title, int from, int to) => Event(
       uid: uid,

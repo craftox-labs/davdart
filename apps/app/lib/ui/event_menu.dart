@@ -280,14 +280,23 @@ class _NewEventForm extends ChangeNotifier {
 
 /// A small dialog for a new event: title, when (date, all day or start and
 /// end time) and location. Resolves to the new event's uid, or null when
-/// cancelled. [day] is the date it starts on (default: today).
+/// cancelled. [day] is the date it starts on (default: today); [until] makes
+/// it an all-day event to that last day (a range dragged on the calendar).
 Future<String?> showNewEventDialog(
   BuildContext context,
   AppState state, {
   DateTime? day,
+  DateTime? until,
   bool personal = false,
 }) {
-  final form = _NewEventForm(wallDay(day ?? wallNow(DateTime.now())));
+  final first = wallDay(day ?? wallNow(DateTime.now()));
+  final form = _NewEventForm(first);
+  if (until != null) {
+    // The form's all-day end is the last day, so a range needs no arithmetic.
+    form.setAllDay(true);
+    form.setStart(first, null);
+    form.setEnd(wallDay(until), null);
+  }
   Future<void> submit(BuildContext ctx) async {
     if (form.title.text.trim().isEmpty || form.bad) return;
     final nav = Navigator.of(ctx);
