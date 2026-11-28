@@ -331,25 +331,30 @@ class ParentCrumb extends StatelessWidget {
       endPad: t.space.xxl,
       maxContentWidth: narrowLayout(context) ? null : t.sizes.pageMax,
       children: [
-        FTappable(
-          onPress: onOpen,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                FLucideIcons.arrowUpToLine,
-                size: t.icons.sm,
-                color: t.muted,
+        Expanded(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: FTappable(
+              onPress: onOpen,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    FLucideIcons.arrowUpToLine,
+                    size: t.icons.sm,
+                    color: t.muted,
+                  ),
+                  SizedBox(width: t.space.xs),
+                  Flexible(
+                    child: OverflowTip(
+                      label,
+                      textKey: const Key('parent-crumb-label'),
+                      style: t.type.captionStyle.copyWith(color: t.muted),
+                    ),
+                  ),
+                ],
               ),
-              SizedBox(width: t.space.xs),
-              Flexible(
-                child: OverflowTip(
-                  label,
-                  textKey: const Key('parent-crumb-label'),
-                  style: t.type.captionStyle.copyWith(color: t.muted),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ],
