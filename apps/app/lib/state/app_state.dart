@@ -4556,6 +4556,10 @@ class AppState extends ChangeNotifier {
   /// Set by the shell: shows why an edit left behind could not be saved.
   void Function(String reason)? onNotSaved;
 
+  /// Shows the shell's "Not saved" notice for [reason] (a pick or an inline
+  /// text commit that did not go through).
+  void reportNotSaved(String reason) => onNotSaved?.call(reason);
+
   String _notSavedReason(String uid) {
     final empty = _taskDrafts.containsKey(uid)
         ? _taskDrafts[uid]!.titleEmpty

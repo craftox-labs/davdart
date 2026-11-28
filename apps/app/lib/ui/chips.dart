@@ -65,12 +65,17 @@ class StatusDot extends StatelessWidget {
 }
 
 class TagChip extends StatelessWidget {
-  const TagChip(this.label, {super.key});
+  const TagChip(this.label, {super.key, this.selected = false});
   final String label;
 
+  /// Filled in the accent tone: the tag is on (a picker's checkable chip).
+  final bool selected;
+
   @override
-  Widget build(BuildContext context) =>
-      FBadge(variant: FBadgeVariant.outline, child: Text(label));
+  Widget build(BuildContext context) => FBadge(
+    variant: selected ? FBadgeVariant.secondary : FBadgeVariant.outline,
+    child: Text(label),
+  );
 }
 
 /// Short label for a note: its item id when it has one, else its title.

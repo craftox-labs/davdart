@@ -269,6 +269,7 @@ class SizeTokens {
     this.spinner = 14,
     this.statusField = 160,
     this.metaLabel = 104,
+    this.propertyRow = 32,
     this.eventTime = 56,
     this.chevronBox = 20,
     this.listChevronBox = 24,
@@ -358,6 +359,11 @@ class SizeTokens {
       statusField,
       metaLabel,
       eventTime;
+
+  /// Height of one property row (a label and a value) on the wide layout;
+  /// the narrow layout uses [touchTarget].
+  final double propertyRow;
+
   final double chevronBox, listChevronBox, listMarker;
   final double treeIndent, listIndent;
   final double dialogSm, dialog, dialogMd, dialogLg, dialogXl;
