@@ -164,6 +164,48 @@ void main() {
     expect(t.widget<Text>(_k('calendar-month')).data, 'November 2026');
   });
 
+  testWidgets('a month arrow moves the selection into the shown month', (
+    t,
+  ) async {
+    final s = await _state(
+      t,
+      events: [
+        Event(
+          uid: 'ny',
+          summary: 'New year',
+          dtstart: ICalDate.date(2027, 1, 1),
+          dtend: ICalDate.date(2027, 1, 2),
+        ),
+      ],
+    );
+    await _pump(t, s);
+    expect(find.text('Wed 18 Nov'), findsOneWidget);
+    // December: the selection follows to the 1st, and the grid is a year
+    // rollover away from January.
+    await t.tap(_k('calendar-next'));
+    await t.pumpAndSettle();
+    expect(t.widget<Text>(_k('calendar-month')).data, 'December 2026');
+    expect(find.text('Tue 1 Dec'), findsOneWidget);
+    expect(_k('calendar-empty'), findsOneWidget);
+    // December to January rolls the year over; that day's items show.
+    await t.tap(_k('calendar-next'));
+    await t.pumpAndSettle();
+    expect(t.widget<Text>(_k('calendar-month')).data, 'January 2027');
+    expect(find.text('Fri 1 Jan 2027'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: _k('calendar-day-card'),
+        matching: find.text('New year'),
+      ),
+      findsOneWidget,
+    );
+    // Back to the current month: the selection returns to today.
+    await t.tap(_k('calendar-today'));
+    await t.pumpAndSettle();
+    expect(t.widget<Text>(_k('calendar-month')).data, 'November 2026');
+    expect(find.text('Wed 18 Nov'), findsOneWidget);
+  });
+
   testWidgets('selecting a day lists its items; an empty day says so', (
     t,
   ) async {

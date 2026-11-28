@@ -153,7 +153,15 @@ class _CalendarViewState extends State<CalendarView> {
     _month = _monthOf(day);
   });
 
-  void _showMonth(DateTime month) => setState(() => _month = month);
+  /// Shows [month] and keeps the selection inside it: today when the month
+  /// holds it, else its first day. The day card and the add buttons always
+  /// target a day that is on screen.
+  void _showMonth(DateTime month, DateTime today) => setState(() {
+    _month = month;
+    _selected = month.year == today.year && month.month == today.month
+        ? today
+        : DateTime.utc(month.year, month.month);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -261,8 +269,10 @@ class _CalendarViewState extends State<CalendarView> {
                 key: const Key('calendar-prev'),
                 tooltip: 'Previous month',
                 icon: FLucideIcons.chevronLeft,
-                onPress: () =>
-                    _showMonth(DateTime.utc(month.year, month.month - 1)),
+                onPress: () => _showMonth(
+                  DateTime.utc(month.year, month.month - 1),
+                  today,
+                ),
               ),
               Expanded(
                 child: Text(
@@ -277,8 +287,10 @@ class _CalendarViewState extends State<CalendarView> {
                 key: const Key('calendar-next'),
                 tooltip: 'Next month',
                 icon: FLucideIcons.chevronRight,
-                onPress: () =>
-                    _showMonth(DateTime.utc(month.year, month.month + 1)),
+                onPress: () => _showMonth(
+                  DateTime.utc(month.year, month.month + 1),
+                  today,
+                ),
               ),
               SizedBox(width: t.space.xs),
               touchBox(
