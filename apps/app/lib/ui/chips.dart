@@ -32,22 +32,33 @@ Color statusColor(String? status, BuildContext context) {
 
 /// The one small round marker: a status colour, or any token colour through
 /// [color] (a kind mark rather than a status, as in the calendar's day cells).
-/// [size] overrides [SizeTokens.statusDot] for denser places.
+/// [size] overrides [SizeTokens.statusDot] for denser places; [hollow] draws
+/// the tone as a hairline ring instead of a fill.
 class StatusDot extends StatelessWidget {
-  const StatusDot(this.status, {super.key, this.color, this.size});
+  const StatusDot(
+    this.status, {
+    super.key,
+    this.color,
+    this.size,
+    this.hollow = false,
+  });
   final String? status;
   final Color? color;
   final double? size;
+  final bool hollow;
 
   @override
   Widget build(BuildContext context) {
-    final dot = size ?? tokensOf(context).sizes.statusDot;
+    final t = tokensOf(context);
+    final dot = size ?? t.sizes.statusDot;
+    final c = color ?? statusColor(status, context);
     return Container(
       width: dot,
       height: dot,
       decoration: BoxDecoration(
-        color: color ?? statusColor(status, context),
+        color: hollow ? null : c,
         shape: BoxShape.circle,
+        border: hollow ? Border.all(color: c, width: t.borders.hairline) : null,
       ),
     );
   }

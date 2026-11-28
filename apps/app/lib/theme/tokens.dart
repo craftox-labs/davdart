@@ -304,6 +304,9 @@ class SizeTokens {
     this.segmentMin = 72,
     this.segmentHeight = 28,
     this.calendarDot = 5,
+    this.calendarNumber = 22,
+    this.calendarChip = 16,
+    this.calendarChipBar = 3,
     this.ring = 2,
     this.progressBar = 4,
     this.statLabel = 80,
@@ -389,6 +392,10 @@ class SizeTokens {
       segmentMin,
       segmentHeight;
   final double calendarDot, ring;
+
+  /// Diameter of the circle (or ring) around a day cell's date number, the
+  /// height of a day cell's event/task chip and the width of its tone bar.
+  final double calendarNumber, calendarChip, calendarChipBar;
 
   /// Height of the thin progress bar on a project row.
   final double progressBar;
@@ -559,6 +566,13 @@ class Tokens {
   Color get accentTint => accent.withValues(alpha: .1);
   Color get selectionFill => accent.withValues(alpha: .3);
   Color get dangerTint => statusBlocked.withValues(alpha: .15);
+
+  /// The very faint weekend wash behind a calendar day cell (Saturday and
+  /// Sunday), and the fills behind a day cell's chips: the event tone, the
+  /// task tone.
+  Color get weekendTint => muted.withValues(alpha: .05);
+  Color get eventTint => accent.withValues(alpha: .12);
+  Color get taskTint => statusTodo.withValues(alpha: .16);
 
   /// Opacity of dimmed content: a canceled card, a ghost left by a drag.
   double get dimmed => .5;
