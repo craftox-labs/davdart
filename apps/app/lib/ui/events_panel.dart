@@ -15,7 +15,10 @@ import 'panel_tags_drawer.dart';
 import 'parts.dart';
 import 'side_panel.dart';
 import 'empty_state.dart';
+import 'section_label.dart';
 import 'surface.dart';
+import 'task_menu.dart';
+import 'task_parts.dart';
 import 'theme.dart';
 import 'overflow_tip.dart';
 
@@ -103,6 +106,96 @@ class EventsPanel extends StatelessWidget {
         final shown = sections.any(
           (s) => s.$3.isNotEmpty || tasks[s.$1]!.isNotEmpty,
         );
+        // Home's picked day (the day the grid beside this panel circles) is
+        // pinned above the agenda: its loose events and dated tasks, and its
+        // own add buttons. The rows are a quick look and stay out of the
+        // panel's keyboard list, which the agenda below already fills.
+        final homeDay = scoped ? null : state.homeDay;
+        final pinned = homeDay == null
+            ? null
+            : bucketByDay(
+                events: state.filteredPersonalEvents,
+                tasks: state.filteredPersonalTasks,
+                from: homeDay,
+                to: homeDay.add(const Duration(days: 1)),
+              )[homeDay];
+        final pinnedAdds = <Widget>[
+          if (homeDay != null && state.eventsEditable)
+            IconAction(
+              compact: true,
+              key: const Key('calendar-day-add-event'),
+              tooltip: 'New event',
+              icon: FLucideIcons.calendarPlus,
+              onPress: () async {
+                final uid = await showNewEventDialog(
+                  context,
+                  state,
+                  day: homeDay,
+                  personal: true,
+                );
+                if (uid == null) return;
+                await state.clickEvent(uid);
+                onPick?.call();
+              },
+            ),
+          if (homeDay != null && state.tasksEditable)
+            IconAction(
+              compact: true,
+              key: const Key('calendar-day-add-task'),
+              tooltip: 'New task',
+              icon: FLucideIcons.listPlus,
+              onPress: () => showNewTaskDialog(
+                context,
+                state,
+                due: dueOfDay(homeDay),
+                personal: true,
+              ),
+            ),
+        ];
+        final dayBlock = homeDay == null
+            ? null
+            : Padding(
+                padding: EdgeInsets.only(top: t.space.md),
+                child: Column(
+                  key: const Key('calendar-day-pin'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SectionLabel(
+                      dayLabel(homeDay, clock),
+                      upper: false,
+                      action: pinnedAdds.isEmpty
+                          ? null
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: pinnedAdds,
+                            ),
+                    ),
+                    SizedBox(height: t.space.xs),
+                    if (pinned == null || pinned.isEmpty)
+                      EmptyState(
+                        'Nothing on this day',
+                        key: const Key('calendar-day-pin-empty'),
+                        padding: EdgeInsets.all(t.space.md),
+                      )
+                    else ...[
+                      for (final o in pinned.events)
+                        EventRow(
+                          key: Key('calendar-pin-${eventRowId(o)}'),
+                          state: state,
+                          occurrence: o,
+                          onOpen: onPick,
+                        ),
+                      for (final k in pinned.tasks)
+                        TaskDueRow(
+                          key: Key('calendar-pin-task-${k.task.uid}'),
+                          state: state,
+                          task: k.task,
+                          onOpen: onPick,
+                        ),
+                    ],
+                  ],
+                ),
+              );
         state.nav.publish('events', [
           for (final s in sections) ...[
             for (final o in s.$3)
@@ -169,6 +262,7 @@ class EventsPanel extends StatelessWidget {
                 t.space.huge,
               ),
               children: [
+                ?dayBlock,
                 // Nothing to list at all: no events and no dated tasks
                 // (either would be shown below).
                 if ((scoped
