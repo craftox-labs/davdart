@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:davdart_app/ui/space_actions.dart';
 import 'package:davdart/davdart.dart';
 
 import '../../../test/support/fake_caldav.dart';
@@ -743,6 +744,17 @@ void main() {
       expect(server.log.where((e) => e.startsWith('DELETE')), isEmpty);
       await s.refreshSpaces();
       expect(s.spaces.map((e) => e.name), contains('Work'));
+      // Fresh and Cal were created by MKCALENDAR but the fake server's
+      // listing does not hold them: they show as gone, and stay.
+      expect(c.gone.length, 2);
+      expect(
+        spaceSyncLabel(s, s.spaces.firstWhere((e) => e.name == 'Fresh')),
+        'Not on the server any more',
+      );
+      expect(
+        spaceSyncLabel(s, s.spaces.firstWhere((e) => e.name == 'Work')),
+        'Synced with the server',
+      );
       // A re-added Space persists again (its writes were not left blocked).
       await s.switchSpace(s.spaces.firstWhere((e) => e.name == 'Work').id);
       await Future<void>.delayed(const Duration(milliseconds: 100));

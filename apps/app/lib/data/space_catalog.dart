@@ -263,8 +263,23 @@ class SpaceCatalog {
   Future<int> refresh() async {
     final a = account;
     if (a == null) return 0;
-    return _addFound(await _discover(a.user, a.password));
+    final found = await _discover(a.user, a.password);
+    final added = _addFound(found);
+    final here = {for (final f in found) _norm(f.path)};
+    gone
+      ..clear()
+      ..addAll([
+        for (final s in spaces)
+          if (s.collection != null && !here.contains(_norm(s.collection!)))
+            s.id,
+      ]);
+    return added;
   }
+
+  /// Ids of account Spaces whose collection the last refresh did not find on
+  /// the server (deleted there). Not saved; the Space and its local copy stay
+  /// until the user removes it, as it may hold unsynced notes.
+  final Set<String> gone = {};
 
   Future<List<FoundCollection>> _discover(String user, String password) async {
     final found = await CalDavClient.discover(

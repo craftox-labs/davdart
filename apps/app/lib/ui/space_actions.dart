@@ -7,7 +7,9 @@ import 'parts.dart';
 
 /// Sync state line of a Space in the Spaces panel.
 String spaceSyncLabel(AppState state, SpaceInfo sp) =>
-    sp.id == state.currentSpaceId && state.syncing
+    state.catalog?.gone.contains(sp.id) ?? false
+    ? 'Not on the server any more'
+    : sp.id == state.currentSpaceId && state.syncing
     ? 'Syncing…'
     : sp.onServer
     ? 'Synced with the server'

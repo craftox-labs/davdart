@@ -733,7 +733,11 @@ class AppState extends ChangeNotifier {
     if (c == null || c.account == null) return;
     try {
       final n = await c.refresh();
-      syncMessage = n == 0 ? 'No new collections' : 'Added $n';
+      final g = c.gone.length;
+      syncMessage = [
+        n == 0 ? 'No new collections' : 'Added $n',
+        if (g > 0) '$g no longer on the server',
+      ].join('; ');
     } catch (e) {
       syncMessage = 'Could not refresh: $e';
     }
