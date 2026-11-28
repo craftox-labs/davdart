@@ -97,9 +97,11 @@ class _PropertyRowState extends State<PropertyRow> {
         ),
       );
     }
+    // No horizontal inset: the label column starts flush with the page's own
+    // text (a title, a section label), and the hover fill does not move it.
     final row = Surface(
       hovered: tappable && _hover,
-      padding: EdgeInsets.symmetric(horizontal: t.space.sm),
+      radius: t.radii.small,
       child: SizedBox(
         height: h,
         child: Row(
@@ -151,9 +153,6 @@ class PropertyDivider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: t.space.sm),
-      child: Container(height: t.borders.hairline, color: t.divider),
-    );
+    return Container(height: t.borders.hairline, color: t.divider);
   }
 }

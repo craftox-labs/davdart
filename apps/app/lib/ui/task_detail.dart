@@ -6,6 +6,7 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/event_rules.dart' show dayLabel;
 import '../state/key_nav.dart';
+import '../state/task_rules.dart' show isTaskOverdue;
 import '../state/task_draft.dart';
 import 'chips.dart';
 import 'markdown_lite.dart';
@@ -174,13 +175,15 @@ class TaskDetail extends StatelessWidget {
       key: const Key('task-priority'),
       muted: priority == 'none',
     );
+    final dueLate = !task.isClosed && isTaskOverdue(task, now);
     final dueValue = task.due == null
         ? null
-        : DueChip(
-            task,
+        : Text(
+            dueLabel(task, now),
             key: const Key('task-due'),
-            now: now,
-            overdue: task.isClosed ? false : null,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: t.type.bodyStyle.copyWith(color: dueLate ? t.error : null),
           );
     final startValue = startDay == null ? null : value(dayLabel(startDay, now));
 
