@@ -151,6 +151,29 @@ void main() {
       expect(app.state.taskTagsOf(app.state.taskById('k')!), ['bills']);
     });
 
+    testWidgets('a label pick and an Undo are not undone by a text save', (
+      t,
+    ) async {
+      final app = await _pump(
+        t,
+        task: mkTask('k', summary: 'Pay rent', tags: ['home']),
+      );
+      await t.tap(_k('pane-title'));
+      await t.pumpAndSettle();
+      await t.enterText(_k('edit-title'), 'Pay rent now');
+      // A pick lands, then its Undo, while the title is still typing.
+      await t.runAsync(() async {
+        await app.state.setTaskTags('k', ['home', 'bills']);
+        await app.state.undoBoard(app.state.pendingUndo!);
+      });
+      await t.pump(const Duration(milliseconds: 900));
+      await t.pumpAndSettle();
+      final task = app.state.taskById('k')!;
+      expect(task.summary, 'Pay rent now');
+      // The labels are back to what the Undo put there.
+      expect(app.state.taskTagsOf(task), ['home']);
+    });
+
     testWidgets('the inside row moves the task at once', (t) async {
       final app = await _pump(
         t,
