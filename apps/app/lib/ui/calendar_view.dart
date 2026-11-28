@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 import '../state/app_state.dart';
 import '../state/event_rules.dart';
 import '../theme/tokens.dart';
+import 'calendar_lanes.dart';
 import 'card_box.dart';
 import 'chips.dart';
 import 'empty_state.dart';
@@ -79,6 +80,26 @@ int firstWeekday(BuildContext context) {
 /// One item of a wide day cell's chip list: what to show, its kind and when
 /// it starts, so all-day items lead and the rest follow in start order.
 typedef _CellItem = ({String title, bool event, DateTime start, bool allDay});
+
+/// `y-m-d`, the id a day's widget keys end with.
+String _id(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
+/// The first day [o] covers, and the last one it covers, as UTC midnights:
+/// an all-day event's end is exclusive, so its last day is the end minus a
+/// second (as bucketByDay counts it).
+DateTime _firstDay(EventOccurrence o) =>
+    DateTime.utc(o.start.year, o.start.month, o.start.day);
+
+DateTime _lastDay(EventOccurrence o) {
+  final end = o.end.isAfter(o.start)
+      ? o.end.subtract(const Duration(seconds: 1))
+      : o.start;
+  return DateTime.utc(end.year, end.month, end.day);
+}
+
+/// True when [o] covers more than one day, so it is drawn as a bar across the
+/// cells rather than as a chip on each of them.
+bool _multiDay(EventOccurrence o) => _lastDay(o).isAfter(_firstDay(o));
 
 /// Chip order in a day cell: all-day items first, then by start time, an
 /// event before a task that starts at the same moment.
@@ -161,6 +182,31 @@ class _CalendarViewState extends State<CalendarView> {
       for (final t in state.tasks)
         if (!state.inProjectsLayer(t.uid) && state.isMine(t)) t,
     ];
+  }
+
+  /// The multi-day items of the grid window `[from, to)`: every event
+  /// occurrence that covers more than one day, clipped to the window and with
+  /// the first and last day it covers, for the bar layer.
+  List<CalendarSpan> _spans(DateTime from, DateTime to) {
+    final last = to.subtract(const Duration(days: 1));
+    final out = <CalendarSpan>[];
+    for (final e in _events()) {
+      for (final o in occurrencesBetween(e, from, to)) {
+        if (o.isCancelled) continue;
+        final first = _firstDay(o);
+        final end = _lastDay(o);
+        if (!end.isAfter(first)) continue;
+        out.add(
+          CalendarSpan(
+            start: first.isBefore(from) ? from : first,
+            end: end.isAfter(last) ? last : end,
+            title: o.summary.isEmpty ? '(no title)' : o.summary,
+            sortKey: '${e.uid}@${_id(first)}',
+          ),
+        );
+      }
+    }
+    return out;
   }
 
   void _select(DateTime day) => setState(() {
@@ -257,8 +303,9 @@ class _CalendarViewState extends State<CalendarView> {
 
   /// The month grid: a header row (month title, arrows, Today), the weekday
   /// labels, then the days in a hairline-ruled grid with a faint weekend
-  /// wash. Wide cells carry up to three item chips (and '+N more'); narrow
-  /// ones only a dot per kind, as the old Home calendar did.
+  /// wash. Wide cells carry up to three item chips (and '+N more') under the
+  /// multi-day bars of their row; narrow ones only a dot per kind, as the old
+  /// Home calendar did.
   Widget _grid(
     BuildContext context, {
     required Tokens t,
@@ -273,6 +320,8 @@ class _CalendarViewState extends State<CalendarView> {
   }) {
     final cellHeight = wide ? t.sizes.calendarCellChips : t.sizes.touchTarget;
     final weekday = t.type.sectionLabelStyle.copyWith(color: t.muted);
+    final end = start.add(Duration(days: weeks * 7));
+    final spans = wide ? _spans(start, end) : const <CalendarSpan>[];
     return CardBox(
       padding: EdgeInsets.all(t.space.sm),
       child: Column(
@@ -341,35 +390,168 @@ class _CalendarViewState extends State<CalendarView> {
           ),
           SizedBox(height: t.space.xs),
           Container(height: t.borders.hairline, color: t.divider),
-          for (var w = 0; w < weeks; w++)
-            Row(
-              children: [
-                for (var i = 0; i < 7; i++)
-                  Expanded(
-                    child: _cell(
+          LayoutBuilder(
+            builder: (context, c) {
+              // The bar layer's pixels: one column per weekday, so a bar can
+              // cover consecutive cells.
+              final g = LaneGeometry(
+                cellWidth: c.maxWidth / 7,
+                laneTop: t.sizes.calendarNumberRow,
+                pitch: t.sizes.calendarLanePitch,
+                barHeight: t.sizes.calendarChip,
+                inset: t.space.xxs,
+              );
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (var w = 0; w < weeks; w++)
+                    _week(
                       context,
                       t: t,
-                      day: start.add(Duration(days: w * 7 + i)),
+                      g: g,
+                      weekStart: start.add(Duration(days: w * 7)),
                       month: month,
                       today: today,
                       selected: selected,
-                      bucket: buckets[start.add(Duration(days: w * 7 + i))],
+                      buckets: buckets,
+                      spans: spans,
                       height: cellHeight,
                       wide: wide,
                       topRule: w > 0,
-                      leftRule: i > 0,
                     ),
-                  ),
-              ],
-            ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
   }
 
+  /// One week row: the seven day cells and, on wide, the multi-day bars laid
+  /// over them on their lanes. Every cell of the row leaves the bars' room
+  /// above its chips, so nothing overlaps.
+  Widget _week(
+    BuildContext context, {
+    required Tokens t,
+    required LaneGeometry g,
+    required DateTime weekStart,
+    required DateTime month,
+    required DateTime today,
+    required DateTime selected,
+    required Map<DateTime, DayBucket> buckets,
+    required List<CalendarSpan> spans,
+    required double height,
+    required bool wide,
+    required bool topRule,
+  }) {
+    final row = wide
+        ? layOutWeek(spans, weekStart, maxLanes: t.sizes.calendarLanes)
+        : const WeekLanes(segments: [], lanes: 0, hidden: 0);
+    final inset = row.lanes == 0
+        ? 0.0
+        : g.reserved(row.lanes, more: row.hidden > 0);
+    final cells = Row(
+      children: [
+        for (var i = 0; i < 7; i++)
+          Expanded(
+            child: _cell(
+              context,
+              t: t,
+              day: weekStart.add(Duration(days: i)),
+              month: month,
+              today: today,
+              selected: selected,
+              bucket: buckets[weekStart.add(Duration(days: i))],
+              height: height,
+              wide: wide,
+              lanesInset: inset,
+              topRule: topRule,
+              leftRule: i > 0,
+            ),
+          ),
+      ],
+    );
+    if (row.segments.isEmpty && row.hidden == 0) return cells;
+    final weekId = _id(weekStart);
+    return Stack(
+      children: [
+        cells,
+        for (final s in row.segments)
+          Positioned(
+            left: g.rectOf(s).left,
+            top: g.rectOf(s).top,
+            width: g.rectOf(s).width,
+            height: g.barHeight,
+            child: _bar(
+              t,
+              s,
+              key: Key('calendar-bar-${s.span.sortKey}-$weekId'),
+            ),
+          ),
+        if (row.hidden > 0)
+          Positioned(
+            left: g.inset,
+            top: g.moreTop(row.lanes),
+            child: Text(
+              '+${row.hidden} more',
+              key: Key('calendar-lanes-more-$weekId'),
+              maxLines: 1,
+              style: t.type.microStyle.copyWith(color: t.muted),
+            ),
+          ),
+      ],
+    );
+  }
+
+  /// One row segment of a multi-day bar: the event tone's tint, the tone bar
+  /// at the span's real start and the title at the segment's start, rounded
+  /// only at the span's real ends. It takes no taps itself, so a press lands
+  /// on the day under it and selects it, as pressing a chip does.
+  Widget _bar(Tokens t, LaneSegment s, {required Key key}) {
+    final radius = Radius.circular(t.radii.small);
+    return IgnorePointer(
+      key: key,
+      child: ClipRRect(
+        borderRadius: BorderRadius.horizontal(
+          left: s.startsSpan ? radius : Radius.zero,
+          right: s.endsSpan ? radius : Radius.zero,
+        ),
+        child: ColoredBox(
+          color: t.eventTint,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (s.startsSpan)
+                SizedBox(
+                  width: t.sizes.calendarChipBar,
+                  child: ColoredBox(color: t.accent),
+                ),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: t.space.xxs),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      s.span.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: t.type.microStyle.copyWith(color: t.fg),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   /// One day of the grid: the date number in its circle at the top-left of the
-  /// cell and the day's chips (wide) or dots (narrow), inside hairline cell
-  /// rules with a faint weekend wash.
+  /// cell, the room its week's multi-day bars take and the day's single-day
+  /// chips (wide) or a dot per kind (narrow), inside hairline cell rules with
+  /// a faint weekend wash.
   ///
   /// The selection is the filled accent circle around the number; today
   /// without the selection is the accent ring around it, so the cell itself
@@ -384,10 +566,11 @@ class _CalendarViewState extends State<CalendarView> {
     required DayBucket? bucket,
     required double height,
     required bool wide,
+    required double lanesInset,
     required bool topRule,
     required bool leftRule,
   }) {
-    final id = '${day.year}-${day.month}-${day.day}';
+    final id = _id(day);
     final inMonth = day.month == month.month;
     final isSelected = day == selected;
     final isToday = day == today;
@@ -416,13 +599,15 @@ class _CalendarViewState extends State<CalendarView> {
       ),
     );
     final items = <_CellItem>[
+      // A multi-day event is a bar across its days, not a chip on each.
       for (final o in bucket?.events ?? const <EventOccurrence>[])
-        (
-          title: o.summary.isEmpty ? '(no title)' : o.summary,
-          event: true,
-          start: o.start,
-          allDay: o.allDay,
-        ),
+        if (!_multiDay(o))
+          (
+            title: o.summary.isEmpty ? '(no title)' : o.summary,
+            event: true,
+            start: o.start,
+            allDay: o.allDay,
+          ),
       for (final k in bucket?.tasks ?? const <TaskOccurrence>[])
         (
           title: k.task.summary.isEmpty ? '(no title)' : k.task.summary,
@@ -437,9 +622,16 @@ class _CalendarViewState extends State<CalendarView> {
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(alignment: Alignment.centerLeft, child: number),
+          SizedBox(
+            height: t.sizes.calendarNumberRow,
+            child: Align(alignment: Alignment.centerLeft, child: number),
+          ),
+          SizedBox(height: lanesInset),
           Expanded(
-            child: ClipRect(
+            // A lane-heavy week leaves little room: the chips scroll out of
+            // sight rather than overflowing the cell.
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
@@ -523,7 +715,12 @@ class _CalendarViewState extends State<CalendarView> {
                   : BorderSide.none,
             ),
           ),
-          child: Padding(padding: EdgeInsets.all(t.space.xxs), child: body),
+          child: Padding(
+            padding: wide
+                ? EdgeInsets.symmetric(horizontal: t.space.xxs)
+                : EdgeInsets.all(t.space.xxs),
+            child: body,
+          ),
         ),
       ),
     );

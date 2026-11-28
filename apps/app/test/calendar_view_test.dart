@@ -417,6 +417,102 @@ void main() {
     }
   });
 
+  testWidgets('a multi-day event is one bar across its cells', (t) async {
+    // Friday 20 to Sunday 22 November: one week row (16..22).
+    final s = await _state(
+      t,
+      events: [
+        Event(
+          uid: 'visit',
+          summary: 'Artist visit',
+          dtstart: ICalDate.date(2026, 11, 20),
+          dtend: ICalDate.date(2026, 11, 23),
+        ),
+      ],
+    );
+    await _pump(t, s);
+    final bar = _k('calendar-bar-visit@2026-11-20-2026-11-16');
+    expect(bar, findsOneWidget);
+    // One bar three cells wide, inset at both real ends.
+    final cell = t.getSize(_k('calendar-day-2026-11-20')).width;
+    expect(t.getSize(bar).width, closeTo(3 * cell - 4, 1));
+    expect(
+      t.getTopLeft(bar).dx,
+      closeTo(t.getTopLeft(_k('calendar-day-2026-11-20')).dx + 2, 1),
+    );
+    // Its days carry no chip for it; the bar's title is the only one.
+    expect(_k('calendar-chip-2026-11-20-0'), findsNothing);
+    expect(_k('calendar-chip-2026-11-21-0'), findsNothing);
+    expect(find.text('Artist visit'), findsOneWidget);
+  });
+
+  testWidgets('overlapping visits stack on separate lanes', (t) async {
+    Event visit(String uid, String title, int from, int to) => Event(
+      uid: uid,
+      summary: title,
+      dtstart: ICalDate.date(2026, 11, from),
+      dtend: ICalDate.date(2026, 11, to),
+    );
+    final s = await _state(
+      t,
+      events: [
+        visit('a', 'Alpha visit', 18, 21),
+        visit('b', 'Beta visit', 19, 22),
+      ],
+    );
+    await _pump(t, s);
+    final a = _k('calendar-bar-a@2026-11-18-2026-11-16');
+    final b = _k('calendar-bar-b@2026-11-19-2026-11-16');
+    expect(a, findsOneWidget);
+    expect(b, findsOneWidget);
+    // The earlier visit keeps the top lane; the one it overlaps drops below.
+    expect(
+      t.getTopLeft(b).dy - t.getTopLeft(a).dy,
+      closeTo(Tokens.light.sizes.calendarLanePitch, 1),
+    );
+    expect(
+      find.descendant(of: a, matching: find.text('Alpha visit')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: b, matching: find.text('Beta visit')),
+      findsOneWidget,
+    );
+    // Nothing was pushed out of the lane layer.
+    expect(_k('calendar-lanes-more-2026-11-16'), findsNothing);
+  });
+
+  testWidgets('lanes cap at three; the rest and a full cell never overflow', (
+    t,
+  ) async {
+    Event visit(String uid, int from, int to) => Event(
+      uid: uid,
+      summary: 'Visit $uid',
+      dtstart: ICalDate.date(2026, 11, from),
+      dtend: ICalDate.date(2026, 11, to),
+    );
+    final s = await _state(
+      t,
+      events: [
+        visit('va', 16, 23),
+        visit('vb', 16, 23),
+        visit('vc', 16, 23),
+        visit('vd', 16, 23),
+        _event('e1', 'One', 20),
+        _event('e2', 'Two', 20),
+        _event('e3', 'Three', 20),
+      ],
+    );
+    await _pump(t, s);
+    expect(_k('calendar-bar-va@2026-11-16-2026-11-16'), findsOneWidget);
+    expect(_k('calendar-bar-vd@2026-11-16-2026-11-16'), findsNothing);
+    expect(
+      t.widget<Text>(_k('calendar-lanes-more-2026-11-16')).data,
+      '+1 more',
+    );
+    expect(t.takeException(), isNull);
+  });
+
   testWidgets('a Space without events hides them and the event add', (t) async {
     final s = await _noEventsState(
       t,
