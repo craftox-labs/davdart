@@ -256,6 +256,19 @@ final _rules = <_Rule>[
     },
     bad: 'GestureDetector(onTap: () {}),',
   ),
+  _Rule(
+    'status, priority and due pickers are built once',
+    RegExp(
+      r"'Set (?:status|priority|due)'|'No priority'|'needs-action'|"
+      r"'in-process'|PickerOption\(\s*'(?:high|medium|low|backlog|todo|doing)'|"
+      r'\bFCalendar\b',
+    ),
+    exempt: {
+      'lib/ui/property/property_defs.dart',
+      'lib/ui/property/date_property_picker.dart',
+    },
+    bad: "NoteMenuItem('Set status', FLucideIcons.circleDot, () {}),",
+  ),
 ];
 
 /// Private widgets that repeat a shared piece were removed; these are the
