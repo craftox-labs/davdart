@@ -683,6 +683,7 @@ class AppState extends ChangeNotifier {
     _eventTagsOpen = false;
     scopeUid = null;
     savedViews.clear();
+    homeDay = null;
     _resetTabs();
     _restoreScopePending = true;
     await load();
@@ -1527,6 +1528,33 @@ class AppState extends ChangeNotifier {
   void setHomeView(HomeView view) {
     if (homeView == view) return;
     prefs?.write('davdart.home.view.v1.$_spaceKey', view.name);
+    notifyListeners();
+  }
+
+  /// The day Home's calendar has picked (a plain UTC-flagged date), shared by
+  /// the grid, which circles it, and the Calendar panel, which pins that
+  /// day's items at its top. Null until a day is picked: the grid shows today
+  /// and the panel keeps its usual shape. Reset on a Space switch, like the
+  /// grid's own view state.
+  DateTime? homeDay;
+
+  /// Picks [day] on Home's calendar and brings the Calendar panel up beside
+  /// it: a folded panel, or one on another section, opens on Calendar (which
+  /// unfolds it); a panel already there is left alone, so a press never folds
+  /// it. The main area stays where it is (Home).
+  void selectHomeDay(DateTime day) {
+    setHomeDay(day);
+    if (section != Section.events || sidebarCollapsed) {
+      setSection(Section.events);
+    }
+  }
+
+  /// Moves the picked day without touching the panel: the grid's month arrows
+  /// keep the selection inside the month they show.
+  void setHomeDay(DateTime day) {
+    final d = wallDay(day);
+    if (homeDay == d) return;
+    homeDay = d;
     notifyListeners();
   }
 
