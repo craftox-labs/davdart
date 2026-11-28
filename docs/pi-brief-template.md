@@ -40,6 +40,6 @@ reads it once, then the code.
 
 - Per commit: `dart format lib test`, `flutter analyze`, and the tests touching
   the changed widgets (`flutter test test/<name>_test.dart ...`).
-- Once at the end: `flutter test -j 1` (about 7 minutes) in the background.
+- Full suite: do NOT run it unless the brief says so. The caller runs it once at merge time, after tm has signed off the visual result.
 - Report to the caller who sent the task (`hc`): under 250 words, commit
   hashes, visible changes, anything skipped and why.
