@@ -1,9 +1,13 @@
 import 'package:davdart/davdart.dart';
+import 'package:davdart_app/data/key_value_storage.dart';
+import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/event_rules.dart';
+import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'catalog_helper.dart';
 import 'tasks_helper.dart';
 
 Finder _k(String k) => find.byKey(Key(k));
@@ -50,6 +54,59 @@ DateTime _otherDay() {
 }
 
 String _dayKey(DateTime d) => 'calendar-day-${d.year}-${d.month}-${d.day}';
+
+/// Two Spaces: the legacy Planning one (local) and a fresh one.
+Future<(AppState, String, MemoryStorage)> _spaces(WidgetTester t) async {
+  t.view.physicalSize = const Size(1280, 900);
+  t.view.devicePixelRatio = 1;
+  addTearDown(t.view.reset);
+  final storage = MemoryStorage();
+  final c = catalogWithPlanning(storage, planningSeed: SeedNotes([]));
+  final other = c.add('Other').id;
+  final s = AppState(c.sourceFor(c.current!), prefs: storage, catalog: c);
+  await t.pumpWidget(DavdartApp(state: s));
+  await t.pumpAndSettle();
+  return (s, other, storage);
+}
+
+/// A state whose "is this mine" answer can hide items: the seam Home's
+/// Calendar reads for its loose items.
+class _MineState extends AppState {
+  _MineState(super.source, {super.prefs, required this.hidden});
+  final Set<String> hidden;
+
+  @override
+  bool isMine(Object item) => switch (item) {
+    Event e => !hidden.contains(e.uid),
+    Task k => !hidden.contains(k.uid),
+    _ => true,
+  };
+}
+
+Future<AppState> _mineApp(
+  WidgetTester t,
+  Set<String> hidden, {
+  List<Event> events = const [],
+  List<Task> tasks = const [],
+}) async {
+  t.view.physicalSize = const Size(1280, 900);
+  t.view.devicePixelRatio = 1;
+  addTearDown(t.view.reset);
+  final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
+  final src = SpaceNoteSource(space, seed: SeedNotes([]));
+  await t.runAsync(() async {
+    for (final e in events) {
+      await src.saveEvent(e);
+    }
+    for (final k in tasks) {
+      await src.saveTask(k);
+    }
+  });
+  final s = _MineState(src, prefs: MemoryStorage(), hidden: hidden);
+  await t.pumpWidget(DavdartApp(state: s));
+  await t.pumpAndSettle();
+  return s;
+}
 
 void main() {
   setUp(() => LocalZone.use('Asia/Bangkok'));
@@ -172,4 +229,111 @@ void main() {
     expect(task.due!.localDay, day);
     await t.pump(const Duration(seconds: 1));
   });
+
+  testWidgets('Home view is remembered per Space; a switch starts on today', (
+    t,
+  ) async {
+    final (s, other, storage) = await _spaces(t);
+    final first = s.currentSpaceId!;
+    expect(s.homeView, HomeView.overview);
+    s.setHomeView(HomeView.calendar);
+    await t.pumpAndSettle();
+    final day = _otherDay();
+    await t.tap(_k(_dayKey(day)));
+    await t.pumpAndSettle();
+    expect(storage.read('davdart.home.view.v1.$first'), 'calendar');
+    // The other Space has its own pref: Overview, and none written for it.
+    await t.runAsync(() => s.switchSpace(other));
+    await t.pumpAndSettle();
+    expect(s.homeView, HomeView.overview);
+    expect(_k('home-page'), findsOneWidget);
+    expect(storage.read('davdart.home.view.v1.$other'), isNull);
+    // Back: Calendar again, but the view was rebuilt for the Space, so the
+    // selected day is today rather than the day picked before the switch.
+    await t.runAsync(() => s.switchSpace(first));
+    await t.pumpAndSettle();
+    expect(s.homeView, HomeView.calendar);
+    expect(_k('calendar-view'), findsOneWidget);
+    final today = wallDay(wallNow(DateTime.now()));
+    expect(find.text(dayLabel(today)), findsOneWidget);
+    expect(find.text(dayLabel(day)), findsNothing);
+  });
+
+  testWidgets('Home Calendar reads the isMine seam for its loose items', (
+    t,
+  ) async {
+    final s = await _mineApp(
+      t,
+      {'hidden', 'htask'},
+      events: [
+        mkEvent('hidden', summary: 'Not mine', days: 0),
+        mkEvent('shown', summary: 'Mine', days: 0),
+      ],
+      tasks: [mkTask('htask', summary: 'Not my task', days: 0)],
+    );
+    s.setHomeView(HomeView.calendar);
+    await t.pumpAndSettle();
+    expect(find.text('Mine'), findsWidgets);
+    expect(find.text('Not mine'), findsNothing);
+    final today = wallDay(wallNow(DateTime.now()));
+    await t.tap(_k(_dayKey(today)));
+    await t.pumpAndSettle();
+    expect(
+      find.descendant(of: _k('calendar-day-card'), matching: find.text('Mine')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(
+        of: _k('calendar-day-card'),
+        matching: find.text('Not my task'),
+      ),
+      findsNothing,
+    );
+  });
+
+  testWidgets(
+    'a project Calendar takes its subfolders, never another project',
+    (t) async {
+      final s = await pumpTasksApp(
+        t,
+        notes: [
+          _folder('c', 'Projects', container: true),
+          _folder('p', 'Alpha', parent: 'c'),
+          _folder('ps', 'Work', parent: 'p'),
+          _folder('q', 'Beta', parent: 'c'),
+        ],
+        events: [
+          mkEvent('p1', summary: 'Alpha ev', days: 0, parent: 'p'),
+          mkEvent('p2', summary: 'Alpha sub ev', days: 0, parent: 'ps'),
+          mkEvent('q1', summary: 'Beta ev', days: 0, parent: 'q'),
+        ],
+        tasks: [mkTask('p3', summary: 'Alpha sub task', days: 0, parent: 'ps')],
+      );
+      s.openProjectTab('p');
+      s.setProjectTab('p', ProjectTab.calendar);
+      await t.pumpAndSettle();
+      expect(find.text('Alpha ev'), findsWidgets);
+      expect(find.text('Alpha sub ev'), findsWidgets);
+      expect(find.text('Beta ev'), findsNothing);
+      final today = wallDay(wallNow(DateTime.now()));
+      await t.tap(_k(_dayKey(today)));
+      await t.pumpAndSettle();
+      final card = _k('calendar-day-card');
+      expect(
+        find.descendant(of: card, matching: find.text('Alpha ev')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: card, matching: find.text('Alpha sub task')),
+        findsOneWidget,
+      );
+      // The other project's Calendar is its own scope and its own state.
+      s.openProjectTab('q');
+      s.setProjectTab('q', ProjectTab.calendar);
+      await t.pumpAndSettle();
+      expect(find.text('Beta ev'), findsWidgets);
+      expect(find.text('Alpha ev'), findsNothing);
+      await t.pump(const Duration(seconds: 1));
+    },
+  );
 }

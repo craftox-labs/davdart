@@ -415,7 +415,15 @@ class HomePage extends StatelessWidget {
         SizedBox(height: t.space.sm),
         Expanded(
           child: state.homeView == HomeView.calendar
-              ? CalendarView(state: state, now: now)
+              // Keyed by Space: a Space switch starts on today again, as a
+              // project's tab does per project.
+              ? CalendarView(
+                  key: ValueKey(
+                    'home-calendar-${state.currentSpaceId ?? 'default'}',
+                  ),
+                  state: state,
+                  now: now,
+                )
               : SingleChildScrollView(
                   key: const Key('home-page'),
                   padding: EdgeInsets.fromLTRB(
