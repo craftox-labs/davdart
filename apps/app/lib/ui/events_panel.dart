@@ -114,8 +114,16 @@ class EventsPanel extends StatelessWidget {
         final pinned = homeDay == null
             ? null
             : bucketByDay(
-                events: state.filteredPersonalEvents,
-                tasks: state.filteredPersonalTasks,
+                // The individual's own loose items, the seam Home's grid
+                // draws from (see AppState.isMine).
+                events: [
+                  for (final e in state.filteredPersonalEvents)
+                    if (state.isMine(e)) e,
+                ],
+                tasks: [
+                  for (final k in state.filteredPersonalTasks)
+                    if (state.isMine(k)) k,
+                ],
                 from: homeDay,
                 to: homeDay.add(const Duration(days: 1)),
               )[homeDay];
