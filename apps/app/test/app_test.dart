@@ -1247,6 +1247,9 @@ void main() {
 
     testWidgets('collapsed: the active icon is a plain highlight', (t) async {
       final state = await multi(t, const Size(1400, 900));
+      // Away from Home, so the folded section is the one current place.
+      state.openNoteTab('c');
+      await t.pumpAndSettle();
       await t.tap(find.byKey(const Key('rail-notes')));
       await t.pumpAndSettle();
       expect(find.byKey(const Key('rail-tab')), findsNothing);

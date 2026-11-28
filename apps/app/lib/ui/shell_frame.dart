@@ -447,7 +447,8 @@ class IconRail extends StatelessWidget {
     final item = strip ? t.sizes.touchTarget : t.sizes.railItem;
     // The strip marks the section the panel shows, which is not
     // [AppState.section] when the Space cannot hold the stored one. Home is
-    // not a panel section, so it has no marked rail entry.
+    // not a panel section, so only the wide rail marks it, as the place the
+    // main area shows.
     final active = strip ? visibleSection(state) : state.section;
     final top = railEntries(state);
     final bottom = railBottomEntries(state);
@@ -457,7 +458,12 @@ class IconRail extends StatelessWidget {
     Future<void> home() async {
       state.clearSearch();
       await state.activateTab(null);
-      state.showHome();
+      if (strip) {
+        // The phone has no docked panel, so a press only shows Home.
+        state.showHome();
+      } else {
+        state.pressRailHome();
+      }
       state.nav.focusArea(NavArea.main, list: navListId(state, NavArea.main));
       onHome?.call();
     }
@@ -494,6 +500,9 @@ class IconRail extends StatelessWidget {
 
     Widget button(SectionDef d, {bool tabJoined = true}) {
       final s = d.section;
+      // Folded at Home, no panel is docked: Home is the one current place, so
+      // the section the folded panel would reopen is not lit as well.
+      final onlyHome = !strip && state.atHome && state.sidebarCollapsed;
       final b = NavRow(
         nav: state.nav,
         list: KeyNav.railList,
@@ -502,11 +511,15 @@ class IconRail extends StatelessWidget {
         child: SectionButton(
           key: Key('rail-${d.id}'),
           def: d,
+          // Home has no panel: it is marked while the main area shows it,
+          // never as a tab joined to the panel.
           active: s == null
-              ? false
-              : active == s ||
-                    (s == Section.projects && state.mainProjectUid != null),
-          tab: tabJoined && (strip || !state.sidebarCollapsed),
+              ? !strip && state.atHome
+              : !onlyHome &&
+                    (active == s ||
+                        (s == Section.projects &&
+                            state.mainProjectUid != null)),
+          tab: s != null && tabJoined && (strip || !state.sidebarCollapsed),
           tabMargin: (t.sizes.rail - item) / 2,
           size: item,
           tipRight: !strip,
