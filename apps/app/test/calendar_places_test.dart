@@ -3,6 +3,7 @@ import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/state/event_rules.dart';
+import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -54,6 +55,15 @@ DateTime _otherDay() {
 }
 
 String _dayKey(DateTime d) => 'calendar-day-${d.year}-${d.month}-${d.day}';
+
+/// The circle (or ring) around a day's date number in the grid.
+BoxDecoration _circle(WidgetTester t, DateTime d) =>
+    t
+            .widget<Container>(
+              find.byKey(Key('calendar-number-${d.year}-${d.month}-${d.day}')),
+            )
+            .decoration!
+        as BoxDecoration;
 
 /// Two Spaces: the legacy Planning one (local) and a fresh one.
 Future<(AppState, String, MemoryStorage)> _spaces(WidgetTester t) async {
@@ -142,18 +152,16 @@ void main() {
     final day = wallDay(wallNow(DateTime.now()));
     await t.tap(_k(_dayKey(day)));
     await t.pumpAndSettle();
+    // Home has no day column: the Calendar panel pins the picked day.
+    expect(_k('calendar-day-card'), findsNothing);
+    final pin = _k('calendar-day-pin');
+    expect(pin, findsOneWidget);
     expect(
-      find.descendant(
-        of: _k('calendar-day-card'),
-        matching: find.text('Loose task'),
-      ),
+      find.descendant(of: pin, matching: find.text('Loose task')),
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: _k('calendar-day-card'),
-        matching: find.text('Project task'),
-      ),
+      find.descendant(of: pin, matching: find.text('Project task')),
       findsNothing,
     );
   });
@@ -208,7 +216,7 @@ void main() {
     final day = _otherDay();
     await t.tap(_k(_dayKey(day)));
     await t.pumpAndSettle();
-    await t.tap(_k('calendar-add-event'));
+    await t.tap(_k('calendar-day-add-event'));
     await t.pumpAndSettle();
     await t.enterText(_k('new-event-title'), 'Coffee');
     await t.pump();
@@ -219,7 +227,7 @@ void main() {
     // A new event on Home goes to Personal, not to the open project.
     expect(event.parentUid, isNot('p'));
 
-    await t.tap(_k('calendar-add-task'));
+    await t.tap(_k('calendar-day-add-task'));
     await t.pumpAndSettle();
     await t.enterText(_k('new-task-title'), 'Water plants');
     await t.pump();
@@ -228,6 +236,65 @@ void main() {
     final task = s.tasks.firstWhere((k) => k.summary == 'Water plants');
     expect(task.due!.localDay, day);
     await t.pump(const Duration(seconds: 1));
+  });
+
+  testWidgets('a day press opens the Calendar panel on that day', (t) async {
+    final s = await _app(t);
+    s.setHomeView(HomeView.calendar);
+    s.setSection(Section.events);
+    await t.pumpAndSettle();
+    // Nothing picked yet: the Calendar panel looks as it always did.
+    expect(_k('calendar-day-pin'), findsNothing);
+    // Folded, or on another section, a day press brings the Calendar panel up.
+    s.setSection(Section.notes);
+    s.setSidebarCollapsed(true);
+    await t.pumpAndSettle();
+    final day = _otherDay();
+    await t.tap(_k(_dayKey(day)));
+    await t.pumpAndSettle();
+    expect(s.section, Section.events);
+    expect(s.sidebarCollapsed, isFalse);
+    expect(s.atHome, isTrue);
+    final pin = _k('calendar-day-pin');
+    expect(pin, findsOneWidget);
+    expect(
+      find.descendant(of: pin, matching: find.text(dayLabel(day))),
+      findsOneWidget,
+    );
+    expect(_k('calendar-day-pin-empty'), findsOneWidget);
+    // Today selects today, so the pinned day follows the grid.
+    await t.tap(_k('calendar-today'));
+    await t.pumpAndSettle();
+    final today = wallDay(wallNow(DateTime.now()));
+    expect(s.homeDay, today);
+    expect(
+      find.descendant(of: pin, matching: find.text(dayLabel(today))),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('narrow keeps the day list under the grid and no panel day', (
+    t,
+  ) async {
+    final s = await pumpTasksApp(
+      t,
+      size: const Size(400, 800),
+      events: [mkEvent('le', summary: 'Loose ev', days: 0)],
+    );
+    s.setHomeView(HomeView.calendar);
+    await t.pumpAndSettle();
+    final today = wallDay(wallNow(DateTime.now()));
+    await t.tap(_k(_dayKey(today)));
+    await t.pumpAndSettle();
+    expect(s.homeDay, today);
+    expect(_k('calendar-day-pin'), findsNothing);
+    expect(
+      find.descendant(
+        of: _k('calendar-day-card'),
+        matching: find.text('Loose ev'),
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('Home view is remembered per Space; a switch starts on today', (
@@ -254,9 +321,13 @@ void main() {
     await t.pumpAndSettle();
     expect(s.homeView, HomeView.calendar);
     expect(_k('calendar-view'), findsOneWidget);
+    // The picked day belonged to the other Space: nothing is picked now, the
+    // grid circles today and the panel has no pinned day.
     final today = wallDay(wallNow(DateTime.now()));
-    expect(find.text(dayLabel(today)), findsOneWidget);
-    expect(find.text(dayLabel(day)), findsNothing);
+    expect(s.homeDay, isNull);
+    expect(_k('calendar-day-pin'), findsNothing);
+    expect(_circle(t, today).color, Tokens.light.accent);
+    expect(_circle(t, day).color, isNull);
   });
 
   testWidgets('Home Calendar reads the isMine seam for its loose items', (
@@ -278,15 +349,13 @@ void main() {
     final today = wallDay(wallNow(DateTime.now()));
     await t.tap(_k(_dayKey(today)));
     await t.pumpAndSettle();
+    final pin = _k('calendar-day-pin');
     expect(
-      find.descendant(of: _k('calendar-day-card'), matching: find.text('Mine')),
+      find.descendant(of: pin, matching: find.text('Mine')),
       findsOneWidget,
     );
     expect(
-      find.descendant(
-        of: _k('calendar-day-card'),
-        matching: find.text('Not my task'),
-      ),
+      find.descendant(of: pin, matching: find.text('Not my task')),
       findsNothing,
     );
   });
