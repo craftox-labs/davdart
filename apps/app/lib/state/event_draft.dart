@@ -2,134 +2,47 @@ import 'package:flutter/widgets.dart';
 
 import 'note_draft.dart' show setText;
 
-/// An open in-place edit of one event, like [TaskDraft]: text fields, the
-/// all-day switch, start and end (wall-clock fields; for an all-day event the
-/// end is the last day, inclusive) and the status, and whether anything
-/// differs from what was loaded. Editing a recurring event edits the series.
+/// The open text buffer of one event: the title, the location and the
+/// description, and whether any of them differs from what was loaded.
+///
+/// Like [TaskDraft] it holds no selector: when, repeat, status and labels are
+/// picked in place and written at once through [AppState], so a save writes
+/// only the text that changed. Editing a recurring event edits the series.
 class EventDraft extends ChangeNotifier {
   EventDraft({
     required this.uid,
     required String title,
-    required String body,
-    required String tags,
     required String location,
-    required bool allDay,
-    required DateTime start,
-    required DateTime end,
-    required String? status,
-    String? rrule,
+    required String body,
   }) : originalTitle = title,
-       originalBody = body,
-       originalTags = tags,
        originalLocation = location,
-       originalAllDay = allDay,
-       originalStart = start,
-       originalEnd = end,
-       originalStatus = status,
-       originalRrule = _norm(rrule),
-       rrule = _norm(rrule),
-       allDay = allDay,
-       start = start,
-       end = end,
-       status = status,
+       originalBody = body,
        titleController = TextEditingController(text: title),
-       bodyController = TextEditingController(text: body),
-       tagsController = TextEditingController(text: tags),
-       locationController = TextEditingController(text: location) {
+       locationController = TextEditingController(text: location),
+       bodyController = TextEditingController(text: body) {
     titleController.addListener(notifyListeners);
-    bodyController.addListener(notifyListeners);
-    tagsController.addListener(notifyListeners);
     locationController.addListener(notifyListeners);
+    bodyController.addListener(notifyListeners);
   }
 
   final String uid;
-  String originalTitle, originalBody, originalTags, originalLocation;
-  bool originalAllDay;
-  DateTime originalStart, originalEnd;
-  String? originalStatus;
-
-  /// The raw RRULE value (null: does not repeat), as loaded and as edited.
-  String? originalRrule, rrule;
-
-  static String? _norm(String? r) =>
-      r == null || r.trim().isEmpty ? null : r.trim();
+  String originalTitle, originalLocation, originalBody;
   final TextEditingController titleController,
-      bodyController,
-      tagsController,
-      locationController;
+      locationController,
+      bodyController;
 
-  bool allDay;
-  DateTime start, end;
-  String? status;
+  /// The inline fields of the title, the location and the description:
+  /// [AppState] focuses one when a tap on the value (or `e`) starts an edit.
+  final FocusNode titleFocus = FocusNode(debugLabel: 'event-title');
+  final FocusNode locationFocus = FocusNode(debugLabel: 'event-location');
+  final FocusNode bodyFocus = FocusNode(debugLabel: 'event-body');
 
-  DateTime _day(DateTime d) => DateTime.utc(d.year, d.month, d.day);
-
-  /// Switching to all day keeps the dates; switching back gives 09:00-10:00
-  /// on the first day (the last day at 10:00 when it spans days).
-  void setAllDay(bool v) {
-    if (v == allDay) return;
-    allDay = v;
-    if (v) {
-      start = _day(start);
-      end = _day(end);
-      if (end.isBefore(start)) end = start;
-    } else {
-      final s = _day(start);
-      start = s.add(const Duration(hours: 9));
-      end = _day(end).add(const Duration(hours: 10));
-      if (end.isBefore(start)) end = start.add(const Duration(hours: 1));
-    }
-    notifyListeners();
-  }
-
-  /// Moves the start to [d] (date) and optionally [minutes] into the day,
-  /// shifting the end by the same amount so the length stays.
-  void moveStart({DateTime? date, int? minutes}) {
-    final len = end.difference(start);
-    final day = date == null ? _day(start) : _day(date);
-    final mins = allDay ? 0 : minutes ?? start.hour * 60 + start.minute;
-    start = day.add(Duration(minutes: mins));
-    end = start.add(len);
-    notifyListeners();
-  }
-
-  void setEnd({DateTime? date, int? minutes}) {
-    final day = date == null ? _day(end) : _day(date);
-    final mins = allDay ? 0 : minutes ?? end.hour * 60 + end.minute;
-    end = day.add(Duration(minutes: mins));
-    notifyListeners();
-  }
-
-  void setStatus(String? v) {
-    status = v;
-    notifyListeners();
-  }
-
-  void setRrule(String? v) {
-    rrule = _norm(v);
-    notifyListeners();
-  }
-
-  void markSaved({
-    required String title,
-    required String body,
-    required String tags,
-    required String location,
-    required bool allDay,
-    required DateTime start,
-    required DateTime end,
-    required String? status,
-    String? rrule,
-  }) {
-    originalTitle = title;
-    originalBody = body;
-    originalTags = tags;
-    originalLocation = location;
-    originalAllDay = allDay;
-    originalStart = start;
-    originalEnd = end;
-    originalStatus = status;
-    originalRrule = _norm(rrule);
+  /// Takes the fields that were saved as their new originals; a null field was
+  /// not written and keeps its own.
+  void markSaved({String? title, String? location, String? body}) {
+    originalTitle = title ?? originalTitle;
+    originalLocation = location ?? originalLocation;
+    originalBody = body ?? originalBody;
     notifyListeners();
   }
 
@@ -140,73 +53,41 @@ class EventDraft extends ChangeNotifier {
     if (!_quiet) super.notifyListeners();
   }
 
-  /// Takes the merged saved values as both the fields and the originals.
-  /// Only for a draft with nothing typed or changed.
+  /// Takes the saved text as both the fields and the originals. Only for a
+  /// buffer with nothing typed.
   void rebase({
     required String title,
-    required String body,
-    required String tags,
     required String location,
-    required bool allDay,
-    required DateTime start,
-    required DateTime end,
-    required String? status,
-    String? rrule,
+    required String body,
   }) {
     // One change for the listeners: no half-way "dirty" in between.
     _quiet = true;
-    this.allDay = allDay;
-    this.start = start;
-    this.end = end;
-    this.status = status;
-    this.rrule = _norm(rrule);
-    markSaved(
-      title: title,
-      body: body,
-      tags: tags,
-      location: location,
-      allDay: allDay,
-      start: start,
-      end: end,
-      status: status,
-      rrule: rrule,
-    );
+    markSaved(title: title, location: location, body: body);
     setText(titleController, title);
-    setText(bodyController, body);
-    setText(tagsController, tags);
     setText(locationController, location);
+    setText(bodyController, body);
     _quiet = false;
     notifyListeners();
   }
 
   bool get titleEmpty => titleController.text.trim().isEmpty;
-  bool get endBeforeStart => end.isBefore(start);
 
-  /// Start, end or all-day changed (the saved event keeps its own end form
-  /// otherwise).
-  bool get whenChanged =>
-      allDay != originalAllDay || start != originalStart || end != originalEnd;
+  bool get titleDirty => titleController.text != originalTitle;
 
-  bool get dirty =>
-      titleController.text != originalTitle ||
-      bodyController.text != originalBody ||
-      tagsController.text != originalTags ||
-      locationController.text != originalLocation ||
-      status != originalStatus ||
-      rrule != originalRrule ||
-      whenChanged;
+  bool get locationDirty => locationController.text != originalLocation;
 
-  List<String> get tagList => [
-    for (final t in tagsController.text.split(','))
-      if (t.trim().isNotEmpty) t.trim(),
-  ];
+  bool get bodyDirty => bodyController.text != originalBody;
+
+  bool get dirty => titleDirty || locationDirty || bodyDirty;
 
   @override
   void dispose() {
     titleController.dispose();
-    bodyController.dispose();
-    tagsController.dispose();
     locationController.dispose();
+    bodyController.dispose();
+    titleFocus.dispose();
+    locationFocus.dispose();
+    bodyFocus.dispose();
     super.dispose();
   }
 }

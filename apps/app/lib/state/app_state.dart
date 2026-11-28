@@ -3960,45 +3960,68 @@ class AppState extends ChangeNotifier {
 
   /// The all-day flag, start and end an event edit shows (for an all-day
   /// event the end is the last day, inclusive).
-  (bool, DateTime, DateTime) _eventWhen(Event e) {
-    final allDay = e.allDay;
-    final start = e.startWall ?? wallDay(wallNow(DateTime.now()));
-    final endWall = e.endWall ?? start;
-    var end = allDay ? endWall.subtract(const Duration(days: 1)) : endWall;
-    if (end.isBefore(start)) end = start;
-    return (allDay, start, end);
-  }
+  EventWhen _eventWhen(Event e) => eventWhenOf(e);
 
-  /// Starts editing event [uid] (no-op if read-only, unknown or already
-  /// open).
-  void startEventEdit(String uid) {
+  /// The text field of an event a tap (or `e`) asks to open.
+  void startEventEdit(
+    String uid, {
+    bool focusBody = false,
+    bool focusLocation = false,
+  }) {
     final e = _eventById(uid);
-    if (e == null || !eventsEditable || _eventDrafts.containsKey(uid)) return;
-    final (allDay, start, end) = _eventWhen(e);
-    _eventDrafts[uid] = EventDraft(
-      uid: uid,
-      title: e.summary,
-      body: e.description,
-      tags: _plainTags(e.categories).join(', '),
-      location: e.location,
-      allDay: allDay,
-      start: start,
-      end: end,
-      status: e.status,
-      rrule: e.rrule,
-    );
-    final d = _eventDrafts[uid]!;
-    _watchDraft(uid, d, () => (d.allDay, d.start, d.end, d.status, d.rrule));
+    if (e == null || !eventsEditable) return;
+    if (!_eventDrafts.containsKey(uid)) {
+      final d = EventDraft(
+        uid: uid,
+        title: e.summary,
+        location: e.location,
+        body: e.description,
+      );
+      _eventDrafts[uid] = d;
+      _watchDraft(uid, d);
+    }
+    eventTextIntent = (uid: uid, body: focusBody, location: focusLocation);
     _focusEditor(uid);
     notifyListeners();
   }
 
-  /// Saves the edit of event [uid]. Text typed while the save runs stays as
-  /// the draft, still dirty. False if nothing was saved.
+  /// The event text field a tap on a value (or `e`) asked to open, waiting for
+  /// the page to build it; null when none is waiting.
+  ({String uid, bool body, bool location})? eventTextIntent;
+
+  /// Whether the field of event [uid] is the one the last tap asked for.
+  bool eventTextTargets(
+    String uid, {
+    bool body = false,
+    bool location = false,
+  }) {
+    final intent = eventTextIntent;
+    if (intent == null || intent.uid != uid || intent.body != body) {
+      return false;
+    }
+    return intent.location == location;
+  }
+
+  /// The field the intent named has opened: the next build does not open it
+  /// again.
+  void clearEventTextIntent() => eventTextIntent = null;
+
+  /// Saves the open text buffer of event [uid] (the typing pause, a blur, a
+  /// picker opening, the page going away) and says why when it cannot.
+  Future<bool> commitEventText(String uid) async {
+    final ok = await flushEdit(uid);
+    if (!ok) reportNotSaved(_notSavedReason(uid));
+    return ok;
+  }
+
+  /// Saves the text buffer of event [uid]: only the field that changed, so a
+  /// value written elsewhere (a pick, an undo, a sync) is never put back by
+  /// this save. Text typed while the save runs stays as the draft, still
+  /// dirty. False if nothing was saved.
   Future<bool> saveEventDraft(String uid, {bool stay = false}) async {
     const gone = 'This event was deleted elsewhere. Your edit is kept.';
     final d = _eventDrafts[uid];
-    if (d == null || d.titleEmpty || d.endBeforeStart) return false;
+    if (d == null || d.titleEmpty) return false;
     // The event is gone (deleted meanwhile, e.g. by a sync): nothing to save
     // to. The draft stays, so the text is not lost.
     if (_eventGone(d)) {
@@ -4006,29 +4029,19 @@ class AppState extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    final title = d.titleController.text;
-    final body = d.bodyController.text;
-    final tagText = d.tagsController.text;
-    final location = d.locationController.text;
-    final allDay = d.allDay;
-    final start = d.start;
-    final end = d.end;
-    final status = d.status;
-    final rrule = d.rrule;
+    final title = d.titleDirty ? d.titleController.text : null;
+    final location = d.locationDirty ? d.locationController.text : null;
+    final body = d.bodyDirty ? d.bodyController.text : null;
+    if (title == null && location == null && body == null) {
+      if (!stay) _eventDrafts.remove(uid);
+      notifyListeners();
+      return true;
+    }
     final ok = await updateEvent(
       uid,
       title: title,
-      description: body,
       location: location,
-      tags: d.tagList,
-      setStatus: status != d.originalStatus,
-      status: status,
-      setWhen: d.whenChanged,
-      allDay: allDay,
-      start: start,
-      end: end,
-      setRrule: rrule != d.originalRrule,
-      rrule: rrule,
+      description: body,
     );
     if (!ok) return false;
     // Deleted while this save ran: the reload has no event, so nothing was
@@ -4039,21 +4052,139 @@ class AppState extends ChangeNotifier {
       return false;
     }
     if (_eventDrafts[uid] == d) {
-      d.markSaved(
-        title: title,
-        body: body,
-        tags: tagText,
-        location: location,
-        allDay: allDay,
-        start: start,
-        end: end,
-        status: status,
-        rrule: rrule,
-      );
+      d.markSaved(title: title, location: location, body: body);
       if (!d.dirty && !stay) _eventDrafts.remove(uid);
     }
     notifyListeners();
     return true;
+  }
+
+  /// Sets an event's status (null clears it), with Undo.
+  Future<bool> setEventStatus(String uid, String? status) async {
+    final e = _eventById(uid);
+    if (e == null) return false;
+    final before = e;
+    final ok = await updateEvent(uid, setStatus: true, status: status);
+    if (ok && before.status != status) {
+      _postUndo(
+        status == null
+            ? 'Status of "${before.summary}" cleared'
+            : 'Status of "${before.summary}" set to '
+                  '${eventStatusName(status)}',
+        () => _restoreEvent(before, status: true),
+      );
+    }
+    return ok;
+  }
+
+  /// Sets an event's labels, with Undo.
+  Future<bool> setEventTags(String uid, List<String> tags) async {
+    final e = _eventById(uid);
+    if (e == null) return false;
+    final before = e;
+    final beforeTags = _plainTags(e.categories);
+    final ok = await updateEvent(uid, tags: tags);
+    if (ok && !listEquals(beforeTags, _plainTags(tags))) {
+      _postUndo(
+        'Labels of "${before.summary}" changed',
+        () => _restoreEvent(before, tags: true),
+      );
+    }
+    return ok;
+  }
+
+  /// Moves an event to [when] (all day, start and end), with Undo. The guard
+  /// on a repeating event whose occurrences were changed separately stays: it
+  /// cannot switch between all day and timed.
+  Future<bool> setEventWhen(
+    String uid,
+    EventWhen when, {
+    bool undoable = true,
+  }) async {
+    final e = _eventById(uid);
+    if (e == null) return false;
+    final before = e;
+    final had = _eventWhen(e);
+    if (had == when) return true;
+    final ok = await updateEvent(
+      uid,
+      setWhen: true,
+      allDay: when.allDay,
+      start: when.start,
+      end: when.end,
+    );
+    if (ok && undoable) {
+      _postUndo(
+        'When of "${before.summary}" changed',
+        () => _restoreEvent(before, when: true),
+      );
+    }
+    return ok;
+  }
+
+  /// Sets an event's repeat rule (null: no repeat), with Undo. Clearing a rule
+  /// also drops its excluded and changed occurrences, which the Undo puts
+  /// back.
+  Future<bool> setEventRrule(String uid, String? rrule) async {
+    final e = _eventById(uid);
+    if (e == null) return false;
+    final before = e;
+    final had = before.rrule ?? '';
+    final next = rrule ?? '';
+    if (had == next) return true;
+    final ok = await updateEvent(uid, setRrule: true, rrule: rrule);
+    if (ok) {
+      _postUndo(
+        next.isEmpty
+            ? 'Repeat of "${before.summary}" cleared'
+            : 'Repeat of "${before.summary}" changed',
+        () => _restoreEvent(before, rrule: true),
+      );
+    }
+    return ok;
+  }
+
+  /// Puts back the picked fields of event [before]: its status, labels, when
+  /// (start, end and the occurrences moved with them) or its repeat rule
+  /// (with the occurrences it had). The event's text and its other fields
+  /// stay as they are now.
+  Future<void> _restoreEvent(
+    Event before, {
+    bool status = false,
+    bool tags = false,
+    bool when = false,
+    bool rrule = false,
+  }) async {
+    final now = _eventById(before.uid);
+    if (now == null) return;
+    var copy = now.copyWith(
+      status: status ? before.status : null,
+      clearStatus: status && before.status == null,
+      rrule: rrule ? before.rrule : null,
+      clearRrule: rrule && (before.rrule == null || before.rrule!.isEmpty),
+      exdates: when || rrule ? before.exdates : null,
+      rdates: when || rrule ? before.rdates : null,
+      siblingLines: when || rrule ? List.of(before.siblingLines) : null,
+    );
+    if (when) {
+      copy = copy.copyWith(
+        dtstart: before.dtstart,
+        clearStart: before.dtstart == null,
+        dtend: before.dtend,
+        clearEnd: before.dtend == null,
+        duration: before.duration,
+        clearDuration: before.duration == null,
+      );
+    }
+    if (tags) {
+      copy.categories = [
+        ...now.categories.where(
+          (c) => c.startsWith('status-') || c.startsWith('kind-'),
+        ),
+        ..._plainTags(_plainTags(before.categories)),
+      ];
+    }
+    await _eventEdit((src) => src.saveEvent(copy));
   }
 
   // --- Document tabs ---
@@ -4607,7 +4738,7 @@ class AppState extends ChangeNotifier {
   /// event end before start).
   bool editBlocked(String uid) {
     final n = _drafts[uid], k = _taskDrafts[uid], e = _eventDrafts[uid];
-    if (e != null) return e.titleEmpty || e.endBeforeStart;
+    if (e != null) return e.titleEmpty;
     if (k != null) return k.titleEmpty;
     if (n != null) return n.titleEmpty;
     return false;
@@ -4670,11 +4801,11 @@ class AppState extends ChangeNotifier {
   }
 
   /// Flushes every pending edit (the app is going to the background): the
-  /// narrow layout's drafts save themselves, and a task's inline text does on
-  /// both layouts.
+  /// narrow layout's drafts save themselves, and inline text (a task's or an
+  /// event's) does on both layouts.
   Future<void> flushAllEdits() => Future.wait([
     for (final u in _allDraftUids())
-      if (dirtyItem(u) && (narrow || _taskDrafts.containsKey(u))) flushEdit(u),
+      if (dirtyItem(u) && (narrow || isTextBuffer(u))) flushEdit(u),
   ]);
 
   /// Whether a save of [uid] is waiting for its typing pause or running.
@@ -4713,39 +4844,30 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// Like [_rebaseDrafts] for events.
+  /// Like [_rebaseDrafts] for events: a buffer with nothing typed takes the
+  /// text a sync brought, a buffer with typed text is left alone.
   void _rebaseEventDrafts() {
-    if (!narrow) return;
     for (final d in _eventDrafts.values) {
       final e = _eventById(d.uid);
       if (e == null || d.dirty) continue;
-      final tags = _plainTags(e.categories).join(', ');
-      final (allDay, start, end) = _eventWhen(e);
       if (e.summary.trim() == d.originalTitle.trim() &&
-          e.description.trimRight() == d.originalBody.trimRight() &&
-          tags == d.originalTags &&
-          e.location == d.originalLocation &&
-          allDay == d.originalAllDay &&
-          start == d.originalStart &&
-          end == d.originalEnd &&
-          e.status == d.originalStatus &&
-          (e.rrule == null || e.rrule!.isEmpty ? null : e.rrule) ==
-              d.originalRrule) {
+          e.location.trim() == d.originalLocation.trim() &&
+          e.description.trimRight() == d.originalBody.trimRight()) {
         continue;
       }
-      d.rebase(
-        title: e.summary,
-        body: e.description,
-        tags: tags,
-        location: e.location,
-        allDay: allDay,
-        start: start,
-        end: end,
-        status: e.status,
-        rrule: e.rrule,
-      );
+      d.rebase(title: e.summary, location: e.location, body: e.description);
     }
   }
+
+  /// Whether [uid] is a task or event whose text is edited in place: it has
+  /// no edit mode to leave, only a buffer whose text commits itself.
+  bool isTextBuffer(String uid) =>
+      _taskDrafts.containsKey(uid) || _eventDrafts.containsKey(uid);
+
+  /// Commits the text buffer of [uid] (task or event) and says why when it
+  /// cannot.
+  Future<bool> commitTextBuffer(String uid) =>
+      _taskDrafts.containsKey(uid) ? commitTaskText(uid) : commitEventText(uid);
 
   /// Whether item [uid] (note, task or event) is open in edit mode.
   bool isEditing(String uid) =>
@@ -4768,9 +4890,9 @@ class AppState extends ChangeNotifier {
   /// closes. False when the user keeps editing.
   Future<bool> leaveEdit(String uid) async {
     if (!isEditing(uid)) return true;
-    if (_taskDrafts.containsKey(uid)) {
-      await commitTaskText(uid);
-      if (!dirtyTaskFor(uid)) _dropDraft(uid);
+    if (isTextBuffer(uid)) {
+      await commitTextBuffer(uid);
+      if (!dirtyItem(uid)) _dropDraft(uid);
       return true;
     }
     if (!await _settleDrafts([uid])) return false;
@@ -4802,10 +4924,11 @@ class AppState extends ChangeNotifier {
   /// title, failure): edit mode stays.
   Future<bool> saveAndLeave(String uid) async {
     if (!isEditing(uid)) return true;
-    // A task's text is inline: saving it closes the buffer, nothing else.
-    if (_taskDrafts.containsKey(uid)) {
-      final saved = await commitTaskText(uid);
-      if (saved && !dirtyTaskFor(uid)) _dropDraft(uid);
+    // A task's or event's text is inline: saving it closes the buffer and
+    // there is nothing else to leave.
+    if (isTextBuffer(uid)) {
+      final saved = await commitTextBuffer(uid);
+      if (saved && !dirtyItem(uid)) _dropDraft(uid);
       return saved;
     }
     // Narrow: through the autosave queue, so it waits for a save in flight
@@ -4818,10 +4941,7 @@ class AppState extends ChangeNotifier {
       _dropDraft(uid);
       return true;
     }
-    final saved = _eventDrafts.containsKey(uid)
-        ? await saveEventDraft(uid)
-        : await saveDraft(uid);
-    return saved;
+    return saveDraft(uid);
   }
 
   /// Runs [action] once unsaved edits are settled: saved or discarded as the
@@ -4846,14 +4966,18 @@ class AppState extends ChangeNotifier {
       if (!dirty) {
         // A clean buffer on the way out is closed; nothing is lost.
         if (isTask) _taskDrafts.remove(u);
+        if (isEvent) _eventDrafts.remove(u);
         continue;
       }
-      // A task's text commits itself (a failed write keeps the buffer);
-      // narrow edits save themselves too; the dialog is the fallback when
-      // the save cannot go through (empty title, error).
-      if (isTask) {
-        await commitTaskText(u);
-        if (!dirtyTaskFor(u)) _taskDrafts.remove(u);
+      // A task's or an event's text commits itself (a failed write keeps the
+      // buffer); narrow edits save themselves too; the dialog is the fallback
+      // when the save cannot go through (empty title, error).
+      if (isTask || isEvent) {
+        await commitTextBuffer(u);
+        if (!dirtyItem(u)) {
+          if (isTask) _taskDrafts.remove(u);
+          if (isEvent) _eventDrafts.remove(u);
+        }
         continue;
       }
       if (narrow && await flushEdit(u)) continue;

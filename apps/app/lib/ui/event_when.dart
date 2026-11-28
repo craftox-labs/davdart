@@ -22,6 +22,7 @@ class EventWhenFields extends StatelessWidget {
     required this.onStart,
     required this.onEnd,
     this.error,
+    this.groupId,
   });
   final String keys;
   final bool allDay;
@@ -31,6 +32,10 @@ class EventWhenFields extends StatelessWidget {
   /// A changed date and/or time of day in minutes (the other stays).
   final void Function(DateTime? date, int? minutes) onStart, onEnd;
   final String? error;
+
+  /// The tap region of the popover this form sits in, so its own date, time
+  /// and select popovers do not count as taps outside it.
+  final Object? groupId;
 
   @override
   Widget build(BuildContext context) {
@@ -47,6 +52,7 @@ class EventWhenFields extends StatelessWidget {
           popoverControl: pc,
           key: Key('$keys-$id-date'),
           label: Text(label),
+          calendar: FDateFieldGridCalendarProperties(groupId: groupId),
           selectionControl: FDateSelectionControl.liftedSingle(
             value: day,
             onChange: (d) {
@@ -60,10 +66,11 @@ class EventWhenFields extends StatelessWidget {
     }
 
     Widget time(String id, String label, DateTime v, ValueChanged<int> set) =>
-        FTimeField(
+        FTimeField.picker(
           key: Key('$keys-$id-time'),
           label: Text(label),
           hour24: true,
+          groupId: groupId,
           control: FTimeFieldControl.lifted(
             time: FTime(v.hour, v.minute),
             onChange: (x) {

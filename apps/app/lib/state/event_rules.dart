@@ -190,3 +190,123 @@ List<String> shiftSiblingLines(List<String> lines, Duration delta) {
   );
   return [for (final l in lines) re.hasMatch(l) ? shiftDateLine(l, delta) : l];
 }
+
+/// The when fields of an event as the page edits them: all day, the start and
+/// the end — for an all-day event the last day, inclusive.
+typedef EventWhen = ({bool allDay, DateTime start, DateTime end});
+
+/// The when fields of [e]: its start (or today), and the end it shows (an
+/// all-day event's last day).
+EventWhen eventWhenOf(Event e, [DateTime? now]) {
+  final allDay = e.allDay;
+  final start = e.startWall ?? wallDay(wallNow(now ?? DateTime.now()));
+  final endWall = e.endWall ?? start;
+  var end = allDay ? endWall.subtract(const Duration(days: 1)) : endWall;
+  if (end.isBefore(start)) end = start;
+  return (allDay: allDay, start: start, end: end);
+}
+
+DateTime _wallDay(DateTime d) => DateTime.utc(d.year, d.month, d.day);
+
+/// [when] switched to all day (or back): the dates stay; a timed event gets
+/// 09:00-10:00 on its first day (the last day at 10:00 when it spans days).
+EventWhen eventAllDaySwitched(EventWhen when, bool allDay) {
+  if (allDay == when.allDay) return when;
+  if (allDay) {
+    final start = _wallDay(when.start);
+    var end = _wallDay(when.end);
+    if (end.isBefore(start)) end = start;
+    return (allDay: true, start: start, end: end);
+  }
+  final start = _wallDay(when.start).add(const Duration(hours: 9));
+  var end = _wallDay(when.end).add(const Duration(hours: 10));
+  if (end.isBefore(start)) end = start.add(const Duration(hours: 1));
+  return (allDay: false, start: start, end: end);
+}
+
+/// [when] with the start moved to [date] and/or [minutes] into the day; the
+/// end moves by the same amount, so the length stays.
+EventWhen eventStartMoved(EventWhen when, {DateTime? date, int? minutes}) {
+  final length = when.end.difference(when.start);
+  final day = date == null ? _wallDay(when.start) : _wallDay(date);
+  final mins = when.allDay
+      ? 0
+      : minutes ?? when.start.hour * 60 + when.start.minute;
+  final start = day.add(Duration(minutes: mins));
+  return (allDay: when.allDay, start: start, end: start.add(length));
+}
+
+/// [when] with the end set to [date] and/or [minutes] into the day.
+EventWhen eventEndSet(EventWhen when, {DateTime? date, int? minutes}) {
+  final day = date == null ? _wallDay(when.end) : _wallDay(date);
+  final mins = when.allDay
+      ? 0
+      : minutes ?? when.end.hour * 60 + when.end.minute;
+  return (
+    allDay: when.allDay,
+    start: when.start,
+    end: day.add(Duration(minutes: mins)),
+  );
+}
+
+/// The status values an event row offers: none, confirmed, tentative,
+/// cancelled.
+const eventStatusWords = [
+  ('', 'none'),
+  ('CONFIRMED', 'confirmed'),
+  ('TENTATIVE', 'tentative'),
+  ('CANCELLED', 'cancelled'),
+];
+
+/// The word a status shows ('none' when it has none).
+String eventStatusName(String? status) => eventStatusWords
+    .firstWhere(
+      (e) => e.$1 == (status ?? ''),
+      orElse: () => (status ?? '', status ?? ''),
+    )
+    .$2;
+
+/// The repeat frequencies a repeat row offers, as (value, label).
+const repeatFrequencies = [
+  ('', 'Does not repeat'),
+  ('DAILY', 'Daily'),
+  ('WEEKLY', 'Weekly'),
+  ('MONTHLY', 'Monthly'),
+  ('YEARLY', 'Yearly'),
+];
+
+/// The unit of a repeat frequency, for 'every 2 weeks'.
+const _freqUnits = {
+  'DAILY': 'day',
+  'WEEKLY': 'week',
+  'MONTHLY': 'month',
+  'YEARLY': 'year',
+};
+
+/// A repeat rule as one line for the row that opens the repeat picker:
+/// 'Does not repeat', 'Weekly on Mon, Wed', 'Every 2 weeks', 'Monthly, 4
+/// times', 'Yearly, until 31 Dec 2026', or the raw rule when it is one the
+/// picker cannot write back.
+String repeatLabel(String? rrule) {
+  if (rrule == null || rrule.trim().isEmpty) return 'Does not repeat';
+  final rule = RepeatRule.parse(rrule);
+  if (rule == null) return rrule.trim();
+  final unit = _freqUnits[rule.freq] ?? rule.freq.toLowerCase();
+  final every = rule.interval > 1
+      ? 'Every ${rule.interval} ${unit}s'
+      : repeatFrequencies
+            .firstWhere(
+              (e) => e.$1 == rule.freq,
+              orElse: () => (rule.freq, rule.freq),
+            )
+            .$2;
+  final days = rule.freq == 'WEEKLY' && rule.weekdays.isNotEmpty
+      ? ' on ${[for (final d in rule.weekdays) _weekdays[d - 1]].join(', ')}'
+      : '';
+  final end = switch ((rule.count, rule.until)) {
+    (final int n, _) => ', $n times',
+    (_, final DateTime u) => ', until ${dayLabel(u)}',
+    _ => '',
+  };
+  return '$every$days$end';
+}

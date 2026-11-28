@@ -126,17 +126,9 @@ class _VimFieldState extends State<VimField> {
     final ok = await result;
     if (ok || !mounted) return;
     final s = widget.state;
-    final u = widget.uid;
-    final task = s.taskDraftFor(u);
-    final event = s.eventDraftFor(u);
-    final note = s.draftFor(u);
-    final empty = task?.titleEmpty ?? event?.titleEmpty ?? note?.titleEmpty;
+    final note = s.draftFor(widget.uid);
     engine.fail(
-      empty == true
-          ? 'E: title is required'
-          : event?.endBeforeStart == true
-          ? 'E: end is before start'
-          : 'E: save failed',
+      note?.titleEmpty == true ? 'E: title is required' : 'E: save failed',
     );
   }
 

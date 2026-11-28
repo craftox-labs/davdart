@@ -4,15 +4,9 @@ import 'package:davdart/davdart.dart';
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
+import '../state/event_rules.dart' show repeatFrequencies;
 import 'theme.dart';
 
-const _freqNames = [
-  ('', 'Does not repeat'),
-  ('DAILY', 'Daily'),
-  ('WEEKLY', 'Weekly'),
-  ('MONTHLY', 'Monthly'),
-  ('YEARLY', 'Yearly'),
-];
 const _unit = {
   'DAILY': 'day(s)',
   'WEEKLY': 'week(s)',
@@ -34,6 +28,7 @@ class RepeatFields extends StatelessWidget {
     required this.start,
     required this.allDay,
     required this.onChange,
+    this.groupId,
   });
   final String keys;
 
@@ -46,6 +41,10 @@ class RepeatFields extends StatelessWidget {
   /// All-day events write a date UNTIL, timed ones a date-time.
   final bool allDay;
   final ValueChanged<String?> onChange;
+
+  /// The tap region of the popover this section sits in, so its own select
+  /// popovers do not count as taps outside it.
+  final Object? groupId;
 
   @override
   Widget build(BuildContext context) {
@@ -98,10 +97,11 @@ class RepeatFields extends StatelessWidget {
           builder: (_, pc) => FSelect<String>.rich(
             popoverControl: pc,
             key: Key('$keys-repeat'),
+            contentGroupId: groupId,
             label: const Text('Repeat'),
             format: (v) => v == 'CUSTOM'
                 ? 'Custom'
-                : _freqNames.firstWhere((e) => e.$1 == v).$2,
+                : repeatFrequencies.firstWhere((e) => e.$1 == v).$2,
             control: FSelectControl.lifted(
               value: freq,
               onChange: (v) {
@@ -117,7 +117,7 @@ class RepeatFields extends StatelessWidget {
               },
             ),
             children: [
-              for (final e in _freqNames)
+              for (final e in repeatFrequencies)
                 FSelectItem<String>(title: Text(e.$2), value: e.$1),
               if (custom)
                 const FSelectItem<String>(

@@ -36,6 +36,9 @@ class PropertyTrigger extends StatefulWidget {
 
 class _PropertyTriggerState extends State<PropertyTrigger>
     with TickerProviderStateMixin {
+  /// The tap region of this row's popover; stable while the row is.
+  final _group = Object();
+
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
@@ -45,12 +48,19 @@ class _PropertyTriggerState extends State<PropertyTrigger>
     return TrackPopover(
       builder: (context, pc) => FPopover(
         control: pc,
-        popoverBuilder: (context, c) => ConstrainedBox(
-          constraints: BoxConstraints(
-            minWidth: t.sizes.dialogSm,
-            maxWidth: t.sizes.dialog,
+        // A picker that opens its own popover (a calendar, a select, a time
+        // picker) shares this group, so tapping the inner one is not a tap
+        // outside this one.
+        groupId: _group,
+        popoverBuilder: (context, c) => PropertyPopoverGroup(
+          groupId: _group,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: t.sizes.dialogSm,
+              maxWidth: t.sizes.dialog,
+            ),
+            child: widget.picker(context, c),
           ),
-          child: widget.picker(context, c),
         ),
         builder: (context, c, child) =>
             FTappable(onPress: () => _open(c.toggle), child: child!),
@@ -94,4 +104,24 @@ class _PropertyTriggerState extends State<PropertyTrigger>
       c.dispose();
     }
   }
+}
+
+/// The tap region a property picker's popover shares with the popovers it
+/// opens itself. A picker reads it to pass to its fields, so tapping a date
+/// calendar or a select inside a picker does not count as tapping outside it.
+class PropertyPopoverGroup extends InheritedWidget {
+  const PropertyPopoverGroup({
+    super.key,
+    required this.groupId,
+    required super.child,
+  });
+  final Object groupId;
+
+  /// The group of the picker above [context], or null in a sheet.
+  static Object? of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<PropertyPopoverGroup>()
+      ?.groupId;
+
+  @override
+  bool updateShouldNotify(PropertyPopoverGroup old) => groupId != old.groupId;
 }

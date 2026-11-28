@@ -205,7 +205,15 @@ class _ShellState extends State<Shell>
     WidgetsBinding.instance.addObserver(this);
     widget.state.onNotSaved = (reason) {
       if (mounted) {
-        showFToast(context: context, title: Text('Not saved: $reason'));
+        showFToast(
+          context: context,
+          // A long item title must not grow the toast past a phone's width.
+          title: Text(
+            'Not saved: $reason',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
       }
     };
     widget.state.onBoardUndo = (u) {
@@ -213,7 +221,7 @@ class _ShellState extends State<Shell>
       _undoToast?.dismiss();
       _undoToast = showFToast(
         context: context,
-        title: Text(u.label),
+        title: Text(u.label, maxLines: 2, overflow: TextOverflow.ellipsis),
         suffixBuilder: (_, entry) => FButton(
           key: const Key('board-undo'),
           variant: FButtonVariant.outline,
