@@ -18,6 +18,8 @@ class PropertyTrigger extends StatefulWidget {
     required this.child,
     this.sheetKey,
     this.onOpen,
+    this.onOpenChanged,
+    this.popoverWidth,
   });
 
   final Widget Function(BuildContext context, FPopoverController control)
@@ -30,6 +32,16 @@ class PropertyTrigger extends StatefulWidget {
   /// text is dirty flushes the text first).
   final Future<void> Function()? onOpen;
 
+  /// Told when this row's popover opens or closes: an anchor that only shows
+  /// on hover stays put while its popover is open.
+  final ValueChanged<bool>? onOpenChanged;
+
+  /// The popover's width, when its anchor is smaller than a picker popover
+  /// (a day cell): the popover fits that width, right-aligned to the anchor
+  /// and opening over it, so it never spills past the cell it was opened
+  /// from.
+  final double? popoverWidth;
+
   @override
   State<PropertyTrigger> createState() => _PropertyTriggerState();
 }
@@ -38,6 +50,30 @@ class _PropertyTriggerState extends State<PropertyTrigger>
     with TickerProviderStateMixin {
   /// The tap region of this row's popover; stable while the row is.
   final _group = Object();
+
+  FPopoverController? _popover;
+  var _wasOpen = false;
+
+  /// Follows the popover's controller (it is created by [TrackPopover], so it
+  /// arrives with the first build) and reports its state.
+  void _adopt(FPopoverController c) {
+    if (identical(_popover, c)) return;
+    _popover?.removeListener(_report);
+    _popover = c..addListener(_report);
+  }
+
+  void _report() {
+    final open = _popover?.status.isForwardOrCompleted ?? false;
+    if (open == _wasOpen) return;
+    _wasOpen = open;
+    widget.onOpenChanged?.call(open);
+  }
+
+  @override
+  void dispose() {
+    _popover?.removeListener(_report);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -48,20 +84,27 @@ class _PropertyTriggerState extends State<PropertyTrigger>
     return TrackPopover(
       builder: (context, pc) => FPopover(
         control: pc,
+        // A narrow anchor (a day cell) gets the popover over itself, its
+        // right edge on the anchor's, so it stays inside the cell's column.
+        childAnchor: widget.popoverWidth == null ? null : Alignment.topRight,
+        popoverAnchor: widget.popoverWidth == null ? null : Alignment.topRight,
         // A picker that opens its own popover (a calendar, a select, a time
         // picker) shares this group, so tapping the inner one is not a tap
         // outside this one.
         groupId: _group,
-        popoverBuilder: (context, c) => PropertyPopoverGroup(
-          groupId: _group,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: t.sizes.dialogSm,
-              maxWidth: t.sizes.dialog,
+        popoverBuilder: (context, c) {
+          _adopt(c);
+          return PropertyPopoverGroup(
+            groupId: _group,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                minWidth: widget.popoverWidth ?? t.sizes.dialogSm,
+                maxWidth: widget.popoverWidth ?? t.sizes.dialog,
+              ),
+              child: widget.picker(context, c),
             ),
-            child: widget.picker(context, c),
-          ),
-        ),
+          );
+        },
         builder: (context, c, child) =>
             FTappable(onPress: () => _open(c.toggle), child: child!),
         child: widget.child,

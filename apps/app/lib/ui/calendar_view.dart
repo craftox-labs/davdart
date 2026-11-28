@@ -299,6 +299,10 @@ class _CalendarViewState extends State<CalendarView> {
   /// shows while the pointer is on it.
   DateTime? _hoverDay;
 
+  /// The day whose add popover is open: its button stays put (and stays
+  /// mounted) while the pointer is on the popover instead of the cell.
+  String? _addOpenDay;
+
   /// The day under [at], in the grid starting on [start]: a column per
   /// weekday, a row per week.
   DateTime _dayAt(
@@ -913,7 +917,8 @@ class _CalendarViewState extends State<CalendarView> {
     final canEvent = state.eventsEditable;
     final canTask = state.tasksEditable;
     if (wide && (canEvent || canTask)) {
-      final showAdd = _hoverDay == day || isToday || isSelected;
+      final showAdd =
+          _hoverDay == day || isToday || isSelected || _addOpenDay == id;
       content = MouseRegion(
         onEnter: (_) {
           if (_hoverDay != day) setState(() => _hoverDay = day);
@@ -924,17 +929,36 @@ class _CalendarViewState extends State<CalendarView> {
         child: Stack(
           children: [
             Positioned.fill(child: content),
-            if (showAdd)
-              Positioned(
-                top: 0,
-                right: 0,
-                child: _addButton(
-                  day,
-                  id,
-                  canEvent: canEvent,
-                  canTask: canTask,
+            // Always mounted, only painted while it shows: the popover of a
+            // button that unmounted would close with it.
+            Positioned.fill(
+              child: IgnorePointer(
+                ignoring: !showAdd,
+                child: Opacity(
+                  opacity: showAdd ? 1 : 0,
+                  child: LayoutBuilder(
+                    builder: (context, box) => Align(
+                      alignment: Alignment.topRight,
+                      child: _addButton(
+                        day,
+                        id,
+                        canEvent: canEvent,
+                        canTask: canTask,
+                        // The popover fits the cell it belongs to.
+                        popoverWidth: box.maxWidth,
+                        onOpenChanged: (open) {
+                          if (open) {
+                            setState(() => _addOpenDay = id);
+                          } else if (_addOpenDay == id) {
+                            setState(() => _addOpenDay = null);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
                 ),
               ),
+            ),
           ],
         ),
       );
@@ -1057,6 +1081,8 @@ class _CalendarViewState extends State<CalendarView> {
     String id, {
     required bool canEvent,
     required bool canTask,
+    required double popoverWidth,
+    required ValueChanged<bool> onOpenChanged,
   }) {
     Widget button(VoidCallback onPress, IconData icon, String tip) =>
         IconAction(
@@ -1073,6 +1099,8 @@ class _CalendarViewState extends State<CalendarView> {
     }
     return PropertyTrigger(
       sheetKey: Key('calendar-add-sheet-$id'),
+      onOpenChanged: onOpenChanged,
+      popoverWidth: popoverWidth,
       picker: (context, control) => OptionPicker<String>(
         id: 'calendar-add',
         onPick: (v) {

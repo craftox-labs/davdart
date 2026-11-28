@@ -5,6 +5,7 @@ import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/calendar_view.dart';
 import 'package:davdart_app/ui/chips.dart';
+import 'package:davdart_app/ui/property/option_picker.dart';
 import 'package:davdart_app/ui/theme.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
@@ -159,9 +160,24 @@ void main() {
     await _pump(t, s);
     // Today's cell always shows the plus; nothing is picked by tapping it.
     expect(_k('calendar-add-2026-11-18'), findsOneWidget);
+    final cell = t.getRect(_k('calendar-day-2026-11-18'));
     await t.tap(_k('calendar-add-2026-11-18'));
     await t.pumpAndSettle();
-    // Both kinds are supported here: the plus asks which.
+    // Both kinds are supported here: the plus asks which, in a popover that
+    // fits the cell it came from and lines up with its edges.
+    final rows = t.getRect(_k('property-option-calendar-add-event'));
+    final option = find.ancestor(
+      of: _k('property-option-calendar-add-event'),
+      matching: find.byType(OptionPicker<String>),
+    );
+    final pop = t.getRect(
+      find
+          .ancestor(of: option.first, matching: find.byType(ConstrainedBox))
+          .first,
+    );
+    expect(pop.width, lessThanOrEqualTo(cell.width + 1));
+    expect(pop.right, closeTo(cell.right, 1.5));
+    expect(rows.width, lessThanOrEqualTo(cell.width));
     await t.tap(_k('property-option-calendar-add-event'));
     await t.pumpAndSettle();
     expect(_k('new-event-title'), findsOneWidget);
@@ -185,27 +201,66 @@ void main() {
     expect(s.homeDay, isNull);
   });
 
+  /// Whether the day's add button is painted (it is mounted throughout, so
+  /// its popover is not dropped when it hides).
+  bool plusShown(WidgetTester t, String id) {
+    final box = find.ancestor(
+      of: _k('calendar-add-$id'),
+      matching: find.byType(Opacity),
+    );
+    return box.evaluate().isNotEmpty &&
+        t.widget<Opacity>(box.first).opacity > 0;
+  }
+
   testWidgets('the plus shows on hover, and for today and the picked day', (
     t,
   ) async {
     final s = await _state(t);
     await _pump(t, s);
-    // A plain day has no plus until the pointer is on its cell.
-    expect(_k('calendar-add-2026-11-20'), findsNothing);
+    // A plain day shows no plus until the pointer is on its cell.
+    expect(plusShown(t, '2026-11-20'), isFalse);
     final cell = t.getRect(_k('calendar-day-2026-11-20'));
     final g = await t.startGesture(cell.center, kind: PointerDeviceKind.mouse);
     await t.pump();
     await g.moveBy(const Offset(4, 0));
     await t.pump();
-    expect(_k('calendar-add-2026-11-20'), findsOneWidget);
+    expect(plusShown(t, '2026-11-20'), isTrue);
     await g.up();
     await t.pumpAndSettle();
-    // Today always carries one, and so does the picked day.
-    expect(_k('calendar-add-2026-11-18'), findsOneWidget);
+    // Today always shows one, and so does the picked day.
+    expect(plusShown(t, '2026-11-18'), isTrue);
     s.setHomeDay(DateTime.utc(2026, 11, 21));
     await t.pumpAndSettle();
-    expect(_k('calendar-add-2026-11-21'), findsOneWidget);
+    expect(plusShown(t, '2026-11-21'), isTrue);
   });
+
+  testWidgets(
+    'the plus and its popover stay when the pointer leaves the cell',
+    (t) async {
+      final s = await _state(t);
+      await _pump(t, s);
+      final cell = t.getRect(_k('calendar-day-2026-11-20'));
+      // Point at the cell so its plus shows, then open the popover.
+      final mouse = await t.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: cell.center);
+      await t.pump();
+      await t.tap(_k('calendar-add-2026-11-20'));
+      await t.pumpAndSettle();
+      expect(_k('property-option-calendar-add-event'), findsOneWidget);
+      // Move the pointer off the cell towards the popover: the button stays
+      // mounted and the rows stay tappable.
+      await mouse.moveTo(Offset(cell.right + 40, cell.bottom + 120));
+      await t.pumpAndSettle();
+      expect(_k('calendar-add-2026-11-20'), findsOneWidget);
+      expect(_k('property-option-calendar-add-event'), findsOneWidget);
+      await t.tap(_k('property-option-calendar-add-task'));
+      await t.pumpAndSettle();
+      expect(_k('new-task-title'), findsOneWidget);
+      await t.tap(find.text('Cancel'));
+      await t.pumpAndSettle();
+      await mouse.removePointer();
+    },
+  );
 
   testWidgets('events only: the plus opens the event dialog directly', (
     t,
@@ -234,6 +289,7 @@ void main() {
 
   testWidgets('a read-only Space has no plus', (t) async {
     await _pump(t, await _state(t, make: (src) => _Neither(src)));
+    // Not built at all: nothing to hover.
     expect(_k('calendar-add-2026-11-18'), findsNothing);
     expect(_k('calendar-add-2026-11-17'), findsNothing);
   });
