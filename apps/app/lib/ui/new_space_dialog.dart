@@ -10,10 +10,15 @@ import 'theme.dart';
 Future<void> showNewSpaceDialog(BuildContext context, AppState state) {
   final name = TextEditingController();
   var onServer = state.accountUser != null;
+  var calendarOnly = false;
   void submit(BuildContext ctx) {
     if (name.text.trim().isEmpty) return;
     Navigator.of(ctx).pop();
-    state.createSpace(name.text, onServer: onServer);
+    state.createSpace(
+      name.text,
+      onServer: onServer,
+      notes: !(onServer && calendarOnly),
+    );
   }
 
   return showAppDialog(
@@ -38,6 +43,18 @@ Future<void> showNewSpaceDialog(BuildContext context, AppState state) {
               value: onServer,
               onChange: (v) => setLocal(() => onServer = v),
               label: const Text('Create on the server and sync'),
+            ),
+          if (state.accountUser != null && onServer)
+            FCheckbox(
+              key: const Key('space-calendar-only'),
+              value: calendarOnly,
+              onChange: (v) => setLocal(() => calendarOnly = v),
+              label: const Text(
+                'Calendar apps can read it (tasks and events, no notes)',
+              ),
+              description: const Text(
+                'Apps such as Vivaldi cannot read a collection that holds notes.',
+              ),
             ),
         ],
       ),

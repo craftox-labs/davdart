@@ -668,6 +668,7 @@ void main() {
         serializeNote(Note(uid: 'one', summary: 'From server')),
       );
       final seen = <String>[];
+      final mkBodies = <String>[];
       final client = MockClient((r) async {
         seen.add('${r.method} ${r.url.path}');
         if (r.method == 'PROPFIND' && r.url.path == '/dav/tm/') {
@@ -682,7 +683,10 @@ void main() {
             207,
           );
         }
-        if (r.method == 'MKCALENDAR') return http.Response('', 201);
+        if (r.method == 'MKCALENDAR') {
+          mkBodies.add(r.body);
+          return http.Response('', 201);
+        }
         if (r.method == 'PROPPATCH') {
           return http.Response(
             '<multistatus xmlns="DAV:"><response><propstat>'
@@ -723,11 +727,19 @@ void main() {
       expect(seen.any((e) => e.startsWith('MKCALENDAR /dav/tm/')), isTrue);
       expect(s.currentSpaceName, 'Fresh');
       expect(s.currentOnServer, isTrue);
+      expect(mkBodies.single, contains('VJOURNAL'));
+      // A calendar-app Space is created without VJOURNAL and has no notes.
+      await s.createSpace('Cal', onServer: true, notes: false);
+      expect(mkBodies.last, isNot(contains('VJOURNAL')));
+      expect(mkBodies.last, contains('VEVENT'));
+      expect(s.supportsNotes, isFalse);
+      expect(s.supportsTasks && s.supportsEvents, isTrue);
+      await s.switchSpace(s.spaces.firstWhere((e) => e.name == 'Fresh').id);
       // Removing an account space is local only; refresh brings it back.
       server.log.clear();
       await s.switchSpace(work.id);
       await s.deleteSpace();
-      expect(s.spaces.map((e) => e.name), ['Planning', 'Fresh']);
+      expect(s.spaces.map((e) => e.name), ['Planning', 'Fresh', 'Cal']);
       expect(server.log.where((e) => e.startsWith('DELETE')), isEmpty);
       await s.refreshSpaces();
       expect(s.spaces.map((e) => e.name), contains('Work'));

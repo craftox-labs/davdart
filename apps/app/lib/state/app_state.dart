@@ -673,7 +673,11 @@ class AppState extends ChangeNotifier {
 
   /// Creates a Space and opens it. With [onServer] (and an account) the
   /// collection is created on the server too; otherwise it stays local.
-  Future<void> createSpace(String name, {bool onServer = false}) async {
+  Future<void> createSpace(
+    String name, {
+    bool onServer = false,
+    bool notes = true,
+  }) async {
     final c = catalog;
     if (c == null || name.trim().isEmpty) return;
     if (!(onServer && c.account != null)) {
@@ -683,7 +687,7 @@ class AppState extends ChangeNotifier {
     syncMessage = 'Creating on server…';
     notifyListeners();
     try {
-      final info = await c.addOnServer(name);
+      final info = await c.addOnServer(name, notes: notes);
       await switchSpace(info.id);
     } catch (e) {
       syncMessage = 'Could not create on server: $e';

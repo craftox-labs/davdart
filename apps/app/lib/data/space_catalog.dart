@@ -439,16 +439,24 @@ class SpaceCatalog {
   }
 
   /// Creates a new collection on the server and a Space for it.
-  Future<SpaceInfo> addOnServer(String name) async {
+  /// With [notes] false the collection is created without VJOURNAL (tasks
+  /// and events only), which calendar apps such as Vivaldi can read.
+  Future<SpaceInfo> addOnServer(String name, {bool notes = true}) async {
     final a = account;
     if (a == null) throw StateError('Not signed in');
     final shown = _unique(name);
-    final url = (await _service(a).create(shown)).href!;
+    final url = (await _service(a).create(
+      shown,
+      components: notes
+          ? const ['VJOURNAL', 'VTODO', 'VEVENT']
+          : const ['VTODO', 'VEVENT'],
+    )).href!;
     final path = davPath(_davBase, url);
     final info = SpaceInfo(
       'srv-${Uri.encodeComponent(path)}',
       shown,
       collection: path,
+      notes: notes,
     );
     _deleted.remove(info.id);
     spaces.add(info);
