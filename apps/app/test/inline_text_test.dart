@@ -1,6 +1,9 @@
 import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/property/inline_text.dart';
 import 'package:davdart_app/ui/theme.dart';
+
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,18 +27,24 @@ const _tokens = Tokens.light;
 
 /// A host for one InlineText: the commits it made and the controller.
 class _Host {
-  _Host(this.text, {this.multiline = false, bool Function(String)? accept})
-    : controller = TextEditingController(text: text) {
+  _Host(
+    this.text, {
+    this.multiline = false,
+    bool Function(String)? accept,
+    Future<bool> Function(String)? commit,
+  }) : controller = TextEditingController(text: text) {
     accept = accept ?? (_) => true;
     this.accept = accept;
+    this.commit = commit ?? _commit;
   }
   final String text;
   final bool multiline;
   final TextEditingController controller;
   late final bool Function(String) accept;
+  late final Future<bool> Function(String) commit;
   final commits = <String>[];
 
-  Future<bool> commit(String text) async {
+  Future<bool> _commit(String text) async {
     if (!accept(text)) return false;
     commits.add(text);
     return true;
@@ -55,9 +64,10 @@ Future<_Host> _pump(
   String text = 'Alpha',
   bool multiline = false,
   bool Function(String)? accept,
+  Future<bool> Function(String)? commit,
   double width = 1000,
 }) async {
-  final h = _Host(text, multiline: multiline, accept: accept);
+  final h = _Host(text, multiline: multiline, accept: accept, commit: commit);
   t.view.physicalSize = Size(width, 800);
   t.view.devicePixelRatio = 1;
   addTearDown(t.view.reset);
@@ -209,6 +219,47 @@ void main() {
       await t.pump(const Duration(milliseconds: 900));
       await t.pumpAndSettle();
       expect(h.commits, ['Line one\nLine two']);
+    });
+
+    testWidgets('Esc reverts to text a rebase brought, not the old one', (
+      t,
+    ) async {
+      final h = await _pump(t);
+      // A sync merges a new description in while the field is closed.
+      h.controller.text = 'Merged elsewhere';
+      await t.pumpAndSettle();
+      await _open(t);
+      await t.enterText(_field, 'Typed over it');
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pumpAndSettle();
+      // The revert goes back to the merged text, and nothing was written.
+      expect(h.controller.text, 'Merged elsewhere');
+      expect(h.commits, isEmpty);
+      expect(_shown(t), 'Merged elsewhere');
+    });
+
+    testWidgets('Esc while a write is in flight leaves the text alone', (
+      t,
+    ) async {
+      final gate = Completer<bool>();
+      final h = await _pump(t, commit: (_) => gate.future);
+      await _open(t);
+      await t.enterText(_field, 'Being saved');
+      // The pause starts the write; Esc arrives while it is running.
+      await t.pump(const Duration(milliseconds: 900));
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pump();
+      // The field stays open, still showing what is being saved.
+      expect(_editing, findsOneWidget);
+      expect(h.controller.text, 'Being saved');
+      gate.complete(true);
+      await t.pumpAndSettle();
+      expect(_editing, findsOneWidget);
+      // And Esc now reverts to what the write saved.
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pumpAndSettle();
+      expect(_editing, findsNothing);
+      expect(h.controller.text, 'Being saved');
     });
 
     testWidgets('a read-only value never becomes a field', (t) async {

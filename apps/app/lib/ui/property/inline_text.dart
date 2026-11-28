@@ -79,6 +79,13 @@ class _InlineTextState extends State<InlineText> {
 
   /// The text the item holds now: what Esc puts back.
   late String _saved;
+
+  /// The text the field last showed, to tell an edit from a change made
+  /// around it (a sync rebase puts the merged text into the controller).
+  late String _seen;
+
+  /// A write is in flight; Esc waits for it instead of reverting under it.
+  var _writing = false;
   var _failed = false;
 
   FocusNode get _focus => widget.focusNode ?? _ownFocus!;
@@ -89,9 +96,9 @@ class _InlineTextState extends State<InlineText> {
     if (widget.focusNode == null) {
       _ownFocus = FocusNode(debugLabel: 'inline-text');
     }
-    _saved = widget.controller.text;
+    _saved = _seen = widget.controller.text;
     _focus.addListener(_focusChanged);
-    widget.controller.addListener(_typed);
+    widget.controller.addListener(_changed);
     if (widget.autoBegin) _autoBegin();
   }
 
@@ -108,9 +115,9 @@ class _InlineTextState extends State<InlineText> {
   void didUpdateWidget(InlineText old) {
     super.didUpdateWidget(old);
     if (old.controller != widget.controller) {
-      old.controller.removeListener(_typed);
-      widget.controller.addListener(_typed);
-      _saved = widget.controller.text;
+      old.controller.removeListener(_changed);
+      widget.controller.addListener(_changed);
+      _saved = _seen = widget.controller.text;
     }
     if (widget.autoBegin && !old.autoBegin) _autoBegin();
   }
@@ -118,7 +125,7 @@ class _InlineTextState extends State<InlineText> {
   @override
   void dispose() {
     _timer?.cancel();
-    widget.controller.removeListener(_typed);
+    widget.controller.removeListener(_changed);
     _focus.removeListener(_focusChanged);
     _ownFocus?.dispose();
     super.dispose();
@@ -133,11 +140,36 @@ class _InlineTextState extends State<InlineText> {
     }
   }
 
-  void _typed() {
-    // A change from outside (a sync rebase) is not typing.
-    if (!_focus.hasFocus) return;
+  /// A change from the field itself (typing, pasting): the pause commits it.
+  void _edited(String text) {
+    _seen = text;
     _timer?.cancel();
     _timer = Timer(widget.debounce, () => unawaited(_commit()));
+  }
+
+  /// A change made around the field (a sync rebase, or a text this widget put
+  /// back): it is what the item holds, so Esc reverts to it, not to the text
+  /// from before.
+  void _changed() {
+    final text = widget.controller.text;
+    if (text == _seen) return;
+    if (!_focus.hasFocus) {
+      // The field cannot have typed this while it had no focus.
+      _seen = text;
+      _saved = text;
+      _timer?.cancel();
+      return;
+    }
+    // With the focus here this may be the field's own edit, which reports
+    // itself right after this change: decide once both have run.
+    scheduleMicrotask(() {
+      if (!mounted) return;
+      final now = widget.controller.text;
+      if (_seen == now) return;
+      _seen = now;
+      _saved = now;
+      _timer?.cancel();
+    });
   }
 
   Future<bool> _commit() async {
@@ -147,9 +179,19 @@ class _InlineTextState extends State<InlineText> {
       if (_failed) setState(() => _failed = false);
       return true;
     }
-    final ok = await widget.onCommit(text);
+    // One write at a time: the rest of the text commits after it.
+    if (_writing) return false;
+    _writing = true;
+    final bool ok;
+    try {
+      ok = await widget.onCommit(text);
+    } finally {
+      _writing = false;
+    }
     if (!mounted) return ok;
     if (ok) {
+      // What was written, even if more was typed while it ran: that text is
+      // still pending and Esc reverts to this one.
       _saved = text;
       if (_failed) setState(() => _failed = false);
     } else {
@@ -165,12 +207,16 @@ class _InlineTextState extends State<InlineText> {
   /// unfocus waits for the key event to finish, so the keys above the field
   /// see the field still holding the focus (Esc does not then leave the page).
   void _revert() {
+    // A write in flight decides what the text is; Esc leaves it alone.
+    if (_writing) return;
     _timer?.cancel();
     if (widget.controller.text != _saved) {
       setText(widget.controller, _saved);
       _timer?.cancel();
     }
-    SchedulerBinding.instance.addPostFrameCallback((_) {
+    // After the key event has been dispatched to the field, so the keys above
+    // it still see the field holding the focus (Esc does not leave the page).
+    scheduleMicrotask(() {
       if (mounted) _focus.unfocus();
     });
     if (_failed) setState(() => _failed = false);
@@ -276,6 +322,7 @@ class _InlineTextState extends State<InlineText> {
         textInputAction: widget.multiline
             ? TextInputAction.newline
             : TextInputAction.done,
+        onChanged: _edited,
         onSubmitted: widget.multiline
             ? null
             : (_) {
