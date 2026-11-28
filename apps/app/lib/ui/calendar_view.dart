@@ -2,6 +2,9 @@ import 'dart:ui' show PlatformDispatcher;
 
 import 'package:davdart/davdart.dart';
 import 'package:flutter/gestures.dart' show kTouchSlop;
+
+import 'dart:async';
+
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -12,6 +15,8 @@ import 'calendar_lanes.dart';
 import 'card_box.dart';
 import 'chips.dart';
 import 'empty_state.dart';
+import 'property/option_picker.dart';
+import 'property/property_trigger.dart';
 import 'event_menu.dart';
 import 'events_panel.dart';
 import 'parts.dart';
@@ -268,6 +273,15 @@ class _CalendarViewState extends State<CalendarView> {
     }
   }
 
+  /// Opens the new-task dialog with [day] as the due date, as the day card's
+  /// own add-task button does.
+  Future<void> _newTask(DateTime day) => showNewTaskDialog(
+    context,
+    state,
+    due: dueOfDay(day),
+    personal: !widget.scoped,
+  );
+
   /// Opens the new-event dialog on [day] (an all-day event to [until], when a
   /// drag across the grid picked a range) and opens what it adds.
   Future<void> _newEvent(DateTime day, {DateTime? until}) async {
@@ -280,6 +294,10 @@ class _CalendarViewState extends State<CalendarView> {
     );
     if (uid != null) await state.clickEvent(uid);
   }
+
+  /// The day cell the pointer is over (wide layout): that cell's add button
+  /// shows while the pointer is on it.
+  DateTime? _hoverDay;
 
   /// The day under [at], in the grid starting on [start]: a column per
   /// weekday, a row per week.
@@ -882,6 +900,45 @@ class _CalendarViewState extends State<CalendarView> {
         ],
       );
     }
+    Widget content = Padding(
+      padding: wide
+          ? EdgeInsets.symmetric(horizontal: t.space.xxs)
+          : EdgeInsets.all(t.space.xxs),
+      child: body,
+    );
+    // Wide: a small add button at the cell's top-right, on hover and always
+    // for today and the picked day. It opens a new event or task on that day
+    // and takes its own press, so it neither picks the day nor opens the
+    // panel. Nothing is shown where the Space takes neither.
+    final canEvent = state.eventsEditable;
+    final canTask = state.tasksEditable;
+    if (wide && (canEvent || canTask)) {
+      final showAdd = _hoverDay == day || isToday || isSelected;
+      content = MouseRegion(
+        onEnter: (_) {
+          if (_hoverDay != day) setState(() => _hoverDay = day);
+        },
+        onExit: (_) {
+          if (_hoverDay == day) setState(() => _hoverDay = null);
+        },
+        child: Stack(
+          children: [
+            Positioned.fill(child: content),
+            if (showAdd)
+              Positioned(
+                top: 0,
+                right: 0,
+                child: _addButton(
+                  day,
+                  id,
+                  canEvent: canEvent,
+                  canTask: canTask,
+                ),
+              ),
+          ],
+        ),
+      );
+    }
     return FTappable(
       key: Key('calendar-day-$id'),
       behavior: HitTestBehavior.opaque,
@@ -905,12 +962,7 @@ class _CalendarViewState extends State<CalendarView> {
                   : BorderSide.none,
             ),
           ),
-          child: Padding(
-            padding: wide
-                ? EdgeInsets.symmetric(horizontal: t.space.xxs)
-                : EdgeInsets.all(t.space.xxs),
-            child: body,
-          ),
+          child: content,
         ),
       ),
     );
@@ -993,6 +1045,53 @@ class _CalendarViewState extends State<CalendarView> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// The day cell's add button: an event and/or a task on that day. With both
+  /// kinds it opens a small tracked popover of the two; with one it goes
+  /// straight there.
+  Widget _addButton(
+    DateTime day,
+    String id, {
+    required bool canEvent,
+    required bool canTask,
+  }) {
+    Widget button(VoidCallback onPress, IconData icon, String tip) =>
+        IconAction(
+          compact: true,
+          key: Key('calendar-add-$id'),
+          tooltip: tip,
+          icon: icon,
+          onPress: onPress,
+        );
+    if (!(canEvent && canTask)) {
+      return canEvent
+          ? button(() => _newEvent(day), FLucideIcons.plus, 'New event')
+          : button(() => _newTask(day), FLucideIcons.plus, 'New task');
+    }
+    return PropertyTrigger(
+      sheetKey: Key('calendar-add-sheet-$id'),
+      picker: (context, control) => OptionPicker<String>(
+        id: 'calendar-add',
+        onPick: (v) {
+          control.hide();
+          if (v == 'event') {
+            unawaited(_newEvent(day));
+          } else if (v == 'task') {
+            unawaited(_newTask(day));
+          }
+        },
+        options: const [
+          PickerOption('event', 'New event', icon: FLucideIcons.calendarPlus),
+          PickerOption('task', 'New task', icon: FLucideIcons.listPlus),
+        ],
+      ),
+      // The trigger's own tap target takes the press; the button is what it
+      // looks like (a disabled button would swallow the press instead).
+      child: IgnorePointer(
+        child: button(() {}, FLucideIcons.plus, 'New event or task'),
       ),
     );
   }

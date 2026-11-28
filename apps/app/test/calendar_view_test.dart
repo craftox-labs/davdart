@@ -6,6 +6,7 @@ import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/calendar_view.dart';
 import 'package:davdart_app/ui/chips.dart';
 import 'package:davdart_app/ui/theme.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -50,11 +51,33 @@ class _Seed implements NoteSource {
   Future<List<Note>> load() async => notes;
 }
 
+/// The calendar's state with only one kind of item writable (or neither).
+class _EventsOnly extends AppState {
+  _EventsOnly(super.source);
+  @override
+  bool get tasksEditable => false;
+}
+
+class _TasksOnly extends AppState {
+  _TasksOnly(super.source);
+  @override
+  bool get eventsEditable => false;
+}
+
+class _Neither extends AppState {
+  _Neither(super.source);
+  @override
+  bool get eventsEditable => false;
+  @override
+  bool get tasksEditable => false;
+}
+
 Future<AppState> _state(
   WidgetTester t, {
   List<Note> notes = const [],
   List<Task> tasks = const [],
   List<Event> events = const [],
+  AppState Function(SpaceNoteSource src)? make,
 }) async {
   final space = Space(SpaceConfig(id: 's', name: 'S'), MemoryNoteStore());
   final src = SpaceNoteSource(space, seed: _Seed([..._tree, ...notes]));
@@ -66,7 +89,7 @@ Future<AppState> _state(
       await src.saveEvent(e);
     }
   });
-  final s = AppState(src, prefs: MemoryStorage());
+  final s = make == null ? AppState(src, prefs: MemoryStorage()) : make(src);
   await t.runAsync(s.load);
   return s;
 }
@@ -128,6 +151,92 @@ Future<void> _pump(
 void main() {
   setUp(() => LocalZone.use('Asia/Bangkok'));
   tearDown(() => LocalZone.use(null));
+
+  testWidgets('the cell plus opens the dialog on that day, event or task', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    // Today's cell always shows the plus; nothing is picked by tapping it.
+    expect(_k('calendar-add-2026-11-18'), findsOneWidget);
+    await t.tap(_k('calendar-add-2026-11-18'));
+    await t.pumpAndSettle();
+    // Both kinds are supported here: the plus asks which.
+    await t.tap(_k('property-option-calendar-add-event'));
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsOneWidget);
+    await t.enterText(_k('new-event-title'), 'From the plus');
+    await t.tap(_k('new-event-add'));
+    await t.pumpAndSettle();
+    final made = s.events.firstWhere((e) => e.summary == 'From the plus');
+    expect(made.dtstart!.localDay, DateTime.utc(2026, 11, 18));
+    // The dialog was the only thing opened: the day was not picked.
+    expect(s.homeDay, isNull);
+    // The task side uses the same day as its due date.
+    await t.tap(_k('calendar-add-2026-11-18'));
+    await t.pumpAndSettle();
+    await t.tap(_k('property-option-calendar-add-task'));
+    await t.pumpAndSettle();
+    await t.enterText(_k('new-task-title'), 'Task from the plus');
+    await t.tap(_k('new-task-add'));
+    await t.pumpAndSettle();
+    final task = s.tasks.firstWhere((k) => k.summary == 'Task from the plus');
+    expect(task.due!.localDay, DateTime.utc(2026, 11, 18));
+    expect(s.homeDay, isNull);
+  });
+
+  testWidgets('the plus shows on hover, and for today and the picked day', (
+    t,
+  ) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    // A plain day has no plus until the pointer is on its cell.
+    expect(_k('calendar-add-2026-11-20'), findsNothing);
+    final cell = t.getRect(_k('calendar-day-2026-11-20'));
+    final g = await t.startGesture(cell.center, kind: PointerDeviceKind.mouse);
+    await t.pump();
+    await g.moveBy(const Offset(4, 0));
+    await t.pump();
+    expect(_k('calendar-add-2026-11-20'), findsOneWidget);
+    await g.up();
+    await t.pumpAndSettle();
+    // Today always carries one, and so does the picked day.
+    expect(_k('calendar-add-2026-11-18'), findsOneWidget);
+    s.setHomeDay(DateTime.utc(2026, 11, 21));
+    await t.pumpAndSettle();
+    expect(_k('calendar-add-2026-11-21'), findsOneWidget);
+  });
+
+  testWidgets('events only: the plus opens the event dialog directly', (
+    t,
+  ) async {
+    await _pump(t, await _state(t, make: (src) => _EventsOnly(src)));
+    await t.tap(_k('calendar-add-2026-11-18'));
+    await t.pumpAndSettle();
+    // No popover: the event dialog itself.
+    expect(_k('property-option-calendar-add-task'), findsNothing);
+    expect(_k('new-event-title'), findsOneWidget);
+    await t.tap(find.text('Cancel'));
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsNothing);
+  });
+
+  testWidgets('tasks only: the plus opens the task dialog directly', (t) async {
+    await _pump(t, await _state(t, make: (src) => _TasksOnly(src)));
+    await t.tap(_k('calendar-add-2026-11-18'));
+    await t.pumpAndSettle();
+    expect(_k('property-option-calendar-add-event'), findsNothing);
+    expect(_k('new-task-title'), findsOneWidget);
+    await t.tap(find.text('Cancel'));
+    await t.pumpAndSettle();
+    expect(_k('new-task-title'), findsNothing);
+  });
+
+  testWidgets('a read-only Space has no plus', (t) async {
+    await _pump(t, await _state(t, make: (src) => _Neither(src)));
+    expect(_k('calendar-add-2026-11-18'), findsNothing);
+    expect(_k('calendar-add-2026-11-17'), findsNothing);
+  });
 
   testWidgets('a chip opens its event; empty cell space picks the day', (
     t,
