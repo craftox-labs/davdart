@@ -8,6 +8,7 @@ import '../state/app_state.dart';
 import '../state/event_rules.dart';
 import '../theme/tokens.dart';
 import 'card_box.dart';
+import 'chips.dart';
 import 'empty_state.dart';
 import 'event_menu.dart';
 import 'events_panel.dart';
@@ -427,7 +428,8 @@ class _CalendarViewState extends State<CalendarView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (bucket != null && bucket.events.isNotEmpty)
-                  _dot(
+                  StatusDot(
+                    null,
                     key: Key('calendar-dot-event-$id'),
                     color: isSelected ? t.onAccent : t.accent,
                     size: t.sizes.calendarDot,
@@ -437,7 +439,8 @@ class _CalendarViewState extends State<CalendarView> {
                     bucket.tasks.isNotEmpty)
                   SizedBox(width: t.space.xxs),
                 if (bucket != null && bucket.tasks.isNotEmpty)
-                  _dot(
+                  StatusDot(
+                    null,
                     key: Key('calendar-dot-task-$id'),
                     color: isSelected ? t.onAccent : t.statusTodo,
                     size: t.sizes.calendarDot,
@@ -481,7 +484,8 @@ class _CalendarViewState extends State<CalendarView> {
     padding: EdgeInsets.only(top: t.space.xxs),
     child: Row(
       children: [
-        _dot(
+        StatusDot(
+          null,
           color: onSelected
               ? t.onAccent
               : event
@@ -503,13 +507,6 @@ class _CalendarViewState extends State<CalendarView> {
       ],
     ),
   );
-
-  Widget _dot({required Color color, required double size, Key? key}) =>
-      DecoratedBox(
-        key: key,
-        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-        child: SizedBox(width: size, height: size),
-      );
 
   /// The selected day: its items and the add buttons for that date.
   Widget _day(
