@@ -167,6 +167,10 @@ class _CalendarViewState extends State<CalendarView> {
   /// The first of the shown month; null follows the selection.
   DateTime? _month;
 
+  /// Home's last seen picked day, to drop the shown month when a Space switch
+  /// clears the pick.
+  DateTime? _lastHome;
+
   DateTime _clock() => widget.now ?? DateTime.now();
 
   static DateTime _monthOf(DateTime d) => DateTime.utc(d.year, d.month);
@@ -262,6 +266,10 @@ class _CalendarViewState extends State<CalendarView> {
       builder: (context, _) {
         final clock = _clock();
         final today = wallDay(wallNow(clock));
+        if (!widget.scoped) {
+          if (state.homeDay == null && _lastHome != null) _month = null;
+          _lastHome = state.homeDay;
+        }
         final selected = (widget.scoped ? _selected : state.homeDay) ?? today;
         final month = _month ?? _monthOf(selected);
         final first = firstWeekday(context);
