@@ -99,11 +99,17 @@ class HomeBoard extends StatelessWidget {
       return EmptyState(state.error!, centered: true, error: true);
     }
     final cols = state.homeColumns();
-    if (cols.isEmpty && !state.loading) {
+    // No columns is never a blank board: it is either a Space still loading
+    // (say a project page restored with its Board tab while the server is
+    // reached) or work items with nothing in a status yet.
+    if (cols.isEmpty) {
       return EmptyState(
-        state.filtered.isNotEmpty || state.tasks.isNotEmpty
+        state.loading
+            ? 'Loading…'
+            : state.filtered.isNotEmpty || state.tasks.isNotEmpty
             ? 'No work items yet. Give a note or task a status (backlog, todo, doing...) and it shows up here.'
             : 'No notes',
+        key: const Key('board-empty'),
         centered: true,
       );
     }

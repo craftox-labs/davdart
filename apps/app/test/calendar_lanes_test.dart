@@ -91,6 +91,23 @@ void main() {
     expect(w.lanes, 0);
   });
 
+  test('lanes fit a row of its height, never clipped', () {
+    // A bar is 16 of an 18-pixel lane under the 24-pixel date row, so a row
+    // holds what fits above its own bottom edge.
+    int fit(double h) => lanesThatFit(h, top: 24, pitch: 18, bar: 16, max: 3);
+    expect(fit(120), 3); // the full cell: the cap, not the room
+    expect(fit(96), 3); // 24 + 3 * 18 + 16 = 94 <= 96
+    expect(fit(78), 2);
+    expect(fit(60), 1);
+    expect(fit(30), 1); // never zero: a barless row would still lose its bars
+    // Every lane of the row is inside it: the last bar's bottom is the top of
+    // its lane plus the bar height.
+    for (final h in [96.0, 78.0, 60.0]) {
+      final lanes = fit(h);
+      expect(24 + (lanes - 1) * 18 + 16, lessThanOrEqualTo(h));
+    }
+  });
+
   test('geometry: only the real ends are inset; lanes and rows map to px', () {
     const g = LaneGeometry(
       cellWidth: 100,

@@ -54,7 +54,10 @@ DateTime _otherDay() {
   return DateTime.utc(d.year, d.month, d.day);
 }
 
-String _dayKey(DateTime d) => 'calendar-day-${d.year}-${d.month}-${d.day}';
+/// Presses the day [d] on its date number: the cell's own press, which never
+/// lands on a chip inside the cell (a chip opens its item instead).
+Future<void> _pressDay(WidgetTester t, DateTime d) =>
+    t.tap(find.byKey(Key('calendar-number-${d.year}-${d.month}-${d.day}')));
 
 /// The circle (or ring) around a day's date number in the grid.
 BoxDecoration _circle(WidgetTester t, DateTime d) =>
@@ -190,7 +193,7 @@ void main() {
     expect(find.text('Project ev'), findsNothing);
     // The loose dated task is on today; the project one is not.
     final day = wallDay(wallNow(DateTime.now()));
-    await t.tap(_k(_dayKey(day)));
+    await _pressDay(t, day);
     await t.pumpAndSettle();
     // Home has no day column: the Calendar panel shows the picked day. Today
     // is the agenda's own Today section (no separate pinned day).
@@ -232,7 +235,7 @@ void main() {
       expect(find.text('Project ev'), findsWidgets);
       expect(find.text('Loose ev'), findsNothing);
       final day = _otherDay();
-      await t.tap(_k(_dayKey(day)));
+      await _pressDay(t, day);
       await t.pumpAndSettle();
       // The project's day card sits under the full-width grid (Home's shape),
       // so on a wide window it is below the fold.
@@ -259,7 +262,7 @@ void main() {
     s.setHomeView(HomeView.calendar);
     await t.pumpAndSettle();
     final day = _otherDay();
-    await t.tap(_k(_dayKey(day)));
+    await _pressDay(t, day);
     await t.pumpAndSettle();
     await t.tap(_k('calendar-day-add-event'));
     await t.pumpAndSettle();
@@ -295,7 +298,7 @@ void main() {
     s.setSidebarCollapsed(true);
     await t.pumpAndSettle();
     final day = _otherDay();
-    await t.tap(_k(_dayKey(day)));
+    await _pressDay(t, day);
     await t.pumpAndSettle();
     expect(s.section, Section.events);
     expect(s.sidebarCollapsed, isFalse);
@@ -332,7 +335,7 @@ void main() {
     s.setSection(Section.events);
     s.eventTagFilter = 'y';
     await t.pumpAndSettle();
-    await t.tap(_k(_dayKey(day)));
+    await _pressDay(t, day);
     await t.pumpAndSettle();
     // The grid draws the day's event, so the panel must list it too.
     expect(_k('calendar-day-pin-empty'), findsNothing);
@@ -356,7 +359,7 @@ void main() {
         find.descendant(of: panel, matching: find.text(text));
     expect(inPanel('Later ev'), findsOneWidget);
     // Pick another day: the other sections shut, the picked day leads.
-    await t.tap(_k(_dayKey(_otherDay())));
+    await _pressDay(t, _otherDay());
     await t.pumpAndSettle();
     expect(_k('calendar-day-pin'), findsOneWidget);
     expect(inPanel('Later ev'), findsNothing);
@@ -370,7 +373,7 @@ void main() {
     expect(inPanel('Later ev'), findsOneWidget);
     expect(storage.read('davdart.events.upcoming.collapsed.v1'), isNull);
     // ...and the next pick shuts it again.
-    await t.tap(_k(_dayKey(wallDay(wallNow(DateTime.now())))));
+    await _pressDay(t, wallDay(wallNow(DateTime.now())));
     await t.pumpAndSettle();
     expect(inPanel('Later ev'), findsNothing);
   });
@@ -385,7 +388,7 @@ void main() {
     final panel = _k('events-panel');
     Finder inPanel(String text) =>
         find.descendant(of: panel, matching: find.text(text));
-    await t.tap(_k(_dayKey(_otherDay())));
+    await _pressDay(t, _otherDay());
     await t.pumpAndSettle();
     expect(_k('calendar-day-pin'), findsOneWidget);
     expect(inPanel('Loose ev'), findsNothing);
@@ -430,7 +433,7 @@ void main() {
     s.setHomeView(HomeView.calendar);
     await t.pumpAndSettle();
     final today = wallDay(wallNow(DateTime.now()));
-    await t.tap(_k(_dayKey(today)));
+    await _pressDay(t, today);
     await t.pumpAndSettle();
     expect(s.homeDay, today);
     expect(_k('calendar-day-pin'), findsNothing);
@@ -452,7 +455,7 @@ void main() {
     s.setHomeView(HomeView.calendar);
     await t.pumpAndSettle();
     final day = _otherDay();
-    await t.tap(_k(_dayKey(day)));
+    await _pressDay(t, day);
     await t.pumpAndSettle();
     expect(storage.read('davdart.home.view.v1.$first'), 'calendar');
     // The other Space has its own pref: Overview, and none written for it.
@@ -501,7 +504,7 @@ void main() {
       findsNothing,
     );
     final today = wallDay(wallNow(DateTime.now()));
-    await t.tap(_k(_dayKey(today)));
+    await _pressDay(t, today);
     await t.pumpAndSettle();
     // Picking today makes the agenda's own Today section the selection.
     expect(
@@ -535,7 +538,7 @@ void main() {
       expect(find.text('Alpha sub ev'), findsWidgets);
       expect(find.text('Beta ev'), findsNothing);
       final today = wallDay(wallNow(DateTime.now()));
-      await t.tap(_k(_dayKey(today)));
+      await _pressDay(t, today);
       await t.pumpAndSettle();
       final card = _k('calendar-day-card');
       expect(

@@ -913,6 +913,71 @@ void main() {
     expect(s.homeDay, DateTime.utc(2026, 11, 22));
   });
 
+  testWidgets('a six-week month fits 1265x800; its last bar is whole', (
+    t,
+  ) async {
+    // November 2026 is six Monday-first weeks (26 October to 6 December) and
+    // this event runs into the last one.
+    final s = await _state(
+      t,
+      events: [
+        Event(
+          uid: 'offsite',
+          summary: 'Offsite',
+          dtstart: ICalDate.date(2026, 11, 27),
+          dtend: ICalDate.date(2026, 12, 2),
+        ),
+      ],
+    );
+    await _pump(t, s, size: const Size(1265, 800));
+    final last = _k('calendar-day-2026-12-6');
+    expect(last, findsOneWidget);
+    // The six rows share the height: the last one is on screen whole (never
+    // under the least row height, never stretched past the most), so there is
+    // nothing left for the view to scroll.
+    final row = t.getRect(_k('calendar-day-2026-11-30'));
+    final sizes = Tokens.light.sizes;
+    expect(row.height, greaterThanOrEqualTo(sizes.calendarRowMin));
+    expect(row.height, lessThanOrEqualTo(sizes.calendarCellChips));
+    expect(t.getBottomLeft(last).dy, lessThanOrEqualTo(800));
+    final scroll = t.state<ScrollableState>(
+      find
+          .descendant(
+            of: _k('calendar-view'),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(scroll.position.maxScrollExtent, lessThan(1));
+    // The bar on the last week's days is a whole bar inside that row, not the
+    // sliver a row cut off by the window would leave.
+    final bar = _k('calendar-bar-offsite@2026-11-27-2026-11-30');
+    expect(bar, findsOneWidget);
+    expect(t.getSize(bar).height, sizes.calendarChip);
+    expect(t.getTopLeft(bar).dy, greaterThanOrEqualTo(row.top));
+    expect(t.getBottomLeft(bar).dy, lessThanOrEqualTo(row.bottom));
+  });
+
+  testWidgets('a project Calendar at 1265x800 scrolls as one piece', (t) async {
+    final s = await _state(t);
+    await _pump(t, s, size: const Size(1265, 800), scoped: true);
+    // The grid fits the height; the picked day's card sits under it and the
+    // view carries both.
+    final scroll = t.state<ScrollableState>(
+      find
+          .descendant(
+            of: _k('calendar-view'),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(scroll.position.maxScrollExtent, greaterThan(0));
+    expect(_k('calendar-day-card'), findsOneWidget);
+    await t.drag(_k('calendar-view'), const Offset(0, -400));
+    await t.pumpAndSettle();
+    expect(t.getBottomLeft(_k('calendar-day-card')).dy, lessThanOrEqualTo(800));
+  });
+
   testWidgets('a project Calendar puts its day under the grid, as Home does', (
     t,
   ) async {

@@ -303,6 +303,8 @@ class SizeTokens {
     this.calendarCellMax = 72,
     this.calendarCell = 36,
     this.calendarCellChips = 120,
+    this.calendarRowMin = 96,
+    this.calendarWeekdayRow = 16,
     this.segmentMin = 72,
     this.segmentHeight = 28,
     this.calendarDot = 5,
@@ -397,12 +399,15 @@ class SizeTokens {
   final double countBox;
 
   /// Calendar: grid width, widest day cell, plain day cell, the day cell that
-  /// carries item chips, the dot and the today ring; the Day|Board switch
-  /// segment minimum width and height.
+  /// carries item chips, the least a wide week row shrinks to (the date row,
+  /// three lanes and a chip) and the weekday label row's height; the dot and
+  /// the today ring; the Day|Board switch segment minimum width and height.
   final double calendarWidth,
       calendarCellMax,
       calendarCell,
       calendarCellChips,
+      calendarRowMin,
+      calendarWeekdayRow,
       segmentMin,
       segmentHeight;
   final double calendarDot, ring;
@@ -600,6 +605,39 @@ class Tokens {
   /// Content outside the current period (a month grid's neighbouring days):
   /// [muted] at [dimmed] opacity.
   Color get faint => muted.withValues(alpha: dimmed);
+
+  /// The height of one wide week row when the month grid has [weeks] rows in a
+  /// view of [viewport] pixels: the rows above and below the grid (the page's
+  /// own [SpaceTokens.md] and [SpaceTokens.xl], plus [bottomInset] on a phone)
+  /// and the grid card's chrome (its [SpaceTokens.sm] padding and
+  /// [BorderTokens.hairline] border, the pane header row, the gaps and weekday
+  /// label row under it, and the hairline above the rows) come off first, and
+  /// the rest is shared by the rows.
+  ///
+  /// Never under [SizeTokens.calendarRowMin] (six weeks then keep that height
+  /// and the Calendar view scrolls instead of squeezing the bars) and never
+  /// over [SizeTokens.calendarCellChips] (the rows do not stretch).
+  double calendarRowHeight({
+    required double viewport,
+    required int weeks,
+    double bottomInset = 0,
+  }) {
+    final chrome =
+        space.md +
+        bottomInset +
+        space.xl +
+        space.sm * 2 +
+        borders.hairline * 2 +
+        sizes.paneHeader +
+        space.xs * 2 +
+        sizes.calendarWeekdayRow +
+        borders.hairline;
+    if (!viewport.isFinite || weeks < 1) return sizes.calendarCellChips;
+    return ((viewport - chrome) / weeks).clamp(
+      sizes.calendarRowMin,
+      sizes.calendarCellChips,
+    );
+  }
 
   final TypeTokens type;
   final SpaceTokens space;

@@ -154,6 +154,21 @@ WeekLanes layOutWeek(
   return WeekLanes(segments: segments, lanes: laneEnds.length, hidden: hidden);
 }
 
+/// How many lanes fit in a week row of [height] pixels: a bar of [bar] pixels
+/// sits in a [pitch]-tall lane under the [top] pixels of the date number row,
+/// and the row never shows more than [max] lanes (the rest go to "+N more").
+///
+/// A row shortened to fit a window therefore shows fewer lanes rather than
+/// clipping its bars: [layOutWeek] is given this, so every bar is drawn inside
+/// the row's own height.
+int lanesThatFit(
+  double height, {
+  required double top,
+  required double pitch,
+  required double bar,
+  required int max,
+}) => (((height - top - (pitch - bar)) / pitch).floor()).clamp(1, max);
+
 /// The pixels of one week row's bar layer: the layer starts [laneTop] below
 /// the row's top (under the date numbers), a day cell is [cellWidth] wide, a
 /// bar is [barHeight] tall and lanes are [pitch] apart. A bar insets its real

@@ -404,6 +404,18 @@ class _CalendarViewState extends State<CalendarView> {
         return LayoutBuilder(
           builder: (context, c) {
             final wide = c.maxWidth >= Tokens.stackBreakpoint;
+            // Wide rows share the height the view leaves under its header, so
+            // a six-week month fits an 800-high window instead of running
+            // past its bottom edge; under the least row height the grid keeps
+            // that height and this scroll view carries it, whole (the grid
+            // and, for a project, the picked day under it).
+            final rowHeight = wide
+                ? t.calendarRowHeight(
+                    viewport: c.maxHeight,
+                    weeks: weeks,
+                    bottomInset: fabInset(context),
+                  )
+                : t.sizes.touchTarget;
             final grid = _grid(
               context,
               t: t,
@@ -415,6 +427,7 @@ class _CalendarViewState extends State<CalendarView> {
               selected: selected,
               buckets: buckets,
               wide: wide,
+              rowHeight: rowHeight,
             );
             final list = _day(
               context,
@@ -470,8 +483,8 @@ class _CalendarViewState extends State<CalendarView> {
     required DateTime selected,
     required Map<DateTime, DayBucket> buckets,
     required bool wide,
+    required double rowHeight,
   }) {
-    final cellHeight = wide ? t.sizes.calendarCellChips : t.sizes.touchTarget;
     final weekday = t.type.sectionLabelStyle.copyWith(color: t.muted);
     final end = start.add(Duration(days: weeks * 7));
     final spans = wide ? _spans(start, end) : const <CalendarSpan>[];
@@ -528,18 +541,23 @@ class _CalendarViewState extends State<CalendarView> {
             ],
           ),
           SizedBox(height: t.space.xs),
-          Row(
-            children: [
-              for (var i = 0; i < 7; i++)
-                Expanded(
-                  child: Center(
-                    child: Text(
-                      _weekdayNames[(first - 1 + i) % 7].substring(0, 2),
-                      style: weekday,
+          SizedBox(
+            // Fixed, so the grid's chrome (and with it the rows' shared
+            // height) is the same whatever the label font renders at.
+            height: t.sizes.calendarWeekdayRow,
+            child: Row(
+              children: [
+                for (var i = 0; i < 7; i++)
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        _weekdayNames[(first - 1 + i) % 7].substring(0, 2),
+                        style: weekday,
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
           SizedBox(height: t.space.xs),
           Container(height: t.borders.hairline, color: t.divider),
@@ -554,6 +572,18 @@ class _CalendarViewState extends State<CalendarView> {
                 barHeight: t.sizes.calendarChip,
                 inset: t.space.xxs,
               );
+              // The lanes a row holds come from its height, so a row
+              // shortened to fit the window shows fewer bars rather than
+              // clipping them.
+              final lanes = wide
+                  ? lanesThatFit(
+                      rowHeight,
+                      top: t.sizes.calendarNumberRow,
+                      pitch: t.sizes.calendarLanePitch,
+                      bar: t.sizes.calendarChip,
+                      max: t.sizes.calendarLanes,
+                    )
+                  : t.sizes.calendarLanes;
               final rows = Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -568,7 +598,8 @@ class _CalendarViewState extends State<CalendarView> {
                       selected: selected,
                       buckets: buckets,
                       spans: spans,
-                      height: cellHeight,
+                      height: rowHeight,
+                      lanes: lanes,
                       wide: wide,
                       topRule: w > 0,
                       range: _range,
@@ -581,7 +612,7 @@ class _CalendarViewState extends State<CalendarView> {
               // gesture: a touch drag there would fight the scroll.
               if (!wide || !state.eventsEditable) return rows;
               DateTime dayAt(Offset p) =>
-                  _dayAt(p, start, weeks, g.cellWidth, cellHeight);
+                  _dayAt(p, start, weeks, g.cellWidth, rowHeight);
               int colAt(Offset p) => g.cellWidth <= 0
                   ? 0
                   : (p.dx / g.cellWidth).floor().clamp(0, 6);
@@ -620,12 +651,13 @@ class _CalendarViewState extends State<CalendarView> {
     required Map<DateTime, DayBucket> buckets,
     required List<CalendarSpan> spans,
     required double height,
+    required int lanes,
     required bool wide,
     required bool topRule,
     required (DateTime, DateTime)? range,
   }) {
     final row = wide
-        ? layOutWeek(spans, weekStart, maxLanes: t.sizes.calendarLanes)
+        ? layOutWeek(spans, weekStart, maxLanes: lanes)
         : const WeekLanes(segments: [], lanes: 0, hidden: 0);
     final inset = row.lanes == 0
         ? 0.0

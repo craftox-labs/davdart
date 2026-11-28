@@ -137,6 +137,9 @@ class _BoardLayoutState<T> extends State<BoardLayout<T>> {
       widget.openMap.remove(boardDoneAllKey);
     }
     final full = widget.cols;
+    // No columns: nothing to lay out (callers show their empty state). Without
+    // this the equal-columns maths below would divide by zero.
+    if (full.isEmpty) return const SizedBox.shrink();
     final cols = [
       for (final (n, items) in full)
         (n, boardCapped(n, items, widget.modified, showAll: _all)),
