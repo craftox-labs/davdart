@@ -303,6 +303,62 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
+  testWidgets('the selection is a filled circle; today keeps the ring', (
+    t,
+  ) async {
+    BoxDecoration circle(String day) =>
+        t.widget<Container>(_k('calendar-number-2026-11-$day')).decoration!
+            as BoxDecoration;
+    final s = await _state(t);
+    await _pump(t, s);
+    // November 18 is today and the selection: filled, no ring.
+    expect(circle('18').color, Tokens.light.accent);
+    expect(circle('18').border, isNull);
+    // Another day is plain.
+    expect(circle('20').color, isNull);
+    expect(circle('20').border, isNull);
+    await t.tap(_k('calendar-day-2026-11-20'));
+    await t.pumpAndSettle();
+    expect(circle('20').color, Tokens.light.accent);
+    // Today is now only the ring.
+    expect(circle('18').color, isNull);
+    expect(circle('18').border, isNotNull);
+    // The cell itself never takes a fill. The first decoration under the
+    // day's tap target is the cell.
+    final cell =
+        t
+                .widget<DecoratedBox>(
+                  find
+                      .descendant(
+                        of: _k('calendar-day-2026-11-20'),
+                        matching: find.byType(DecoratedBox),
+                      )
+                      .first,
+                )
+                .decoration
+            as BoxDecoration;
+    expect(cell.color, isNot(Tokens.light.accent));
+  });
+
+  testWidgets('the header row: title, arrows, Today', (t) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    final month = t.widget<Text>(_k('calendar-month'));
+    expect(month.data, 'November 2026');
+    expect(month.style?.fontSize, Tokens.light.type.title);
+    expect(_k('calendar-prev'), findsOneWidget);
+    expect(_k('calendar-next'), findsOneWidget);
+    expect(
+      t.widget<FButton>(_k('calendar-today')).variant,
+      FButtonVariant.secondary,
+    );
+    // One row: all three share a vertical centre with the title.
+    final y = t.getCenter(_k('calendar-month')).dy;
+    for (final k in ['calendar-prev', 'calendar-next', 'calendar-today']) {
+      expect((t.getCenter(_k(k)).dy - y).abs(), lessThan(1), reason: k);
+    }
+  });
+
   testWidgets('a Space without events hides them and the event add', (t) async {
     final s = await _noEventsState(
       t,

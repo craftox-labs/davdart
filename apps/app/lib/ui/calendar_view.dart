@@ -241,9 +241,10 @@ class _CalendarViewState extends State<CalendarView> {
     );
   }
 
-  /// The month grid: arrows, month name, Today, weekdays, then the days.
-  /// Wide cells carry up to three item chips (and '+N more'); narrow ones
-  /// only a dot per kind, as the old Home calendar did.
+  /// The month grid: a header row (month title, arrows, Today), the weekday
+  /// labels, then the days in a hairline-ruled grid with a faint weekend
+  /// wash. Wide cells carry up to three item chips (and '+N more'); narrow
+  /// ones only a dot per kind, as the old Home calendar did.
   Widget _grid(
     BuildContext context, {
     required Tokens t,
@@ -257,14 +258,25 @@ class _CalendarViewState extends State<CalendarView> {
     required bool wide,
   }) {
     final cellHeight = wide ? t.sizes.calendarCellChips : t.sizes.touchTarget;
-    final muted = t.type.captionStyle.copyWith(color: t.muted);
+    final weekday = t.type.sectionLabelStyle.copyWith(color: t.muted);
     return CardBox(
       padding: EdgeInsets.all(t.space.sm),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
+          PaneHeaderRow(
+            startPad: t.space.xs,
+            endPad: t.space.xs,
             children: [
+              Expanded(
+                child: Text(
+                  '${_monthNames[month.month - 1]} ${month.year}',
+                  key: const Key('calendar-month'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: t.type.titleStyle.copyWith(color: t.fg),
+                ),
+              ),
               IconAction(
                 compact: true,
                 key: const Key('calendar-prev'),
@@ -273,14 +285,6 @@ class _CalendarViewState extends State<CalendarView> {
                 onPress: () => _showMonth(
                   DateTime.utc(month.year, month.month - 1),
                   today,
-                ),
-              ),
-              Expanded(
-                child: Text(
-                  '${_monthNames[month.month - 1]} ${month.year}',
-                  key: const Key('calendar-month'),
-                  textAlign: TextAlign.center,
-                  style: t.type.labelStyle.copyWith(color: t.fg),
                 ),
               ),
               IconAction(
@@ -298,7 +302,7 @@ class _CalendarViewState extends State<CalendarView> {
                 context,
                 FButton(
                   key: const Key('calendar-today'),
-                  variant: FButtonVariant.outline,
+                  variant: FButtonVariant.secondary,
                   size: FButtonSizeVariant.xs,
                   mainAxisSize: MainAxisSize.min,
                   onPress: () => _select(today),
@@ -315,12 +319,14 @@ class _CalendarViewState extends State<CalendarView> {
                   child: Center(
                     child: Text(
                       _weekdayNames[(first - 1 + i) % 7].substring(0, 2),
-                      style: muted,
+                      style: weekday,
                     ),
                   ),
                 ),
             ],
           ),
+          SizedBox(height: t.space.xs),
+          Container(height: t.borders.hairline, color: t.divider),
           for (var w = 0; w < weeks; w++)
             Row(
               children: [
@@ -336,6 +342,8 @@ class _CalendarViewState extends State<CalendarView> {
                       bucket: buckets[start.add(Duration(days: w * 7 + i))],
                       height: cellHeight,
                       wide: wide,
+                      topRule: w > 0,
+                      leftRule: i > 0,
                     ),
                   ),
               ],
@@ -345,8 +353,13 @@ class _CalendarViewState extends State<CalendarView> {
     );
   }
 
-  /// One day of the grid: the number and its chips (wide) or dots (narrow),
-  /// a fill when selected and a ring on today.
+  /// One day of the grid: the date number in its circle at the top-left of the
+  /// cell and the day's chips (wide) or dots (narrow), inside hairline cell
+  /// rules with a faint weekend wash.
+  ///
+  /// The selection is the filled accent circle around the number; today
+  /// without the selection is the accent ring around it, so the cell itself
+  /// never takes a fill or a heavy border.
   Widget _cell(
     BuildContext context, {
     required Tokens t,
@@ -357,17 +370,36 @@ class _CalendarViewState extends State<CalendarView> {
     required DayBucket? bucket,
     required double height,
     required bool wide,
+    required bool topRule,
+    required bool leftRule,
   }) {
     final id = '${day.year}-${day.month}-${day.day}';
     final inMonth = day.month == month.month;
     final isSelected = day == selected;
     final isToday = day == today;
-    final number = t.type.captionStyle.copyWith(
-      color: isSelected
-          ? t.onAccent
-          : inMonth
-          ? t.fg
-          : t.faint,
+    final weekend = day.weekday >= DateTime.saturday;
+    final number = Container(
+      key: Key('calendar-number-$id'),
+      width: t.sizes.calendarNumber,
+      height: t.sizes.calendarNumber,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isSelected ? t.accent : null,
+        border: isToday && !isSelected
+            ? Border.all(color: t.accent, width: t.sizes.ring)
+            : null,
+      ),
+      child: Text(
+        '${day.day}',
+        style: t.type.captionStrong.copyWith(
+          color: isSelected
+              ? t.onAccent
+              : inMonth
+              ? t.fg
+              : t.muted,
+        ),
+      ),
     );
     final items = <({String title, bool event})>[
       for (final o in bucket?.events ?? const <EventOccurrence>[])
@@ -384,7 +416,7 @@ class _CalendarViewState extends State<CalendarView> {
       body = Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('${day.day}', textAlign: TextAlign.center, style: number),
+          Align(alignment: Alignment.centerLeft, child: number),
           Expanded(
             child: ClipRect(
               child: Column(
@@ -396,7 +428,7 @@ class _CalendarViewState extends State<CalendarView> {
                       key: Key('calendar-chip-$id-$i'),
                       title: item.title,
                       event: item.event,
-                      onSelected: isSelected,
+                      muted: !inMonth,
                     ),
                   if (items.length > cap)
                     Padding(
@@ -406,9 +438,7 @@ class _CalendarViewState extends State<CalendarView> {
                         key: Key('calendar-more-$id'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: t.type.microStyle.copyWith(
-                          color: isSelected ? t.onAccent : t.muted,
-                        ),
+                        style: t.type.microStyle.copyWith(color: t.muted),
                       ),
                     ),
                 ],
@@ -419,9 +449,9 @@ class _CalendarViewState extends State<CalendarView> {
       );
     } else {
       body = Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('${day.day}', style: number),
+          number,
           SizedBox(
             height: t.sizes.calendarDot,
             child: Row(
@@ -431,7 +461,7 @@ class _CalendarViewState extends State<CalendarView> {
                   StatusDot(
                     null,
                     key: Key('calendar-dot-event-$id'),
-                    color: isSelected ? t.onAccent : t.accent,
+                    color: t.accent,
                     size: t.sizes.calendarDot,
                   ),
                 if (bucket != null &&
@@ -442,7 +472,7 @@ class _CalendarViewState extends State<CalendarView> {
                   StatusDot(
                     null,
                     key: Key('calendar-dot-task-$id'),
-                    color: isSelected ? t.onAccent : t.statusTodo,
+                    color: t.statusTodo,
                     size: t.sizes.calendarDot,
                   ),
               ],
@@ -460,11 +490,15 @@ class _CalendarViewState extends State<CalendarView> {
         height: height,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: isSelected ? t.accent : null,
-            borderRadius: BorderRadius.circular(t.radii.small),
-            border: isToday && !isSelected
-                ? Border.all(color: t.accent, width: t.sizes.ring)
-                : null,
+            color: weekend ? t.weekendTint : null,
+            border: Border(
+              top: topRule
+                  ? BorderSide(color: t.divider, width: t.borders.hairline)
+                  : BorderSide.none,
+              left: leftRule
+                  ? BorderSide(color: t.divider, width: t.borders.hairline)
+                  : BorderSide.none,
+            ),
           ),
           child: Padding(padding: EdgeInsets.all(t.space.xxs), child: body),
         ),
@@ -478,7 +512,7 @@ class _CalendarViewState extends State<CalendarView> {
     required Key key,
     required String title,
     required bool event,
-    required bool onSelected,
+    required bool muted,
   }) => Padding(
     key: key,
     padding: EdgeInsets.only(top: t.space.xxs),
@@ -486,11 +520,7 @@ class _CalendarViewState extends State<CalendarView> {
       children: [
         StatusDot(
           null,
-          color: onSelected
-              ? t.onAccent
-              : event
-              ? t.accent
-              : t.statusTodo,
+          color: event ? t.accent : t.statusTodo,
           size: t.sizes.calendarDot,
         ),
         SizedBox(width: t.space.xxs),
@@ -499,9 +529,7 @@ class _CalendarViewState extends State<CalendarView> {
             title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: t.type.microStyle.copyWith(
-              color: onSelected ? t.onAccent : t.fg,
-            ),
+            style: t.type.microStyle.copyWith(color: muted ? t.muted : t.fg),
           ),
         ),
       ],

@@ -300,7 +300,7 @@ class SizeTokens {
     this.calendarWidth = 320,
     this.calendarCellMax = 72,
     this.calendarCell = 36,
-    this.calendarCellChips = 88,
+    this.calendarCellChips = 104,
     this.segmentMin = 72,
     this.segmentHeight = 28,
     this.calendarDot = 5,
