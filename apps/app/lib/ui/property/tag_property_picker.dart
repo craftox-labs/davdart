@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/widgets.dart';
 import 'package:forui/forui.dart';
 
@@ -31,6 +32,23 @@ class TagPropertyPicker extends StatefulWidget {
 class _TagPropertyPickerState extends State<TagPropertyPicker> {
   final _controller = TextEditingController();
 
+  /// The tags showing here: the last toggle or added label, until the item
+  /// reports it back. Two quick taps build on it, so both land.
+  List<String>? _pending;
+
+  List<String> get _tags => _pending ?? widget.value;
+
+  @override
+  void didUpdateWidget(TagPropertyPicker old) {
+    super.didUpdateWidget(old);
+    final pending = _pending;
+    // The item caught up with the pick, or its labels changed elsewhere: show
+    // its own.
+    if (pending != null && setEquals(pending.toSet(), widget.value.toSet())) {
+      _pending = null;
+    }
+  }
+
   @override
   void dispose() {
     _controller.dispose();
@@ -38,20 +56,27 @@ class _TagPropertyPickerState extends State<TagPropertyPicker> {
   }
 
   Future<void> _commit(List<String> tags) async {
-    if (await widget.onPick(tags)) _controller.clear();
+    setState(() => _pending = tags);
+    if (await widget.onPick(tags)) {
+      _controller.clear();
+      return;
+    }
+    // Did not go through: the item's own labels show again.
+    if (mounted) setState(() => _pending = null);
   }
 
   void _add(String text) {
     final tag = text.trim();
-    if (tag.isEmpty || widget.value.contains(tag)) return;
-    _commit([...widget.value, tag]);
+    if (tag.isEmpty || _tags.contains(tag)) return;
+    _commit([..._tags, tag]);
   }
 
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
+    final tags = _tags;
     final all = <String>{
-      ...widget.value,
+      ...tags,
       for (final s in widget.suggestions)
         if (s.isNotEmpty) s,
     }.toList()..sort();
@@ -73,11 +98,11 @@ class _TagPropertyPickerState extends State<TagPropertyPicker> {
                   FTappable(
                     key: Key('property-tag-${widget.id}-$tag'),
                     onPress: () => _commit(
-                      widget.value.contains(tag)
-                          ? [...widget.value.where((v) => v != tag)]
-                          : [...widget.value, tag],
+                      tags.contains(tag)
+                          ? [...tags.where((v) => v != tag)]
+                          : [...tags, tag],
                     ),
-                    child: TagChip(tag, selected: widget.value.contains(tag)),
+                    child: TagChip(tag, selected: tags.contains(tag)),
                   ),
               ],
             ),

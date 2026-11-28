@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-import 'note_draft.dart' show setText;
+import 'note_draft.dart' show CommitSignal, setText;
 
 /// The open text buffer of one task: the title and the description, and
 /// whether either differs from what was loaded.
@@ -28,6 +28,9 @@ class TaskDraft extends ChangeNotifier {
   /// one when a tap on the value (or `e`) starts an edit.
   final FocusNode titleFocus = FocusNode(debugLabel: 'task-title');
   final FocusNode bodyFocus = FocusNode(debugLabel: 'task-body');
+
+  /// The fields' Ctrl+S: the page pings it to save through them.
+  final commitSignal = CommitSignal();
 
   /// Takes the fields that were saved as their new originals; a null field was
   /// not written and keeps its own.
@@ -72,6 +75,7 @@ class TaskDraft extends ChangeNotifier {
     bodyController.dispose();
     titleFocus.dispose();
     bodyFocus.dispose();
+    commitSignal.dispose();
     super.dispose();
   }
 }

@@ -100,6 +100,9 @@ class NoteEditor extends StatelessWidget {
                 id: 'parent',
                 state: state,
                 uid: note.uid,
+                // The draft's parent, which a save writes: the row marked is
+                // the one the pick would keep.
+                currentParent: (draft.parent,),
                 onPick: (v) async {
                   control.hide();
                   draft.setParent(v);

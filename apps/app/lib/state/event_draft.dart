@@ -1,6 +1,6 @@
 import 'package:flutter/widgets.dart';
 
-import 'note_draft.dart' show setText;
+import 'note_draft.dart' show CommitSignal, setText;
 
 /// The open text buffer of one event: the title, the location and the
 /// description, and whether any of them differs from what was loaded.
@@ -36,6 +36,9 @@ class EventDraft extends ChangeNotifier {
   final FocusNode titleFocus = FocusNode(debugLabel: 'event-title');
   final FocusNode locationFocus = FocusNode(debugLabel: 'event-location');
   final FocusNode bodyFocus = FocusNode(debugLabel: 'event-body');
+
+  /// The fields' Ctrl+S: the page pings it to save through them.
+  final commitSignal = CommitSignal();
 
   /// Takes the fields that were saved as their new originals; a null field was
   /// not written and keeps its own.
@@ -88,6 +91,7 @@ class EventDraft extends ChangeNotifier {
     titleFocus.dispose();
     locationFocus.dispose();
     bodyFocus.dispose();
+    commitSignal.dispose();
     super.dispose();
   }
 }

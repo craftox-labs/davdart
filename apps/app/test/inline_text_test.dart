@@ -262,6 +262,59 @@ void main() {
       expect(h.controller.text, 'Being saved');
     });
 
+    testWidgets('a commit made during a write sends the latest text after it', (
+      t,
+    ) async {
+      final gate = Completer<bool>();
+      final calls = <String>[];
+      final h = await _pump(
+        t,
+        commit: (text) async {
+          calls.add(text);
+          if (calls.length == 1) await gate.future;
+          return true;
+        },
+      );
+      await _open(t);
+      await t.enterText(_field, 'First');
+      // The pause starts the write of "First"; the next pause lands while it
+      // runs and waits for it.
+      await t.pump(const Duration(milliseconds: 900));
+      await t.enterText(_field, 'First, then more');
+      await t.pump(const Duration(milliseconds: 900));
+      expect(calls, ['First']);
+      gate.complete(true);
+      await t.pumpAndSettle();
+      // The queued commit sends what the field shows once the write is done.
+      expect(calls, ['First', 'First, then more']);
+      expect(h.controller.text, 'First, then more');
+    });
+
+    testWidgets('a failed write keeps text typed while it ran', (t) async {
+      final gate = Completer<bool>();
+      final h = await _pump(
+        t,
+        commit: (_) async {
+          await gate.future;
+          return false;
+        },
+      );
+      await _open(t);
+      await t.enterText(_field, 'First');
+      await t.pump(const Duration(milliseconds: 900));
+      await t.enterText(_field, 'First, then more');
+      gate.complete(false);
+      await t.pumpAndSettle();
+      // Not reset to the saved text (the note still holds it): what the user
+      // typed stays, in the error colour, and Esc goes back to the note.
+      expect(h.controller.text, 'First, then more');
+      expect(t.widget<EditableText>(_field).style.color, _tokens.error);
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pumpAndSettle();
+      expect(h.controller.text, 'Alpha');
+      expect(_shown(t), 'Alpha');
+    });
+
     testWidgets('a read-only value never becomes a field', (t) async {
       t.view.physicalSize = const Size(1000, 800);
       t.view.devicePixelRatio = 1;

@@ -367,6 +367,7 @@ class TaskDetail extends StatelessWidget {
                   key: const Key('edit-title'),
                   controller: draft.titleController,
                   focusNode: draft.titleFocus,
+                  commitSignal: draft.commitSignal,
                   style: paneTitleStyle(t, muted: task.isClosed).copyWith(
                     decoration: task.isClosed
                         ? TextDecoration.lineThrough
@@ -452,15 +453,18 @@ class TaskDetail extends StatelessWidget {
         ),
       ],
     );
+    // Ctrl/Cmd+S saves through the fields: each one writes what it shows, so
+    // it records the text it saved rather than going stale.
+    void saveNow() {
+      if (draft != null && draft.dirty) draft.commitSignal.ping();
+    }
+
     Widget withKeys = CallbackShortcuts(
       bindings: {
         if (draft != null) ...{
-          const SingleActivator(LogicalKeyboardKey.keyS, control: true): () {
-            if (draft.dirty) state.commitTaskText(uid);
-          },
-          const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () {
-            if (draft.dirty) state.commitTaskText(uid);
-          },
+          const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+              saveNow,
+          const SingleActivator(LogicalKeyboardKey.keyS, meta: true): saveNow,
         },
       },
       child: page,
@@ -525,6 +529,7 @@ class TaskDetail extends StatelessWidget {
         key: const Key('edit-body'),
         controller: draft.bodyController,
         focusNode: draft.bodyFocus,
+        commitSignal: draft.commitSignal,
         multiline: true,
         placeholder: 'Description',
         autoBegin: state.taskTextTargets(uid, body: true),

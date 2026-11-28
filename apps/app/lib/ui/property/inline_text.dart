@@ -16,9 +16,10 @@ import '../theme.dart';
 /// focus) so a press lands on a text field and takes the focus the way any
 /// other field does. Typing pauses for [debounce] and commits through
 /// [onCommit]; so does a blur, Enter (a single line) and leaving the field.
-/// Esc reverts the field to the last saved text. A commit that fails reverts
-/// the text too and colours it with [Tokens.error] until the next edit; the
-/// caller shows the toast.
+/// Esc reverts the field to the last saved text. A commit that fails keeps
+/// what was typed and colours it with [Tokens.error] until the next edit (a
+/// field left as it was goes back to the saved text); the caller shows the
+/// toast. Text typed while a write runs is written once that write is done.
 class InlineText extends StatefulWidget {
   const InlineText({
     super.key,
@@ -34,6 +35,7 @@ class InlineText extends StatefulWidget {
     this.focusNode,
     this.autoBegin = false,
     this.onBegan,
+    this.commitSignal,
   });
 
   final TextEditingController controller;
@@ -69,6 +71,11 @@ class InlineText extends StatefulWidget {
   /// again.
   final VoidCallback? onBegan;
 
+  /// Pinged when the value is saved around this field (the page's Ctrl+S):
+  /// the field writes what it shows, so it records what it saved instead of
+  /// going stale.
+  final Listenable? commitSignal;
+
   @override
   State<InlineText> createState() => _InlineTextState();
 }
@@ -88,6 +95,9 @@ class _InlineTextState extends State<InlineText> {
   var _writing = false;
   var _failed = false;
 
+  /// Text typed while a write ran: it commits once that write is done.
+  var _queued = false;
+
   FocusNode get _focus => widget.focusNode ?? _ownFocus!;
 
   @override
@@ -99,6 +109,7 @@ class _InlineTextState extends State<InlineText> {
     _saved = _seen = widget.controller.text;
     _focus.addListener(_focusChanged);
     widget.controller.addListener(_changed);
+    widget.commitSignal?.addListener(_pinged);
     if (widget.autoBegin) _autoBegin();
   }
 
@@ -119,6 +130,10 @@ class _InlineTextState extends State<InlineText> {
       widget.controller.addListener(_changed);
       _saved = _seen = widget.controller.text;
     }
+    if (old.commitSignal != widget.commitSignal) {
+      old.commitSignal?.removeListener(_pinged);
+      widget.commitSignal?.addListener(_pinged);
+    }
     if (widget.autoBegin && !old.autoBegin) _autoBegin();
   }
 
@@ -126,10 +141,15 @@ class _InlineTextState extends State<InlineText> {
   void dispose() {
     _timer?.cancel();
     widget.controller.removeListener(_changed);
+    widget.commitSignal?.removeListener(_pinged);
     _focus.removeListener(_focusChanged);
     _ownFocus?.dispose();
     super.dispose();
   }
+
+  /// The value was saved around this field (Ctrl+S): write what it shows, so
+  /// [_saved] is what the item holds.
+  void _pinged() => unawaited(_commit());
 
   void _focusChanged() {
     if (!mounted) return;
@@ -179,8 +199,11 @@ class _InlineTextState extends State<InlineText> {
       if (_failed) setState(() => _failed = false);
       return true;
     }
-    // One write at a time: the rest of the text commits after it.
-    if (_writing) return false;
+    // One write at a time: the text showing when it is done commits next.
+    if (_writing) {
+      _queued = true;
+      return false;
+    }
     _writing = true;
     final bool ok;
     try {
@@ -194,13 +217,20 @@ class _InlineTextState extends State<InlineText> {
       // still pending and Esc reverts to this one.
       _saved = text;
       if (_failed) setState(() => _failed = false);
-    } else {
-      // Back to what the item holds; the reason is the caller's toast.
-      setText(widget.controller, _saved);
-      _timer?.cancel();
-      setState(() => _failed = true);
+      // Text typed during the write goes next, as the latest text.
+      if (_queued) {
+        _queued = false;
+        unawaited(_commit());
+      }
+      return true;
     }
-    return ok;
+    _queued = false;
+    _timer?.cancel();
+    // Keep what the user typed (the reason is the caller's toast): only a
+    // field left as the write found it goes back to what the item holds.
+    if (widget.controller.text == text) setText(widget.controller, _saved);
+    setState(() => _failed = true);
+    return false;
   }
 
   /// Esc: the text goes back to the last saved one, the field closes. The

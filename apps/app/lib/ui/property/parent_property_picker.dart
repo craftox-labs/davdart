@@ -23,6 +23,7 @@ class ParentPropertyPicker extends StatefulWidget {
     required this.state,
     required this.uid,
     required this.onPick,
+    this.currentParent,
   });
 
   /// Names the rows' and field's keys (`property-parent-<id>-...`).
@@ -32,6 +33,11 @@ class ParentPropertyPicker extends StatefulWidget {
   /// The item being moved: the picker cannot offer itself or its subtree.
   final String uid;
   final Future<bool> Function(String?) onPick;
+
+  /// The parent the item has now (a note draft's unsaved one, wrapped so that
+  /// a null — the top level — is a value too). Null: the item's parent in the
+  /// tree.
+  final (String?,)? currentParent;
 
   @override
   State<ParentPropertyPicker> createState() => _ParentPropertyPickerState();
@@ -52,7 +58,10 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
     final t = tokensOf(context);
     final state = widget.state;
     final q = _query.trim().toLowerCase();
-    final project = state.projectIndex.projectOf(widget.uid);
+    // The row the item sits in is the one marked: its own parent, not the
+    // project of whatever that parent is under.
+    final (parentUid,) =
+        widget.currentParent ?? (parentUidOfItem(state, widget.uid),);
     final projects = state.projectsByRecent;
     // Only a search shows the folders and sub-tasks: the projects are the
     // everyday answer, the tree is the exception.
@@ -95,7 +104,7 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
                     key: Key('property-parent-${widget.id}-top'),
                     label: 'Personal (top level)',
                     icon: FLucideIcons.circleUser,
-                    selected: project == null,
+                    selected: parentUid == null,
                     onPress: () => widget.onPick(null),
                   ),
                   for (final p in projects)
@@ -104,7 +113,7 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
                       label: p.summary,
                       hint: folderOf[p.uid],
                       icon: FLucideIcons.folderKanban,
-                      selected: project?.uid == p.uid,
+                      selected: parentUid == p.uid,
                       onPress: () => widget.onPick(p.uid),
                     ),
                   for (final o in others)
@@ -123,7 +132,7 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
                         ParentKind.top => FLucideIcons.fileText,
                       },
                       depth: o.depth,
-                      selected: o.uid == widget.uid,
+                      selected: o.uid == parentUid,
                       onPress: () => widget.onPick(o.uid),
                     ),
                 ],
@@ -139,6 +148,16 @@ class _ParentPropertyPickerState extends State<ParentPropertyPicker> {
 /// The project [uid] sits in, or null when it sits outside every project.
 Note? projectOfItem(AppState state, String uid) =>
     state.projectIndex.projectOf(uid);
+
+/// The uid of the item [uid] sits in now (a note, a task or an event), or null
+/// at the top level.
+String? parentUidOfItem(AppState state, String uid) =>
+    switch (state.findItem(uid)) {
+      Note n => n.parentUid,
+      Task t => t.parentUid,
+      Event e => e.parentUid,
+      _ => null,
+    };
 
 /// The value a Project row shows: what the item really sits in (a parent
 /// task, a project, a folder or note outside every project), or 'Personal'.

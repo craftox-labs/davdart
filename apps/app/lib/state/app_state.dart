@@ -2650,16 +2650,19 @@ class AppState extends ChangeNotifier {
   }
 
   /// Sets the note body text of [uid] (its header fields stay), for the inline
-  /// text of a project's About.
+  /// text of a project's About. False when the write did not go through (the
+  /// reason is [error]), so the field can show it.
   Future<bool> setNoteText(String uid, String text) async {
     final n = tree.find(uid)?.note;
     if (n == null || !editable) return false;
+    error = null;
     await updateNote(uid, text: text);
-    return true;
+    return error == null;
   }
 
   /// Sets (or, with an empty [value], removes) the header field [key] of note
-  /// [uid]: the project details (lead, team, start, due, members).
+  /// [uid]: the project details (lead, team, start, due, members). False when
+  /// the write did not go through (the reason is [error]).
   Future<bool> setNoteField(String uid, String key, String? value) async {
     final n = tree.find(uid)?.note;
     if (n == null || !editable) return false;
@@ -2671,8 +2674,9 @@ class AppState extends ChangeNotifier {
     } else {
       p.setField(key, v);
     }
+    error = null;
     await _save(p.apply());
-    return true;
+    return error == null;
   }
 
   /// Moves note [uid] under [parentUid] (null: the top level). Returns false,

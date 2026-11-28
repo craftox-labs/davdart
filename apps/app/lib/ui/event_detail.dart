@@ -86,6 +86,7 @@ class EventDetail extends StatelessWidget {
           key: const Key('edit-location'),
           controller: draft.locationController,
           focusNode: draft.locationFocus,
+          commitSignal: draft.commitSignal,
           placeholder: 'Where…',
           style: t.type.bodyStyle,
           autoBegin: state.eventTextTargets(uid, location: true),
@@ -269,6 +270,7 @@ class EventDetail extends StatelessWidget {
                   key: const Key('edit-title'),
                   controller: draft.titleController,
                   focusNode: draft.titleFocus,
+                  commitSignal: draft.commitSignal,
                   style: paneTitleStyle(t, muted: event.isCancelled).copyWith(
                     decoration: event.isCancelled
                         ? TextDecoration.lineThrough
@@ -371,15 +373,18 @@ class EventDetail extends StatelessWidget {
         ),
       ],
     );
+    // Ctrl/Cmd+S saves through the fields: each one writes what it shows, so
+    // it records the text it saved rather than going stale.
+    void saveNow() {
+      if (draft != null && draft.dirty) draft.commitSignal.ping();
+    }
+
     Widget withKeys = CallbackShortcuts(
       bindings: {
         if (draft != null) ...{
-          const SingleActivator(LogicalKeyboardKey.keyS, control: true): () {
-            if (draft.dirty) state.commitEventText(uid);
-          },
-          const SingleActivator(LogicalKeyboardKey.keyS, meta: true): () {
-            if (draft.dirty) state.commitEventText(uid);
-          },
+          const SingleActivator(LogicalKeyboardKey.keyS, control: true):
+              saveNow,
+          const SingleActivator(LogicalKeyboardKey.keyS, meta: true): saveNow,
         },
       },
       child: page,
@@ -403,6 +408,7 @@ class EventDetail extends StatelessWidget {
         key: const Key('edit-body'),
         controller: draft.bodyController,
         focusNode: draft.bodyFocus,
+        commitSignal: draft.commitSignal,
         multiline: true,
         placeholder: 'Description',
         autoBegin: state.eventTextTargets(uid, body: true),

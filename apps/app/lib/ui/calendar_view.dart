@@ -1,7 +1,7 @@
 import 'dart:ui' show PlatformDispatcher;
 
 import 'package:davdart/davdart.dart';
-import 'package:flutter/gestures.dart' show kTouchSlop;
+import 'package:flutter/gestures.dart' show kPrimaryButton, kTouchSlop;
 
 import 'dart:async';
 
@@ -587,6 +587,9 @@ class _CalendarViewState extends State<CalendarView> {
                   : (p.dx / g.cellWidth).floor().clamp(0, 6);
               return Listener(
                 onPointerDown: (e) {
+                  // Only the primary button, a finger or a pen starts a range:
+                  // a right or middle press scrolls or opens a menu instead.
+                  if (e.buttons & kPrimaryButton == 0) return;
                   _dragAt = e.localPosition;
                   _dragFrom = dayAt(e.localPosition);
                   _dragTo = null;
@@ -930,29 +933,36 @@ class _CalendarViewState extends State<CalendarView> {
           children: [
             Positioned.fill(child: content),
             // Always mounted, only painted while it shows: the popover of a
-            // button that unmounted would close with it.
+            // button that unmounted would close with it. While it is not
+            // painted it takes no focus and no screen reader: it is not there.
             Positioned.fill(
               child: IgnorePointer(
                 ignoring: !showAdd,
-                child: Opacity(
-                  opacity: showAdd ? 1 : 0,
-                  child: LayoutBuilder(
-                    builder: (context, box) => Align(
-                      alignment: Alignment.topRight,
-                      child: _addButton(
-                        day,
-                        id,
-                        canEvent: canEvent,
-                        canTask: canTask,
-                        // The popover fits the cell it belongs to.
-                        popoverWidth: box.maxWidth,
-                        onOpenChanged: (open) {
-                          if (open) {
-                            setState(() => _addOpenDay = id);
-                          } else if (_addOpenDay == id) {
-                            setState(() => _addOpenDay = null);
-                          }
-                        },
+                child: ExcludeFocus(
+                  excluding: !showAdd,
+                  child: ExcludeSemantics(
+                    excluding: !showAdd,
+                    child: Opacity(
+                      opacity: showAdd ? 1 : 0,
+                      child: LayoutBuilder(
+                        builder: (context, box) => Align(
+                          alignment: Alignment.topRight,
+                          child: _addButton(
+                            day,
+                            id,
+                            canEvent: canEvent,
+                            canTask: canTask,
+                            // The popover fits the cell it belongs to.
+                            popoverWidth: box.maxWidth,
+                            onOpenChanged: (open) {
+                              if (open) {
+                                setState(() => _addOpenDay = id);
+                              } else if (_addOpenDay == id) {
+                                setState(() => _addOpenDay = null);
+                              }
+                            },
+                          ),
+                        ),
                       ),
                     ),
                   ),

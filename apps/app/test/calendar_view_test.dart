@@ -750,6 +750,34 @@ void main() {
     expect(s.events, isEmpty);
   });
 
+  testWidgets('only the primary button drags a range', (t) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    final a = t.getCenter(_k('calendar-day-2026-11-17'));
+    final b = t.getCenter(_k('calendar-day-2026-11-19'));
+    // A right or middle press drags nothing: those scroll or open a menu.
+    for (final button in [kSecondaryButton, kMiddleMouseButton]) {
+      final g = await t.startGesture(
+        a,
+        kind: PointerDeviceKind.mouse,
+        buttons: button,
+      );
+      await g.moveTo(b);
+      await t.pump();
+      await g.up();
+      await t.pumpAndSettle();
+      expect(_k('new-event-title'), findsNothing);
+      expect(s.events, isEmpty);
+    }
+    // The primary button still drags its range.
+    final g = await t.startGesture(a, kind: PointerDeviceKind.mouse);
+    await g.moveTo(b);
+    await t.pump();
+    await g.up();
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsOneWidget);
+  });
+
   testWidgets('the phone has no range drag; a press picks the day', (t) async {
     final s = await _state(t);
     await _pump(t, s, size: const Size(400, 800));

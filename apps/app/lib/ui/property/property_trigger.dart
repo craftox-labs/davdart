@@ -119,8 +119,13 @@ class _PropertyTriggerState extends State<PropertyTrigger>
     await show();
   }
 
+  /// The narrow sheet is up (a second tap while it opens is the same sheet).
+  var _sheetOpen = false;
+
   /// The touch form of the same picker.
   Future<void> _openSheet() async {
+    if (_sheetOpen) return;
+    _sheetOpen = true;
     final navigator = Navigator.of(context);
     var open = true;
     final c = SheetPopoverController(
@@ -144,6 +149,7 @@ class _PropertyTriggerState extends State<PropertyTrigger>
       );
     } finally {
       open = false;
+      _sheetOpen = false;
       c.dispose();
     }
   }

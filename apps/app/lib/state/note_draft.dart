@@ -18,6 +18,13 @@ void setText(TextEditingController c, String text) {
 /// What the user chose when asked about unsaved edits.
 enum DraftChoice { save, discard, keep }
 
+/// A nudge to the inline fields of a text buffer: the page pings it to have
+/// them write what they show (Ctrl+S saves through the fields, so each one
+/// records the text it saved instead of going stale).
+class CommitSignal extends ChangeNotifier {
+  void ping() => notifyListeners();
+}
+
 /// An open in-place edit of one note: the text fields and selectors, and
 /// whether anything differs from what was loaded. Held by AppState so the
 /// peek pane and the full page share one session.

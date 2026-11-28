@@ -122,6 +122,26 @@ void main() {
       expect(_k('inline-text-editing'), findsNothing);
     });
 
+    testWidgets('Ctrl+S saves through the field, so Esc keeps that text', (
+      t,
+    ) async {
+      final app = await _pump(t);
+      await t.tap(_k('pane-title'));
+      await t.pumpAndSettle();
+      await t.enterText(_k('edit-title'), 'Pay the rent');
+      await t.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+      await t.sendKeyEvent(LogicalKeyboardKey.keyS);
+      await t.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+      await t.pumpAndSettle();
+      expect(app.state.taskById('k')!.summary, 'Pay the rent');
+      // Esc goes back to what was saved by those keys, not to the text they
+      // replaced: the field recorded the save.
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pumpAndSettle();
+      expect(app.state.taskDraftFor('k')!.titleController.text, 'Pay the rent');
+      expect(app.state.taskById('k')!.summary, 'Pay the rent');
+    });
+
     testWidgets('a status pick saves at once and leaves an Undo', (t) async {
       final app = await _pump(t);
       await t.tap(_k('property-status'));

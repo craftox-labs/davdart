@@ -48,12 +48,23 @@ class NoteInlineText extends StatefulWidget {
 
 class _NoteInlineTextState extends State<NoteInlineText> {
   final _controller = TextEditingController();
+  final _focus = FocusNode(debugLabel: 'note-inline-text');
+
+  /// The note's value this field last took.
   late String _value;
+
+  /// The text this field last wrote to the note. The field holds an edit of
+  /// its own while it shows anything else.
+  late String _saved;
+
+  /// A write of this field is in flight: the note it reloads is this field's
+  /// own text on its way back, not a change made elsewhere.
+  var _writing = false;
 
   @override
   void initState() {
     super.initState();
-    _value = _current;
+    _value = _saved = _current;
     _controller.text = _value;
   }
 
@@ -63,25 +74,47 @@ class _NoteInlineTextState extends State<NoteInlineText> {
   @override
   void didUpdateWidget(NoteInlineText old) {
     super.didUpdateWidget(old);
+    _followNote();
+  }
+
+  /// Takes the note's value when the note changed elsewhere, and leaves the
+  /// field alone while it is the one being typed in: it has the focus, it
+  /// holds text this field has not written yet, or its write is in flight
+  /// (that write, not a reload, decides what the note holds).
+  void _followNote() {
     final now = _current;
     if (now == _value) return;
-    _value = now;
-    // The note changed elsewhere: show the new value, unless the field holds
-    // something else (someone typing here).
-    if (_controller.text != now) setText(_controller, now);
+    if (_focus.hasFocus || _writing) return;
+    if (_controller.text != _saved) return;
+    _value = _saved = now;
+    setText(_controller, now);
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _focus.dispose();
     super.dispose();
   }
 
-  Future<bool> _commit(String text) {
+  Future<bool> _commit(String text) async {
     final field = widget.field;
-    return field == null
-        ? widget.state.setNoteText(widget.uid, text)
-        : widget.state.setNoteField(widget.uid, field, text);
+    _writing = true;
+    final bool ok;
+    try {
+      ok = await (field == null
+          ? widget.state.setNoteText(widget.uid, text)
+          : widget.state.setNoteField(widget.uid, field, text));
+    } finally {
+      _writing = false;
+    }
+    if (!ok) return false;
+    // What the note holds, even if the field has moved on since: text typed
+    // while the write ran is an edit of its own. A reload that landed during
+    // the write was skipped, so it is taken now if it says something else.
+    _value = _saved = text;
+    if (mounted) _followNote();
+    return true;
   }
 
   @override
@@ -91,6 +124,7 @@ class _NoteInlineTextState extends State<NoteInlineText> {
     final empty = widget.placeholder;
     return InlineText(
       controller: _controller,
+      focusNode: _focus,
       multiline: widget.multiline,
       style: style,
       onCommit: _commit,
