@@ -256,10 +256,18 @@ void main() {
       await t.pumpAndSettle();
       expect(find.byType(HomeBoard), findsOneWidget);
       expect(_k('board-drop-notes'), findsNothing);
+      // No Board/List view toggle up there whatever mode is persisted: the
+      // one "Board" in the top bar is the project's own tab pill (the pill
+      // moved into the page header row).
       final top = find.byKey(const Key('top-bar'));
-      for (final w in ['Board', 'List']) {
-        expect(find.descendant(of: top, matching: find.text(w)), findsNothing);
-      }
+      expect(
+        find.descendant(of: top, matching: find.text('List')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: top, matching: _k('proj-tab-board')),
+        findsOneWidget,
+      );
       expect(s.columns().map((c) => c.$1), contains('notes'));
       expect(
         s.columns(includeNoStatus: false).map((c) => c.$1),

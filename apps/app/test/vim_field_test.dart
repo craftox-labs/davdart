@@ -3,6 +3,7 @@ import 'package:davdart_app/data/key_value_storage.dart';
 import 'package:davdart_app/state/app_action.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/ui/app_actions.dart';
+import 'package:davdart_app/ui/property/inline_text.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
@@ -12,7 +13,9 @@ import 'tasks_helper.dart';
 
 Finder _k(String k) => find.byKey(Key(k));
 
-/// The three editors and how to open each in edit mode and read its body.
+/// The one editor with Vim editing: a note's body. The task and event
+/// descriptions are plain multiline inline fields (see the last group, and the
+/// design doc's stage list: stage 1 defers Vim in descriptions).
 class _Kind {
   _Kind(this.name, this.uid, this.start, this.body);
   final String name;
@@ -27,18 +30,6 @@ final _kinds = [
     'n1',
     (s) => s.startEdit('n1'),
     (s) => s.draftFor('n1')!.bodyController.text,
-  ),
-  _Kind(
-    'task',
-    'k1',
-    (s) => s.startTaskEdit('k1'),
-    (s) => s.taskDraftFor('k1')!.bodyController.text,
-  ),
-  _Kind(
-    'event',
-    'e1',
-    (s) => s.startEventEdit('e1'),
-    (s) => s.eventDraftFor('e1')!.bodyController.text,
   ),
 ];
 
@@ -205,11 +196,7 @@ void main() {
         expect(find.text(':wq'), findsOneWidget);
         await _enter(t);
         expect(s.isEditing(k.uid), isFalse);
-        expect(switch (k.name) {
-          'note' => s.tree.find('n1')!.note.description,
-          'task' => s.taskById('k1')!.description,
-          _ => s.eventById('e1')!.description,
-        }, contains('ello world'));
+        expect(s.tree.find('n1')!.note.description, contains('ello world'));
       });
 
       testWidgets('ZZ saves and leaves', (t) async {
@@ -522,6 +509,58 @@ void main() {
       await t.tap(_k('vim-editor'));
       await t.pumpAndSettle();
       expect(s.vimEditor, isTrue);
+    });
+  });
+
+  // A task's and an event's description is a plain multiline field, not a Vim
+  // one: their edit modes are gone (2026-11-28-inline-edit-design.md, section
+  // 6's stage list, and its open question 2 - Vim there waits until VimField no
+  // longer needs a draft).
+  group('vim field: task and event descriptions are plain fields', () {
+    testWidgets('no Vim field, no mode footer, a multiline InlineText', (
+      t,
+    ) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final s = await pumpTasksApp(
+        t,
+        notes: [
+          Note(
+            uid: 'n1',
+            summary: 'Note one',
+            description: 'hello world\nsecond',
+          ),
+        ],
+        tasks: [mkTask('k1', days: 0, description: 'hello world\nsecond')],
+        events: [
+          mkEvent('e1', days: 0, hour: 9, description: 'hello world\nsecond'),
+        ],
+      );
+      for (final (uid, start, read) in [
+        ('k1', s.startTaskEdit, (AppState s) => s.taskById('k1')!.description),
+        (
+          'e1',
+          s.startEventEdit,
+          (AppState s) => s.eventById('e1')!.description,
+        ),
+      ]) {
+        s.select(uid);
+        await t.pumpAndSettle();
+        start(uid);
+        await t.pumpAndSettle();
+        final field = _k('edit-body');
+        expect(field, findsOneWidget);
+        expect(t.widget<InlineText>(field).multiline, isTrue);
+        expect(_k('vim-mode'), findsNothing);
+        await t.tap(field);
+        await t.pumpAndSettle();
+        expect(_k('inline-text-editing'), findsOneWidget);
+        await t.enterText(field, 'plain text');
+        await t.pump(const Duration(milliseconds: 900));
+        await t.pumpAndSettle();
+        expect(read(s), 'plain text');
+        expect(_k('vim-mode'), findsNothing);
+      }
     });
   });
 
