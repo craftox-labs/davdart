@@ -181,6 +181,37 @@ void main() {
       expect(_k('property-status'), findsOneWidget);
     });
 
+    testWidgets('the pending text is flushed before the picker shows', (
+      t,
+    ) async {
+      final log = <String>[];
+      await _pump(
+        t,
+        PropertyTrigger(
+          onOpen: () async {
+            // A slow write: the picker must not show before it lands.
+            await Future<void>.delayed(const Duration(milliseconds: 50));
+            log.add('flush');
+          },
+          picker: (context, control) {
+            log.add('shown');
+            return _statusPicker(value: 'todo');
+          },
+          child: const PropertyRow(
+            key: Key('property-status'),
+            icon: FLucideIcons.circleDot,
+            label: 'status',
+            text: 'needs-action',
+            interactive: true,
+          ),
+        ),
+      );
+      await t.tap(_k('property-status'));
+      await t.pumpAndSettle();
+      expect(log, ['flush', 'shown']);
+      expect(find.byType(OptionPicker<String>), findsOneWidget);
+    });
+
     testWidgets('narrow: the same picker shows in a sheet', (t) async {
       await _pump(
         t,

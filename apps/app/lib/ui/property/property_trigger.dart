@@ -17,12 +17,18 @@ class PropertyTrigger extends StatefulWidget {
     required this.picker,
     required this.child,
     this.sheetKey,
+    this.onOpen,
   });
 
   final Widget Function(BuildContext context, FPopoverController control)
   picker;
   final Widget child;
   final Key? sheetKey;
+
+  /// Runs before the picker shows: text that is still typing is committed
+  /// first, so the pick carries everything the field holds (a pick made while
+  /// text is dirty flushes the text first).
+  final Future<void> Function()? onOpen;
 
   @override
   State<PropertyTrigger> createState() => _PropertyTriggerState();
@@ -34,7 +40,7 @@ class _PropertyTriggerState extends State<PropertyTrigger>
   Widget build(BuildContext context) {
     final t = tokensOf(context);
     if (narrowLayout(context)) {
-      return FTappable(onPress: _openSheet, child: widget.child);
+      return FTappable(onPress: () => _open(_openSheet), child: widget.child);
     }
     return TrackPopover(
       builder: (context, pc) => FPopover(
@@ -47,10 +53,17 @@ class _PropertyTriggerState extends State<PropertyTrigger>
           child: widget.picker(context, c),
         ),
         builder: (context, c, child) =>
-            FTappable(onPress: c.toggle, child: child!),
+            FTappable(onPress: () => _open(c.toggle), child: child!),
         child: widget.child,
       ),
     );
+  }
+
+  /// Flushes what is pending, then shows [show] (the popover or the sheet).
+  Future<void> _open(Future<void> Function() show) async {
+    await widget.onOpen?.call();
+    if (!mounted) return;
+    await show();
   }
 
   /// The touch form of the same picker.

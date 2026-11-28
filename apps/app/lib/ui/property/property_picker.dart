@@ -14,6 +14,7 @@ class PropertyPicker<T> extends StatefulWidget {
   const PropertyPicker({
     super.key,
     required this.id,
+    required this.uid,
     required this.state,
     required this.icon,
     required this.label,
@@ -27,6 +28,10 @@ class PropertyPicker<T> extends StatefulWidget {
   /// Names the row, its sheet and its options (`property-<id>`,
   /// `property-sheet-<id>`).
   final String id;
+
+  /// The item the picks are written to: its text is flushed before a picker
+  /// shows.
+  final String uid;
   final AppState state;
   final IconData icon;
   final String label;
@@ -70,6 +75,9 @@ class _PropertyPickerState<T> extends State<PropertyPicker<T>> {
   @override
   Widget build(BuildContext context) => PropertyTrigger(
     sheetKey: Key('property-sheet-${widget.id}'),
+    onOpen: () async {
+      await widget.state.flushEdit(widget.uid);
+    },
     picker: (context, control) => widget.picker(context, control, _apply),
     child: PropertyRow(
       key: Key('property-${widget.id}'),

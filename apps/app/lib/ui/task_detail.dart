@@ -195,6 +195,7 @@ class TaskDetail extends StatelessWidget {
       if (edit)
         PropertyPicker<String>(
           id: 'status',
+          uid: uid,
           state: state,
           icon: FLucideIcons.circleDot,
           label: 'status',
@@ -230,6 +231,7 @@ class TaskDetail extends StatelessWidget {
       if (edit)
         PropertyPicker<int>(
           id: 'priority',
+          uid: uid,
           state: state,
           icon: FLucideIcons.flag,
           label: 'priority',
@@ -286,6 +288,7 @@ class TaskDetail extends StatelessWidget {
       if (edit)
         PropertyPicker<List<String>>(
           id: 'tags',
+          uid: uid,
           state: state,
           icon: FLucideIcons.tag,
           label: 'labels',
@@ -309,6 +312,7 @@ class TaskDetail extends StatelessWidget {
       if (edit)
         PropertyPicker<String>(
           id: 'parent',
+          uid: uid,
           state: state,
           icon: FLucideIcons.folderInput,
           label: 'inside',
@@ -488,6 +492,7 @@ class TaskDetail extends StatelessWidget {
     }
     return PropertyPicker<DateTime>(
       id: id,
+      uid: uid,
       state: state,
       icon: icon,
       label: label,
