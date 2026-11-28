@@ -31,11 +31,12 @@ class PropertyPicker<T> extends StatefulWidget {
   final IconData icon;
   final String label;
 
-  /// The picker content; `apply` writes the picked value.
+  /// The picker content; `apply` writes the picked value and is false when
+  /// the write did not go through.
   final Widget Function(
     BuildContext context,
     FPopoverController control,
-    ValueChanged<T?> apply,
+    Future<bool> Function(T?) apply,
   )
   picker;
   final Future<bool> Function(T? value) onPick;
@@ -50,12 +51,12 @@ class PropertyPicker<T> extends StatefulWidget {
 class _PropertyPickerState<T> extends State<PropertyPicker<T>> {
   var _failed = false;
 
-  Future<void> _apply(T? value) async {
+  Future<bool> _apply(T? value) async {
     final ok = await widget.onPick(value);
-    if (!mounted) return;
+    if (!mounted) return ok;
     if (ok) {
       if (_failed) setState(() => _failed = false);
-      return;
+      return true;
     }
     setState(() => _failed = true);
     widget.state.reportNotSaved(widget.state.error ?? 'could not save');
@@ -63,6 +64,7 @@ class _PropertyPickerState<T> extends State<PropertyPicker<T>> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _failed) setState(() => _failed = false);
     });
+    return false;
   }
 
   @override

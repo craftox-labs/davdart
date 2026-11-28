@@ -9,6 +9,16 @@ import 'package:forui/forui.dart';
 Finder _k(String k) => find.byKey(Key(k));
 
 Finder get _field => _k('inline-text-field');
+Finder get _editing => _k('inline-text-editing');
+
+/// The [Text] the value paints (the field is an EditableText, not a Text).
+Finder get _valueText =>
+    find.descendant(of: _k('subject'), matching: find.byType(Text));
+
+String? _shown(WidgetTester t) {
+  final texts = t.widgetList<Text>(_valueText).toList();
+  return texts.isEmpty ? null : texts.first.data;
+}
 
 const _tokens = Tokens.light;
 
@@ -80,11 +90,14 @@ void main() {
   group('InlineText', () {
     testWidgets('the value is plain text until it is tapped', (t) async {
       await _pump(t);
-      expect(find.text('Alpha'), findsOneWidget);
-      expect(_field, findsNothing);
+      expect(_shown(t), 'Alpha');
+      // The field is mounted but takes no text until it has the focus.
+      expect(t.widget<EditableText>(_field).readOnly, isTrue);
+      expect(_editing, findsNothing);
       await _open(t);
-      expect(_field, findsOneWidget);
-      // The field holds what the value showed.
+      expect(_editing, findsOneWidget);
+      // The field holds what the value showed; until it is focused it takes
+      // no text.
       expect(t.widget<EditableText>(_field).controller.text, 'Alpha');
     });
 
@@ -107,7 +120,7 @@ void main() {
       FocusManager.instance.primaryFocus?.unfocus();
       await t.pumpAndSettle();
       expect(h.commits, ['Beta']);
-      expect(_field, findsNothing);
+      expect(_editing, findsNothing);
     });
 
     testWidgets('Esc reverts the field to the last saved text', (t) async {
@@ -118,8 +131,8 @@ void main() {
       await t.pumpAndSettle();
       expect(h.commits, isEmpty);
       expect(h.controller.text, 'Alpha');
-      expect(find.text('Alpha'), findsOneWidget);
-      expect(_field, findsNothing);
+      expect(_shown(t), 'Alpha');
+      expect(_editing, findsNothing);
     });
 
     testWidgets('Esc after a commit reverts to what was saved', (t) async {
@@ -145,7 +158,7 @@ void main() {
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pumpAndSettle();
       expect(h.commits, ['Entered']);
-      expect(_field, findsNothing);
+      expect(_editing, findsNothing);
     });
 
     testWidgets('a commit that fails puts the saved text back', (t) async {
@@ -160,12 +173,14 @@ void main() {
       expect(t.widget<EditableText>(_field).style.color, _tokens.error);
       await t.sendKeyEvent(LogicalKeyboardKey.escape);
       await t.pumpAndSettle();
-      expect(find.text('Alpha'), findsOneWidget);
+      expect(_shown(t), 'Alpha');
+      expect(_editing, findsNothing);
     });
 
     testWidgets('an empty value shows the muted placeholder', (t) async {
       await _pump(t, text: '');
-      final text = t.widget<Text>(find.text('Nothing here'));
+      final text = t.widget<Text>(_valueText);
+      expect(text.data, 'Nothing here');
       expect(text.style!.color, _tokens.muted);
     });
 
@@ -175,7 +190,7 @@ void main() {
       final h = await _pump(t);
       h.controller.text = 'From the server';
       await t.pumpAndSettle();
-      expect(find.text('From the server'), findsOneWidget);
+      expect(_shown(t), 'From the server');
       expect(h.commits, isEmpty);
     });
 
@@ -183,14 +198,14 @@ void main() {
       t,
     ) async {
       final h = await _pump(t, text: 'Body', multiline: true);
-      // Unfocused: a preview builder draws the value.
-      expect(find.text('Body'), findsOneWidget);
+      // Unfocused: the value is the plain Text (no preview builder here).
+      expect(_shown(t), 'Body');
       await _open(t);
       await t.enterText(_field, 'Line one\nLine two');
       await t.sendKeyEvent(LogicalKeyboardKey.enter);
       await t.pumpAndSettle();
       expect(h.commits, isEmpty);
-      expect(_field, findsOneWidget);
+      expect(_editing, findsOneWidget);
       await t.pump(const Duration(milliseconds: 900));
       await t.pumpAndSettle();
       expect(h.commits, ['Line one\nLine two']);
@@ -222,8 +237,11 @@ void main() {
       await t.pumpAndSettle();
       await t.tap(_k('subject'), warnIfMissed: false);
       await t.pumpAndSettle();
-      expect(_field, findsNothing);
-      expect(find.text('Fixed'), findsOneWidget);
+      expect(_editing, findsNothing);
+      expect(
+        find.descendant(of: _k('subject'), matching: find.byType(Text)),
+        findsOneWidget,
+      );
     });
   });
 }

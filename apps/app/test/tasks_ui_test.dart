@@ -6,8 +6,8 @@ import 'package:davdart_app/state/tab_state.dart';
 import 'package:davdart_app/ui/app.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:davdart_app/ui/parts.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 
@@ -415,14 +415,16 @@ void main() {
       final s = await pumpTasksApp(t, tasks: [mkTask('k', summary: 'S')]);
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('task-status-menu'));
+      await t.tap(_k('property-status'));
       await t.pumpAndSettle();
-      await t.tap(find.text('in-process').last);
+      await t.tap(_k('property-option-status-doing'));
       await t.pumpAndSettle();
       expect(s.taskById('k')!.status, 'IN-PROCESS');
     });
 
-    testWidgets('edit, save, due and priority', (t) async {
+    testWidgets('no pencil: the title opens the field and saves itself', (
+      t,
+    ) async {
       final s = await pumpTasksApp(
         t,
         notes: _notes(),
@@ -430,58 +432,80 @@ void main() {
       );
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
+      // No pencil and no Save or Cancel on a task.
+      for (final k in [
+        'edit-note',
+        'edit-save-action',
+        'edit-cancel-action',
+        'dirty-indicator',
+      ]) {
+        expect(_k(k), findsNothing, reason: k);
+      }
+      expect(_k('pane-title'), findsOneWidget);
+      await t.tap(_k('pane-title'));
       await t.pumpAndSettle();
       expect(s.taskDraftFor('k'), isNotNull);
-      expect(_k('dirty-indicator'), findsNothing);
       await t.enterText(_k('edit-title'), 'Edited');
-      await t.pump();
-      expect(_k('dirty-indicator'), findsOneWidget);
-      s.taskDraftFor('k')!
-        ..setDue(dueIn(2))
-        ..setPriority(5);
-      await t.pump();
-      await t.tap(_k('edit-save-action'));
+      await t.pump(const Duration(milliseconds: 900));
       await t.pumpAndSettle();
-      final k = s.taskById('k')!;
-      expect(k.summary, 'Edited');
-      expect(k.due, dueIn(2));
-      expect(k.priority, 5);
-      expect(s.taskDraftFor('k'), isNull);
+      expect(s.taskById('k')!.summary, 'Edited');
+      // The text buffer stays open (there is no mode to leave); Enter closes
+      // the field itself.
+      expect(_k('inline-text-editing'), findsOneWidget);
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pumpAndSettle();
+      expect(_k('inline-text-editing'), findsNothing);
+      expect(_k('pane-title'), findsOneWidget);
     });
 
-    testWidgets('the date field and priority select drive the draft', (
-      t,
-    ) async {
+    testWidgets('the due, start and priority rows save at once', (t) async {
       final s = await pumpTasksApp(
         t,
         tasks: [mkTask('k', summary: 'Fields', days: 1)],
       );
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
+      await t.tap(_k('property-due'));
       await t.pumpAndSettle();
-      expect(_k('edit-due'), findsOneWidget);
-      expect(_k('edit-priority'), findsOneWidget);
-      await t.tap(_k('edit-priority'));
+      t.takeException(); // the test font overflows the calendar header
+      await t.tap(_k('property-date-due-tomorrow'));
       await t.pumpAndSettle();
-      await t.tap(find.text('high').last);
+      expect(s.taskById('k')!.due, dueIn(1));
+      await t.tap(_k('property-start'));
       await t.pumpAndSettle();
-      expect(s.taskDraftFor('k')!.priority, 1);
+      t.takeException(); // the test font overflows the calendar header
+      await t.tap(_k('property-date-start-today'));
+      await t.pumpAndSettle();
+      expect(s.taskById('k')!.dtstart, dueIn(0));
+      await t.tap(_k('property-priority'));
+      await t.pumpAndSettle();
+      await t.tap(_k('property-option-priority-1'));
+      await t.pumpAndSettle();
+      expect(s.taskById('k')!.priority, 1);
+      // Each pick left an Undo toast; the last one restores the priority.
+      await t.tap(_k('board-undo'));
+      await t.pumpAndSettle();
+      expect(s.taskById('k')!.priority, isNull);
     });
 
-    testWidgets('empty title cannot be saved', (t) async {
+    testWidgets('an empty title is not saved and says so', (t) async {
       final s = await pumpTasksApp(t, tasks: [mkTask('k')]);
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
+      await t.tap(_k('pane-title'));
       await t.pumpAndSettle();
       await t.enterText(_k('edit-title'), '  ');
-      await t.pump();
-      expect(t.widget<IconAction>(_k('edit-save-action')).onPress, isNull);
+      await t.pump(const Duration(milliseconds: 900));
+      await t.pumpAndSettle();
+      // The text goes back to what the task holds, with the reason.
+      expect(s.taskById('k')!.summary, 'k');
+      expect(s.taskDraftFor('k')!.titleController.text, 'k');
+      expect(find.textContaining('Not saved'), findsOneWidget);
     });
 
-    testWidgets('dirty guard: keep editing, discard, save', (t) async {
+    testWidgets('leaving a task saves its typed text without asking', (
+      t,
+    ) async {
       final s = await pumpTasksApp(
         t,
         tasks: [
@@ -493,20 +517,13 @@ void main() {
       await t.pumpAndSettle();
       s.startTaskEdit('k');
       s.taskDraftFor('k')!.titleController.text = 'Changed';
+      // A task's text has no edit mode to ask about: it commits.
       s.leaveGuard = () async => DraftChoice.keep;
-      await s.openNote('m');
-      expect(s.peekUid, 'k');
-      s.leaveGuard = () async => DraftChoice.discard;
-      await s.openNote('m');
-      expect(s.peekUid, 'm');
-      expect(s.taskById('k')!.summary, 'Guard');
-      s.select('k');
-      s.startTaskEdit('k');
-      s.taskDraftFor('k')!.titleController.text = 'Saved';
-      s.leaveGuard = () async => DraftChoice.save;
       await t.runAsync(() => s.openNote('m'));
       await t.pumpAndSettle();
-      expect(s.taskById('k')!.summary, 'Saved');
+      expect(s.peekUid, 'm');
+      expect(s.taskById('k')!.summary, 'Changed');
+      expect(s.taskDraftFor('k'), isNull);
     });
 
     testWidgets('the draft survives promoting to the main area', (t) async {
@@ -520,9 +537,12 @@ void main() {
       expect(s.mainTaskUid, 'k');
       expect(s.taskDraftFor('k')!.titleController.text, 'Typed');
       expect(s.tabDirty(const DocTab.task('k')), isTrue);
+      // Closing the tab commits the text and closes it.
       s.leaveGuard = () async => DraftChoice.keep;
-      await s.closeTab(const DocTab.task('k'));
-      expect(s.tabs, isNotEmpty);
+      await t.runAsync(() => s.closeTab(const DocTab.task('k')));
+      await t.pumpAndSettle();
+      expect(s.tabs, isEmpty);
+      expect(s.taskById('k')!.summary, 'Typed');
     });
 
     testWidgets('parent select lists notes and other tasks', (t) async {
@@ -536,15 +556,17 @@ void main() {
       );
       s.select('k');
       await t.pumpAndSettle();
-      await t.tap(_k('edit-note'));
+      await t.tap(_k('property-parent'));
       await t.pumpAndSettle();
-      await t.tap(_k('edit-parent'));
-      await t.pumpAndSettle();
-      expect(find.textContaining('Parent'), findsWidgets);
-      await t.tap(find.textContaining('Parent  (task)').last);
-      await t.pumpAndSettle();
-      expect(s.taskDraftFor('k')!.parent, 'p');
-      await t.tap(_k('edit-save-action'));
+      expect(_k('property-parent-parent-top'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: _k('property-parent-parent-p'),
+          matching: find.text('Parent'),
+        ),
+        findsOneWidget,
+      );
+      await t.tap(_k('property-parent-parent-p'));
       await t.pumpAndSettle();
       expect(s.taskById('k')!.parentUid, 'p');
     });

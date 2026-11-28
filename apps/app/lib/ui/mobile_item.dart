@@ -13,6 +13,9 @@ import 'theme.dart';
 /// The toggle's icon shows the action a press does: a pencil while previewing
 /// (edit), an open book while editing (back to the preview). Leaving edit mode
 /// saves first (edits autosave, there is no cancel).
+///
+/// An item with no edit mode ([canEdit] false, a task whose text is edited in
+/// place) keeps only the ⋯ button and the dot of its text buffer.
 class MobileItemActions extends StatefulWidget {
   const MobileItemActions({
     super.key,
@@ -28,7 +31,7 @@ class MobileItemActions extends StatefulWidget {
   final String uid;
   final bool editing, canEdit;
 
-  /// Starts editing the item.
+  /// Starts editing the item (unused when [canEdit] is false).
   final VoidCallback onEdit;
 
   /// The edit session, for the saved indicator.
@@ -78,6 +81,8 @@ class _MobileItemActionsState extends State<MobileItemActions>
                 ),
             ],
           ),
+        if (!widget.canEdit && widget.draft != null)
+          AutosaveDot(state: state, uid: widget.uid, draft: widget.draft!),
         IconAction(
           key: const Key('item-more'),
           tooltip: 'More',
@@ -112,6 +117,32 @@ class AutosaveIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final t = tokensOf(context);
+    return Positioned(
+      top: t.space.sm,
+      right: t.space.sm,
+      child: IgnorePointer(
+        child: AutosaveDot(state: state, uid: uid, draft: draft),
+      ),
+    );
+  }
+}
+
+/// The dot itself, for the places that have no mode button to sit on (a
+/// task's inline text beside the ⋯ button).
+class AutosaveDot extends StatelessWidget {
+  const AutosaveDot({
+    super.key,
+    required this.state,
+    required this.uid,
+    required this.draft,
+  });
+  final AppState state;
+  final String uid;
+  final Listenable draft;
+
+  @override
+  Widget build(BuildContext context) {
+    final t = tokensOf(context);
     return ListenableBuilder(
       listenable: Listenable.merge([state, draft]),
       builder: (context, _) {
@@ -121,25 +152,19 @@ class AutosaveIndicator extends StatelessWidget {
             : state.autosavePending(uid)
             ? ('saving', 'Saving', t.muted)
             : ('failed', 'Not saved', t.error);
-        return Positioned(
-          top: t.space.sm,
-          right: t.space.sm,
-          child: IgnorePointer(
-            child: Semantics(
-              key: Key('autosave-$key'),
-              label: label,
-              child: color == null
-                  ? const SizedBox.shrink()
-                  : Container(
-                      width: t.sizes.statusDot,
-                      height: t.sizes.statusDot,
-                      decoration: BoxDecoration(
-                        color: color,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-            ),
-          ),
+        return Semantics(
+          key: Key('autosave-$key'),
+          label: label,
+          child: color == null
+              ? const SizedBox.shrink()
+              : Container(
+                  width: t.sizes.statusDot,
+                  height: t.sizes.statusDot,
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
+                ),
         );
       },
     );

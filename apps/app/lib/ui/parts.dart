@@ -247,6 +247,7 @@ class ItemHeader extends StatelessWidget {
     this.editor,
     this.leading,
     this.strike = false,
+    this.onTitleTap,
   });
   final String title;
   final bool full, inHeader, strike;
@@ -255,6 +256,10 @@ class ItemHeader extends StatelessWidget {
 
   /// The title field while the item is being edited.
   final Widget? editor;
+
+  /// Makes the title itself the way into its inline field (an item whose text
+  /// is edited in place).
+  final VoidCallback? onTitleTap;
 
   /// Shown before the title when not editing (a task's checkbox).
   final Widget? leading;
@@ -284,23 +289,28 @@ class ItemHeader extends StatelessWidget {
           leading!,
           SizedBox(width: t.space.md),
         ],
-        Expanded(
-          child:
-              editor ??
-              Align(
-                alignment: Alignment.centerLeft,
-                child: PaneTitle(
-                  title,
-                  textKey: const Key('pane-title'),
-                  muted: strike,
-                  strike: strike,
-                ),
-              ),
-        ),
+        Expanded(child: editor ?? _title(context)),
         SizedBox(width: t.space.md),
         ...actions,
       ],
     );
+  }
+}
+
+/// The title as text, or as the tap target that opens its inline field.
+extension on ItemHeader {
+  Widget _title(BuildContext context) {
+    final text = Align(
+      alignment: Alignment.centerLeft,
+      child: PaneTitle(
+        title,
+        textKey: const Key('pane-title'),
+        muted: strike,
+        strike: strike,
+      ),
+    );
+    final tap = onTitleTap;
+    return tap == null ? text : FTappable(onPress: tap, child: text);
   }
 }
 

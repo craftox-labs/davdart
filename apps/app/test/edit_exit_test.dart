@@ -43,12 +43,6 @@ void main() {
       (s) => s.draftFor('n1')!.titleController.text = 'Changed',
     ),
     _Kind(
-      'task',
-      'k1',
-      (s) => s.startTaskEdit('k1'),
-      (s) => s.taskDraftFor('k1')!.titleController.text = 'Changed',
-    ),
-    _Kind(
       'event',
       'e1',
       (s) => s.startEventEdit('e1'),
@@ -156,31 +150,87 @@ void main() {
   ) async {
     final s = await pumpTasksApp(
       t,
-      notes: [Note(uid: 'n1', summary: 'Note one', description: 'body')],
+      notes: [
+        Note(uid: 'n1', summary: 'Note one', description: 'body'),
+        Note(uid: 'n2', summary: 'Peek note', description: 'body'),
+      ],
       tasks: [mkTask('k1', days: 0)],
     );
     await s.openNote('k1', mode: OpenMode.main);
-    s.select('n1');
     await t.pumpAndSettle();
+    // A text buffer in the main page, then an edit whose title field takes
+    // the focus in the peek.
     s.startTaskEdit('k1');
     await t.pumpAndSettle();
+    s.select('n2');
+    await t.pumpAndSettle();
+    s.startEdit('n2');
+    await t.pumpAndSettle();
     expect(s.isEditing('k1'), isTrue);
-    expect(s.nav.area, NavArea.main);
-    // The peek (no editor) has the focus: the main edit is left alone.
+    expect(s.isEditing('n2'), isTrue);
+    // The peek is the area with the keys: Esc ends its edit only.
+    FocusManager.instance.primaryFocus?.unfocus();
     s.nav.focusArea(NavArea.peek);
     await t.pump();
     await _esc(t);
+    expect(s.isEditing('n2'), isFalse);
     expect(s.isEditing('k1'), isTrue);
-    s.nav.focusArea(NavArea.peek);
-    await t.pump();
     await _ctrlEnter(t);
     expect(s.isEditing('k1'), isTrue);
-    // With the main page focused, Esc leaves its edit.
+    // With the main page focused, Esc closes the task's text buffer.
     s.nav.focusArea(NavArea.main);
     s.nav.hide();
+    FocusManager.instance.primaryFocus?.unfocus();
     await t.pump();
     await _esc(t);
     expect(s.isEditing('k1'), isFalse);
+  });
+
+  group('edit exit: task (inline text)', () {
+    Future<AppState> openTask(WidgetTester t) async {
+      final s = await pumpTasksApp(
+        t,
+        tasks: [mkTask('k1', summary: 'Task one', days: 0)],
+      );
+      s.select('k1');
+      await t.pumpAndSettle();
+      s.startTaskEdit('k1');
+      await t.pumpAndSettle();
+      expect(s.isEditing('k1'), isTrue);
+      return s;
+    }
+
+    testWidgets('a task header has no Cancel or Save icon', (t) async {
+      await openTask(t);
+      expect(_k('edit-cancel-action'), findsNothing);
+      expect(_k('edit-save-action'), findsNothing);
+      expect(_k('edit-note'), findsNothing);
+      // The title is the field.
+      expect(_k('inline-text-editing'), findsOneWidget);
+    });
+
+    testWidgets('Esc reverts the field; the next Esc leaves the buffer', (
+      t,
+    ) async {
+      final s = await openTask(t);
+      await t.enterText(_k('edit-title'), 'Half typed');
+      await _esc(t);
+      expect(s.taskDraftFor('k1')!.titleController.text, 'Task one');
+      expect(s.taskById('k1')!.summary, 'Task one');
+      expect(_k('inline-text-editing'), findsNothing);
+      expect(s.isEditing('k1'), isTrue);
+      // Nothing in the page holds the field now: Esc leaves the buffer.
+      await _esc(t);
+      expect(s.isEditing('k1'), isFalse);
+    });
+
+    testWidgets('Ctrl+Enter saves the text and closes the buffer', (t) async {
+      final s = await openTask(t);
+      await t.enterText(_k('edit-title'), 'Saved by keys');
+      await _ctrlEnter(t);
+      expect(s.taskById('k1')!.summary, 'Saved by keys');
+      expect(s.isEditing('k1'), isFalse);
+    });
   });
 
   Future<void> openSelect(WidgetTester t) async {
@@ -208,19 +258,22 @@ void main() {
     expect(s.isEditing('n1'), isFalse);
   });
 
-  testWidgets('Esc closes a real FDateField popover first; second leaves', (
-    t,
-  ) async {
-    final s = await open(t, kinds[1]);
-    await t.tap(_k('edit-due'));
+  testWidgets('Esc closes a real date picker first; second leaves', (t) async {
+    final s = await pumpTasksApp(
+      t,
+      tasks: [mkTask('k1', days: 0, summary: 'Task one')],
+    );
+    s.select('k1');
+    await t.pumpAndSettle();
+    await t.tap(_k('property-due'));
     await t.pumpAndSettle();
     t.takeException(); // the test font overflows the calendar header
     expect(find.byType(FCalendar), findsWidgets);
     await _esc(t);
     expect(find.byType(FCalendar), findsNothing);
-    expect(s.isEditing('k1'), isTrue);
-    await _esc(t);
-    expect(s.isEditing('k1'), isFalse);
+    // The picker was closed, the page is untouched.
+    expect(_k('task-detail'), findsOneWidget);
+    expect(s.taskById('k1')!.due, dueIn(0));
   });
 
   testWidgets('a calendar outside any popover does not disable Esc', (t) async {

@@ -1,5 +1,6 @@
 import 'package:davdart/davdart.dart';
 import 'package:davdart_app/state/app_state.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
@@ -351,7 +352,7 @@ void main() {
   });
 
   group('tasks and events', () {
-    testWidgets('a task: toggle, ⋯, autosave of text and a selector', (
+    testWidgets('a task: no toggle, the title and the rows edit in place', (
       t,
     ) async {
       final s = await pumpTasksApp(
@@ -361,19 +362,41 @@ void main() {
       );
       await s.openNote('k1');
       await t.pumpAndSettle();
+      // No edit/preview toggle and no pencil: the text edits in place.
       expect(_k('item-more'), findsOneWidget);
-      expect(_icon(FLucideIcons.pencil), findsOneWidget);
-      await t.tap(_k('item-mode'));
+      expect(_k('item-mode'), findsNothing);
+      expect(_icon(FLucideIcons.pencil), findsNothing);
+      expect(_k('edit-note'), findsNothing);
+      // An empty description offers the way into its field.
+      await t.ensureVisible(_k('task-description-tap'));
       await t.pumpAndSettle();
-      expect(_icon(FLucideIcons.bookOpen), findsOneWidget);
-      expect(_k('edit-save-action'), findsNothing);
+      await t.tap(_k('task-description-tap'));
+      await t.pumpAndSettle();
       await t.enterText(_k('edit-body'), 'Details');
-      await t.pump(const Duration(milliseconds: 1600));
+      await t.pump(const Duration(milliseconds: 900));
       await t.pumpAndSettle();
       expect(s.taskById('k1')!.description, contains('Details'));
-      s.taskDraftFor('k1')!.setPriority(1);
+      await t.sendKeyEvent(LogicalKeyboardKey.escape);
+      await t.pumpAndSettle();
+      expect(_k('inline-text-editing'), findsNothing);
+      // The title is the way into its field.
+      await t.tap(_k('pane-title'));
+      await t.pumpAndSettle();
+      expect(_k('inline-text-editing'), findsOneWidget);
+      await t.enterText(_k('edit-title'), 'Pay the rent');
+      await t.pump(const Duration(milliseconds: 900));
+      await t.pumpAndSettle();
+      expect(s.taskById('k1')!.summary, 'Pay the rent');
+      await t.sendKeyEvent(LogicalKeyboardKey.enter);
+      await t.pumpAndSettle();
+      // A selector is a sheet of the same rows.
+      await t.tap(_k('property-priority'));
+      await t.pumpAndSettle();
+      expect(_k('property-sheet-priority'), findsOneWidget);
+      await t.tap(_k('property-option-priority-1'));
       await t.pumpAndSettle();
       expect(s.taskById('k1')!.priority, 1);
+      // The dot follows the text buffer's save state.
       expect(s.dirtyTaskFor('k1'), isFalse);
       await t.tap(_k('item-more'));
       await t.pumpAndSettle();

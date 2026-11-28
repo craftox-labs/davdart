@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/scheduler.dart' show SchedulerBinding;
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
-import 'package:forui/forui.dart';
 
 import '../../state/note_draft.dart' show setText;
 import '../../theme/tokens.dart';
@@ -74,7 +73,6 @@ class InlineText extends StatefulWidget {
 
 class _InlineTextState extends State<InlineText> {
   FocusNode? _ownFocus;
-  final _fieldFocus = FocusNode(debugLabel: 'inline-text-field');
   Timer? _timer;
 
   /// The text the item holds now: what Esc puts back.
@@ -121,7 +119,6 @@ class _InlineTextState extends State<InlineText> {
     widget.controller.removeListener(_typed);
     _focus.removeListener(_focusChanged);
     _ownFocus?.dispose();
-    _fieldFocus.dispose();
     super.dispose();
   }
 
@@ -162,14 +159,18 @@ class _InlineTextState extends State<InlineText> {
     return ok;
   }
 
-  /// Esc: the text goes back to the last saved one, the field closes.
+  /// Esc: the text goes back to the last saved one, the field closes. The
+  /// unfocus waits for the key event to finish, so the keys above the field
+  /// see the field still holding the focus (Esc does not then leave the page).
   void _revert() {
     _timer?.cancel();
     if (widget.controller.text != _saved) {
       setText(widget.controller, _saved);
       _timer?.cancel();
     }
-    _focus.unfocus();
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.unfocus();
+    });
     if (_failed) setState(() => _failed = false);
   }
 
@@ -203,17 +204,26 @@ class _InlineTextState extends State<InlineText> {
       listenable: widget.controller,
       builder: (context, _) {
         final text = widget.controller.text;
-        if (widget.readOnly) return _value(t, style, text, t.fg);
-        // The node stays on one widget in both states, so the focus it takes
-        // is not lost when the value turns into a field.
-        return Focus(
-          focusNode: _focus,
-          child: _focus.hasFocus
-              ? _field(t, style)
-              : FTappable(
-                  onPress: _focus.requestFocus,
-                  child: _value(t, style, text, null),
-                ),
+        if (widget.readOnly) return _value(t, style, text, null);
+        final focused = _focus.hasFocus;
+        // The field is always in the tree (invisibly while it has no focus):
+        // it owns the focus node, so a press on the value lands on a text
+        // field and the shell's key catcher leaves the focus where it is. The
+        // value is painted over it, and takes no press of its own, so a press
+        // anywhere on it opens the field.
+        return Stack(
+          alignment: widget.multiline
+              ? AlignmentDirectional.topStart
+              : AlignmentDirectional.centerStart,
+          children: [
+            Opacity(opacity: focused ? 1 : 0, child: _field(t, style, focused)),
+            if (!focused) IgnorePointer(child: _value(t, style, text, null)),
+            if (focused)
+              const Positioned.fill(
+                key: Key('inline-text-editing'),
+                child: IgnorePointer(child: SizedBox.expand()),
+              ),
+          ],
         );
       },
     );
@@ -242,7 +252,7 @@ class _InlineTextState extends State<InlineText> {
         : Align(alignment: .centerLeft, child: shown);
   }
 
-  Widget _field(Tokens t, TextStyle style) => Focus(
+  Widget _field(Tokens t, TextStyle style, bool focused) => Focus(
     canRequestFocus: false,
     skipTraversal: true,
     onKeyEvent: _keys,
@@ -251,8 +261,8 @@ class _InlineTextState extends State<InlineText> {
       child: EditableText(
         key: const Key('inline-text-field'),
         controller: widget.controller,
-        focusNode: _fieldFocus,
-        autofocus: true,
+        focusNode: _focus,
+        readOnly: !focused,
         style: style.copyWith(color: _failed ? t.error : null),
         cursorColor: t.accent,
         backgroundCursorColor: t.muted,
