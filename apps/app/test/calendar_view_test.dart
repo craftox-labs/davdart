@@ -500,6 +500,37 @@ void main() {
     expect(e.dtend!.value, '20261120');
   });
 
+  testWidgets('a drag highlights the days of its range as it goes', (t) async {
+    final s = await _state(t);
+    await _pump(t, s);
+    // The cell's own wash: the outer fill of the day's box.
+    Color? fill(String id) {
+      final box = t.widget<DecoratedBox>(
+        find
+            .descendant(
+              of: _k('calendar-day-$id'),
+              matching: find.byType(DecoratedBox),
+            )
+            .first,
+      );
+      return (box.decoration as BoxDecoration).color;
+    }
+
+    expect(fill('2026-11-18'), isNull);
+    final g = await t.startGesture(t.getCenter(_k('calendar-day-2026-11-17')));
+    await g.moveTo(t.getCenter(_k('calendar-day-2026-11-19')));
+    await t.pump();
+    // The three days of the range carry the event tint; the day after is
+    // untouched.
+    for (final d in [17, 18, 19]) {
+      expect(fill('2026-11-$d'), Tokens.light.eventTint, reason: 'Nov $d');
+    }
+    expect(fill('2026-11-20'), isNull);
+    await g.up();
+    await t.pumpAndSettle();
+    expect(_k('new-event-title'), findsOneWidget);
+  });
+
   testWidgets('a drag back along the row makes the same range', (t) async {
     final s = await _state(t);
     await _pump(t, s);
