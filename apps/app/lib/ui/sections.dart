@@ -275,6 +275,12 @@ class SpacesSection extends _Section {
             onPick();
             showNewSpaceDialog(context, state);
           }),
+          if (state.accountUser != null)
+            _item(
+              FLucideIcons.refreshCw,
+              'Refresh Spaces',
+              state.refreshSpaces,
+            ),
           if (state.currentSpaceId != null) ...[
             _item(FLucideIcons.pencil, 'Rename this Space…', () {
               onPick();
@@ -1066,7 +1072,6 @@ class AccountSection extends _Section {
           'Signed in as ${state.accountUser}',
           key: const Key('account-label'),
         ),
-        _item(FLucideIcons.refreshCw, 'Refresh Spaces', state.refreshSpaces),
         _item(FLucideIcons.logOut, 'Sign out', state.signOut),
       ],
       if (state.connected) ...[
