@@ -76,6 +76,20 @@ int firstWeekday(BuildContext context) {
       : DateTime.monday;
 }
 
+/// One item of a wide day cell's chip list: what to show, its kind and when
+/// it starts, so all-day items lead and the rest follow in start order.
+typedef _CellItem = ({String title, bool event, DateTime start, bool allDay});
+
+/// Chip order in a day cell: all-day items first, then by start time, an
+/// event before a task that starts at the same moment.
+int _byWhen(_CellItem a, _CellItem b) {
+  if (a.allDay != b.allDay) return a.allDay ? -1 : 1;
+  final byStart = a.start.compareTo(b.start);
+  if (byStart != 0) return byStart;
+  if (a.event != b.event) return a.event ? -1 : 1;
+  return 0;
+}
+
 /// The one calendar: a month grid and the selected day's items, with a way to
 /// add an event or a task on that day.
 ///
@@ -401,15 +415,22 @@ class _CalendarViewState extends State<CalendarView> {
         ),
       ),
     );
-    final items = <({String title, bool event})>[
+    final items = <_CellItem>[
       for (final o in bucket?.events ?? const <EventOccurrence>[])
-        (title: o.summary.isEmpty ? '(no title)' : o.summary, event: true),
+        (
+          title: o.summary.isEmpty ? '(no title)' : o.summary,
+          event: true,
+          start: o.start,
+          allDay: o.allDay,
+        ),
       for (final k in bucket?.tasks ?? const <TaskOccurrence>[])
         (
           title: k.task.summary.isEmpty ? '(no title)' : k.task.summary,
           event: false,
+          start: k.start,
+          allDay: k.allDay,
         ),
-    ];
+    ]..sort(_byWhen);
     Widget body;
     if (wide) {
       const cap = 3;
@@ -428,6 +449,8 @@ class _CalendarViewState extends State<CalendarView> {
                       key: Key('calendar-chip-$id-$i'),
                       title: item.title,
                       event: item.event,
+                      start: item.start,
+                      allDay: item.allDay,
                       muted: !inMonth,
                     ),
                   if (items.length > cap)
@@ -506,35 +529,74 @@ class _CalendarViewState extends State<CalendarView> {
     );
   }
 
-  /// One item in a wide day cell: a kind dot and the title, cut to the cell.
+  /// One item in a wide day cell: a small rounded chip whose left bar carries
+  /// the tone (an event's accent, a task's todo tone, with a hollow dot for a
+  /// task), a timed item's start time in muted text, then the truncated
+  /// title.
   Widget _chip({
     required Tokens t,
     required Key key,
     required String title,
     required bool event,
+    required DateTime start,
+    required bool allDay,
     required bool muted,
-  }) => Padding(
-    key: key,
-    padding: EdgeInsets.only(top: t.space.xxs),
-    child: Row(
-      children: [
-        StatusDot(
-          null,
-          color: event ? t.accent : t.statusTodo,
-          size: t.sizes.calendarDot,
-        ),
-        SizedBox(width: t.space.xxs),
-        Expanded(
-          child: Text(
-            title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: t.type.microStyle.copyWith(color: muted ? t.muted : t.fg),
+  }) {
+    final tone = event ? t.accent : t.statusTodo;
+    final small = t.type.microStyle.copyWith;
+    return Padding(
+      key: key,
+      padding: EdgeInsets.only(top: t.space.xxs),
+      child: SizedBox(
+        height: t.sizes.calendarChip,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(t.radii.small),
+          child: ColoredBox(
+            color: event ? t.eventTint : t.taskTint,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(
+                  width: t.sizes.calendarChipBar,
+                  child: ColoredBox(color: tone),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: t.space.xxs),
+                    child: Row(
+                      children: [
+                        if (!event) ...[
+                          StatusDot(
+                            null,
+                            color: tone,
+                            size: t.sizes.calendarDot,
+                            hollow: true,
+                          ),
+                          SizedBox(width: t.space.xxs),
+                        ],
+                        if (!allDay) ...[
+                          Text(timeLabel(start), style: small(color: t.muted)),
+                          SizedBox(width: t.space.xxs),
+                        ],
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: small(color: muted ? t.muted : t.fg),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ],
-    ),
-  );
+      ),
+    );
+  }
 
   /// The selected day: its items and the add buttons for that date.
   Widget _day(

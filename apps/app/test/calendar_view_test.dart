@@ -4,6 +4,7 @@ import 'package:davdart_app/data/note_source.dart';
 import 'package:davdart_app/state/app_state.dart';
 import 'package:davdart_app/theme/tokens.dart';
 import 'package:davdart_app/ui/calendar_view.dart';
+import 'package:davdart_app/ui/chips.dart';
 import 'package:davdart_app/ui/theme.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -267,6 +268,63 @@ void main() {
     expect(t.widget<Text>(_k('calendar-more-2026-11-20')).data, '+1 more');
     // No dots on the wide grid.
     expect(_k('calendar-dot-event-2026-11-20'), findsNothing);
+  });
+
+  testWidgets('chips lead with all-day items, then times; a task dot rings', (
+    t,
+  ) async {
+    // Bangkok is UTC+7: 02:00Z is 09:00 and 09:00Z is 16:00.
+    final s = await _state(
+      t,
+      events: [
+        _event('e1', 'All day ev', 20),
+        Event(
+          uid: 'e2',
+          summary: 'Early ev',
+          dtstart: const ICalDate('20261120T020000Z'),
+          dtend: const ICalDate('20261120T030000Z'),
+        ),
+        Event(
+          uid: 'e3',
+          summary: 'Late ev',
+          dtstart: const ICalDate('20261120T090000Z'),
+          dtend: const ICalDate('20261120T100000Z'),
+        ),
+      ],
+      tasks: [_task('t1', 'All day task', 20)],
+    );
+    await _pump(t, s);
+    Finder chip(int i) => _k('calendar-chip-2026-11-20-$i');
+    String first(int i) => t
+        .widget<Text>(
+          find.descendant(of: chip(i), matching: find.byType(Text)).first,
+        )
+        .data!;
+    // All-day items first (the event, then the task), then by start time.
+    expect(first(0), 'All day ev');
+    expect(first(1), 'All day task');
+    expect(first(2), '09:00');
+    expect(
+      find.descendant(of: chip(2), matching: find.text('Early ev')),
+      findsOneWidget,
+    );
+    expect(t.widget<Text>(_k('calendar-more-2026-11-20')).data, '+1 more');
+    // The task chip's mark is a hollow dot; the event chip carries none.
+    BoxDecoration mark(int i) =>
+        t
+                .widget<Container>(
+                  find
+                      .descendant(of: chip(i), matching: find.byType(Container))
+                      .first,
+                )
+                .decoration
+            as BoxDecoration;
+    expect(mark(1).color, isNull);
+    expect(mark(1).border, isNotNull);
+    expect(
+      find.descendant(of: chip(0), matching: find.byType(StatusDot)),
+      findsNothing,
+    );
   });
 
   testWidgets('narrow cells show a dot per kind', (t) async {
