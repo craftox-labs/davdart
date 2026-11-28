@@ -311,7 +311,7 @@ class _InlineTextState extends State<InlineText> {
         controller: widget.controller,
         focusNode: _focus,
         readOnly: !focused,
-        style: style.copyWith(color: _failed ? t.error : null),
+        style: style.copyWith(color: _failed ? t.error : t.fg),
         cursorColor: t.accent,
         backgroundCursorColor: t.muted,
         selectionColor: t.selectionFill,
