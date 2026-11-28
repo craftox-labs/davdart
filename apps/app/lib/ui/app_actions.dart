@@ -13,7 +13,7 @@ import '../state/tab_state.dart';
 import 'account_dialog.dart';
 import 'edit_note_dialog.dart';
 import 'event_menu.dart';
-import 'move_folder_dialog.dart';
+import 'property/property_dialog.dart';
 import 'move_space_dialog.dart';
 import 'new_folder_dialog.dart';
 import 'new_note_dialog.dart';
@@ -528,7 +528,9 @@ List<AppAction> buildActions(AppState state) {
       enabled: (s) => itemIs<Note>(s) && s.editable,
       run: (c) {
         final n = targetItem(c.state);
-        return n is Note ? showMoveFolderDialog(c.context, c.state, n) : null;
+        return n is Note
+            ? showMoveToParentDialog(c.context, c.state, n.uid)
+            : null;
       },
     ),
     AppAction(

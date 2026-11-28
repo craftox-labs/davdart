@@ -3908,6 +3908,7 @@ class AppState extends ChangeNotifier {
     bool allDay = false,
     String location = '',
     String? description,
+    String? parentUid,
     List<String> tags = const [],
     bool personal = false,
   }) async {
@@ -3931,9 +3932,9 @@ class AppState extends ChangeNotifier {
       description: description ?? '',
       location: location.trim(),
       categories: _plainTags(tags),
-      parentUid: personal
+      parentUid: personal && parentUid == null
           ? await ensurePersonalContainer()
-          : _parentOrScope(null),
+          : _parentOrScope(parentUid),
       dtstart: eventDate(first, allDay: allDay),
       dtend: last,
       created: now,

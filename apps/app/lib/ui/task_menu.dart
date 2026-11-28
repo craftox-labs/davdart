@@ -7,7 +7,18 @@ import '../state/app_state.dart';
 import '../state/tab_state.dart';
 import 'note_menu.dart';
 import 'parts.dart';
-import 'task_detail.dart' show priorityBucket, priorityOfBucket;
+import 'chips.dart' show StatusDot;
+import '../state/event_rules.dart' show dayLabel;
+import 'property/date_property_picker.dart';
+import 'property/draft_property_row.dart';
+import 'property/option_picker.dart';
+import 'property/parent_property_picker.dart'
+    show ParentPropertyPicker, projectValueFor;
+import 'property/property_defs.dart';
+import 'property/property_row.dart' show PropertySection;
+import 'property/tag_property_picker.dart';
+import 'property/property_dialog.dart';
+import 'property/property_menu.dart';
 import 'task_parts.dart';
 import 'theme.dart';
 
@@ -75,8 +86,6 @@ class TaskContextMenu extends StatelessWidget {
     final edit = state.tasksEditable;
     final blocked =
         !task.isClosed && state.taskCompletionBlockerFor(uid) != null;
-    void due(DateTime? day) =>
-        state.setTaskDue(uid, day == null ? null : dueOfDay(day, task.due));
     final manage = <NoteMenuItem>[
       if (edit && !blocked)
         NoteMenuItem(
@@ -86,89 +95,39 @@ class TaskContextMenu extends StatelessWidget {
           key: const Key('menu-task-toggle'),
         ),
       if (edit)
-        NoteMenuItem(
-          'Set status',
-          FLucideIcons.circleDot,
-          () {},
+        optionMenuItem<String>(
+          Props.status,
           key: const Key('menu-task-status'),
-          children: [
-            for (final s in const [
-              'backlog',
-              'todo',
-              'doing',
-              'blocked',
-              'review',
-              'done',
-              'canceled',
-            ])
-              NoteMenuItem(
-                s,
-                FLucideIcons.circleDot,
-                () => state.setTaskStatus(uid, s),
-                key: Key('menu-task-status-$s'),
-                selected: task.boardStatus == s,
-              ),
-          ],
+          optionPrefix: 'menu-task-status',
+          options: taskStatusOptions(),
+          value: task.boardStatus,
+          onPick: (v) => state.setTaskStatus(uid, v!),
         ),
       if (edit)
         NoteMenuItem(
-          'Set due',
-          FLucideIcons.calendar,
-          () {},
+          Props.due.setLabel,
+          Props.due.icon,
+          () => showTaskDueDialog(context, state, task),
           key: const Key('menu-task-due'),
-          children: [
-            NoteMenuItem(
-              'Today',
-              FLucideIcons.calendarCheck,
-              () => due(dayFromToday(0)),
-              key: const Key('menu-task-due-today'),
-            ),
-            NoteMenuItem(
-              'Tomorrow',
-              FLucideIcons.calendarPlus,
-              () => due(dayFromToday(1)),
-              key: const Key('menu-task-due-tomorrow'),
-            ),
-            NoteMenuItem(
-              'Next week',
-              FLucideIcons.calendarRange,
-              () => due(dayFromToday(7)),
-              key: const Key('menu-task-due-week'),
-            ),
-            NoteMenuItem('Pick a date…', FLucideIcons.calendar, () async {
-              final d = await showTaskDateDialog(
-                context,
-                initial: dueDate(task),
-              );
-              if (d != null) due(d);
-            }, key: const Key('menu-task-due-pick')),
-            if (task.due != null)
-              NoteMenuItem(
-                'Clear due date',
-                FLucideIcons.calendarX,
-                () => due(null),
-                key: const Key('menu-task-due-clear'),
-              ),
-          ],
+        ),
+      if (edit)
+        optionMenuItem<String>(
+          Props.priority,
+          key: const Key('menu-priority'),
+          optionPrefix: 'menu-priority',
+          options: priorityOptions<String>((b) => b),
+          value: priorityBucket(task.priority) == 'none'
+              ? null
+              : priorityBucket(task.priority),
+          noneLabel: Props.noPriority,
+          onPick: (v) => state.setTaskPriority(uid, priorityOfBucket(v)),
         ),
       if (edit)
         NoteMenuItem(
-          'Set priority',
-          FLucideIcons.flag,
-          () {},
-          key: const Key('menu-priority'),
-          children: [
-            for (final b in const ['none', 'high', 'medium', 'low'])
-              NoteMenuItem(
-                b == 'none'
-                    ? 'No priority'
-                    : b[0].toUpperCase() + b.substring(1),
-                b == 'none' ? FLucideIcons.circle : FLucideIcons.flag,
-                () => state.setTaskPriority(uid, priorityOfBucket(b)),
-                key: Key('menu-priority-$b'),
-                selected: priorityBucket(task.priority) == b,
-              ),
-          ],
+          Props.moveLabel,
+          Props.moveIcon,
+          () => showMoveToParentDialog(context, state, uid),
+          key: const Key('menu-move-folder'),
         ),
       if (edit && state.spaces.length > 1)
         NoteMenuItem(
@@ -277,38 +236,18 @@ Future<void> confirmDeleteTask(
   );
 }
 
-/// A small calendar dialog; resolves to the picked day (UTC midnight) or null.
-Future<DateTime?> showTaskDateDialog(
-  BuildContext context, {
-  DateTime? initial,
-}) {
-  return showAppDialog<DateTime>(
-    context,
-    title: 'Due date',
-    width: tokensOf(context).sizes.dialogLg,
-    content: Builder(
-      builder: (ctx) => FittedBox(
-        // The calendar needs its own width; narrow dialogs scale it down.
-        fit: BoxFit.scaleDown,
-        child: SizedBox(
-          width: tokensOf(ctx).sizes.dialogMd,
-          child: FCalendar.grid(
-            key: const Key('task-date-calendar'),
-            selectionControl: FDateSelectionControl.managedSingle(
-              initial: initial,
-              onChange: (d) {
-                if (d != null) {
-                  Navigator.of(ctx).pop(DateTime.utc(d.year, d.month, d.day));
-                }
-              },
-            ),
-          ),
-        ),
-      ),
-    ),
-    actions: [const CancelButton()],
-  );
-}
+/// The due date in the shared date picker's dialog.
+Future<void> showTaskDueDialog(
+  BuildContext context,
+  AppState state,
+  Task task,
+) => showDateDialog(
+  context,
+  def: Props.due,
+  value: task.due == null ? null : dueDate(task),
+  onPick: (d) =>
+      state.setTaskDue(task.uid, d == null ? null : dueOfDay(d, task.due)),
+);
 
 /// Moves a task (and the tasks under it) to another Space.
 Future<void> showMoveTaskDialog(
@@ -355,7 +294,9 @@ Future<void> showMoveTaskDialog(
   );
 }
 
-/// Asks for a title and adds a task under [parentUid] (a note or task).
+/// Asks for a title and adds a task under [parentUid] (a note or task). The
+/// properties are the shared rows and pickers of the task page (status,
+/// priority, due, start, labels, belongs to), applied once the task exists.
 Future<void> showNewTaskDialog(
   BuildContext context,
   AppState state, {
@@ -364,11 +305,29 @@ Future<void> showNewTaskDialog(
   bool personal = false,
 }) {
   final title = TextEditingController();
-  void submit(BuildContext ctx) {
+  var status = 'todo';
+  int? priority;
+  var dueDay = due?.localDay;
+  DateTime? startDay;
+  var tags = <String>[];
+  var parent = parentUid;
+  Future<void> submit(BuildContext ctx) async {
     final text = title.text;
     if (text.trim().isEmpty) return;
     Navigator.of(ctx).pop();
-    state.addTask(text, parentUid: parentUid, due: due, personal: personal);
+    final uid = await state.addTask(
+      text,
+      parentUid: parent,
+      due: dueDay == null ? null : dueOfDay(dueDay!, due),
+      priority: priority,
+      tags: tags,
+      personal: personal,
+    );
+    if (uid == null) return;
+    if (status != 'todo') {
+      await state.setTaskStatus(uid, status, undoable: false);
+    }
+    if (startDay != null) await state.setTaskStart(uid, dueOfDay(startDay!));
   }
 
   return showAppDialog(
@@ -376,12 +335,121 @@ Future<void> showNewTaskDialog(
     title: 'New task',
     width: tokensOf(context).sizes.dialog,
     content: Builder(
-      builder: (ctx) => field(
-        key: const Key('new-task-title'),
-        controller: title,
-        autofocus: true,
-        hint: 'Title',
-        onSubmit: (_) => submit(ctx),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, set) {
+          final t = tokensOf(ctx);
+          final now = DateTime.now();
+          Widget pickDate(
+            PropertyDef def,
+            DateTime? day,
+            void Function(DateTime?) put,
+          ) => DraftPropertyRow(
+            def: def,
+            text: day == null ? null : dayLabel(day, now),
+            picker: (_, control) => DatePropertyPicker(
+              id: 'new-${def.id}',
+              value: day,
+              onPick: (d) {
+                control.hide();
+                set(() => put(d));
+              },
+            ),
+          );
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: t.space.lg,
+            children: [
+              field(
+                key: const Key('new-task-title'),
+                controller: title,
+                autofocus: true,
+                hint: 'Title',
+                onSubmit: (_) => submit(ctx),
+              ),
+              PropertySection(
+                rows: [
+                  DraftPropertyRow(
+                    def: Props.status,
+                    value: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      spacing: t.space.sm,
+                      children: [
+                        StatusDot(status),
+                        Flexible(
+                          child: Text(
+                            statusWordOf(status),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: t.type.bodyStyle,
+                          ),
+                        ),
+                      ],
+                    ),
+                    picker: (_, control) => OptionPicker<String>(
+                      id: 'new-status',
+                      value: status,
+                      options: taskStatusOptions(),
+                      onPick: (v) {
+                        control.hide();
+                        if (v != null) set(() => status = v);
+                      },
+                    ),
+                  ),
+                  DraftPropertyRow(
+                    def: Props.priority,
+                    text: priorityBucket(priority) == 'none'
+                        ? null
+                        : priorityBucket(priority),
+                    picker: (_, control) => OptionPicker<int>(
+                      id: 'new-priority',
+                      value: priority,
+                      clearable: true,
+                      clearLabel: Props.noPriority,
+                      options: priorityOptions<int>(
+                        (b) => priorityOfBucket(b)!,
+                      ),
+                      onPick: (v) {
+                        control.hide();
+                        set(() => priority = v);
+                      },
+                    ),
+                  ),
+                  pickDate(Props.due, dueDay, (d) => dueDay = d),
+                  pickDate(Props.start, startDay, (d) => startDay = d),
+                  DraftPropertyRow(
+                    def: Props.labels,
+                    text: tags.isEmpty ? null : tags.join(', '),
+                    picker: (_, control) => TagPropertyPicker(
+                      id: 'new-tags',
+                      value: tags,
+                      suggestions: state.taskTags,
+                      onPick: (v) async {
+                        set(() => tags = v);
+                        return true;
+                      },
+                    ),
+                  ),
+                  DraftPropertyRow(
+                    def: Props.parent,
+                    text: projectValueFor(state, parent),
+                    picker: (_, control) => ParentPropertyPicker(
+                      id: 'new-parent',
+                      state: state,
+                      uid: '',
+                      currentParent: (parent,),
+                      onPick: (v) async {
+                        control.hide();
+                        set(() => parent = v);
+                        return true;
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
       ),
     ),
     actions: [

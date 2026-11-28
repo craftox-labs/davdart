@@ -9,6 +9,14 @@ import '../state/tab_state.dart';
 import 'event_when.dart';
 import 'note_menu.dart';
 import 'parts.dart';
+import 'property/draft_property_row.dart';
+import 'property/option_picker.dart';
+import 'property/parent_property_picker.dart'
+    show ParentPropertyPicker, projectValueFor;
+import 'property/property_defs.dart';
+import 'property/property_row.dart' show PropertySection;
+import 'property/tag_property_picker.dart';
+import 'property/property_dialog.dart';
 import 'theme.dart';
 
 /// Right-click (or long-press) menu for an event: open in peek or main, move
@@ -71,6 +79,13 @@ class EventContextMenu extends StatelessWidget {
 
     final edit = state.eventsEditable;
     final manage = <NoteMenuItem>[
+      if (edit)
+        NoteMenuItem(
+          Props.moveLabel,
+          Props.moveIcon,
+          () => showMoveToParentDialog(context, state, uid),
+          key: const Key('menu-move-folder'),
+        ),
       if (edit && state.spaces.length > 1)
         NoteMenuItem(
           'Move to Space…',
@@ -235,10 +250,20 @@ class _NewEventForm extends ChangeNotifier {
   final location = TextEditingController();
   bool allDay = false;
   DateTime start, end;
+  String status = '';
+  List<String> tags = [];
+  String? parent;
 
   DateTime _day(DateTime d) => DateTime.utc(d.year, d.month, d.day);
 
   bool get bad => end.isBefore(start);
+
+  void pick({String? status, List<String>? tags, (String?,)? parent}) {
+    if (status != null) this.status = status;
+    if (tags != null) this.tags = tags;
+    if (parent != null) this.parent = parent.$1;
+    notifyListeners();
+  }
 
   void setAllDay(bool v) {
     if (v == allDay) return;
@@ -306,8 +331,13 @@ Future<String?> showNewEventDialog(
       end: form.end,
       allDay: form.allDay,
       location: form.location.text,
+      parentUid: form.parent,
+      tags: form.tags,
       personal: personal,
     );
+    if (uid != null && form.status.isNotEmpty) {
+      await state.setEventStatus(uid, form.status);
+    }
     if (uid != null) nav.pop(uid);
   }
 
@@ -347,6 +377,53 @@ Future<String?> showNewEventDialog(
                 controller: form.location,
                 label: 'Location',
                 onSubmit: (_) => submit(ctx),
+              ),
+              PropertySection(
+                rows: [
+                  DraftPropertyRow(
+                    def: Props.status,
+                    text: form.status.isEmpty
+                        ? null
+                        : eventStatusName(form.status),
+                    picker: (_, control) => OptionPicker<String>(
+                      id: 'new-event-status',
+                      value: form.status,
+                      options: eventStatusOptions(),
+                      onPick: (v) {
+                        control.hide();
+                        if (v != null) form.pick(status: v);
+                      },
+                    ),
+                  ),
+                  DraftPropertyRow(
+                    def: Props.labels,
+                    text: form.tags.isEmpty ? null : form.tags.join(', '),
+                    picker: (_, control) => TagPropertyPicker(
+                      id: 'new-event-tags',
+                      value: form.tags,
+                      suggestions: state.eventTags,
+                      onPick: (v) async {
+                        form.pick(tags: v);
+                        return true;
+                      },
+                    ),
+                  ),
+                  DraftPropertyRow(
+                    def: Props.parent,
+                    text: projectValueFor(state, form.parent),
+                    picker: (_, control) => ParentPropertyPicker(
+                      id: 'new-event-parent',
+                      state: state,
+                      uid: '',
+                      currentParent: (form.parent,),
+                      onPick: (v) async {
+                        control.hide();
+                        form.pick(parent: (v,));
+                        return true;
+                      },
+                    ),
+                  ),
+                ],
               ),
             ],
           ),
